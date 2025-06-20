@@ -16,12 +16,12 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, opts: any) {
-          request.cookies.set({ name, value, ...opts })
-          response.cookies.set({ name, value, ...opts })
+          request.cookies.set(name, value, opts)
+          response.cookies.set(name, value, opts)
         },
         remove(name: string, opts: any) {
-          request.cookies.set({ name, value: '', ...opts })
-          response.cookies.set({ name, value: '', ...opts })
+          request.cookies.set(name, '', opts)
+          response.cookies.set(name, '', opts)
         },
       },
     }
