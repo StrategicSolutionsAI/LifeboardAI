@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Calendar, Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
+import { format, addDays } from "date-fns"
 
 interface Task {
   id: string
@@ -15,16 +16,18 @@ interface Task {
 }
 
 export function TaskColumn() {
-  const [currentDate] = useState(new Date(2023, 10, 13)) // November 13, 2023 to match design
+  const today = new Date()
+
+  const calendarDays = Array.from({ length: 7 }).map((_, i) => {
+    const d = addDays(today, i)
+    return {
+      date: d.getDate(),
+      day: format(d, 'EEE'),
+      active: i === 0,
+    }
+  })
   
-  const calendarDays = [
-    { date: 2, day: 'Thu' },
-    { date: 3, day: 'Fri' },
-    { date: 4, day: 'Sat', active: true },
-    { date: 5, day: 'Sun' },
-    { date: 6, day: 'Mon' },
-    { date: 7, day: 'Tue' },
-  ]
+
 
   const tasks = [
     {
@@ -88,7 +91,7 @@ export function TaskColumn() {
       {/* Calendar Widget */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">November 2023</h3>
+          <h3 className="font-semibold text-gray-900">{format(today, 'MMMM yyyy')}</h3>
           <div className="flex items-center space-x-2">
             <ChevronLeft className="w-4 h-4 text-gray-400" />
             <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -96,7 +99,7 @@ export function TaskColumn() {
         </div>
 
         {/* Calendar Days */}
-        <div className="grid grid-cols-6 gap-2 mb-4">
+        <div className="grid grid-cols-7 gap-2 mb-4">
           {calendarDays.map((day) => (
             <div 
               key={day.date}

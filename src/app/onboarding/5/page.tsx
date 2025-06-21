@@ -12,7 +12,12 @@ export default function OnboardingStep5() {
       data: { user },
     } = await supabase.auth.getUser()
     if (user) {
-      await supabase.from('profiles').upsert({ id: user.id, onboarded: true })
+      const { error } = await supabase.from('profiles').upsert({ id: user.id, onboarded: true })
+      if (error) {
+        console.error('Failed to mark onboarding complete:', error)
+        // Optionally show a toast or redirect with error query
+        return
+      }
     }
     router.push('/dashboard')
   }

@@ -1,0 +1,30 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getGoogleAuthUrl } from '@/lib/google/client';
+import { supabaseServer } from '@/utils/supabase/server';
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const redirectUrl = searchParams.get('redirectUrl') || '/onboarding/3';
+  
+  // Get user from Supabase
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=You must be logged in to connect Google Calendar`
+    );
+  }
+
+  // Create state parameter with redirect URL and user ID
+  const state = encodeURIComponent(JSON.stringify({
+    redirectUrl,
+    userId: user.id,
+  }));
+
+  // Get the authorization URL
+  const authUrl = getGoogleAuthUrl() + `&state=${state}`;
+  
+  // Redirect to Google's OAuth consent screen
+  return NextResponse.redirect(authUrl);
+}

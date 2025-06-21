@@ -3,12 +3,15 @@
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import Link from "next/link"
 
 interface OnboardingLayoutProps {
   step: number
   title: string
+  subtitle?: string
   description: string
   children: React.ReactNode
+  buttonText?: string
   onNext: () => void
   onBack?: () => void
   isLastStep?: boolean
@@ -17,8 +20,10 @@ interface OnboardingLayoutProps {
 export function OnboardingLayout({
   step,
   title,
+  subtitle,
   description,
   children,
+  buttonText,
   onNext,
   onBack,
   isLastStep = false
@@ -26,46 +31,40 @@ export function OnboardingLayout({
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl p-8">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-gray-500 mb-2">
-            <span>Step {step} of 5</span>
-            <span>{Math.round((step / 5) * 100)}% Complete</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(step / 5) * 100}%` }}
-            />
+    <div className="min-h-screen bg-[#F6F6FC] flex flex-col items-center">
+      {/* Navbar */}
+      <div className="w-full h-[84px] bg-white">
+        <div className="w-full h-full px-10 flex items-center">
+          <div className="flex items-center gap-0.5">
+            <span className="text-[#242849] text-[30px] font-medium">TaskBoard</span>
+            <span className="text-[#7482FE] text-[30px] font-medium">AI</span>
           </div>
         </div>
-
-        {/* Content */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{title}</h1>
-          <p className="text-gray-600 text-lg">{description}</p>
+      </div>
+      
+      {/* Content Area */}
+      <div className="w-full max-w-[500px] flex flex-col items-center gap-4 mt-[100px]">
+        {/* Header */}
+        <div className="w-full p-2.5 flex flex-col items-center">
+          <h1 className="text-[#242849] text-[30px] font-medium">{title}</h1>
+          {subtitle && <p className="text-[#171A1F] text-base font-normal">{subtitle}</p>}
         </div>
-
-        <div className="mb-8">
+        
+        {/* Main Content Card */}
+        <Card className="w-full p-8 bg-white rounded-lg shadow-sm border border-[#5271F8]">
           {children}
-        </div>
+        </Card>
 
-        {/* Navigation */}
-        <div className="flex justify-between">
-          <div>
-            {step > 1 && onBack && (
-              <Button variant="outline" onClick={onBack}>
-                Back
-              </Button>
-            )}
-          </div>
-          <Button onClick={onNext}>
-            {isLastStep ? "Finish & Go to Dashboard" : "Next"}
+        {/* Continue Button */}
+        <div className="w-full pt-12 flex justify-center">
+          <Button 
+            onClick={onNext} 
+            className="px-6 py-4 bg-gradient-to-r from-[#7482FE] to-[#909CFF] rounded-xl text-[#FFFEF7] uppercase font-bold text-base tracking-wider"
+          >
+            {isLastStep ? "finish & go to dashboard" : (buttonText?.toLowerCase() || "continue")}
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }
