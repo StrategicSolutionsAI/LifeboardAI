@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Fetch existing preferences
     const { data: existingPrefs, error: fetchError } = await supabase
       .from('user_preferences')
-      .select('life_buckets')
+      .select('*')
       .eq('user_id', user.id)
       .single();
 
@@ -25,19 +25,41 @@ export async function POST(request: NextRequest) {
     }
 
     const existingBuckets = existingPrefs?.life_buckets || [];
+    const existingWidgets = existingPrefs?.widgets_by_bucket || {};
+    
     const newBuckets = body.life_buckets || [];
+    const newWidgets = body.widgets_by_bucket || {};
 
     // Merge and deduplicate buckets
     const combinedBuckets = Array.from(new Set([...existingBuckets, ...newBuckets]));
+    
+    // Merge widgets - new widgets take precedence
+    const combinedWidgets = { ...existingWidgets, ...newWidgets };
+
+    // Prepare the update data
+    const updateData: any = {
+      user_id: user.id,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update fields that are provided in the request
+    if (body.life_buckets !== undefined) {
+      updateData.life_buckets = combinedBuckets;
+    }
+    if (body.widgets_by_bucket !== undefined) {
+      updateData.widgets_by_bucket = combinedWidgets;
+    }
+
+    // If neither field is provided, just use existing data
+    if (body.life_buckets === undefined && body.widgets_by_bucket === undefined) {
+      updateData.life_buckets = existingBuckets;
+      updateData.widgets_by_bucket = existingWidgets;
+    }
 
     // Now save the merged user preferences
     const { data, error } = await supabase
       .from('user_preferences')
-      .upsert({
-        user_id: user.id,
-        life_buckets: combinedBuckets,
-        updated_at: new Date().toISOString(),
-      }, {
+      .upsert(updateData, {
         onConflict: 'user_id',
       })
       .select()
@@ -75,7 +97,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data || { life_buckets: [] });
+    return NextResponse.json(data || { 
+      life_buckets: [], 
+      widgets_by_bucket: {} 
+    });
   } catch (error) {
     console.error('Error in get preferences endpoint:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

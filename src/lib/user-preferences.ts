@@ -25,12 +25,34 @@ export async function getUserPreferencesClient() {
       .single();
     
     if (error && error.code === 'PGRST116') {
-      // No rows found, return empty preferences
-      return {
+      // No rows found, create initial preferences
+      console.log('No preferences found, creating initial record...');
+      
+      const initialPrefs = {
         user_id: user.id,
         life_buckets: [],
-        widgets_by_bucket: {}
+        widgets_by_bucket: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
+      
+      const { data: newData, error: insertError } = await supabase
+        .from('user_preferences')
+        .insert(initialPrefs)
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error('Error creating initial preferences:', insertError);
+        return {
+          user_id: user.id,
+          life_buckets: [],
+          widgets_by_bucket: {}
+        };
+      }
+      
+      console.log('Created initial preferences record');
+      return newData;
     }
     
     if (error) {

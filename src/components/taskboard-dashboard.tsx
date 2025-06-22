@@ -199,10 +199,13 @@ export function TaskBoardDashboard() {
       
       if (prefs?.widgets_by_bucket && Object.keys(prefs.widgets_by_bucket).length > 0) {
         console.log('Loading widgets from Supabase:', prefs.widgets_by_bucket);
+        console.log('Current buckets available:', buckets);
         
         const supabaseWidgetsStr = JSON.stringify(prefs.widgets_by_bucket);
         const localWidgetsStr = JSON.stringify(localWidgets);
         const dataIsDifferent = supabaseWidgetsStr !== localWidgetsStr;
+        
+        console.log('Data is different:', dataIsDifferent);
         
         if (dataIsDifferent) {
           console.log('Supabase widgets differ from localStorage, updating state...');
@@ -212,6 +215,8 @@ export function TaskBoardDashboard() {
             localStorage.setItem('widgets_by_bucket', supabaseWidgetsStr);
             console.log('Updated localStorage with Supabase data');
           }
+        } else {
+          console.log('Supabase and localStorage widgets are the same');
         }
       } else if (loadedFromLocal && Object.keys(localWidgets).length > 0) {
         console.log('No widgets in Supabase but found in localStorage, saving to Supabase...');
@@ -221,10 +226,13 @@ export function TaskBoardDashboard() {
             widgets_by_bucket: localWidgets
           });
         }
+      } else {
+        console.log('No widgets found in either Supabase or localStorage');
       }
     } catch (err) {
       console.error('Failed to load widgets from preferences', err);
     } finally {
+        console.log('Widget load complete');
         setIsWidgetLoadComplete(true);
     }
   }
@@ -359,6 +367,11 @@ export function TaskBoardDashboard() {
     setSelectedDate(newDate);
   };
 
+  const clearLocalStorage = () => {
+    localStorage.removeItem("widgets_by_bucket");
+    localStorage.removeItem("life_buckets");
+  };
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -387,9 +400,9 @@ export function TaskBoardDashboard() {
         {/* Greeting */}
         <section className="mx-auto w-full max-w-7xl px-6 pt-6 sm:pt-10">
           <h2 className="text-base font-medium text-gray-800">
-            Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You’ve got this!</span>
+            Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
           </h2>
-
+          
           {/* Bucket tabs */}
           <div className="mt-6 flex items-end overflow-x-auto px-px">
             {buckets.length > 0 && buckets.map((b, idx) => (
@@ -507,8 +520,8 @@ export function TaskBoardDashboard() {
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
                     <div className="flex gap-1 text-gray-500">
-                      <button onClick={() => handleDateChange(addDays(date, -7))}>&lt;</button>
-                      <button onClick={() => handleDateChange(addDays(date, 7))}>&gt;</button>
+                      <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
+                      <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
@@ -527,9 +540,9 @@ export function TaskBoardDashboard() {
                 <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
                   <h3 className="mb-4 text-sm font-medium text-gray-900">{format(selectedDate, 'MMM d')} <span className="ml-1 text-xs text-indigo-400">{getDayOfWeek(selectedDate)}</span></h3>
                   <ul className="space-y-3 text-sm text-gray-800">
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1"/> <span>Create user flow</span></li>
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1"/> <span>Add a task +</span></li>
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1"/> <span>Connect Todoist</span></li>
+                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Create user flow"/> <span>Create user flow</span></li>
+                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Add a task"/> <span>Add a task +</span></li>
+                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Connect Todoist"/> <span>Connect Todoist</span></li>
                   </ul>
                 </div>
               </aside>
