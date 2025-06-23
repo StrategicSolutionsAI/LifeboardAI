@@ -10,9 +10,14 @@ export function supabaseServer() {
         getAll: async () =>
           cookies().getAll().map(({ name, value }) => ({ name, value })),
         setAll: async (all) => {
-          all.forEach(({ name, value, options }) => {
-            cookies().set(name, value, options)
-          })
+          try {
+            all.forEach(({ name, value, options }) => {
+              cookies().set(name, value, options)
+            })
+          } catch {
+            // Writing cookies isn't allowed in Server Components –
+            // this will be handled by middleware on the response instead.
+          }
         },
       },
     },

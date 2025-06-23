@@ -96,7 +96,7 @@ export function DashboardLayout() {
               Add a Widget
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[480px] sm:w-[540px]">
+          <SheetContent side="right" className="w-[520px] sm:w-[700px]">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Widget Library</SheetTitle>
               <SheetDescription>

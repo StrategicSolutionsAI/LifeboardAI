@@ -49,7 +49,10 @@ import {
   TrendingUp,
   Home as HomeIcon,
   Flag,
+  Plus,
   } from "lucide-react"
+import { WidgetPreview } from "./widget-preview"
+import type { WidgetInstance } from "@/types/widgets"
 
 export interface WidgetTemplate {
   id: string
@@ -60,6 +63,7 @@ export interface WidgetTemplate {
   color: string
   defaultTarget: number
   unit: string
+  units: string[]
 }
 
 const widgetTemplates: WidgetTemplate[] = [
@@ -71,7 +75,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "blue",
     defaultTarget: 8,
-    unit: "cups"
+    unit: "cups",
+    units: ["cups","ml","oz"]
   },
   {
     id: "calories",
@@ -81,7 +86,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "orange",
     defaultTarget: 2500,
-    unit: "cal"
+    unit: "cal",
+    units: ["cal"]
   },
   {
     id: "steps",
@@ -91,7 +97,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health", 
     color: "green",
     defaultTarget: 10000,
-    unit: "steps"
+    unit: "steps",
+    units: ["steps"]
   },
   {
     id: "weight",
@@ -101,7 +108,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "purple",
     defaultTarget: 150,
-    unit: "lbs"
+    unit: "lbs",
+    units: ["lbs","kg"]
   },
   {
     id: "heartrate",
@@ -111,7 +119,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "red",
     defaultTarget: 70,
-    unit: "bpm"
+    unit: "bpm",
+    units: ["bpm"]
   },
   {
     id: "sleep",
@@ -121,7 +130,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "indigo",
     defaultTarget: 8,
-    unit: "hours"
+    unit: "hours",
+    units: ["hours"]
   },
   {
     id: "exercise",
@@ -131,7 +141,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "green",
     defaultTarget: 30,
-    unit: "min"
+    unit: "min",
+    units: ["min"]
   },
   {
     id: "caffeine",
@@ -141,7 +152,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "health",
     color: "amber",
     defaultTarget: 2,
-    unit: "cups"
+    unit: "cups",
+    units: ["cups"]
   },
   {
     id: "mood",
@@ -151,7 +163,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "teal",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "journal",
@@ -161,7 +174,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "rose",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "meditation",
@@ -171,7 +185,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "cyan",
     defaultTarget: 10,
-    unit: "min"
+    unit: "min",
+    units: ["min"]
   },
   {
     id: "gratitude",
@@ -181,7 +196,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "yellow",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "breathwork",
@@ -191,7 +207,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "sky",
     defaultTarget: 5,
-    unit: "min"
+    unit: "min",
+    units: ["min"]
   },
   {
     id: "stretch",
@@ -201,7 +218,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "emerald",
     defaultTarget: 3,
-    unit: "breaks"
+    unit: "breaks",
+    units: ["breaks"]
   },
   {
     id: "affirmations",
@@ -211,7 +229,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "violet",
     defaultTarget: 1,
-    unit: "set"
+    unit: "set",
+    units: ["set"]
   },
   {
     id: "screen_time",
@@ -221,7 +240,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "amber",
     defaultTarget: 60,
-    unit: "min"
+    unit: "min",
+    units: ["min"]
   },
   {
     id: "stress",
@@ -231,7 +251,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "red",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "self_care",
@@ -241,7 +262,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "wellness",
     color: "lime",
     defaultTarget: 1,
-    unit: "list"
+    unit: "list",
+    units: ["list"]
   },
   {
     id: "doctor_appt",
@@ -251,7 +273,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "medical",
     color: "indigo",
     defaultTarget: 1,
-    unit: "event"
+    unit: "event",
+    units: ["event"]
   },
   {
     id: "medication",
@@ -261,7 +284,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "medical",
     color: "fuchsia",
     defaultTarget: 1,
-    unit: "dose"
+    unit: "dose",
+    units: ["dose"]
   },
   {
     id: "quit_habit",
@@ -271,7 +295,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "medical",
     color: "gray",
     defaultTarget: 1,
-    unit: "day"
+    unit: "day",
+    units: ["day"]
   },
   {
     id: "symptom_log",
@@ -281,7 +306,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "medical",
     color: "orange",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "medical_bills",
@@ -291,7 +317,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "medical",
     color: "slate",
     defaultTarget: 1,
-    unit: "bill"
+    unit: "bill",
+    units: ["bill"]
   },
   {
     id: "chores",
@@ -301,7 +328,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "household",
     color: "amber",
     defaultTarget: 1,
-    unit: "list"
+    unit: "list",
+    units: ["list"]
   },
   {
     id: "home_projects",
@@ -311,7 +339,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "household",
     color: "blue",
     defaultTarget: 1,
-    unit: "project"
+    unit: "project",
+    units: ["project"]
   },
   {
     id: "maintenance",
@@ -321,7 +350,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "household",
     color: "green",
     defaultTarget: 1,
-    unit: "task"
+    unit: "task",
+    units: ["task"]
   },
   {
     id: "cleaning",
@@ -331,7 +361,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "household",
     color: "purple",
     defaultTarget: 1,
-    unit: "task"
+    unit: "task",
+    units: ["task"]
   },
   {
     id: "family_members",
@@ -341,7 +372,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "indigo",
     defaultTarget: 1,
-    unit: "list"
+    unit: "list",
+    units: ["list"]
   },
   {
     id: "family_calendar",
@@ -351,7 +383,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "sky",
     defaultTarget: 1,
-    unit: "event"
+    unit: "event",
+    units: ["event"]
   },
   {
     id: "family_chores",
@@ -361,7 +394,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "green",
     defaultTarget: 1,
-    unit: "task"
+    unit: "task",
+    units: ["task"]
   },
   {
     id: "meal_plan",
@@ -371,7 +405,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "amber",
     defaultTarget: 1,
-    unit: "week"
+    unit: "week",
+    units: ["week"]
   },
   {
     id: "family_budget",
@@ -381,7 +416,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "violet",
     defaultTarget: 1,
-    unit: "budget"
+    unit: "budget",
+    units: ["budget"]
   },
   {
     id: "photo_carousel",
@@ -391,7 +427,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "rose",
     defaultTarget: 1,
-    unit: "photo"
+    unit: "photo",
+    units: ["photo"]
   },
   {
     id: "emergency_info",
@@ -401,7 +438,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "red",
     defaultTarget: 1,
-    unit: "entry"
+    unit: "entry",
+    units: ["entry"]
   },
   {
     id: "carpool",
@@ -411,7 +449,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "family",
     color: "cyan",
     defaultTarget: 1,
-    unit: "ride"
+    unit: "ride",
+    units: ["ride"]
   },
   {
     id: "birthdays",
@@ -421,7 +460,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "social",
     color: "rose",
     defaultTarget: 1,
-    unit: "birthday"
+    unit: "birthday",
+    units: ["birthday"]
   },
   {
     id: "social_events",
@@ -431,7 +471,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "social",
     color: "indigo",
     defaultTarget: 1,
-    unit: "event"
+    unit: "event",
+    units: ["event"]
   },
   {
     id: "holidays",
@@ -441,7 +482,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "social",
     color: "emerald",
     defaultTarget: 1,
-    unit: "holiday"
+    unit: "holiday",
+    units: ["holiday"]
   },
   {
     id: "work_projects",
@@ -451,7 +493,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "work",
     color: "blue",
     defaultTarget: 1,
-    unit: "project"
+    unit: "project",
+    units: ["project"]
   },
   {
     id: "work_deadlines",
@@ -461,7 +504,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "work",
     color: "orange",
     defaultTarget: 1,
-    unit: "deadline"
+    unit: "deadline",
+    units: ["deadline"]
   },
   {
     id: "pomodoro",
@@ -471,7 +515,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "work",
     color: "teal",
     defaultTarget: 1,
-    unit: "session"
+    unit: "session",
+    units: ["session"]
   },
   {
     id: "finance_budget",
@@ -481,7 +526,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "finance",
     color: "lime",
     defaultTarget: 1,
-    unit: "budget"
+    unit: "budget",
+    units: ["budget"]
   },
   {
     id: "savings_tracker",
@@ -491,7 +537,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "finance",
     color: "emerald",
     defaultTarget: 1,
-    unit: "amount"
+    unit: "amount",
+    units: ["amount"]
   },
   {
     id: "net_worth",
@@ -501,7 +548,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "finance",
     color: "violet",
     defaultTarget: 1,
-    unit: "amount"
+    unit: "amount",
+    units: ["amount"]
   },
   {
     id: "properties",
@@ -511,7 +559,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "finance",
     color: "amber",
     defaultTarget: 1,
-    unit: "property"
+    unit: "property",
+    units: ["property"]
   },
   {
     id: "financial_goals",
@@ -521,7 +570,8 @@ const widgetTemplates: WidgetTemplate[] = [
     category: "finance",
     color: "fuchsia",
     defaultTarget: 1,
-    unit: "goal"
+    unit: "goal",
+    units: ["goal"]
   }
 ]
 
@@ -552,9 +602,18 @@ const getColorClass = (color: string): string => {
   return colorMap[color] || "bg-gray-500" // Default to gray if color not found
 }
 
-interface WidgetLibraryProps { onAdd: (widget: WidgetTemplate) => void; bucket: string }
+const COLORS = [
+  "blue","green","red","orange","purple","indigo","amber","teal","rose","cyan","yellow","sky","emerald","violet","lime","fuchsia","gray","slate","stone"
+];
 
-export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
+const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+interface WidgetLibraryProps {
+  onAdd?: (widget: any) => void;
+  bucket?: string;
+}
+
+export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   // For now, we'll use a simple approach: let the user choose which category to view
@@ -601,6 +660,24 @@ export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
   
   // State for selected category (defaults to recommended based on bucket)
   const [selectedCategory, setSelectedCategory] = useState<string>(getRecommendedCategory(bucket));
+  const [selectedTemplate, setSelectedTemplate] = useState<WidgetTemplate | null>(null);
+  const [draftWidget, setDraftWidget] = useState<WidgetInstance | null>(null);
+  
+  // Whenever a new template is chosen initialise a draft instance
+  useEffect(() => {
+    if (selectedTemplate) {
+      setDraftWidget({
+        ...selectedTemplate,
+        instanceId: "draft",
+        target: selectedTemplate.defaultTarget,
+        schedule: [true, true, true, true, true, true, true],
+        color: selectedTemplate.color,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
+      setDraftWidget(null);
+    }
+  }, [selectedTemplate]);
   
   // Update selected category when bucket changes
   useEffect(() => {
@@ -626,107 +703,253 @@ export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
 
 
   return (
-    <div className="space-y-6 mt-6">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <input
-          type="text"
-          placeholder="Search widgets..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-        />
-      </div>
-      
-      {/* Category Filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-gray-700">Category:</span>
-        <div className="flex flex-wrap gap-1">
-          <button
-            className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
-              ? 'bg-indigo-100 text-indigo-700 font-medium' 
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            onClick={() => setSelectedCategory('all')}
-          >
-            All
-          </button>
-          {allCategories.map(category => (
+    <div className="flex gap-6 mt-6">
+      {/* Left: list & filters */}
+      <div className="flex-1 space-y-6">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search widgets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+        </div>
+        
+        {/* Category Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-gray-700">Category:</span>
+          <div className="flex flex-wrap gap-1">
             <button
-              key={category}
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
+              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
                 ? 'bg-indigo-100 text-indigo-700 font-medium' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} ${
-                  getRecommendedCategory(bucket) === category && selectedCategory !== category 
-                    ? 'ring-2 ring-indigo-300 ring-offset-1' 
-                    : ''
-                }`}
-              onClick={() => setSelectedCategory(category)}
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              onClick={() => setSelectedCategory('all')}
             >
-              {category.charAt(0).toUpperCase() + category.slice(1)}
-              {getRecommendedCategory(bucket) === category && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-              )}
+              All
             </button>
-          ))}
+            {allCategories.map(category => (
+              <button
+                key={category}
+                className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
+                  ? 'bg-indigo-100 text-indigo-700 font-medium' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} ${
+                    getRecommendedCategory(bucket) === category && selectedCategory !== category 
+                      ? 'ring-2 ring-indigo-300 ring-offset-1' 
+                      : ''
+                  }`}
+                onClick={() => setSelectedCategory(category)}
+              >
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+                {getRecommendedCategory(bucket) === category && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Show a hint if not viewing the recommended category */}
-      {selectedCategory !== getRecommendedCategory(bucket) && selectedCategory !== 'all' && (
-        <div className="text-sm text-gray-500 flex items-center gap-2">
-          <span className="inline-block w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-          <span>Tip: Try the <button 
-            onClick={() => setSelectedCategory(getRecommendedCategory(bucket))} 
-            className="text-indigo-600 hover:underline font-medium"
-          >
-            {getRecommendedCategory(bucket).charAt(0).toUpperCase() + getRecommendedCategory(bucket).slice(1)}
-          </button> category for widgets that match your "{bucket}" bucket</span>
+        {/* Show a hint if not viewing the recommended category */}
+        {selectedCategory !== getRecommendedCategory(bucket) && selectedCategory !== 'all' && (
+          <div className="text-sm text-gray-500 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+            <span>Tip: Try the <button 
+              onClick={() => setSelectedCategory(getRecommendedCategory(bucket))} 
+              className="text-indigo-600 hover:underline font-medium"
+            >
+              {getRecommendedCategory(bucket).charAt(0).toUpperCase() + getRecommendedCategory(bucket).slice(1)}
+            </button> category for widgets that match your "{bucket}" bucket</span>
+          </div>
+        )}
+
+        {/* Widget Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
+          {filteredWidgets.map((widget) => {
+            const Icon = widget.icon
+            return (
+              <Card key={widget.id} className={`hover:shadow-md transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-indigo-400' : ''}`} onClick={() => setSelectedTemplate(widget)}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClass(widget.color)}`}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-sm font-medium">{widget.name}</CardTitle>
+                      <p className="text-xs text-gray-500 mt-1">{widget.description}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-500">
+                      Target: {widget.defaultTarget} {widget.unit}
+                    </div>
+                    <Button 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAdd(widget);
+                      }}
+                      className="text-xs px-3 py-1"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
-      )}
 
-      {/* Widget Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
-        {filteredWidgets.map((widget) => {
-          const Icon = widget.icon
-          return (
-            <Card key={widget.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClass(widget.color)}`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm font-medium">{widget.name}</CardTitle>
-                    <p className="text-xs text-gray-500 mt-1">{widget.description}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-500">
-                    Target: {widget.defaultTarget} {widget.unit}
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => onAdd(widget)}
-                    className="text-xs px-3 py-1"
+        {filteredWidgets.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>No widgets found matching your criteria</p>
+          </div>
+        )}
+      </div> {/* end left column */}
+
+      {/* Right: live preview & config */}
+      <div className="w-72 shrink-0 space-y-4">
+        <h4 className="text-sm font-semibold text-gray-700">Preview</h4>
+        {draftWidget ? (
+          <>
+            <WidgetPreview widget={draftWidget} />
+
+            {/* Target input */}
+            <div className="pt-4 space-y-2 border-t">
+              <p className="text-xs font-medium text-gray-600">Daily target</p>
+              <div className="flex items-center gap-2">
+                <button
+                  aria-label="Decrease target"
+                  className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, target: Math.max(0, prev.target - 1) } : prev
+                    )
+                  }
+                >
+                  –
+                </button>
+                <input
+                  type="number"
+                  value={draftWidget.target}
+                  onChange={(e) =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, target: Number(e.target.value) } : prev
+                    )
+                  }
+                  className="w-16 text-center border rounded"
+                  aria-label="Target value"
+                />
+                <span className="text-sm text-gray-600">{draftWidget.unit}</span>
+                <button
+                  aria-label="Increase target"
+                  className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, target: prev.target + 1 } : prev
+                    )
+                  }
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Color picker */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">Colour</p>
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((clr) => (
+                  <button
+                    key={clr}
+                    aria-label={clr}
+                    className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-indigo-500' : 'border-white'}`}
+                    onClick={() =>
+                      setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Schedule picker */}
+            <div className="space-y-2 pt-4 border-t">
+              <p className="text-xs font-medium text-gray-600">Schedule</p>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((d, idx) => (
+                  <button
+                    key={d}
+                    aria-label={d}
+                    className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-indigo-500 text-white' : 'bg-white text-gray-600'} hover:bg-indigo-100`}
+                    onClick={() =>
+                      setDraftWidget((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              schedule: prev.schedule.map((v, i) =>
+                                i === idx ? !v : v
+                              ) as boolean[],
+                            }
+                          : prev
+                      )
+                    }
                   >
-                    Add
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                    {d.charAt(0)}
+                  </button>
+                ))}
+              </div>
+              {/* Presets */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, schedule: [true, true, true, true, true, true, true] } : prev
+                    )
+                  }
+                >Every day</button>
+                <button
+                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, schedule: [false, true, true, true, true, true, false] } : prev
+                    )
+                  }
+                >Weekdays</button>
+                <button
+                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() =>
+                    setDraftWidget((prev) =>
+                      prev ? { ...prev, schedule: [true, false, true, false, true, false, true] } : prev
+                    )
+                  }
+                >Alternate</button>
+              </div>
+            </div>
 
-      {filteredWidgets.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p>No widgets found matching your criteria</p>
-        </div>
-      )}
+            <button
+              className="w-full mt-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+              onClick={() => {
+                if (!draftWidget) return;
+                const instance: WidgetInstance = {
+                  ...draftWidget,
+                  instanceId: `widget-${Date.now()}`,
+                  createdAt: new Date().toISOString(),
+                };
+                onAdd(instance);
+              }}
+            >
+              Add Widget
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-gray-500">Select a widget to see a preview</p>
+        )}
+      </div>
     </div>
   )
 }

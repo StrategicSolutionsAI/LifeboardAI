@@ -117,7 +117,7 @@ export function HealthWidgets() {
               <span className="text-sm font-medium text-gray-900">4,783</span>
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             </div>
-            <select className="text-sm text-gray-600 border-none bg-transparent">
+            <select aria-label="Time range" className="text-sm text-gray-600 border-none bg-transparent">
               <option>Yearly</option>
               <option>Monthly</option>
               <option>Weekly</option>
@@ -249,7 +249,7 @@ export function HealthWidgets() {
             </CardContent>
           </Card>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px]">
+        <SheetContent className="w-[520px] sm:w-[700px]">
           <SheetHeader>
             <SheetTitle>Widget Library</SheetTitle>
             <SheetDescription>

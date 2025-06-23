@@ -51,7 +51,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { WidgetLibrary, WidgetTemplate } from "./widget-library";
+import { WidgetLibrary } from "./widget-library";
+import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -129,7 +130,7 @@ export function TaskBoardDashboard() {
   const [newBucket, setNewBucket] = useState("");
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetTemplate[]>>({});
+  const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
   const [date, setDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
@@ -139,7 +140,7 @@ export function TaskBoardDashboard() {
   widgetsByBucketRef.current = widgetsByBucket;
 
   // Centralized function to save widgets, including to localStorage
-  const saveWidgets = async (widgetsToSave: Record<string, WidgetTemplate[]>) => {
+  const saveWidgets = async (widgetsToSave: Record<string, WidgetInstance[]>) => {
     // Always fetch the current user from Supabase to avoid race conditions
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
@@ -562,10 +563,10 @@ export function TaskBoardDashboard() {
   // Clean up debug widgets from all buckets
   const cleanupDebugWidgets = async () => {
     console.log('Cleaning up debug widgets...');
-    const cleaned: Record<string, WidgetTemplate[]> = {};
+    const cleaned: Record<string, WidgetInstance[]> = {};
     
     Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
-      cleaned[bucket] = widgets.filter(w => !w.id.startsWith('debug-'));
+      cleaned[bucket] = widgets.filter(w => !w.instanceId?.startsWith('debug-'));
     });
     
     setWidgetsByBucket(cleaned);
@@ -576,7 +577,7 @@ export function TaskBoardDashboard() {
   // Filter out debug widgets when displaying
   const getDisplayWidgets = (bucket: string) => {
     const widgets = widgetsByBucket[bucket] ?? [];
-    return widgets.filter(w => !w.id.startsWith('debug-'));
+    return widgets.filter(w => !w.instanceId?.startsWith('debug-'));
   };
 
   return (
@@ -596,7 +597,7 @@ export function TaskBoardDashboard() {
           <div className="flex items-center gap-4">
             {/* Temporary cleanup button - remove after use */}
             {Object.values(widgetsByBucket).some(widgets => 
-              widgets.some(w => w.id.startsWith('debug-'))
+              widgets.some(w => w.instanceId?.startsWith('debug-'))
             ) && (
               <button 
                 onClick={cleanupDebugWidgets}
@@ -698,14 +699,14 @@ export function TaskBoardDashboard() {
               {/* Widgets grid */}
               <div className="flex flex-wrap gap-4">
                 {getDisplayWidgets(activeBucket).map((w) => (
-                  <div key={w.id} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group">
+                  <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group">
                     <button
                       onClick={() => {
-                        console.log('Deleting widget:', w.id);
+                        console.log('Deleting widget:', w.instanceId);
                         // Use callback pattern to ensure we're working with the latest state
                         setWidgetsByBucket(prevWidgets => {
                           const updatedWidgets = { ...prevWidgets };
-                          updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.id !== w.id);
+                          updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
                           
                           console.log('Widget deleted from bucket:', activeBucket);
                           console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
@@ -805,151 +806,57 @@ export function TaskBoardDashboard() {
                   </div>
                   <div className="grid grid-cols-7 gap-1 text-center text-xs">
                     {getDaysArray().map((day, idx) => (
-                      <span key={idx} className={`py-1 ${isSameDay(day, selectedDate) ? 'rounded bg-indigo-500 text-white' : ''}`}>
-                        {day.getDate()}
+                      <span
+                        key={idx}
+                        className={`py-1 ${isSameDay(day, selectedDate) ? 'rounded bg-indigo-500 text-white' : ''}`}
+                      >
+                        {format(day, 'd')}
                       </span>
                     ))}
                   </div>
                 </div>
-
-                {/* Todo list */}
-                <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
-                  <h3 className="mb-4 text-sm font-medium text-gray-900">{format(selectedDate, 'MMM d')} <span className="ml-1 text-xs text-indigo-400">{getDayOfWeek(selectedDate)}</span></h3>
-                  <ul className="space-y-3 text-sm text-gray-800">
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Create user flow"/> <span>Create user flow</span></li>
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Add a task"/> <span>Add a task +</span></li>
-                    <li className="flex items-start gap-2"><input type="checkbox" className="mt-1" aria-label="Connect Todoist"/> <span>Connect Todoist</span></li>
-                  </ul>
-                </div>
               </aside>
-            </div>
-            </div>
-          </div>
 
-        {/* Chat bar */}
-        <footer className="sticky bottom-4 z-10 mx-auto w-full max-w-7xl px-6">
-          <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-indigo-500 p-1.5 text-white">
-                <Search className="h-5 w-5" />
-              </div>
-              <span className="text-sm text-gray-500">Ask me anything</span>
-            </div>
-            <div className="flex items-center gap-4 text-indigo-500">
-              <Plus className="h-5 w-5" />
-              <MessageSquare className="h-5 w-5" />
-            </div>
-          </div>
-        </footer>
+              {/* Widget Library side sheet */}
+              <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
+                <SheetContent side="right" className="w-[520px] sm:w-[700px]">
+                  <SheetHeader>
+                    <SheetTitle>Add a new widget</SheetTitle>
+                  </SheetHeader>
+                  <WidgetLibrary
+                    bucket={activeBucket}
+                    onAdd={(template: WidgetTemplate) => {
+                      const newInstance: WidgetInstance = {
+                        ...template,
+                        instanceId: `widget-${Date.now()}`,
+                        createdAt: new Date().toISOString(),
+                        schedule: [true, true, true, true, true, true, true],
+                        target: template.defaultTarget ?? 0,
+                        color: template.color ?? '#ffffff',
+                        dataSource: template.dataSource,
+                      };
 
-      {/* Bucket editor modal */}
-      {isEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="mb-4 text-lg font-semibold text-gray-800">Edit Buckets</h3>
-            <div className="mb-4 flex flex-wrap gap-2 max-h-48 overflow-y-auto">
-              {buckets.map((b) => (
-                <div key={b} className="flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-sm">
-                  <span>{b}</span>
-                  <button
-                    onClick={() => handleRemoveBucket(b)}
-                    className="text-gray-400 hover:text-red-500"
-                    title="Remove"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mb-4 flex gap-2">
-              <input
-                type="text"
-                value={newBucket}
-                onChange={(e) => setNewBucket(e.target.value)}
-                placeholder="New bucket name"
-                className="flex-1 rounded border px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              <button
-                onClick={handleAddBucket}
-                className="rounded bg-indigo-500 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-600"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setIsEditorOpen(false)}
-                className="rounded bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
-              >
-                Close
-              </button>
+                      setWidgetsByBucket((prev) => {
+                        const updated = {
+                          ...prev,
+                          [activeBucket]: [...(prev[activeBucket] ?? []), newInstance],
+                        };
+                        widgetsByBucketRef.current = updated;
+                        return updated;
+                      });
+
+                      // Trigger a debounced save
+                      debouncedSaveToSupabase();
+                      setIsWidgetSheetOpen(false);
+                    }}
+                  />
+                </SheetContent>
+              </Sheet>
+
             </div>
           </div>
         </div>
-      )}
-
-      {/* Widget Library Sheet */}
-      <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-        <SheetContent side="right" className="w-[480px] sm:w-[540px]">
-          <SheetHeader>
-            <SheetTitle className="text-indigo-950">Widget Library</SheetTitle>
-          </SheetHeader>
-          <div className="mt-6">
-            <WidgetLibrary bucket={activeBucket} onAdd={(w) => {
-              console.log('Adding widget to bucket:', activeBucket, 'widget:', w);
-              
-              // Create a unique instance of the widget with a timestamp-based ID
-              const widgetInstance = {
-                ...w,
-                id: `${w.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                addedAt: new Date().toISOString(),
-                // Store the icon name as a string
-                icon: (() => {
-                  // If it's already a string, use it
-                  if (typeof w.icon === 'string') return w.icon;
-                  
-                  // If it's a function (React component), get its name
-                  if (typeof w.icon === 'function' && w.icon.name) {
-                    return w.icon.name;
-                  }
-                  
-                  // Try to find the icon in our map by comparing references
-                  for (const [name, component] of Object.entries(iconMap)) {
-                    if (component === w.icon) {
-                      return name;
-                    }
-                  }
-                  
-                  // Default fallback
-                  return 'Heart';
-                })()
-              };
-              
-              console.log('Widget instance created:', widgetInstance);
-              
-              // Use callback pattern to ensure we're working with the latest state
-              setWidgetsByBucket(prevWidgets => {
-                const updatedWidgets = { ...prevWidgets };
-                const list = updatedWidgets[activeBucket] ?? [];
-                updatedWidgets[activeBucket] = [...list, widgetInstance];
-                
-                console.log('Updated widgets state:', updatedWidgets);
-                
-                // Also update the ref immediately
-                widgetsByBucketRef.current = updatedWidgets;
-                
-                return updatedWidgets;
-              });
-              
-              // Close the widget sheet
-              setIsWidgetSheetOpen(false);
-            }} />
-          </div>
-        </SheetContent>
-      </Sheet>
       </div>
     </div>
   );
 }
-
-

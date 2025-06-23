@@ -15,14 +15,22 @@ export async function updateSession(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value
         },
+        // The `set` and `remove` helpers accept an `opts` bag for expiry, path, etc.
+        // The `cookies.set()` typings currently only allow 2 params, so we suppress here.
+        /* eslint-disable @typescript-eslint/ban-ts-comment */
         set(name: string, value: string, opts: any) {
+          // @ts-ignore – third param opts is supported at runtime
           request.cookies.set(name, value, opts)
+          // @ts-ignore
           response.cookies.set(name, value, opts)
         },
         remove(name: string, opts: any) {
+          // @ts-ignore
           request.cookies.set(name, '', opts)
+          // @ts-ignore
           response.cookies.set(name, '', opts)
         },
+        /* eslint-enable @typescript-eslint/ban-ts-comment */
       },
     }
   )

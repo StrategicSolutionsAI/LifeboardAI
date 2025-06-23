@@ -109,7 +109,7 @@ export function DynamicBucketTabs({
                         </CardContent>
                       </Card>
                     </SheetTrigger>
-                    <SheetContent className="w-[400px] sm:w-[540px]">
+                    <SheetContent className="w-[520px] sm:w-[700px]">
                       <SheetHeader>
                         <SheetTitle>Widget Library</SheetTitle>
                         <SheetDescription>

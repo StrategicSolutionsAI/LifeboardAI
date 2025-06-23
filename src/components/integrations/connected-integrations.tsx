@@ -6,7 +6,7 @@ import { CalendarEvents } from "./calendar-events";
 import { GoogleCalendarStatus } from "./google-calendar-status";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw } from "lucide-react";
-import { supabaseClient } from "@/utils/supabase/client";
+import { supabase } from "@/utils/supabase/client";
 
 interface ConnectedIntegrationsProps {
   className?: string;
@@ -21,7 +21,6 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
     async function getUserAndIntegrations() {
       try {
         setIsLoading(true);
-        const supabase = supabaseClient();
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
