@@ -1,5 +1,5 @@
-import { DashboardLayout } from "@/components/dashboard-layout"
+import { TaskBoardDashboard } from "@/components/taskboard-dashboard"
 
 export default function Dashboard() {
-  return <DashboardLayout />
+  return <TaskBoardDashboard />
 }

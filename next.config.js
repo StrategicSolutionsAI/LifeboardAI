@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   images: {
-    domains: ['placekitten.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placekitten.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
 }
 

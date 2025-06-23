@@ -3,61 +3,74 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { OnboardingLayout } from "@/components/onboarding-layout"
+import { cn } from "@/lib/utils"
 
-const goals = [
-  "Improve physical health",
-  "Better mental wellness",
-  "Increase productivity",
-  "Build better habits",
-  "Track life metrics",
-  "Achieve work-life balance"
+const lifeBuckets = [
+  "Health",
+  "Wellness",
+  "Medical",
+  "Household",
+  "Family",
+  "Social",
+  "Work",
+  "Finance",
+  "Education",
+  "Hobbies",
+  "Travel",
+  "Meals"
 ]
 
 export default function OnboardingStep1() {
   const router = useRouter()
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([])
+  const [selectedBuckets, setSelectedBuckets] = useState<string[]>([])
 
-  const toggleGoal = (goal: string) => {
-    setSelectedGoals(prev => 
-      prev.includes(goal) 
-        ? prev.filter(g => g !== goal)
-        : [...prev, goal]
+  const toggleBucket = (bucket: string) => {
+    setSelectedBuckets(prev => 
+      prev.includes(bucket) 
+        ? prev.filter(b => b !== bucket)
+        : [...prev, bucket]
     )
   }
 
-  const handleNext = () => {
-    // Store selected goals (in real app, save to user profile)
-    router.push("/onboarding/2")
+  const handleContinue = () => {
+    // Store selected buckets in localStorage to be picked up by the next step
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets', JSON.stringify(selectedBuckets));
+    }
+    router.push("/onboarding/2");
   }
 
   return (
     <OnboardingLayout
       step={1}
-      title="What are your main goals?"
-      description="Select the areas where you'd like Lifeboard.ai to help you improve."
-      onNext={handleNext}
+      title="Welcome to Onboarding!"
+      subtitle="Let's get your account set up"
+      description=""
+      buttonText="CONTINUE"
+      onNext={handleContinue}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {goals.map((goal) => (
-          <button
-            key={goal}
-            onClick={() => toggleGoal(goal)}
-            className={`p-4 rounded-lg border-2 text-left transition-all ${
-              selectedGoals.includes(goal)
-                ? "border-indigo-500 bg-indigo-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-full border-2 mr-3 ${
-                selectedGoals.includes(goal)
-                  ? "bg-indigo-500 border-indigo-500"
-                  : "border-gray-300"
-              }`} />
-              <span className="font-medium">{goal}</span>
-            </div>
-          </button>
-        ))}
+      <div className="w-full flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <h2 className="text-[18px] font-medium text-[#171A1F]">Pick your life buckets</h2>
+          <p className="text-[14px] text-[#565E6C]">Select categories for your AI Taskboard</p>
+        </div>
+        
+        <div className="flex flex-wrap gap-1.5">
+          {lifeBuckets.map((bucket) => (
+            <button
+              key={bucket}
+              onClick={() => toggleBucket(bucket)}
+              className={cn(
+                "py-3.5 px-3 rounded transition-all",
+                selectedBuckets.includes(bucket)
+                  ? "bg-[#EEF0FF] text-[#5271F8]"
+                  : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]"
+              )}
+            >
+              <span className="text-xs font-medium">{bucket}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </OnboardingLayout>
   )

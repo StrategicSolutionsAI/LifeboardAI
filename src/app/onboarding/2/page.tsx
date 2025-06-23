@@ -1,31 +1,112 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, FormEvent, KeyboardEvent, ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import { OnboardingLayout } from "@/components/onboarding-layout"
+import { PlusCircle, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
+import { saveUserPreferences } from "@/lib/user-preferences"
+import { supabase } from "@/utils/supabase/client"
 
-const healthMetrics = [
-  { id: "weight", name: "Weight", icon: "⚖️" },
-  { id: "sleep", name: "Sleep Hours", icon: "😴" },
-  { id: "steps", name: "Daily Steps", icon: "👟" },
-  { id: "water", name: "Water Intake", icon: "💧" },
-  { id: "exercise", name: "Exercise Minutes", icon: "💪" },
-  { id: "mood", name: "Mood Rating", icon: "😊" }
+// Some suggested custom buckets to help users get started
+const suggestedBuckets = [
+  "Travel",
+  "Learning",
+  "Side Projects",
+  "Pets",
+  "Home",
+  "Volunteering"
 ]
 
 export default function OnboardingStep2() {
   const router = useRouter()
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([])
+  const [selectedBuckets, setSelectedBuckets] = useState<string[]>([])
+  const [customBuckets, setCustomBuckets] = useState<string[]>([])
+  const [newBucketInput, setNewBucketInput] = useState<string>('')
 
-  const toggleMetric = (metricId: string) => {
-    setSelectedMetrics(prev => 
-      prev.includes(metricId) 
-        ? prev.filter(m => m !== metricId)
-        : [...prev, metricId]
+  useEffect(() => {
+    // Load buckets from step 1
+    if (typeof window !== 'undefined') {
+      const storedBuckets = localStorage.getItem('life_buckets');
+      if (storedBuckets) {
+        try {
+          const bucketsFromStep1 = JSON.parse(storedBuckets);
+          if (Array.isArray(bucketsFromStep1)) {
+            setSelectedBuckets(bucketsFromStep1);
+          }
+        } catch (e) {
+          console.error("Failed to parse life_buckets from localStorage", e);
+        }
+      }
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  const toggleBucket = (bucket: string) => {
+    setSelectedBuckets(prev => 
+      prev.includes(bucket) 
+        ? prev.filter(b => b !== bucket)
+        : [...prev, bucket]
     )
   }
 
-  const handleNext = () => {
+  const addCustomBucket = () => {
+    const trimmedInput = newBucketInput.trim()
+    if (trimmedInput && !customBuckets.includes(trimmedInput)) {
+      setCustomBuckets(prev => [...prev, trimmedInput])
+      setSelectedBuckets(prev => [...prev, trimmedInput])
+      setNewBucketInput('')
+    }
+  }
+
+  const handleInputSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    addCustomBucket()
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addCustomBucket()
+    }
+  }
+
+  const handleContinue = async () => {
+    try {
+      // Save selected buckets to user preferences
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        // First attempt direct API save
+        const response = await fetch('/api/user/preferences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            life_buckets: selectedBuckets,
+          }),
+        })
+
+        if (response.ok) {
+          const savedPrefs = await response.json();
+          if (savedPrefs && savedPrefs.life_buckets) {
+            localStorage.setItem('life_buckets', JSON.stringify(savedPrefs.life_buckets));
+          }
+        } else {
+          console.error('API save failed. You may be offline.');
+          // Fallback for offline: merge with existing localStorage
+          const existingBuckets = JSON.parse(localStorage.getItem('life_buckets') || '[]');
+          const combined = Array.from(new Set([...existingBuckets, ...selectedBuckets]));
+          localStorage.setItem('life_buckets', JSON.stringify(combined));
+        }
+      }
+    } catch (error) {
+      console.error('Error saving user preferences:', error)
+    }
+
+    // Continue to next step regardless of save status
     router.push("/onboarding/3")
   }
 
@@ -36,35 +117,80 @@ export default function OnboardingStep2() {
   return (
     <OnboardingLayout
       step={2}
-      title="What would you like to track?"
-      description="Choose the health and wellness metrics you want to monitor daily."
-      onNext={handleNext}
+      title="Customize Your Buckets"
+      subtitle="Add your own custom categories"
+      description=""
+      buttonText="CONTINUE"
+      onNext={handleContinue}
       onBack={handleBack}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {healthMetrics.map((metric) => (
-          <button
-            key={metric.id}
-            onClick={() => toggleMetric(metric.id)}
-            className={`p-4 rounded-lg border-2 text-left transition-all ${
-              selectedMetrics.includes(metric.id)
-                ? "border-indigo-500 bg-indigo-50"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
+      <div className="w-full flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <h2 className="text-[18px] font-medium text-[#171A1F]">Add custom life buckets</h2>
+          <p className="text-[14px] text-[#565E6C]">Create your own categories for better organization</p>
+        </div>
+        
+        <form onSubmit={handleInputSubmit} className="flex gap-2">
+          <Input
+            type="text"
+            placeholder="Enter custom bucket name"
+            value={newBucketInput}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setNewBucketInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 border-[#E5E7EB] focus-visible:ring-[#5271F8] rounded"
+          />
+          <Button 
+            onClick={addCustomBucket} 
+            type="button"
+            className="bg-[#5271F8] hover:bg-[#4060E8] text-white"
           >
-            <div className="flex items-center">
-              <span className="text-2xl mr-3">{metric.icon}</span>
-              <div>
-                <div className="font-medium">{metric.name}</div>
-              </div>
-              <div className={`ml-auto w-4 h-4 rounded-full border-2 ${
-                selectedMetrics.includes(metric.id)
-                  ? "bg-indigo-500 border-indigo-500"
-                  : "border-gray-300"
-              }`} />
-            </div>
-          </button>
-        ))}
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add
+          </Button>
+        </form>
+        
+        {/* Selected buckets section */}
+        <div className="flex flex-col gap-2">  
+          <h3 className="text-[16px] font-medium text-[#171A1F]">Your selected buckets</h3>
+          
+          <div className="flex flex-wrap gap-1.5">
+            {selectedBuckets.length > 0 ? (
+              selectedBuckets.map((bucket) => (
+                <div 
+                  key={bucket} 
+                  className="py-3.5 px-3 bg-[#EEF0FF] text-[#5271F8] rounded"
+                  onClick={() => toggleBucket(bucket)}
+                >
+                  <span className="text-xs font-medium">{bucket}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-[14px] text-[#6B7280] italic">No buckets selected yet</p>
+            )}
+          </div>
+        </div>
+        
+        {/* Suggestions section */}
+        <div className="flex flex-col gap-2 mt-2">
+          <h3 className="text-[16px] font-medium text-[#171A1F]">Suggestions</h3>
+          
+          <div className="flex flex-wrap gap-1.5">
+            {suggestedBuckets.map((bucket) => (
+              <button
+                key={bucket}
+                onClick={() => toggleBucket(bucket)}
+                className={cn(
+                  "py-3.5 px-3 rounded transition-all",
+                  selectedBuckets.includes(bucket)
+                    ? "bg-[#EEF0FF] text-[#5271F8]"
+                    : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]"
+                )}
+              >
+                <span className="text-xs font-medium">{bucket}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </OnboardingLayout>
   )
