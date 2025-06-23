@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
@@ -406,7 +406,7 @@ const widgetTemplates: WidgetTemplate[] = [
   {
     id: "carpool",
     name: "Carpool Schedule",
-    description: "Who’s driving where & when",
+    description: "Who's driving where & when",
     icon: Car,
     category: "family",
     color: "cyan",
@@ -568,16 +568,46 @@ export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
   // Initial recommended category based on bucket name
   const getRecommendedCategory = (bucketName: string): string => {
     const lowerBucket = bucketName.toLowerCase();
+    
+    // Direct matches
     if (lowerBucket === 'health' || lowerBucket === 'fitness') return 'health';
-    if (lowerBucket === 'work' || lowerBucket === 'school') return 'productivity';
-    if (lowerBucket === 'personal' || lowerBucket === 'wellness') return 'wellness';
-    if (lowerBucket === 'finance' || lowerBucket === 'money') return 'finance';
-    if (lowerBucket === 'social' || lowerBucket === 'family') return 'social';
-    return 'health'; // Default
+    if (lowerBucket === 'wellness' || lowerBucket === 'personal') return 'wellness';
+    if (lowerBucket === 'medical') return 'medical';
+    if (lowerBucket === 'household' || lowerBucket === 'home') return 'household';
+    if (lowerBucket === 'family') return 'family';
+    if (lowerBucket === 'social') return 'social';
+    if (lowerBucket === 'work' || lowerBucket === 'projects' || lowerBucket === 'side projects') return 'work';
+    if (lowerBucket === 'finance' || lowerBucket === 'money' || lowerBucket === 'budget') return 'finance';
+    
+    // Partial matches
+    if (lowerBucket.includes('health')) return 'health';
+    if (lowerBucket.includes('wellness')) return 'wellness';
+    if (lowerBucket.includes('medical')) return 'medical';
+    if (lowerBucket.includes('family')) return 'family';
+    if (lowerBucket.includes('social')) return 'social';
+    if (lowerBucket.includes('work') || lowerBucket.includes('project')) return 'work';
+    if (lowerBucket.includes('finance') || lowerBucket.includes('money')) return 'finance';
+    if (lowerBucket.includes('house') || lowerBucket.includes('home')) return 'household';
+    
+    // Check for meal-related buckets
+    if (lowerBucket.includes('meal') || lowerBucket.includes('food')) return 'family'; // meal planning is in family category
+    
+    // Check for hobby/travel buckets
+    if (lowerBucket.includes('hobby') || lowerBucket.includes('hobbies')) return 'wellness'; // self-care activities
+    if (lowerBucket.includes('travel')) return 'social'; // events and planning
+    
+    return 'all'; // Default to showing all widgets if no match
   };
   
   // State for selected category (defaults to recommended based on bucket)
   const [selectedCategory, setSelectedCategory] = useState<string>(getRecommendedCategory(bucket));
+  
+  // Update selected category when bucket changes
+  useEffect(() => {
+    const recommendedCategory = getRecommendedCategory(bucket);
+    setSelectedCategory(recommendedCategory);
+    console.log(`Bucket changed to: ${bucket}, recommending category: ${recommendedCategory}`);
+  }, [bucket]);
   
   // Filter widgets by search term and selected category
   let filteredWidgets = widgetTemplates.filter(widget => {
@@ -611,12 +641,12 @@ export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
       
       {/* Category Filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-gray-500">Category:</span>
+        <span className="text-sm font-medium text-gray-700">Category:</span>
         <div className="flex flex-wrap gap-1">
           <button
-            className={`px-2 py-1 text-xs rounded-full ${selectedCategory === 'all' 
-              ? 'bg-indigo-100 text-indigo-700' 
-              : 'bg-gray-100 text-gray-600'}`}
+            className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
+              ? 'bg-indigo-100 text-indigo-700 font-medium' 
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             onClick={() => setSelectedCategory('all')}
           >
             All
@@ -624,17 +654,36 @@ export function WidgetLibrary({ onAdd, bucket }: WidgetLibraryProps) {
           {allCategories.map(category => (
             <button
               key={category}
-              className={`px-2 py-1 text-xs rounded-full ${selectedCategory === category 
-                ? 'bg-indigo-100 text-indigo-700' 
-                : 'bg-gray-100 text-gray-600'}`}
+              className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
+                ? 'bg-indigo-100 text-indigo-700 font-medium' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} ${
+                  getRecommendedCategory(bucket) === category && selectedCategory !== category 
+                    ? 'ring-2 ring-indigo-300 ring-offset-1' 
+                    : ''
+                }`}
               onClick={() => setSelectedCategory(category)}
             >
               {category.charAt(0).toUpperCase() + category.slice(1)}
+              {getRecommendedCategory(bucket) === category && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+              )}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Show a hint if not viewing the recommended category */}
+      {selectedCategory !== getRecommendedCategory(bucket) && selectedCategory !== 'all' && (
+        <div className="text-sm text-gray-500 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+          <span>Tip: Try the <button 
+            onClick={() => setSelectedCategory(getRecommendedCategory(bucket))} 
+            className="text-indigo-600 hover:underline font-medium"
+          >
+            {getRecommendedCategory(bucket).charAt(0).toUpperCase() + getRecommendedCategory(bucket).slice(1)}
+          </button> category for widgets that match your "{bucket}" bucket</span>
+        </div>
+      )}
 
       {/* Widget Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">

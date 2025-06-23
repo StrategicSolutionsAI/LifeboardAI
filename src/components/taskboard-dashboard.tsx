@@ -7,6 +7,7 @@ import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
 import { format, addDays, isSameDay } from 'date-fns';
 import {
+  type LucideIcon,
   Plus,
   Search,
   MessageSquare,
@@ -20,12 +21,40 @@ import {
   Moon,
   Activity,
   Coffee,
+  Brain,
+  Calendar,
+  CheckSquare,
+  Clock,
+  Users,
+  Pill,
+  Apple,
+  Utensils,
+  TreePine,
+  Dumbbell,
+  Home,
+  DollarSign,
+  Briefcase,
+  Zap,
+  Book,
+  Gamepad2,
+  Music,
+  Palette,
+  Camera,
+  Plane,
+  ShoppingBag,
+  Wrench,
+  FileText,
+  BarChart,
+  TrendingUp,
+  Award,
+  Gift,
+  Sparkles,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { WidgetLibrary, WidgetTemplate } from "./widget-library";
 
 // Icon mapping for serialization
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, LucideIcon> = {
   Droplets,
   Flame,
   Target,
@@ -34,14 +63,42 @@ const iconMap: Record<string, any> = {
   Moon,
   Activity,
   Coffee,
+  Brain,
+  Calendar,
+  CheckSquare,
+  Clock,
+  Users,
+  Pill,
+  Apple,
+  Utensils,
+  TreePine,
+  Dumbbell,
+  Home,
+  DollarSign,
+  Briefcase,
+  Zap,
+  Book,
+  Gamepad2,
+  Music,
+  Palette,
+  Camera,
+  Plane,
+  ShoppingBag,
+  Wrench,
+  FileText,
+  BarChart,
+  TrendingUp,
+  Award,
+  Gift,
+  Sparkles,
 };
 
 // Helper to get icon component from string name
-const getIconComponent = (iconName: string | any) => {
+const getIconComponent = (iconName: string | any): LucideIcon | null => {
   if (typeof iconName === 'string') {
-    return iconMap[iconName];
+    return iconMap[iconName] || null;
   }
-  return iconName;
+  return null;
 };
 
 /**
@@ -93,10 +150,18 @@ export function TaskBoardDashboard() {
     console.log('User:', currentUser.id);
     console.log('Widgets to save:', JSON.stringify(widgetsToSave, null, 2));
 
-    // Save to localStorage
+    // Save to localStorage immediately (no async needed)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('widgets_by_bucket', JSON.stringify(widgetsToSave));
-      console.log('Saved to localStorage');
+      const dataToSave = {
+        widgets: widgetsToSave,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+      console.log('Auto-saved to localStorage at:', dataToSave.savedAt);
+      console.log('Total buckets:', Object.keys(widgetsToSave).length);
+      Object.entries(widgetsToSave).forEach(([bucket, widgets]) => {
+        console.log(`  Bucket "${bucket}": ${widgets.length} widgets`);
+      });
     }
 
     // Save to Supabase
@@ -115,7 +180,15 @@ export function TaskBoardDashboard() {
     }
   };
 
-  const debouncedSave = useRef(debounce(saveWidgets, 2000)).current;
+  // Create a debounced save that always uses the latest state from the ref
+  const debouncedSaveToSupabase = useRef(
+    debounce(() => {
+      // Always use the latest state from the ref
+      const latestWidgets = widgetsByBucketRef.current;
+      console.log('Debounced save executing with widgets:', latestWidgets);
+      saveWidgets(latestWidgets);
+    }, 2000)
+  ).current;
 
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent double-clicks
@@ -195,6 +268,9 @@ export function TaskBoardDashboard() {
 
   async function loadWidgets() {
     console.log('*** LOADING WIDGETS ***');
+    console.log('Current user:', user?.id);
+    console.log('Current buckets:', buckets);
+    
     setIsWidgetLoadComplete(false);
     
     // First try to load from localStorage for immediate display
@@ -204,9 +280,28 @@ export function TaskBoardDashboard() {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('widgets_by_bucket');
+        console.log('Raw localStorage data:', stored);
+        
         if (stored) {
-          localWidgets = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          
+          // Handle both old format (direct widgets) and new format (with metadata)
+          if (parsed.widgets && parsed.savedAt) {
+            console.log('Found new format data, saved at:', parsed.savedAt);
+            localWidgets = parsed.widgets;
+          } else {
+            console.log('Found old format data');
+            localWidgets = parsed;
+          }
+          
           console.log('Found widgets in localStorage:', localWidgets);
+          console.log('Widget keys:', Object.keys(localWidgets));
+          
+          // Count widgets per bucket
+          Object.entries(localWidgets).forEach(([bucket, widgets]) => {
+            console.log(`Bucket "${bucket}" has ${(widgets as any[]).length} widgets`);
+          });
+          
           setWidgetsByBucket(localWidgets);
           loadedFromLocal = true;
         } else {
@@ -323,10 +418,35 @@ export function TaskBoardDashboard() {
   // Save widgets whenever they change
   useEffect(() => {
     if (!isWidgetLoadComplete || !user) {
+      console.log('Skipping save - load not complete or no user', { isWidgetLoadComplete, user: !!user });
       return; // Don't save on initial load or if logged out
     }
-    debouncedSave(widgetsByBucket);
-  }, [widgetsByBucket, isWidgetLoadComplete, user, debouncedSave]);
+    
+    console.log('Widget save effect triggered');
+    console.log('Current widgets:', JSON.stringify(widgetsByBucket, null, 2));
+    
+    // Save to localStorage immediately
+    if (typeof window !== 'undefined') {
+      const dataToSave = {
+        widgets: widgetsByBucket,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+      console.log('Auto-saved to localStorage at:', dataToSave.savedAt);
+      console.log('Total buckets:', Object.keys(widgetsByBucket).length);
+      Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
+        console.log(`  Bucket "${bucket}": ${widgets.length} widgets`);
+      });
+      
+      // Verify save by reading back
+      const savedData = localStorage.getItem('widgets_by_bucket');
+      const verified = JSON.parse(savedData!);
+      console.log('Verified save - savedAt:', verified.savedAt);
+    }
+    
+    // Debounce the Supabase save
+    debouncedSaveToSupabase();
+  }, [widgetsByBucket, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
 
   async function loadBuckets() {
     let loadedFromLocal = false;
@@ -582,10 +702,30 @@ export function TaskBoardDashboard() {
                     <button
                       onClick={() => {
                         console.log('Deleting widget:', w.id);
-                        const updatedWidgets = { ...widgetsByBucket };
-                        updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.id !== w.id);
-                        setWidgetsByBucket(updatedWidgets);
-                        console.log('Widget deleted, updated state:', updatedWidgets);
+                        // Use callback pattern to ensure we're working with the latest state
+                        setWidgetsByBucket(prevWidgets => {
+                          const updatedWidgets = { ...prevWidgets };
+                          updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.id !== w.id);
+                          
+                          console.log('Widget deleted from bucket:', activeBucket);
+                          console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
+                          console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
+                          
+                          // Also update the ref immediately
+                          widgetsByBucketRef.current = updatedWidgets;
+                          
+                          // Force immediate save to localStorage
+                          if (typeof window !== 'undefined') {
+                            const dataToSave = {
+                              widgets: updatedWidgets,
+                              savedAt: new Date().toISOString()
+                            };
+                            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+                            console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                          }
+                          
+                          return updatedWidgets;
+                        });
                       }}
                       className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
                       aria-label="Delete widget"
@@ -595,15 +735,29 @@ export function TaskBoardDashboard() {
                     <div className="flex items-center gap-2">
                       {(() => {
                         // Resolve the icon component safely
-                        const maybeIcon = typeof w.icon === 'string'
-                          ? getIconComponent(w.icon)
-                          : w.icon;
-
-                        // Only render if it's a valid React component/function
-                        if (typeof maybeIcon === 'function') {
-                          return React.createElement(maybeIcon, { className: 'h-5 w-5 text-gray-500' });
+                        try {
+                          // Handle different icon formats
+                          let IconComponent = null;
+                          
+                          if (typeof w.icon === 'string') {
+                            // Icon stored as string name
+                            IconComponent = getIconComponent(w.icon);
+                          } else if (typeof w.icon === 'function') {
+                            // Icon is already a component
+                            IconComponent = w.icon;
+                          } else if (w.icon && typeof w.icon === 'object' && w.icon.$$typeof) {
+                            // Icon might be a React element (shouldn't happen but handle it)
+                            console.warn('Icon is a React element, not a component:', w.icon);
+                            return null;
+                          }
+                          
+                          if (IconComponent && typeof IconComponent === 'function') {
+                            return <IconComponent className="h-5 w-5 text-gray-500" />;
+                          }
+                        } catch (error) {
+                          console.error('Error rendering icon:', error, 'Widget:', w);
                         }
-
+                        
                         // Fallback placeholder when icon is invalid or absent
                         return <div className="h-5 w-5 bg-gray-300 rounded" />;
                       })()}
@@ -748,18 +902,44 @@ export function TaskBoardDashboard() {
               const widgetInstance = {
                 ...w,
                 id: `${w.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                addedAt: new Date().toISOString()
+                addedAt: new Date().toISOString(),
+                // Store the icon name as a string
+                icon: (() => {
+                  // If it's already a string, use it
+                  if (typeof w.icon === 'string') return w.icon;
+                  
+                  // If it's a function (React component), get its name
+                  if (typeof w.icon === 'function' && w.icon.name) {
+                    return w.icon.name;
+                  }
+                  
+                  // Try to find the icon in our map by comparing references
+                  for (const [name, component] of Object.entries(iconMap)) {
+                    if (component === w.icon) {
+                      return name;
+                    }
+                  }
+                  
+                  // Default fallback
+                  return 'Heart';
+                })()
               };
               
               console.log('Widget instance created:', widgetInstance);
               
-              // Update local state, which will trigger the debounced save
-              const updatedWidgets = { ...widgetsByBucket };
-              const list = updatedWidgets[activeBucket] ?? [];
-              updatedWidgets[activeBucket] = [...list, widgetInstance];
-              setWidgetsByBucket(updatedWidgets);
-              
-              console.log('Updated widgets state:', updatedWidgets);
+              // Use callback pattern to ensure we're working with the latest state
+              setWidgetsByBucket(prevWidgets => {
+                const updatedWidgets = { ...prevWidgets };
+                const list = updatedWidgets[activeBucket] ?? [];
+                updatedWidgets[activeBucket] = [...list, widgetInstance];
+                
+                console.log('Updated widgets state:', updatedWidgets);
+                
+                // Also update the ref immediately
+                widgetsByBucketRef.current = updatedWidgets;
+                
+                return updatedWidgets;
+              });
               
               // Close the widget sheet
               setIsWidgetSheetOpen(false);
