@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import Image from "next/image";
 import { supabase } from "@/utils/supabase/client";
@@ -11,9 +11,38 @@ import {
   Search,
   MessageSquare,
   LogOut,
+  X,
+  Droplets,
+  Flame,
+  Target,
+  Scale,
+  Heart,
+  Moon,
+  Activity,
+  Coffee,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { WidgetLibrary, WidgetTemplate } from "./widget-library";
+
+// Icon mapping for serialization
+const iconMap: Record<string, any> = {
+  Droplets,
+  Flame,
+  Target,
+  Scale,
+  Heart,
+  Moon,
+  Activity,
+  Coffee,
+};
+
+// Helper to get icon component from string name
+const getIconComponent = (iconName: string | any) => {
+  if (typeof iconName === 'string') {
+    return iconMap[iconName];
+  }
+  return iconName;
+};
 
 /**
  * TaskBoardDashboard
@@ -39,13 +68,11 @@ const debounce = (func: (...args: any[]) => void, delay: number) => {
 export function TaskBoardDashboard() {
   const [buckets, setBuckets] = useState<string[]>([]);
   const [activeBucket, setActiveBucket] = useState<string>("");
-  const [maxTabWidth, setMaxTabWidth] = useState<number>(0);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetTemplate[]>>({});
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [date, setDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
@@ -56,26 +83,32 @@ export function TaskBoardDashboard() {
 
   // Centralized function to save widgets, including to localStorage
   const saveWidgets = async (widgetsToSave: Record<string, WidgetTemplate[]>) => {
-    if (!user) {
-      console.log('User not logged in, skipping save.');
+    // Always fetch the current user from Supabase to avoid race conditions
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) {
+      console.log('User not logged in (supabase session missing), skipping save.');
       return;
     }
-    console.log('Saving widgets...', widgetsToSave);
+    console.log('*** SAVING WIDGETS ***');
+    console.log('User:', currentUser.id);
+    console.log('Widgets to save:', JSON.stringify(widgetsToSave, null, 2));
 
     // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('widgets_by_bucket', JSON.stringify(widgetsToSave));
+      console.log('Saved to localStorage');
     }
 
     // Save to Supabase
     try {
       const prefs = await getUserPreferencesClient();
+      console.log('Current preferences before save:', prefs);
       if (prefs) {
-        await saveUserPreferences({
+        const savedPrefs = await saveUserPreferences({
           ...prefs,
           widgets_by_bucket: widgetsToSave,
         });
-        console.log('Widgets saved to Supabase successfully.');
+        console.log('Widgets saved to Supabase successfully:', savedPrefs);
       }
     } catch (err) {
       console.error('Failed to save widgets to preferences', err);
@@ -111,14 +144,6 @@ export function TaskBoardDashboard() {
       setIsSigningOut(false); // Re-enable button on error
     }
   };
-
-  useLayoutEffect(() => {
-    // ensure refs array matches buckets length
-    tabRefs.current.length = buckets.length;
-    const widths = tabRefs.current.map(el => (el ? el.scrollWidth : 0));
-    const max = widths.length ? Math.max(...widths) : 0;
-    setMaxTabWidth(max);
-  }, [buckets]);
 
   const handleAddBucket = async () => {
     const name = newBucket.trim();
@@ -210,6 +235,25 @@ export function TaskBoardDashboard() {
         if (dataIsDifferent) {
           console.log('Supabase widgets differ from localStorage, updating state...');
           setWidgetsByBucket(prefs.widgets_by_bucket);
+          
+          // --- NEW: ensure bucket list includes any bucket keys from widgets ---
+          const widgetBuckets = Object.keys(prefs.widgets_by_bucket);
+          setBuckets(prev => {
+            const merged = Array.from(new Set([...prev, ...widgetBuckets]));
+            if (merged.length !== prev.length) {
+              console.log('Adding buckets from widgets to bucket list:', merged);
+              // Persist merged buckets to localStorage
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('life_buckets', JSON.stringify(merged));
+              }
+              // Persist merged buckets to Supabase
+              saveUserPreferences({
+                ...prefs,
+                life_buckets: merged
+              });
+            }
+            return merged;
+          });
           
           if (typeof window !== 'undefined') {
             localStorage.setItem('widgets_by_bucket', supabaseWidgetsStr);
@@ -309,9 +353,32 @@ export function TaskBoardDashboard() {
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
         setBuckets(prefs.life_buckets);
         setActiveBucket(prefs.life_buckets[0]);
+      } else {
+        // If no buckets found, set default buckets
+        console.log('No buckets found, setting defaults');
+        const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
+        setBuckets(defaultBuckets);
+        setActiveBucket(defaultBuckets[0]);
+        
+        // Save the default buckets
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
+        }
+        
+        // Save to Supabase
+        if (prefs) {
+          await saveUserPreferences({
+            ...prefs,
+            life_buckets: defaultBuckets
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to load preferences', err);
+      // Set defaults on error too
+      const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
+      setBuckets(defaultBuckets);
+      setActiveBucket(defaultBuckets[0]);
     }
   }
 
@@ -372,6 +439,26 @@ export function TaskBoardDashboard() {
     localStorage.removeItem("life_buckets");
   };
 
+  // Clean up debug widgets from all buckets
+  const cleanupDebugWidgets = async () => {
+    console.log('Cleaning up debug widgets...');
+    const cleaned: Record<string, WidgetTemplate[]> = {};
+    
+    Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
+      cleaned[bucket] = widgets.filter(w => !w.id.startsWith('debug-'));
+    });
+    
+    setWidgetsByBucket(cleaned);
+    await saveWidgets(cleaned);
+    console.log('Debug widgets cleaned up');
+  };
+
+  // Filter out debug widgets when displaying
+  const getDisplayWidgets = (bucket: string) => {
+    const widgets = widgetsByBucket[bucket] ?? [];
+    return widgets.filter(w => !w.id.startsWith('debug-'));
+  };
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -386,13 +473,24 @@ export function TaskBoardDashboard() {
             <span className="text-indigo-500">AI</span>
             <span>TaskBoard</span>
           </div>
-
           <div className="flex items-center gap-4">
+            {/* Temporary cleanup button - remove after use */}
+            {Object.values(widgetsByBucket).some(widgets => 
+              widgets.some(w => w.id.startsWith('debug-'))
+            ) && (
+              <button 
+                onClick={cleanupDebugWidgets}
+                className="text-xs text-red-600 underline"
+              >
+                Clean Debug Widgets
+              </button>
+            )}
             <button 
               onClick={handleSignOut} 
               disabled={isSigningOut}
               className={`flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 ${isSigningOut ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <LogOut className="h-5 w-5" />
+              Sign out
             </button>
           </div>
         </header>
@@ -425,12 +523,10 @@ export function TaskBoardDashboard() {
                 onDragEnd={() => setDragIndex(null)}
                 key={b}
                 onClick={() => setActiveBucket(b)}
-  ref={el => { tabRefs.current[idx] = el; }}
-                style={{ zIndex: b === activeBucket ? buckets.length + 5 : buckets.length - idx, minWidth: maxTabWidth || undefined }}
                 className={`relative -mx-0.5 flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-4 text-[11px] font-bold uppercase tracking-[0.05em] shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)] transition-colors ${
                   b === activeBucket
-                    ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF]'
-                    : 'bg-white hover:bg-gray-50'
+                    ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] z-10'
+                    : 'bg-white hover:bg-gray-50 z-0'
                 }`}
               >
                 {b === activeBucket ? (
@@ -443,7 +539,6 @@ export function TaskBoardDashboard() {
               </button>
             ))}
             <button
-              style={{ zIndex: 0 }}
               onClick={() => setIsEditorOpen(true)}
               className="relative -mx-0.5 flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-6 text-[21px] font-bold shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)] transition-colors hover:bg-gray-50"
             >
@@ -482,10 +577,36 @@ export function TaskBoardDashboard() {
             <div className="flex-1 overflow-y-auto p-6 flex gap-6">
               {/* Widgets grid */}
               <div className="flex flex-wrap gap-4">
-                {(widgetsByBucket[activeBucket] ?? []).map((w) => (
-                  <div key={w.id} className="w-48 rounded-lg border bg-white p-3 shadow-sm">
+                {getDisplayWidgets(activeBucket).map((w) => (
+                  <div key={w.id} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group">
+                    <button
+                      onClick={() => {
+                        console.log('Deleting widget:', w.id);
+                        const updatedWidgets = { ...widgetsByBucket };
+                        updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.id !== w.id);
+                        setWidgetsByBucket(updatedWidgets);
+                        console.log('Widget deleted, updated state:', updatedWidgets);
+                      }}
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
+                      aria-label="Delete widget"
+                    >
+                      <X className="h-3 w-3 text-red-600" />
+                    </button>
                     <div className="flex items-center gap-2">
-                      {React.createElement(w.icon, { className: 'h-5 w-5 text-gray-500' })}
+                      {(() => {
+                        // Resolve the icon component safely
+                        const maybeIcon = typeof w.icon === 'string'
+                          ? getIconComponent(w.icon)
+                          : w.icon;
+
+                        // Only render if it's a valid React component/function
+                        if (typeof maybeIcon === 'function') {
+                          return React.createElement(maybeIcon, { className: 'h-5 w-5 text-gray-500' });
+                        }
+
+                        // Fallback placeholder when icon is invalid or absent
+                        return <div className="h-5 w-5 bg-gray-300 rounded" />;
+                      })()}
                       <span className="text-sm font-medium truncate">{w.name}</span>
                     </div>
                     <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
@@ -508,7 +629,8 @@ export function TaskBoardDashboard() {
                 </div>
                 <button
                     onClick={() => setIsWidgetSheetOpen(true)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-500" >
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-500"
+                    aria-label="Add widget">
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
@@ -525,7 +647,7 @@ export function TaskBoardDashboard() {
                     </div>
                   </div>
                   <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-                    {['S','M','T','W','T','F','S'].map(d=> <span key={d}>{d}</span>)}
+                    {['S','M','T','W','T','F','S'].map((d, index) => <span key={`weekday-${index}`}>{d}</span>)}
                   </div>
                   <div className="grid grid-cols-7 gap-1 text-center text-xs">
                     {getDaysArray().map((day, idx) => (
@@ -622,11 +744,22 @@ export function TaskBoardDashboard() {
             <WidgetLibrary bucket={activeBucket} onAdd={(w) => {
               console.log('Adding widget to bucket:', activeBucket, 'widget:', w);
               
+              // Create a unique instance of the widget with a timestamp-based ID
+              const widgetInstance = {
+                ...w,
+                id: `${w.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                addedAt: new Date().toISOString()
+              };
+              
+              console.log('Widget instance created:', widgetInstance);
+              
               // Update local state, which will trigger the debounced save
               const updatedWidgets = { ...widgetsByBucket };
               const list = updatedWidgets[activeBucket] ?? [];
-              updatedWidgets[activeBucket] = [...list, w];
+              updatedWidgets[activeBucket] = [...list, widgetInstance];
               setWidgetsByBucket(updatedWidgets);
+              
+              console.log('Updated widgets state:', updatedWidgets);
               
               // Close the widget sheet
               setIsWidgetSheetOpen(false);
