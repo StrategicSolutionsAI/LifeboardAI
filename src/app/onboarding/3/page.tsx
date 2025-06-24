@@ -42,7 +42,13 @@ const integrations: Integration[] = [
     description: "Get notifications directly in your Slack workspace", 
     icon: "💬",
     comingSoon: true
-  }
+  },
+  { 
+    id: "fitbit", 
+    name: "Fitbit", 
+    description: "Connect your Fitbit device to sync health and fitness data", 
+    icon: "⌚"
+  },
 ]
 
 export default function OnboardingStep3() {
@@ -50,6 +56,7 @@ export default function OnboardingStep3() {
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([])
 
   const [connectingGoogle, setConnectingGoogle] = useState(false)
+  const [connectingFitbit, setConnectingFitbit] = useState(false)
   
   const connectGoogleCalendar = async () => {
     setConnectingGoogle(true)
@@ -63,6 +70,16 @@ export default function OnboardingStep3() {
     }
   }
   
+  const connectFitbit = async () => {
+    setConnectingFitbit(true)
+    try {
+      window.location.href = '/api/auth/fitbit?redirectUrl=/onboarding/3'
+    } catch (error) {
+      console.error('Error connecting to Fitbit:', error)
+      setConnectingFitbit(false)
+    }
+  }
+  
   const toggleIntegration = (integrationId: string) => {
     const integration = integrations.find(i => i.id === integrationId)
     
@@ -72,6 +89,11 @@ export default function OnboardingStep3() {
     // For Google Calendar, start the OAuth flow
     if (integrationId === 'google-calendar') {
       connectGoogleCalendar()
+      return
+    }
+    // For Fitbit, start OAuth
+    if (integrationId === 'fitbit') {
+      connectFitbit()
       return
     }
     
@@ -146,6 +168,8 @@ export default function OnboardingStep3() {
                   "flex items-center justify-center",
                 )}>
                   {integration.id === 'google-calendar' && connectingGoogle ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
+                  ) : integration.id === 'fitbit' && connectingFitbit ? (
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
                   ) : (
                     <div className={cn(
