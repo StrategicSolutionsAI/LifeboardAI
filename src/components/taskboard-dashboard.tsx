@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import Image from "next/image";
 import { supabase } from "@/utils/supabase/client";
@@ -72,6 +72,8 @@ import {
   Hammer,
   Brush,
   CalendarDays,
+  RotateCw,
+  Loader2,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -215,6 +217,21 @@ const dateStr = (d: Date) => d.toISOString().slice(0, 10);
 const todayStrGlobal = dateStr(new Date());
 const yesterdayStrGlobal = dateStr(new Date(Date.now() - 86400000));
 
+const SUGGESTED_BUCKETS = [
+  "Health",
+  "Wellness",
+  "Medical",
+  "Household",
+  "Family",
+  "Social",
+  "Work",
+  "Finance",
+  "Education",
+  "Hobbies",
+  "Travel",
+  "Meals",
+];
+
 export function TaskBoardDashboard() {
   const [buckets, setBuckets] = useState<string[]>([]);
   const [activeBucket, setActiveBucket] = useState<string>("");
@@ -240,6 +257,36 @@ export function TaskBoardDashboard() {
   // ----------------------------------------------------------------------
   interface ProgressEntry { value:number; date:string; streak:number; lastCompleted:string; }
   const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
+  
+  // Fitbit data state
+  const [fitbitData, setFitbitData] = useState<Record<string, number>>(()=>{
+    if (typeof window !== 'undefined'){
+      try{ const stored=localStorage.getItem('fitbit_metrics'); if(stored) return JSON.parse(stored);}catch(e){}
+    }
+    return {};
+  });
+  const [isLoadingFitbit, setIsLoadingFitbit] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const fetchIntegrationsData = useCallback( async () => {
+    // detect if any widget needs fitbit
+    const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
+    if(!needFitbit || !user) return;
+    setIsRefreshing(true);
+    try{
+       const res = await fetch('/api/integrations/fitbit/metrics');
+       if(res.ok){
+          const data = await res.json();
+          setFitbitData({water:data.water||0,steps:data.steps||0,calories:data.calories||0});
+          if(typeof window!=='undefined') localStorage.setItem('fitbit_metrics', JSON.stringify({water:data.water||0,steps:data.steps||0,calories:data.calories||0}));
+       }
+    }catch(err){console.error('Manual refresh failed',err);}finally{
+       setIsRefreshing(false);
+    }
+  },[user]);
+
+  // modify useEffect to use fetchIntegrationsData
+  useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
 
   // Load progress from localStorage once
   useEffect(() => {
@@ -857,95 +904,122 @@ export function TaskBoardDashboard() {
 
             {/* Content area */}
             <div className="flex-1 overflow-y-auto p-6 flex gap-6">
-              {/* Widgets grid */}
-              <div className="flex flex-wrap gap-4">
-                {getDisplayWidgets(activeBucket).map((w) => (
-                  <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group cursor-pointer" onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('Deleting widget:', w.instanceId);
-                        // Use callback pattern to ensure we're working with the latest state
-                        setWidgetsByBucket(prevWidgets => {
-                          const updatedWidgets = { ...prevWidgets };
-                          updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
-                          
-                          console.log('Widget deleted from bucket:', activeBucket);
-                          console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
-                          console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
-                          
-                          // Also update the ref immediately
-                          widgetsByBucketRef.current = updatedWidgets;
-                          
-                          // Force immediate save to localStorage
-                          if (typeof window !== 'undefined') {
-                            const dataToSave = {
-                              widgets: updatedWidgets,
-                              savedAt: new Date().toISOString()
-                            };
-                            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                            console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+              {/* Left column: refresh + widgets */}
+              <div className="flex flex-col gap-4">
+                <button onClick={fetchIntegrationsData} disabled={isRefreshing} className="flex items-center gap-1 text-xs text-gray-600 hover:text-indigo-600 w-max">
+                  {isRefreshing? <Loader2 className="animate-spin h-4 w-4"/>:<RotateCw className="h-4 w-4"/>}
+                  Refresh
+                </button>
+                <div className="flex flex-wrap gap-4">
+                  {getDisplayWidgets(activeBucket).map((w) => (
+                    <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group cursor-pointer" onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('Deleting widget:', w.instanceId);
+                          // Use callback pattern to ensure we're working with the latest state
+                          setWidgetsByBucket(prevWidgets => {
+                            const updatedWidgets = { ...prevWidgets };
+                            updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
+                            
+                            console.log('Widget deleted from bucket:', activeBucket);
+                            console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
+                            console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
+                            
+                            // Also update the ref immediately
+                            widgetsByBucketRef.current = updatedWidgets;
+                            
+                            // Force immediate save to localStorage
+                            if (typeof window !== 'undefined') {
+                              const dataToSave = {
+                                widgets: updatedWidgets,
+                                savedAt: new Date().toISOString()
+                              };
+                              localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+                              console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                            }
+                            
+                            return updatedWidgets;
+                          });
+                        }}
+                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
+                        aria-label="Delete widget"
+                      >
+                        <X className="h-3 w-3 text-red-600" />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        {(() => {
+                          const colorClasses: Record<string,string> = {
+                            blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
+                          };
+                          let IconComponent:any = null;
+                          if (typeof w.icon === 'string') {
+                            IconComponent = getIconComponent(w.icon);
+                          } else if (typeof w.icon === 'function') {
+                            IconComponent = w.icon;
                           }
-                          
-                          return updatedWidgets;
-                        });
-                      }}
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
-                      aria-label="Delete widget"
-                    >
-                      <X className="h-3 w-3 text-red-600" />
-                    </button>
-                    <div className="flex items-center gap-2">
+                          if (!IconComponent) {
+                            IconComponent = getIconComponent(w.id);
+                          }
+                          if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
+
+                          // Get color - fallback to widget template default if not set
+                          const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
+
+                          return (
+                            <div
+                              className={`w-8 h-8 rounded flex items-center justify-center ${colorClasses[widgetColor] ?? 'bg-gray-500'}`}
+                            >
+                              <IconComponent className="h-5 w-5 text-white" />
+                            </div>
+                          );
+                        })()}
+                        <span className="text-sm font-medium truncate">{w.name}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
+
                       {(() => {
-                        const colorClasses: Record<string,string> = {
-                          blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
-                        };
-                        let IconComponent:any = null;
-                        if (typeof w.icon === 'string') {
-                          IconComponent = getIconComponent(w.icon);
-                        } else if (typeof w.icon === 'function') {
-                          IconComponent = w.icon;
+                        // For water widgets with Fitbit data source, use Fitbit data
+                        let todayVal = 0;
+                        let isFitbitData = false;
+                        
+                        if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
+                          todayVal = fitbitData.water;
+                          isFitbitData = true;
+                        } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
+                          todayVal = fitbitData.steps;
+                          isFitbitData = true;
+                        } else {
+                          // Use manual progress tracking
+                          const prog = progressByWidget[w.instanceId];
+                          todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
                         }
-                        if (!IconComponent) {
-                          IconComponent = getIconComponent(w.id);
-                        }
-                        if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
-
-                        // Get color - fallback to widget template default if not set
-                        const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
-
+                        
+                        const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
+                        const prog = progressByWidget[w.instanceId];
+                        
                         return (
-                          <div
-                            className={`w-8 h-8 rounded flex items-center justify-center ${colorClasses[widgetColor] ?? 'bg-gray-500'}`}
-                          >
-                            <IconComponent className="h-5 w-5 text-white" />
+                          <div className="mt-3">
+                            <div className="h-1 rounded bg-gray-200">
+                              <div className="h-1 rounded bg-indigo-500" style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
+                              <span>
+                                {todayVal} / {w.target}
+                                {isFitbitData && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
+                              </span>
+                              {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
+                            </div>
                           </div>
                         );
                       })()}
-                      <span className="text-sm font-medium truncate">{w.name}</span>
+
+                      {!( ['water','steps'].includes(w.id) && w.dataSource === 'fitbit') && (
+                        <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
+                      )}
                     </div>
-                    <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
-
-                    {(() => {
-                      const prog = progressByWidget[w.instanceId];
-                      const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                      const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
-                      return (
-                        <div className="mt-3">
-                          <div className="h-1 rounded bg-gray-200">
-                            <div className="h-1 rounded bg-indigo-500" style={{ width: `${pct}%` }} />
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-                            <span>{todayVal} / {w.target}</span>
-                            {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Add Widget card */}
@@ -1067,6 +1141,32 @@ export function TaskBoardDashboard() {
                       handleAddBucket();
                       setNewBucket('');
                     }}>Add Bucket</Button>
+                  </div>
+                </div>
+
+                {/* Suggested buckets */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Suggestions</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {SUGGESTED_BUCKETS.filter(b=>!buckets.includes(b)).map((b)=>(
+                      <button
+                        key={b}
+                        onClick={() => {
+                          if (buckets.includes(b)) return;
+                          setBuckets(prev=>[...prev,b]);
+                          if (typeof window!== 'undefined') {
+                            localStorage.setItem('life_buckets', JSON.stringify([...buckets,b]));
+                          }
+                          // Save to Supabase
+                          (async ()=>{
+                            try{
+                              const prefs = await getUserPreferencesClient();
+                              if (prefs){ await saveUserPreferences({ ...prefs, life_buckets:[...buckets,b] }); }
+                            }catch(err){ console.error('Failed to save bucket suggestion',err);} })();
+                        }}
+                        className="px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs"
+                      >{b}</button>
+                    ))}
                   </div>
                 </div>
 

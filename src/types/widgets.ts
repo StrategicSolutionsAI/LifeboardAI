@@ -8,7 +8,7 @@ export interface WidgetTemplate {
   units?: string[];      // optional list of alternative units
   defaultTarget: number; // suggested starting goal
   color?: string;
-  dataSource?: string;
+  dataSource?: string;   // optional: "manual", "fitbit", etc.
 }
 
 export interface WidgetInstance extends WidgetTemplate {

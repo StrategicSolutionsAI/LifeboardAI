@@ -76,7 +76,7 @@ const widgetTemplates: WidgetTemplate[] = [
     color: "blue",
     defaultTarget: 8,
     unit: "cups",
-    units: ["cups","ml","oz"]
+    units: ["cups","ml","oz"],
   },
   {
     id: "calories",
@@ -662,6 +662,23 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
   const [selectedCategory, setSelectedCategory] = useState<string>(getRecommendedCategory(bucket));
   const [selectedTemplate, setSelectedTemplate] = useState<WidgetTemplate | null>(null);
   const [draftWidget, setDraftWidget] = useState<WidgetInstance | null>(null);
+  const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
+  
+  // Check for connected integrations
+  useEffect(() => {
+    const checkIntegrations = async () => {
+      try {
+        const fitbitResponse = await fetch('/api/integrations/status?provider=fitbit');
+        const fitbitData = await fitbitResponse.json();
+        if (fitbitData.connected) {
+          setConnectedIntegrations(prev => [...prev, 'fitbit']);
+        }
+      } catch (error) {
+        console.error('Error checking integrations:', error);
+      }
+    };
+    checkIntegrations();
+  }, []);
   
   // Whenever a new template is chosen initialise a draft instance
   useEffect(() => {
@@ -673,6 +690,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
         schedule: [true, true, true, true, true, true, true],
         color: selectedTemplate.color,
         createdAt: new Date().toISOString(),
+        dataSource: "manual", // Default to manual
       });
     } else {
       setDraftWidget(null);
@@ -875,6 +893,42 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                 ))}
               </div>
             </div>
+
+            {/* Data Source Selector - Only for water widget with Fitbit connected */}
+            {['water','steps'].includes(draftWidget.id) && connectedIntegrations.includes('fitbit') && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Data Source</p>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      value="manual"
+                      checked={draftWidget.dataSource === 'manual'}
+                      onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm">Manual tracking</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      value="fitbit"
+                      checked={draftWidget.dataSource === 'fitbit'}
+                      onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm">Fitbit (automatic)</span>
+                  </label>
+                </div>
+                {draftWidget.dataSource === 'fitbit' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {draftWidget.name} will sync automatically from your Fitbit device
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Schedule picker */}
             <div className="space-y-2 pt-4 border-t">

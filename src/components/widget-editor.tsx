@@ -1,7 +1,7 @@
 "use client";
 
 import { WidgetInstance } from "@/types/widgets";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,12 @@ const COLORS = [
 
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-const getColorClass = (color: string) => `bg-${color}-500`;
+const getColorClass = (color: string): string => {
+  const colorMap: Record<string, string> = {
+    blue: "bg-blue-500", green: "bg-green-500", red: "bg-red-500", orange: "bg-orange-500", purple: "bg-purple-500", indigo: "bg-indigo-500", amber: "bg-amber-500", teal: "bg-teal-500", rose: "bg-rose-500", cyan: "bg-cyan-500", yellow: "bg-yellow-500", sky: "bg-sky-500", emerald: "bg-emerald-500", violet: "bg-violet-500", lime: "bg-lime-500", fuchsia: "bg-fuchsia-500", gray: "bg-gray-500", slate: "bg-slate-500", stone: "bg-stone-500"
+  }
+  return colorMap[color] || "bg-gray-500"
+}
 
 interface WidgetEditorProps {
   widget: WidgetInstance | null;
@@ -24,6 +29,21 @@ interface WidgetEditorProps {
 
 export default function WidgetEditorSheet({ widget, open, onClose, onSave }: WidgetEditorProps) {
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
+  const [isFitbitConnected, setIsFitbitConnected] = useState(false);
+
+  // Check if Fitbit is connected
+  useEffect(() => {
+    const checkFitbitConnection = async () => {
+      try {
+        const response = await fetch('/api/integrations/status?provider=fitbit');
+        const data = await response.json();
+        setIsFitbitConnected(data.connected);
+      } catch (error) {
+        console.error('Error checking Fitbit connection:', error);
+      }
+    };
+    checkFitbitConnection();
+  }, []);
 
   // keep draft in sync when widget changes
   if (widget && draft?.instanceId !== widget.instanceId) {
@@ -52,6 +72,42 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
               <button className="px-2 py-1 rounded bg-gray-100" onClick={() => setDraft(p => p ? { ...p, target: p.target+1}:p)}>+</button>
             </div>
           </div>
+
+          {/* Data Source Selector - Only for water widget with Fitbit connected */}
+          {['water','steps'].includes(draft.id) && isFitbitConnected && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">Data Source</p>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="dataSource"
+                    value="manual"
+                    checked={draft.dataSource !== 'fitbit'}
+                    onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
+                    className="text-indigo-600"
+                  />
+                  <span className="text-sm">Manual tracking</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="dataSource"
+                    value="fitbit"
+                    checked={draft.dataSource === 'fitbit'}
+                    onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
+                    className="text-indigo-600"
+                  />
+                  <span className="text-sm">Fitbit (automatic)</span>
+                </label>
+              </div>
+              {draft.dataSource === 'fitbit' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {draft.name} will sync automatically from your Fitbit device
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Colour */}
           <div className="space-y-2">

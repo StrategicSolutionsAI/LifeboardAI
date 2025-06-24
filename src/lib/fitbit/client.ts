@@ -55,4 +55,68 @@ export async function exchangeFitbitCodeForToken(code: string) {
 
   const data = await response.json();
   return data; // Contains access_token, refresh_token, expires_in, etc.
+}
+
+export async function refreshFitbitToken(refreshToken: string) {
+  const credentials = Buffer.from(
+    `${process.env.FITBIT_CLIENT_ID}:${process.env.FITBIT_CLIENT_SECRET}`,
+  ).toString('base64');
+
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(FITBIT_TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${credentials}`,
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Fitbit token refresh failed: ${response.status} ${text}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+export async function fetchFitbitDailySummary(accessToken: string, date: string) {
+  const response = await fetch(
+    `https://api.fitbit.com/1/user/-/activities/date/${date}.json`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Fitbit daily summary fetch failed: ${response.status} ${text}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchFitbitWater(accessToken: string, date: string) {
+  const response = await fetch(
+    `https://api.fitbit.com/1/user/-/foods/log/water/date/${date}.json`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Fitbit water fetch failed: ${response.status} ${text}`);
+  }
+
+  return response.json();
 } 
