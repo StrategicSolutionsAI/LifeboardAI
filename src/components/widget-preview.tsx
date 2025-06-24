@@ -2,6 +2,7 @@
 
 import { WidgetInstance } from "@/types/widgets";
 import React from "react";
+import * as Icons from "lucide-react";
 
 // Local colour utility (same as widget-library)
 const colorClassMap: Record<string, string> = {
@@ -30,7 +31,17 @@ const getColorClass = (color: string) => colorClassMap[color] || "bg-gray-500";
 
 // Re-use a tiny version of the dashboard card so users can see changes instantly
 export function WidgetPreview({ widget }: { widget: WidgetInstance }) {
-  const Icon = (widget.icon as any) || (() => null);
+  let Icon: any = widget.icon as any;
+  if (typeof Icon === "string") {
+    Icon = (Icons as any)[Icon] ?? null;
+  } else if (Icon && typeof Icon === "object" && "default" in Icon) {
+    Icon = (Icon as any).default;
+  }
+
+  const SafeIcon =
+    typeof Icon === "function" || (Icon && typeof Icon === "object" && Icon.$$typeof)
+      ? Icon
+      : null;
 
   return (
     <div className="w-48 rounded-lg border bg-white p-3 shadow-sm">
@@ -40,13 +51,27 @@ export function WidgetPreview({ widget }: { widget: WidgetInstance }) {
             widget.color ?? "gray"
           )}`}
         >
-          <Icon className="h-4 w-4 text-white" />
+          {SafeIcon ? (
+            <SafeIcon className="h-4 w-4 text-white" />
+          ) : (
+            <span className="text-white text-xs">?</span>
+          )}
         </div>
         <span className="text-sm font-medium truncate">{widget.name}</span>
       </div>
       <p className="mt-1 text-xs text-gray-500 truncate">
         Target: {widget.target} {widget.unit}
       </p>
+      {widget.schedule && (
+        <p className="mt-1 text-[10px] text-gray-400 truncate">
+          {widget.schedule
+            .map((enabled, idx) => {
+              const labels = ["S","M","T","W","T","F","S"];
+              return enabled ? labels[idx] : "·";
+            })
+            .join(" ")}
+        </p>
+      )}
     </div>
   );
 } 

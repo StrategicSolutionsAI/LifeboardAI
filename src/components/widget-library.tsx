@@ -606,7 +606,7 @@ const COLORS = [
   "blue","green","red","orange","purple","indigo","amber","teal","rose","cyan","yellow","sky","emerald","violet","lime","fuchsia","gray","slate","stone"
 ];
 
-const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 interface WidgetLibraryProps {
   onAdd?: (widget: any) => void;
@@ -935,8 +935,14 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               className="w-full mt-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
               onClick={() => {
                 if (!draftWidget) return;
+                // Convert component to its name string for persistence
+                let iconField: string | any = draftWidget.icon;
+                if (typeof draftWidget.icon === 'function') {
+                  iconField = (draftWidget.icon as any).displayName || (draftWidget.icon as any).name || '';
+                }
                 const instance: WidgetInstance = {
                   ...draftWidget,
+                  icon: iconField,
                   instanceId: `widget-${Date.now()}`,
                   createdAt: new Date().toISOString(),
                 };

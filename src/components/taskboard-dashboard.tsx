@@ -49,10 +49,34 @@ import {
   Award,
   Gift,
   Sparkles,
+  Smile,
+  Notebook,
+  Wind,
+  Move,
+  Quote,
+  Smartphone,
+  Gauge,
+  CalendarClock,
+  ClipboardList,
+  Wallet,
+  ImageIcon,
+  HeartPulse,
+  Car,
+  Cake,
+  PartyPopper,
+  ShieldOff,
+  Timer,
+  PiggyBank,
+  Flag,
+  HomeIcon,
+  Hammer,
+  Brush,
+  CalendarDays,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
+import WidgetEditorSheet from "@/components/widget-editor";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -92,14 +116,74 @@ const iconMap: Record<string, LucideIcon> = {
   Award,
   Gift,
   Sparkles,
+  water: Droplets,
+  calories: Flame,
+  steps: Target,
+  weight: Scale,
+  heartrate: Heart,
+  sleep: Moon,
+  exercise: Activity,
+  caffeine: Coffee,
+  chores: CheckSquare,
+  mood: Smile,
+  journal: Notebook,
+  meditation: Brain,
+  gratitude: Sparkles,
+  breathwork: Wind,
+  stretch: Move,
+  affirmations: Quote,
+  screen_time: Smartphone,
+  stress: Gauge,
+  self_care: CheckSquare,
+  doctor_appt: CalendarClock,
+  medication: Pill,
+  quit_habit: ShieldOff,
+  symptom_log: ClipboardList,
+  medical_bills: DollarSign,
+  home_projects: Hammer,
+  maintenance: Wrench,
+  cleaning: Brush,
+  family_members: Users,
+  family_calendar: CalendarDays,
+  family_chores: ClipboardList,
+  meal_plan: Utensils,
+  family_budget: Wallet,
+  photo_carousel: ImageIcon,
+  emergency_info: HeartPulse,
+  carpool: Car,
+  birthdays: Cake,
+  social_events: PartyPopper,
+  holidays: Gift,
+  work_projects: Briefcase,
+  work_deadlines: CalendarClock,
+  pomodoro: Timer,
+  finance_budget: Wallet,
+  savings_tracker: PiggyBank,
+  net_worth: TrendingUp,
+  properties: HomeIcon,
+  financial_goals: Flag,
 };
 
 // Helper to get icon component from string name
-const getIconComponent = (iconName: string | any): LucideIcon | null => {
-  if (typeof iconName === 'string') {
-    return iconMap[iconName] || null;
-  }
-  return null;
+const getIconComponent = (name: string): LucideIcon | null => {
+  return iconMap[name] || null
+}
+
+// Default colors for widget templates
+const templateColors: Record<string, string> = {
+  water: "blue",
+  calories: "orange",
+  steps: "green",
+  weight: "purple",
+  heartrate: "red",
+  sleep: "indigo",
+  exercise: "teal",
+  caffeine: "amber",
+  chores: "amber",
+};
+
+const getTemplateColor = (id: string): string | null => {
+  return templateColors[id] || null;
 };
 
 /**
@@ -123,6 +207,13 @@ const debounce = (func: (...args: any[]) => void, delay: number) => {
   };
 };
 
+// -----------------------------------------------------------------------------
+// Date helpers
+// -----------------------------------------------------------------------------
+const dateStr = (d: Date) => d.toISOString().slice(0, 10);
+const todayStrGlobal = dateStr(new Date());
+const yesterdayStrGlobal = dateStr(new Date(Date.now() - 86400000));
+
 export function TaskBoardDashboard() {
   const [buckets, setBuckets] = useState<string[]>([]);
   const [activeBucket, setActiveBucket] = useState<string>("");
@@ -138,6 +229,59 @@ export function TaskBoardDashboard() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const widgetsByBucketRef = useRef(widgetsByBucket);
   widgetsByBucketRef.current = widgetsByBucket;
+
+  // Editing widget state
+  const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
+  const [editingBucket, setEditingBucket] = useState<string | null>(null);
+
+  // ----------------------------------------------------------------------
+  // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
+  // ----------------------------------------------------------------------
+  interface ProgressEntry { value:number; date:string; streak:number; lastCompleted:string; }
+  const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
+
+  // Load progress from localStorage once
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = localStorage.getItem('widget_progress');
+    if (raw) {
+      try { setProgressByWidget(JSON.parse(raw)); } catch {}
+    }
+  }, []);
+
+  // Save progress whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('widget_progress', JSON.stringify(progressByWidget));
+    }
+  }, [progressByWidget]);
+
+  // Helper to get today string
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  const incrementProgress = (w: WidgetInstance) => {
+    setProgressByWidget(prev => {
+      const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
+      let { value, streak, lastCompleted } = entry;
+      // if the stored date isn't today, reset value
+      if (entry.date !== todayStrGlobal) {
+        value = 0;
+      }
+      value += 1;
+      // determine if target reached
+      let newLast = lastCompleted;
+      let newStreak = streak;
+      if (value >= w.target) {
+        if (lastCompleted === yesterdayStrGlobal) {
+          newStreak = streak + 1;
+        } else if (lastCompleted !== todayStrGlobal) {
+          newStreak = 1;
+        }
+        newLast = todayStrGlobal;
+      }
+      return { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
+    });
+  };
 
   // Centralized function to save widgets, including to localStorage
   const saveWidgets = async (widgetsToSave: Record<string, WidgetInstance[]>) => {
@@ -580,6 +724,21 @@ export function TaskBoardDashboard() {
     return widgets.filter(w => !w.instanceId?.startsWith('debug-'));
   };
 
+  const handleSaveWidget = (updated: WidgetInstance) => {
+    if (!editingBucket) return;
+    setWidgetsByBucket(prev => {
+      const updatedState = { ...prev };
+      updatedState[editingBucket] = (updatedState[editingBucket] ?? []).map(w =>
+        w.instanceId === updated.instanceId ? updated : w
+      );
+      // persist
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: updatedState, savedAt: new Date().toISOString() }));
+      }
+      return updatedState;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -699,9 +858,10 @@ export function TaskBoardDashboard() {
               {/* Widgets grid */}
               <div className="flex flex-wrap gap-4">
                 {getDisplayWidgets(activeBucket).map((w) => (
-                  <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group">
+                  <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group cursor-pointer" onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         console.log('Deleting widget:', w.instanceId);
                         // Use callback pattern to ensure we're working with the latest state
                         setWidgetsByBucket(prevWidgets => {
@@ -735,36 +895,53 @@ export function TaskBoardDashboard() {
                     </button>
                     <div className="flex items-center gap-2">
                       {(() => {
-                        // Resolve the icon component safely
-                        try {
-                          // Handle different icon formats
-                          let IconComponent = null;
-                          
-                          if (typeof w.icon === 'string') {
-                            // Icon stored as string name
-                            IconComponent = getIconComponent(w.icon);
-                          } else if (typeof w.icon === 'function') {
-                            // Icon is already a component
-                            IconComponent = w.icon;
-                          } else if (w.icon && typeof w.icon === 'object' && w.icon.$$typeof) {
-                            // Icon might be a React element (shouldn't happen but handle it)
-                            console.warn('Icon is a React element, not a component:', w.icon);
-                            return null;
-                          }
-                          
-                          if (IconComponent && typeof IconComponent === 'function') {
-                            return <IconComponent className="h-5 w-5 text-gray-500" />;
-                          }
-                        } catch (error) {
-                          console.error('Error rendering icon:', error, 'Widget:', w);
+                        const colorClasses: Record<string,string> = {
+                          blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
+                        };
+                        let IconComponent:any = null;
+                        if (typeof w.icon === 'string') {
+                          IconComponent = getIconComponent(w.icon);
+                        } else if (typeof w.icon === 'function') {
+                          IconComponent = w.icon;
                         }
-                        
-                        // Fallback placeholder when icon is invalid or absent
-                        return <div className="h-5 w-5 bg-gray-300 rounded" />;
+                        if (!IconComponent) {
+                          IconComponent = getIconComponent(w.id);
+                        }
+                        if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
+
+                        // Get color - fallback to widget template default if not set
+                        const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
+
+                        return (
+                          <div
+                            className={`w-8 h-8 rounded flex items-center justify-center ${colorClasses[widgetColor] ?? 'bg-gray-500'}`}
+                          >
+                            <IconComponent className="h-5 w-5 text-white" />
+                          </div>
+                        );
                       })()}
                       <span className="text-sm font-medium truncate">{w.name}</span>
                     </div>
                     <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
+
+                    {(() => {
+                      const prog = progressByWidget[w.instanceId];
+                      const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
+                      const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
+                      return (
+                        <div className="mt-3">
+                          <div className="h-1 rounded bg-gray-200">
+                            <div className="h-1 rounded bg-indigo-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
+                            <span>{todayVal} / {w.target}</span>
+                            {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
                   </div>
                 ))}
               </div>
@@ -855,6 +1032,16 @@ export function TaskBoardDashboard() {
 
             </div>
           </div>
+
+          {/* Widget editor sheet */}
+          {typeof window !== 'undefined' && (
+            <WidgetEditorSheet 
+              widget={editingWidget}
+              open={editingWidget !== null}
+              onClose={() => setEditingWidget(null)}
+              onSave={handleSaveWidget}
+            />
+          )}
         </div>
       </div>
     </div>
