@@ -77,6 +77,7 @@ import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -809,6 +810,7 @@ export function TaskBoardDashboard() {
                     : 'bg-white hover:bg-gray-50 z-0'
                 }`}
               >
+                {/* Bucket label */}
                 {b === activeBucket ? (
                   <span className="text-white">{b}</span>
                 ) : (
@@ -1042,6 +1044,56 @@ export function TaskBoardDashboard() {
               onSave={handleSaveWidget}
             />
           )}
+
+          {/* Add Bucket Sheet */}
+          <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+            <SheetContent side="right" className="w-[420px] sm:w-[500px]">
+              <SheetHeader>
+                <SheetTitle className="text-indigo-950">Add a new bucket</SheetTitle>
+              </SheetHeader>
+              <div className="space-y-6 mt-6">
+                {/* Add new bucket input */}
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="New bucket name (e.g. Fitness)"
+                    value={newBucket}
+                    onChange={(e) => setNewBucket(e.target.value)}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                  />
+                  <div className="flex justify-end gap-3">
+                    <Button variant="secondary" onClick={() => setIsEditorOpen(false)}>Close</Button>
+                    <Button onClick={() => {
+                      handleAddBucket();
+                      setNewBucket('');
+                    }}>Add Bucket</Button>
+                  </div>
+                </div>
+
+                {/* Existing buckets list */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Existing buckets</h4>
+                  <ul className="space-y-2">
+                    {buckets.map((b) => (
+                      <li key={b} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                        <span>{b}</span>
+                        {buckets.length > 1 ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleRemoveBucket(b)}
+                            aria-label={`Delete ${b}`}
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </div>
