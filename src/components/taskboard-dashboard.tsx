@@ -830,9 +830,13 @@ export function TaskBoardDashboard() {
           </h2>
           
           {/* Bucket tabs */}
-          <div className="mt-6 flex items-end overflow-x-auto px-px">
+          <div
+            className="mt-10 flex overflow-x-auto"
+            style={{ maxWidth: 'calc(100% - 344px)' }}
+          >
             {buckets.length > 0 && buckets.map((b, idx) => (
               <button
+                key={b}
                 draggable
                 onDragStart={() => setDragIndex(idx)}
                 onDragOver={(e) => {
@@ -844,32 +848,32 @@ export function TaskBoardDashboard() {
                   updated.splice(idx, 0, moved);
                   setBuckets(updated);
                   setDragIndex(idx);
+                  // persist reordering
                   if (typeof window !== 'undefined') {
                     localStorage.setItem('life_buckets', JSON.stringify(updated));
                   }
                 }}
                 onDragEnd={() => setDragIndex(null)}
-                key={b}
                 onClick={() => setActiveBucket(b)}
-                className={`relative -mx-0.5 flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-4 text-[11px] font-bold uppercase tracking-[0.05em] shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)] transition-colors ${
+                style={{ 
+                  zIndex: b === activeBucket ? 20 : 10 - idx,
+                  marginRight: '-10px'
+                }}
+                className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[11px] font-bold uppercase tracking-[0.05em] transition-all ${
                   b === activeBucket
-                    ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] z-10'
-                    : 'bg-white hover:bg-gray-50 z-0'
+                    ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)]'
+                    : 'bg-white text-[#7482FE] hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]'
                 }`}
               >
-                {/* Bucket label */}
-                {b === activeBucket ? (
-                  <span className="text-white">{b}</span>
-                ) : (
-                  <span className="bg-gradient-to-r from-[#7482FE] to-[#909CFF] bg-clip-text text-transparent">
-                    {b}
-                  </span>
-                )}
+                {b}
               </button>
             ))}
             <button
               onClick={() => setIsEditorOpen(true)}
-              className="relative -mx-0.5 flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-6 text-[21px] font-bold shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)] transition-colors hover:bg-gray-50"
+              style={{ 
+                zIndex: 5
+              }}
+              className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]"
             >
               <span className="bg-gradient-to-r from-[#7482FE] to-[#909CFF] bg-clip-text text-transparent">
                 +
