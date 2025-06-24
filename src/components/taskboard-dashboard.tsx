@@ -878,39 +878,57 @@ export function TaskBoardDashboard() {
           </div>
         </section>
 
-        {/* Main white card */}
-        <div className="mx-auto w-full max-w-7xl flex-1 px-6 pb-24">
-          <div className="relative -mt-px flex h-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg border-t border-gray-200 bg-white">
-            {/* Inner nav */}
-            <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
-              {[
-                "Overview",
-                "Trends",
-                "Logs",
-                "Settings",
-              ].map((item, idx) => (
-                <span
-                  key={item}
-                  className={
-                    idx === 0
-                      ? "border-indigo-500 text-indigo-500 pb-3 border-b-2"
-                      : "text-gray-400"
-                  }
-                >
-                  {item}
-                </span>
-              ))}
-            </nav>
+        {/* Main content container */}
+        <div className="mx-auto w-full max-w-7xl flex-1 px-6 pb-24 flex gap-6">
+          {/* Left section: tabs and widgets */}
+          <div className="flex-1">
+            <div className="relative -mt-px flex h-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg border-t border-gray-200 bg-white">
+              {/* Inner nav */}
+              <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
+                {[
+                  "Overview",
+                  "Trends",
+                  "Logs",
+                  "Settings",
+                ].map((item, idx) => (
+                  <span
+                    key={item}
+                    className={
+                      idx === 0
+                        ? "border-indigo-500 text-indigo-500 pb-3 border-b-2"
+                        : "text-gray-400"
+                    }
+                  >
+                    {item}
+                  </span>
+                ))}
+              </nav>
 
-            {/* Content area */}
-            <div className="flex-1 overflow-y-auto p-6 flex gap-6">
-              {/* Left column: refresh + widgets */}
-              <div className="flex flex-col gap-4">
-                <button onClick={fetchIntegrationsData} disabled={isRefreshing} className="flex items-center gap-1 text-xs text-gray-600 hover:text-indigo-600 w-max">
-                  {isRefreshing? <Loader2 className="animate-spin h-4 w-4"/>:<RotateCw className="h-4 w-4"/>}
-                  Refresh
-                </button>
+              {/* Content area */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {/* Widgets grid */}
                 <div className="flex flex-wrap gap-4">
+                  {/* Refresh card */}
+                  <div
+                    onClick={isRefreshing ? undefined : fetchIntegrationsData}
+                    className="w-48 rounded-lg border bg-white p-3 shadow-sm relative cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded flex items-center justify-center bg-indigo-500">
+                        {isRefreshing ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-white" />
+                        ) : (
+                          <RotateCw className="h-5 w-5 text-white" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium truncate">Refresh</span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500 truncate">Sync integrations</p>
+                    {/* Invisible progress bar placeholder to equalize height */}
+                    <div className="mt-3 h-1 bg-transparent" />
+                  </div>
+
+                  {/* Widget cards */}
                   {getDisplayWidgets(activeBucket).map((w) => (
                     <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group cursor-pointer" onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
                       <button
@@ -1019,108 +1037,66 @@ export function TaskBoardDashboard() {
                       )}
                     </div>
                   ))}
-                </div>
-              </div>
 
-              {/* Add Widget card */}
-              <div className="w-64 rounded-xl border border-gray-100 bg-white p-4 shadow-sm flex items-center gap-3">
-                <Image
-                  src="/images/addwidget.png"
-                  alt="Add Widget"
-                  width={56}
-                  height={56}
-                  className="rounded-md"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-800">Add a Widget</p>
-                  <p className="text-xs text-gray-500">Track your stats</p>
-                </div>
-                <button
-                    onClick={() => setIsWidgetSheetOpen(true)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-indigo-500"
-                    aria-label="Add widget">
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Right sidebar */}
-              <aside className="ml-auto w-72 flex-shrink-0 space-y-6">
-                {/* Simple calendar */}
-                <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
-                    <div className="flex gap-1 text-gray-500">
-                      <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
-                      <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
+                  {/* Add Widget card */}
+                  <div className="w-48 rounded-lg border border-gray-100 bg-white p-3 shadow-sm flex flex-col items-center gap-2 cursor-pointer hover:bg-gray-50" onClick={() => setIsWidgetSheetOpen(true)}>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50">
+                      <Plus className="h-6 w-6 text-indigo-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-gray-800">Add Widget</p>
+                      <p className="text-xs text-gray-500">Track your stats</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-                    {['S','M','T','W','T','F','S'].map((d, index) => <span key={`weekday-${index}`}>{d}</span>)}
-                  </div>
-                  <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                    {getDaysArray().map((day, idx) => (
-                      <span
-                        key={idx}
-                        className={`py-1 ${isSameDay(day, selectedDate) ? 'rounded bg-indigo-500 text-white' : ''}`}
-                      >
-                        {format(day, 'd')}
-                      </span>
-                    ))}
-                  </div>
                 </div>
-              </aside>
-
-              {/* Widget Library side sheet */}
-              <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-                <SheetContent side="right" className="w-[520px] sm:w-[700px]">
-                  <SheetHeader>
-                    <SheetTitle>Add a new widget</SheetTitle>
-                  </SheetHeader>
-                  <WidgetLibrary
-                    bucket={activeBucket}
-                    onAdd={(template: WidgetTemplate) => {
-                      const newInstance: WidgetInstance = {
-                        ...template,
-                        instanceId: `widget-${Date.now()}`,
-                        createdAt: new Date().toISOString(),
-                        schedule: [true, true, true, true, true, true, true],
-                        target: template.defaultTarget ?? 0,
-                        color: template.color ?? '#ffffff',
-                        dataSource: template.dataSource,
-                      };
-
-                      setWidgetsByBucket((prev) => {
-                        const updated = {
-                          ...prev,
-                          [activeBucket]: [...(prev[activeBucket] ?? []), newInstance],
-                        };
-                        widgetsByBucketRef.current = updated;
-                        return updated;
-                      });
-
-                      // Trigger a debounced save
-                      debouncedSaveToSupabase();
-                      setIsWidgetSheetOpen(false);
-                    }}
-                  />
-                </SheetContent>
-              </Sheet>
-
+              </div>
             </div>
           </div>
 
-          {/* Widget editor sheet */}
-          {typeof window !== 'undefined' && (
-            <WidgetEditorSheet 
-              widget={editingWidget}
-              open={editingWidget !== null}
-              onClose={() => setEditingWidget(null)}
-              onSave={handleSaveWidget}
-            />
-          )}
+          {/* Right section: Calendar and To-do */}
+          <aside className="w-80 flex-shrink-0">
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
+                <div className="flex gap-1 text-gray-500">
+                  <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
+                  <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
+                {['S','M','T','W','T','F','S'].map((d, index) => <span key={`weekday-${index}`}>{d}</span>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                {getDaysArray().map((day, idx) => (
+                  <span key={idx} className={`py-1 ${isSameDay(day, selectedDate) ? 'rounded bg-indigo-500 text-white' : ''}`}>{format(day,'d')}</span>
+                ))}
+              </div>
 
-          {/* Add Bucket Sheet */}
-          <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+              {/* To-do list */}
+              <div className="mt-6">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">To-dos on {format(selectedDate,'MMM d, yyyy')}</h4>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 1" className="accent-indigo-500"/> Example task 1</li>
+                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 2" className="accent-indigo-500"/> Example task 2</li>
+                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 3" className="accent-indigo-500"/> Example task 3</li>
+                </ul>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* Widget editor sheet */}
+        {typeof window !== 'undefined' && (
+          <WidgetEditorSheet 
+            widget={editingWidget}
+            open={editingWidget !== null}
+            onClose={() => setEditingWidget(null)}
+            onSave={handleSaveWidget}
+          />
+        )}
+
+        {/* Add Bucket Sheet */}
+        <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
             <SheetContent side="right" className="w-[420px] sm:w-[500px]">
               <SheetHeader>
                 <SheetTitle className="text-indigo-950">Add a new bucket</SheetTitle>
@@ -1194,7 +1170,40 @@ export function TaskBoardDashboard() {
               </div>
             </SheetContent>
           </Sheet>
-        </div>
+
+        {/* Widget library sheet */}
+        <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
+          <SheetContent side="right" className="w-[800px]">
+            <SheetHeader>
+              <SheetTitle>Add a Widget</SheetTitle>
+            </SheetHeader>
+            <WidgetLibrary
+              bucket={activeBucket}
+              onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
+                const isInstance = 'instanceId' in widgetOrTemplate;
+                const newInstance: WidgetInstance = isInstance
+                  ? widgetOrTemplate
+                  : {
+                      ...widgetOrTemplate,
+                      instanceId: `${widgetOrTemplate.id}-${Date.now()}`,
+                      target: widgetOrTemplate.defaultTarget || 100,
+                      color: widgetOrTemplate.color || 'gray',
+                      dataSource: 'manual',
+                      createdAt: new Date().toISOString(),
+                      schedule: [true, true, true, true, true, true, true],
+                    };
+                const updated = { ...widgetsByBucket };
+                updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
+                setWidgetsByBucket(updated);
+                widgetsByBucketRef.current = updated; // Update the ref immediately
+                setIsWidgetSheetOpen(false);
+                // Save immediately
+                debouncedSaveToSupabase();
+              }}
+            />
+          </SheetContent>
+        </Sheet>
+
       </div>
     </div>
   );
