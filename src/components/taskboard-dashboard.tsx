@@ -277,6 +277,8 @@ export function TaskBoardDashboard() {
   const [allTodoistTasks, setAllTodoistTasks] = useState<any[]>([]);
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
   
+  const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
+  
   const fetchIntegrationsData = useCallback( async () => {
     // detect if any widget needs fitbit
     const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
@@ -984,6 +986,41 @@ export function TaskBoardDashboard() {
     });
   };
 
+  const completeTask = async (taskId: string) => {
+    // Mark task as completed and move to bottom of its list(s)
+    const reorder = (arr: any[]) => {
+      const updated = arr.map((t) =>
+        t.id.toString() === taskId ? { ...t, completed: true } : t
+      );
+      // sort: incomplete first, then completed (preserve relative order otherwise)
+      return [
+        ...updated.filter((t) => !t.completed),
+        ...updated.filter((t) => t.completed),
+      ];
+    };
+
+    setTodoistTasks((prev) => reorder(prev));
+    setAllTodoistTasks((prev) => reorder(prev));
+
+    // Track loading state (optional spinner)
+    setIsCompletingTask((prev) => ({ ...prev, [taskId]: true }));
+
+    try {
+      await fetch('/api/integrations/todoist/tasks/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId }),
+      });
+    } catch (err) {
+      console.error('Failed to complete Todoist task', err);
+    } finally {
+      setIsCompletingTask((prev) => {
+        const { [taskId]: _removed, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -1305,7 +1342,7 @@ export function TaskBoardDashboard() {
                             <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
                               {(provided: any)=>(
                                 <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
-                                  <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                                  <input type="checkbox" aria-label={t.content} checked={t.completed ?? false} onChange={() => completeTask(t.id.toString())} className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`} />
                                   <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
                                 </li>
                               )}
@@ -1334,7 +1371,7 @@ export function TaskBoardDashboard() {
                             <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
                               {(provided: any)=>(
                                 <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
-                                  <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                                  <input type="checkbox" aria-label={t.content} checked={t.completed ?? false} onChange={() => completeTask(t.id.toString())} className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`} />
                                   <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
                                 </li>
                               )}
