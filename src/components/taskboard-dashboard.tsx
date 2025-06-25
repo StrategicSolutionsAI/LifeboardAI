@@ -74,6 +74,8 @@ import {
   CalendarDays,
   RotateCw,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -282,6 +284,10 @@ export function TaskBoardDashboard() {
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState('');
   const [newOpenTask, setNewOpenTask] = useState('');
+  
+  // Collapse state for task lists
+  const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
+  const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   
   const fetchIntegrationsData = useCallback( async () => {
     // detect if any widget needs fitbit
@@ -1431,13 +1437,20 @@ export function TaskBoardDashboard() {
               <div className="mt-6 flex-1 overflow-hidden flex flex-col">
                 <DragDropContext onDragEnd={handleDragEnd}>
                   {/* Daily tasks */}
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
+                  <div
+                    className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                    onClick={() => setIsDailyCollapsed((c) => !c)}
+                  >
+                    <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
+                    {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </div>
                   <Droppable droppableId="dailyTasks">
                     {(provided: any) => (
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1"
+                        className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
                       >
                         {isLoadingTasks && todoistTasks.length === 0 ? (
                           <li className="text-gray-500">Loading…</li>
@@ -1475,32 +1488,41 @@ export function TaskBoardDashboard() {
                   </Droppable>
 
                   {/* Add task to daily list */}
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add task…"
-                      value={newDailyTask}
-                      onChange={(e) => setNewDailyTask(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
-                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleAddDailyTask}
-                      className="text-sm text-indigo-600 hover:underline"
-                    >Add</button>
-                  </div>
+                  {!isDailyCollapsed && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add task…"
+                        value={newDailyTask}
+                        onChange={(e) => setNewDailyTask(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
+                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleAddDailyTask}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >Add</button>
+                    </div>
+                  )}
                    
                   {/* Divider */}
                   <hr className="my-4" />
 
                   {/* Master tasks */}
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
+                  <div
+                    className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                    onClick={() => setIsOpenCollapsed((c) => !c)}
+                  >
+                    <span>All open tasks</span>
+                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </div>
                   <Droppable droppableId="openTasks">
                     {(provided: any) => (
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1"
+                        className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
                       >
                         {isLoadingAllTasks && openTasksToShow.length === 0 ? (
                           <li className="text-gray-500">Loading…</li>
@@ -1538,20 +1560,22 @@ export function TaskBoardDashboard() {
                   </Droppable>
 
                   {/* Add open task */}
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add task…"
-                      value={newOpenTask}
-                      onChange={(e) => setNewOpenTask(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
-                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleAddOpenTask}
-                      className="text-sm text-indigo-600 hover:underline"
-                    >Add</button>
-                  </div>
+                  {!isOpenCollapsed && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add task…"
+                        value={newOpenTask}
+                        onChange={(e) => setNewOpenTask(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleAddOpenTask}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >Add</button>
+                    </div>
+                  )}
                 </DragDropContext>
               </div>
             </div>
