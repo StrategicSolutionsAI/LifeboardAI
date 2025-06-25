@@ -7,7 +7,9 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const date = searchParams.get('date'); // YYYY-MM-DD
-    if (!date) {
+    const allParam = searchParams.get('all');
+
+    if (!date && !allParam) {
       return NextResponse.json({ error: 'Missing date parameter' }, { status: 400 });
     }
 
@@ -51,13 +53,18 @@ export async function GET(request: NextRequest) {
 
     const tasks = await todoistRes.json();
 
-    // Include tasks that are due today or overdue
-    const filtered = tasks.filter((t: any) => {
-      if (!t.due?.date) return false;
-      return t.due.date <= date; // string compare works for YYYY-MM-DD
-    });
+    let responseTasks = tasks;
 
-    return NextResponse.json({ tasks: filtered });
+    if (date && !allParam) {
+      // Include tasks that are due today or overdue (tasks with no due date are excluded)
+      responseTasks = tasks.filter((t: any) => {
+        if (!t.due?.date) return false;
+        return t.due.date <= date; // string compare works for YYYY-MM-DD
+      });
+    }
+
+    // For all=true we return all open tasks (no filtering)
+    return NextResponse.json({ tasks: responseTasks });
   } catch (err) {
     console.error('Todoist tasks endpoint error', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

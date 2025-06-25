@@ -272,6 +272,10 @@ export function TaskBoardDashboard() {
   const [todoistTasks, setTodoistTasks] = useState<any[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   
+  // Master list of all open tasks
+  const [allTodoistTasks, setAllTodoistTasks] = useState<any[]>([]);
+  const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
+  
   const fetchIntegrationsData = useCallback( async () => {
     // detect if any widget needs fitbit
     const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
@@ -308,13 +312,32 @@ export function TaskBoardDashboard() {
     }
   }, []);
 
+  const fetchAllTodoistTasks = useCallback(async () => {
+    try {
+      setIsLoadingAllTasks(true);
+      const res = await fetch('/api/integrations/todoist/tasks?all=true');
+      if (!res.ok) {
+        setAllTodoistTasks([]);
+        return;
+      }
+      const data = await res.json();
+      setAllTodoistTasks(data.tasks || []);
+    } catch (err) {
+      console.error('Failed to load all Todoist tasks', err);
+      setAllTodoistTasks([]);
+    } finally {
+      setIsLoadingAllTasks(false);
+    }
+  }, []);
+
   // modify useEffect to use fetchIntegrationsData
   useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
 
   // Fetch tasks whenever date changes
   useEffect(() => {
     fetchTodoistTasks(selectedDate);
-  }, [selectedDate, fetchTodoistTasks]);
+    fetchAllTodoistTasks();
+  }, [selectedDate, fetchTodoistTasks, fetchAllTodoistTasks]);
 
   // Load progress from localStorage once
   useEffect(() => {
@@ -1136,13 +1159,34 @@ export function TaskBoardDashboard() {
               {/* To-do list */}
               <div className="mt-6 flex-1 overflow-hidden flex flex-col">
                 <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
+                {/* Daily tasks */}
                 {isLoadingTasks ? (
                   <p className="text-sm text-gray-500">Loading…</p>
                 ) : todoistTasks.length === 0 ? (
                   <p className="text-sm text-gray-500">No tasks</p>
                 ) : (
-                  <ul className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
+                  <ul className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1">
                     {todoistTasks.map((t:any)=> (
+                      <li key={t.id} className="flex items-start gap-2">
+                        <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                        <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Divider */}
+                <hr className="my-4" />
+
+                {/* Master tasks */}
+                <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
+                {isLoadingAllTasks ? (
+                  <p className="text-sm text-gray-500">Loading…</p>
+                ) : allTodoistTasks.length === 0 ? (
+                  <p className="text-sm text-gray-500">No tasks</p>
+                ) : (
+                  <ul className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
+                    {allTodoistTasks.map((t:any)=> (
                       <li key={t.id} className="flex items-start gap-2">
                         <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
                         <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
