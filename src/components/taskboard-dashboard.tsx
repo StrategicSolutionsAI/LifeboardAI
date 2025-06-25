@@ -268,6 +268,10 @@ export function TaskBoardDashboard() {
   const [isLoadingFitbit, setIsLoadingFitbit] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Todoist task state
+  const [todoistTasks, setTodoistTasks] = useState<any[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  
   const fetchIntegrationsData = useCallback( async () => {
     // detect if any widget needs fitbit
     const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
@@ -285,8 +289,32 @@ export function TaskBoardDashboard() {
     }
   },[user]);
 
+  const fetchTodoistTasks = useCallback(async (d: Date) => {
+    try {
+      setIsLoadingTasks(true);
+      const iso = d.toISOString().slice(0,10);
+      const res = await fetch(`/api/integrations/todoist/tasks?date=${iso}`);
+      if (!res.ok) {
+        setTodoistTasks([]);
+        return;
+      }
+      const data = await res.json();
+      setTodoistTasks(data.tasks || []);
+    } catch (err) {
+      console.error('Failed to load Todoist tasks', err);
+      setTodoistTasks([]);
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  }, []);
+
   // modify useEffect to use fetchIntegrationsData
   useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
+
+  // Fetch tasks whenever date changes
+  useEffect(() => {
+    fetchTodoistTasks(selectedDate);
+  }, [selectedDate, fetchTodoistTasks]);
 
   // Load progress from localStorage once
   useEffect(() => {
@@ -742,6 +770,20 @@ export function TaskBoardDashboard() {
     return days;
   };
 
+  // Returns an array of the 7 Date objects for the week that contains `selectedDate`
+  const getWeekDays = () => {
+    const start = new Date(selectedDate);
+    // Move `start` back to Sunday of the current week
+    start.setDate(start.getDate() - start.getDay());
+    const days: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  };
+
   const handleDateChange = (newDate: Date) => {
     setDate(newDate);
     setSelectedDate(newDate);
@@ -831,8 +873,8 @@ export function TaskBoardDashboard() {
           
           {/* Bucket tabs */}
           <div
-            className="mt-10 flex overflow-x-auto"
-            style={{ maxWidth: 'calc(100% - 344px)' }}
+            className="relative mt-10 flex items-start overflow-x-auto"
+            style={{ maxWidth: 'calc(100% - 344px)', zIndex: 4 }}
           >
             {buckets.length > 0 && buckets.map((b, idx) => (
               <button
@@ -856,10 +898,11 @@ export function TaskBoardDashboard() {
                 onDragEnd={() => setDragIndex(null)}
                 onClick={() => setActiveBucket(b)}
                 style={{ 
-                  zIndex: b === activeBucket ? 20 : 10 - idx,
+                  // Active tab always highest; otherwise cascade left-over-right
+                  zIndex: b === activeBucket ? 50 : 9 - idx,
                   marginRight: '-10px'
                 }}
-                className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[11px] font-bold uppercase tracking-[0.05em] transition-all ${
+                className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[11px] font-bold uppercase tracking-[0.05em] transition-colors ${
                   b === activeBucket
                     ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)]'
                     : 'bg-white text-[#7482FE] hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]'
@@ -871,7 +914,9 @@ export function TaskBoardDashboard() {
             <button
               onClick={() => setIsEditorOpen(true)}
               style={{ 
-                zIndex: 5
+                // "+" tab participates in the same stacking order (lowest, furthest right)
+                zIndex: 0,
+                marginRight: '-10px'
               }}
               className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]"
             >
@@ -879,6 +924,8 @@ export function TaskBoardDashboard() {
                 +
               </span>
             </button>
+            {/* bottom gray divider under all tabs */}
+            <div className="absolute bottom-0 left-0 w-full h-px bg-gray-200" style={{ zIndex: -1 }} />
           </div>
         </section>
 
@@ -886,7 +933,7 @@ export function TaskBoardDashboard() {
         <div className="mx-auto w-full max-w-7xl flex-1 px-6 pb-24 flex gap-6">
           {/* Left section: tabs and widgets */}
           <div className="flex-1">
-            <div className="relative -mt-px flex h-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg border-t border-gray-200 bg-white">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg border-t border-gray-200 bg-white">
               {/* Inner nav */}
               <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
                 {[
@@ -1058,8 +1105,8 @@ export function TaskBoardDashboard() {
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className="w-80 flex-shrink-0">
-            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full">
+          <aside className="w-80 flex-shrink-0 -mt-10">
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
                 <div className="flex gap-1 text-gray-500">
@@ -1067,23 +1114,42 @@ export function TaskBoardDashboard() {
                   <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
                 </div>
               </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-                {['S','M','T','W','T','F','S'].map((d, index) => <span key={`weekday-${index}`}>{d}</span>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                {getDaysArray().map((day, idx) => (
-                  <span key={idx} className={`py-1 ${isSameDay(day, selectedDate) ? 'rounded bg-indigo-500 text-white' : ''}`}>{format(day,'d')}</span>
+
+              {/* Week view */}
+              <div className="flex justify-between gap-2 overflow-x-auto pb-1">
+                {getWeekDays().map((day, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleDateChange(day)}
+                    className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
+                      isSameDay(day, selectedDate)
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-lg font-semibold leading-none">{format(day, 'd')}</span>
+                    <span className="text-xs leading-none mt-1">{format(day, 'EEE')}</span>
+                  </button>
                 ))}
               </div>
 
               {/* To-do list */}
-              <div className="mt-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">To-dos on {format(selectedDate,'MMM d, yyyy')}</h4>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 1" className="accent-indigo-500"/> Example task 1</li>
-                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 2" className="accent-indigo-500"/> Example task 2</li>
-                  <li className="flex items-center gap-2"><input type="checkbox" disabled aria-label="Example task 3" className="accent-indigo-500"/> Example task 3</li>
-                </ul>
+              <div className="mt-6 flex-1 overflow-hidden flex flex-col">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
+                {isLoadingTasks ? (
+                  <p className="text-sm text-gray-500">Loading…</p>
+                ) : todoistTasks.length === 0 ? (
+                  <p className="text-sm text-gray-500">No tasks</p>
+                ) : (
+                  <ul className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
+                    {todoistTasks.map((t:any)=> (
+                      <li key={t.id} className="flex items-start gap-2">
+                        <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                        <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </aside>

@@ -49,6 +49,12 @@ const integrations: Integration[] = [
     description: "Connect your Fitbit device to sync health and fitness data", 
     icon: "⌚"
   },
+  { 
+    id: "todoist", 
+    name: "Todoist", 
+    description: "Sync tasks from your Todoist account", 
+    icon: "✅" 
+  },
 ]
 
 export default function OnboardingStep3() {
@@ -57,6 +63,7 @@ export default function OnboardingStep3() {
 
   const [connectingGoogle, setConnectingGoogle] = useState(false)
   const [connectingFitbit, setConnectingFitbit] = useState(false)
+  const [connectingTodoist, setConnectingTodoist] = useState(false)
   
   const connectGoogleCalendar = async () => {
     setConnectingGoogle(true)
@@ -80,6 +87,16 @@ export default function OnboardingStep3() {
     }
   }
   
+  const connectTodoist = async () => {
+    setConnectingTodoist(true)
+    try {
+      window.location.href = '/api/auth/todoist?redirectUrl=/onboarding/3'
+    } catch (error) {
+      console.error('Error connecting to Todoist:', error)
+      setConnectingTodoist(false)
+    }
+  }
+  
   const toggleIntegration = (integrationId: string) => {
     const integration = integrations.find(i => i.id === integrationId)
     
@@ -94,6 +111,11 @@ export default function OnboardingStep3() {
     // For Fitbit, start OAuth
     if (integrationId === 'fitbit') {
       connectFitbit()
+      return
+    }
+    // For Todoist, start OAuth
+    if (integrationId === 'todoist') {
+      connectTodoist()
       return
     }
     
@@ -171,6 +193,8 @@ export default function OnboardingStep3() {
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
                   ) : integration.id === 'fitbit' && connectingFitbit ? (
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
+                  ) : integration.id === 'todoist' && connectingTodoist ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
                   ) : (
                     <div className={cn(
                       "w-6 h-6 flex items-center justify-center rounded-full",
@@ -213,6 +237,21 @@ export default function OnboardingStep3() {
                 </>
               ) : (
                 <>Connect Google Calendar</>
+              )}
+            </Button>
+            <Button
+              onClick={connectTodoist}
+              disabled={connectingTodoist}
+              variant="secondary"
+              className="text-sm ml-2"
+            >
+              {connectingTodoist ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>Connect Todoist</>
               )}
             </Button>
           </div>
