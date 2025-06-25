@@ -989,7 +989,8 @@ export function TaskBoardDashboard() {
   const toggleTaskCompletion = async (taskId: string) => {
     // Determine current completion state
     const isCurrentlyCompleted =
-      todoistTasks.find((t) => t.id.toString() === taskId)?.completed ?? false;
+      (allTodoistTasks.find((t) => t.id.toString() === taskId)?.completed ?? false);
+
     const newCompleted = !isCurrentlyCompleted;
 
     const reorder = (arr: any[]) => {
@@ -1003,7 +1004,8 @@ export function TaskBoardDashboard() {
       ];
     };
 
-    setTodoistTasks((prev) => reorder(prev));
+    // Update lists (only reorder if the task array contains it)
+    setTodoistTasks((prev) => prev.some((t) => t.id.toString() === taskId) ? reorder(prev) : prev);
     setAllTodoistTasks((prev) => reorder(prev));
 
     setIsCompletingTask((prev) => ({ ...prev, [taskId]: true }));
