@@ -353,41 +353,112 @@ export function TaskBoardDashboard() {
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    if (source.droppableId === destination.droppableId) return;
+    // If dropped in the same list and at same index, do nothing
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
+      return;
+    }
+
+    // Helper to remove a task by id from an array (immutably)
+    const removeById = (arr: any[], id: string) => arr.filter((t) => t.id.toString() !== id);
 
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
-      // Moving from the dated list ➜ open list (clear due date)
-      const moved = todoistTasks.find((t) => t.id.toString() === draggableId);
-      // Remove from the daily list locally
-      setTodoistTasks((prev) => prev.filter((t) => t.id.toString() !== draggableId));
+      // -------------------------------------------
+      // Move task from daily list ➜ open list
+      // -------------------------------------------
+      const moved = todoistTasks[source.index];
+      if (!moved) return;
 
-      if (moved) {
-        // Insert at top of the open-task array locally (with cleared due)
+      // 1) Update daily list order (remove)
+      setTodoistTasks((prev) => {
+        const next = [...prev];
+        next.splice(source.index, 1);
+        return next;
+      });
+
+      // 2) Insert into open list at destination.index
+      setAllTodoistTasks((prev) => {
         const clearedDue = moved.due ? { ...moved.due, date: null } : { date: null };
         const cleared = { ...moved, due: clearedDue };
-        setAllTodoistTasks((prev) => [cleared, ...prev.filter((t) => t.id.toString() !== draggableId)]);
-      }
+
+        const without = removeById(prev, draggableId);
+
+        // Separate lists so we can insert into the open subset and then stitch back together
+        const openSubset: any[] = [];
+        const datedSubset: any[] = [];
+        without.forEach((task) => {
+          if (task.due?.date === selectedDateStr) datedSubset.push(task);
+          else openSubset.push(task);
+        });
+
+        openSubset.splice(destination.index, 0, cleared);
+        return [...openSubset, ...datedSubset];
+      });
 
       await updateTaskDueDate(draggableId, null);
     } else if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
-      // Moving from open ➜ dated list (set due to selected day)
-      const moved = allTodoistTasks.find((t: any) => t.id.toString() === draggableId);
-      if (moved) {
-        // Insert at top of the daily list locally
-        setTodoistTasks((prev) => [moved, ...prev]);
+      // -------------------------------------------
+      // Move task from open list ➜ daily list
+      // -------------------------------------------
+      // Need to derive the actual task from openTasksToShow order.
+      const openVisible = allTodoistTasks.filter(
+        (t: any) => t.due?.date !== selectedDateStr
+      );
+      const moved = openVisible[source.index];
+      if (!moved) return;
 
-        // Update all tasks array so the moved one now has the due date (it will be filtered out of open list)
+      // 1) Update allTodoistTasks (remove, then reinsert with due date) preserving order
+      setAllTodoistTasks((prev) => {
         const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
         const updated = { ...moved, due: updatedDue };
-        setAllTodoistTasks((prev) => prev.map((t) => (t.id.toString() === draggableId ? updated : t)));
-      }
+
+        const without = removeById(prev, draggableId);
+
+        const openSubset: any[] = [];
+        const datedSubset: any[] = [];
+        without.forEach((task) => {
+          if (task.due?.date === selectedDateStr) datedSubset.push(task);
+          else openSubset.push(task);
+        });
+
+        // Now updated will belong to datedSubset; we'll insert into dated list later via todoistTasks state
+        datedSubset.push(updated); // order inside dated subset managed below
+
+        return [...openSubset, ...datedSubset];
+      });
+
+      // 2) Insert into daily list at drop position
+      setTodoistTasks((prev) => {
+        const next = [...prev];
+        next.splice(destination.index, 0, moved);
+        return next;
+      });
 
       await updateTaskDueDate(draggableId, selectedDateStr);
+    } else if (source.droppableId === 'dailyTasks' && destination.droppableId === 'dailyTasks') {
+      // Reorder within daily list
+      setTodoistTasks((prev) => {
+        const next = [...prev];
+        const [movedItem] = next.splice(source.index, 1);
+        next.splice(destination.index, 0, movedItem);
+        return next;
+      });
+    } else if (source.droppableId === 'openTasks' && destination.droppableId === 'openTasks') {
+      // Reorder within open list (affects allTodoistTasks order)
+      const openSubset = allTodoistTasks.filter((t) => t.due?.date !== selectedDateStr);
+      const datedSubset = allTodoistTasks.filter((t) => t.due?.date === selectedDateStr);
+
+      const [movedItem] = openSubset.splice(source.index, 1);
+      openSubset.splice(destination.index, 0, movedItem);
+
+      setAllTodoistTasks([...openSubset, ...datedSubset]);
     }
 
-    // Refresh lists to reflect latest server state
-    fetchTodoistTasks(selectedDate);
-    fetchAllTodoistTasks();
+    // Optionally you can refresh from server, but keeping as-is to avoid flicker
+    // fetchTodoistTasks(selectedDate);
+    // fetchAllTodoistTasks();
   };
 
   // modify useEffect to use fetchIntegrationsData
