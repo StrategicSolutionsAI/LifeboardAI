@@ -82,13 +82,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
-// Prevent Next.js server-side rendering issue (store not found)
-if (typeof window === "undefined") {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { resetServerContext } = require("@hello-pangea/dnd");
-  resetServerContext();
-}
-
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
   Droplets,
@@ -1205,13 +1198,14 @@ export function TaskBoardDashboard() {
                 ))}
               </div>
 
-              {/* To-do list with drag & drop */}
+              {/* To-do lists with drag & drop */}
               <div className="mt-6 flex-1 overflow-hidden flex flex-col">
                 <DragDropContext onDragEnd={handleDragEnd}>
+                  {/* Daily tasks */}
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
                   <Droppable droppableId="dailyTasks">
                     {(provided: any) => (
-                      isLoadingTasks ? (
+                      (isLoadingTasks && todoistTasks.length === 0) ? (
                         <p className="text-sm text-gray-500">Loading…</p>
                       ) : todoistTasks.length === 0 ? (
                         <p className="text-sm text-gray-500">No tasks</p>
@@ -1232,36 +1226,36 @@ export function TaskBoardDashboard() {
                       )
                     )}
                   </Droppable>
+
+                  {/* Divider */}
+                  <hr className="my-4" />
+
+                  {/* Master tasks */}
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
+                  <Droppable droppableId="openTasks">
+                    {(provided: any)=> (
+                      (isLoadingAllTasks && openTasksToShow.length === 0) ? (
+                        <p className="text-sm text-gray-500">Loading…</p>
+                      ) : openTasksToShow.length === 0 ? (
+                        <p className="text-sm text-gray-500">No tasks</p>
+                      ) : (
+                        <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
+                          {openTasksToShow.map((t:any, index:number)=> (
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                              {(provided: any)=>(
+                                <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
+                                  <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
+                      )
+                    )}
+                  </Droppable>
                 </DragDropContext>
-
-                {/* Divider */}
-                <hr className="my-4" />
-
-                {/* Master tasks */}
-                <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
-                <Droppable droppableId="openTasks">
-                  {(provided: any)=>(
-                    isLoadingAllTasks ? (
-                      <p className="text-sm text-gray-500">Loading…</p>
-                    ) : openTasksToShow.length === 0 ? (
-                      <p className="text-sm text-gray-500">No tasks</p>
-                    ) : (
-                      <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
-                        {openTasksToShow.map((t:any, index:number)=> (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                            {(provided: any)=>(
-                              <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
-                                <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
-                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </ul>
-                    )
-                  )}
-                </Droppable>
               </div>
             </div>
           </aside>
