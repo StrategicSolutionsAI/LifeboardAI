@@ -1038,38 +1038,77 @@ export function TaskBoardDashboard() {
    * Create a new Todoist task (optionally for the selected date)
    */
   const createTask = async (content: string, dueDate: string | null) => {
-    if (!content.trim()) return;
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    // --------------------------------------------------
+    // 1. Optimistic UI update
+    // --------------------------------------------------
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTask: any = {
+      id: tempId,
+      content: trimmed,
+      completed: false,
+      due: dueDate ? { date: dueDate } : null,
+    };
+
+    setAllTodoistTasks((prev) => [optimisticTask, ...prev]);
+    if (dueDate) {
+      const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+      if (dueDate === selectedDateStr) {
+        setTodoistTasks((prev) => [optimisticTask, ...prev]);
+      }
+    }
 
     try {
+      // --------------------------------------------------
+      // 2. Call API to actually create task in Todoist
+      // --------------------------------------------------
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim(), dueDate }),
+        body: JSON.stringify({ content: trimmed, dueDate }),
       });
 
       if (!res.ok) {
         console.error('Failed to create task', await res.text());
-        return;
+        throw new Error('Todoist create failed');
       }
 
       const { task } = await res.json();
-      if (!task) return;
+      if (!task) throw new Error('No task returned');
 
-      // Ensure our custom fields exist
       task.completed = false;
 
-      // Optimistically add to appropriate arrays
-      setAllTodoistTasks((prev) => [task, ...prev]);
+      // --------------------------------------------------
+      // 3. Replace optimistic task with the real one
+      // --------------------------------------------------
+      setAllTodoistTasks((prev) => {
+        const without = prev.filter((t) => t.id !== tempId);
+        return [task, ...without];
+      });
 
       if (dueDate) {
-        // If for current selected date include in daily list
         const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         if (dueDate === selectedDateStr) {
-          setTodoistTasks((prev) => [task, ...prev]);
+          setTodoistTasks((prev) => {
+            const without = prev.filter((t) => t.id !== tempId);
+            return [task, ...without];
+          });
         }
       }
     } catch (err) {
+      // --------------------------------------------------
+      // 4. Roll back optimistic update on failure
+      // --------------------------------------------------
       console.error('Error creating task', err);
+      setAllTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
+      if (dueDate) {
+        const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        if (dueDate === selectedDateStr) {
+          setTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
+        }
+      }
     }
   };
 
