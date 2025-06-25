@@ -296,7 +296,7 @@ export function TaskBoardDashboard() {
   const fetchTodoistTasks = useCallback(async (d: Date) => {
     try {
       setIsLoadingTasks(true);
-      const iso = d.toISOString().slice(0,10);
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const res = await fetch(`/api/integrations/todoist/tasks?date=${iso}`);
       if (!res.ok) {
         setTodoistTasks([]);
@@ -808,8 +808,9 @@ export function TaskBoardDashboard() {
   };
 
   const handleDateChange = (newDate: Date) => {
-    setDate(newDate);
-    setSelectedDate(newDate);
+    const normalized = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
+    setDate(normalized);
+    setSelectedDate(normalized);
   };
 
   const clearLocalStorage = () => {
