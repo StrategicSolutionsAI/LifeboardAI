@@ -80,6 +80,7 @@ import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -329,6 +330,46 @@ export function TaskBoardDashboard() {
       setIsLoadingAllTasks(false);
     }
   }, []);
+
+  // ----------------------------------------------------------------------
+  // Drag & Drop handling between dailyTasks and openTasks
+  // ----------------------------------------------------------------------
+  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+
+  const openTasksToShow = allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr);
+
+  const updateTaskDueDate = async (taskId: string, dueDate: string | null) => {
+    try {
+      await fetch('/api/integrations/todoist/tasks/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, dueDate }),
+      });
+    } catch (err) {
+      console.error('Failed to update Todoist task', err);
+    }
+  };
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+    if (source.droppableId === destination.droppableId) return;
+
+    if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
+      setTodoistTasks((prev) => prev.filter((t) => t.id.toString() !== draggableId));
+      await updateTaskDueDate(draggableId, null);
+    } else if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
+      const moved = allTodoistTasks.find((t: any) => t.id.toString() === draggableId);
+      if (moved) {
+        setTodoistTasks((prev) => [...prev, moved]);
+        await updateTaskDueDate(draggableId, selectedDateStr);
+      }
+    }
+
+    // Refresh lists to reflect latest server state
+    fetchTodoistTasks(selectedDate);
+    fetchAllTodoistTasks();
+  };
 
   // modify useEffect to use fetchIntegrationsData
   useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
@@ -1157,44 +1198,63 @@ export function TaskBoardDashboard() {
                 ))}
               </div>
 
-              {/* To-do list */}
+              {/* To-do list with drag & drop */}
               <div className="mt-6 flex-1 overflow-hidden flex flex-col">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
-                {/* Daily tasks */}
-                {isLoadingTasks ? (
-                  <p className="text-sm text-gray-500">Loading…</p>
-                ) : todoistTasks.length === 0 ? (
-                  <p className="text-sm text-gray-500">No tasks</p>
-                ) : (
-                  <ul className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1">
-                    {todoistTasks.map((t:any)=> (
-                      <li key={t.id} className="flex items-start gap-2">
-                        <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
-                        <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
+                  <Droppable droppableId="dailyTasks">
+                    {(provided: any) => (
+                      isLoadingTasks ? (
+                        <p className="text-sm text-gray-500">Loading…</p>
+                      ) : todoistTasks.length === 0 ? (
+                        <p className="text-sm text-gray-500">No tasks</p>
+                      ) : (
+                        <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1">
+                          {todoistTasks.map((t:any, index:number)=> (
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                              {(provided: any)=>(
+                                <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
+                                  <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
+                      )
+                    )}
+                  </Droppable>
+                </DragDropContext>
 
                 {/* Divider */}
                 <hr className="my-4" />
 
                 {/* Master tasks */}
                 <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
-                {isLoadingAllTasks ? (
-                  <p className="text-sm text-gray-500">Loading…</p>
-                ) : allTodoistTasks.length === 0 ? (
-                  <p className="text-sm text-gray-500">No tasks</p>
-                ) : (
-                  <ul className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
-                    {allTodoistTasks.map((t:any)=> (
-                      <li key={t.id} className="flex items-start gap-2">
-                        <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
-                        <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <Droppable droppableId="openTasks">
+                  {(provided: any)=>(
+                    isLoadingAllTasks ? (
+                      <p className="text-sm text-gray-500">Loading…</p>
+                    ) : openTasksToShow.length === 0 ? (
+                      <p className="text-sm text-gray-500">No tasks</p>
+                    ) : (
+                      <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
+                        {openTasksToShow.map((t:any, index:number)=> (
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            {(provided: any)=>(
+                              <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
+                                <input type="checkbox" disabled aria-label={t.content} checked={t.completed ?? false} className="accent-indigo-500 mt-0.5" />
+                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </ul>
+                    )
+                  )}
+                </Droppable>
               </div>
             </div>
           </aside>
