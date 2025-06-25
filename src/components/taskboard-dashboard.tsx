@@ -279,6 +279,10 @@ export function TaskBoardDashboard() {
   
   const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
   
+  // New task input state
+  const [newDailyTask, setNewDailyTask] = useState('');
+  const [newOpenTask, setNewOpenTask] = useState('');
+  
   const fetchIntegrationsData = useCallback( async () => {
     // detect if any widget needs fitbit
     const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
@@ -1030,6 +1034,56 @@ export function TaskBoardDashboard() {
     }
   };
 
+  /**
+   * Create a new Todoist task (optionally for the selected date)
+   */
+  const createTask = async (content: string, dueDate: string | null) => {
+    if (!content.trim()) return;
+
+    try {
+      const res = await fetch('/api/integrations/todoist/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content.trim(), dueDate }),
+      });
+
+      if (!res.ok) {
+        console.error('Failed to create task', await res.text());
+        return;
+      }
+
+      const { task } = await res.json();
+      if (!task) return;
+
+      // Ensure our custom fields exist
+      task.completed = false;
+
+      // Optimistically add to appropriate arrays
+      setAllTodoistTasks((prev) => [task, ...prev]);
+
+      if (dueDate) {
+        // If for current selected date include in daily list
+        const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        if (dueDate === selectedDateStr) {
+          setTodoistTasks((prev) => [task, ...prev]);
+        }
+      }
+    } catch (err) {
+      console.error('Error creating task', err);
+    }
+  };
+
+  const handleAddDailyTask = () => {
+    const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+    createTask(newDailyTask, selectedDateStr);
+    setNewDailyTask('');
+  };
+
+  const handleAddOpenTask = () => {
+    createTask(newOpenTask, null);
+    setNewOpenTask('');
+  };
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -1381,6 +1435,22 @@ export function TaskBoardDashboard() {
                     )}
                   </Droppable>
 
+                  {/* Add task to daily list */}
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add task…"
+                      value={newDailyTask}
+                      onChange={(e) => setNewDailyTask(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleAddDailyTask}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >Add</button>
+                  </div>
+                   
                   {/* Divider */}
                   <hr className="my-4" />
 
@@ -1427,6 +1497,22 @@ export function TaskBoardDashboard() {
                       </ul>
                     )}
                   </Droppable>
+
+                  {/* Add open task */}
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add task…"
+                      value={newOpenTask}
+                      onChange={(e) => setNewOpenTask(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleAddOpenTask}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >Add</button>
+                  </div>
                 </DragDropContext>
               </div>
             </div>

@@ -69,4 +69,61 @@ export async function GET(request: NextRequest) {
     console.error('Todoist tasks endpoint error', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { content, dueDate } = await request.json();
+
+    if (!content || typeof content !== 'string') {
+      return NextResponse.json({ error: 'content required' }, { status: 400 });
+    }
+
+    const supabase = supabaseServer();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const { data: integration } = await supabase
+      .from('user_integrations')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('provider', 'todoist')
+      .single();
+
+    if (!integration?.access_token) {
+      return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
+    }
+
+    const body: Record<string, string> = { content };
+    if (dueDate) {
+      body['due_date'] = dueDate; // YYYY-MM-DD
+    }
+
+    const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${integration.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!todoistRes.ok) {
+      const text = await todoistRes.text();
+      console.error('Todoist create task error', todoistRes.status, text);
+      return NextResponse.json({ error: 'Todoist API error', status: todoistRes.status }, { status: 502 });
+    }
+
+    const task = await todoistRes.json();
+
+    return NextResponse.json({ task });
+  } catch (err) {
+    console.error('Todoist create task endpoint error', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
 } 
