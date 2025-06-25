@@ -205,6 +205,11 @@ const BG_COLOR_CLASSES: Record<string,string> = {
   blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
 };
 
+// Text color classes to match widget icon color (500 tone)
+const TEXT_COLOR_CLASSES: Record<string,string> = {
+  blue:'text-blue-500', green:'text-green-500', red:'text-red-500', orange:'text-orange-500', purple:'text-purple-500', indigo:'text-indigo-500', amber:'text-amber-500', teal:'text-teal-500', rose:'text-rose-500', cyan:'text-cyan-500', yellow:'text-yellow-500', sky:'text-sky-500', emerald:'text-emerald-500', violet:'text-violet-500', lime:'text-lime-500', fuchsia:'text-fuchsia-500', gray:'text-gray-500', slate:'text-slate-500', stone:'text-stone-500'
+};
+
 /**
  * TaskBoardDashboard
  * -----------------------------------------------------------------------------
@@ -275,6 +280,10 @@ export function TaskBoardDashboard() {
   interface ProgressEntry { value:number; date:string; streak:number; lastCompleted:string; }
   const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
   
+  // Add a ref for progress too
+  const progressByWidgetRef = useRef(progressByWidget);
+  progressByWidgetRef.current = progressByWidget;
+  
   // Fitbit data state
   const [fitbitData, setFitbitData] = useState<Record<string, number>>(()=>{
     if (typeof window !== 'undefined'){
@@ -304,40 +313,71 @@ export function TaskBoardDashboard() {
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   
   const fetchIntegrationsData = useCallback( async () => {
-    const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
-    if(!needFitbit || !user) return;
-
-    // 1. Try cached value first (5-minute TTL)
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('fitbit_metrics');
-        if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached.savedAt && Date.now() - cached.savedAt < 5 * 60 * 1000) {
-            setFitbitData({ water: cached.water, steps: cached.steps, calories: cached.calories });
-            return; // fresh enough → skip fetch
-          }
-        }
-      } catch {}
-    }
+    if (!user) return; // must be signed in to fetch integration data
 
     setIsRefreshing(true);
+
     try {
-      const res = await fetch('/api/integrations/fitbit/metrics');
-      if (res.ok) {
-        const data = await res.json();
-        const obj = { water: data.water || 0, steps: data.steps || 0, calories: data.calories || 0 };
-        setFitbitData(obj);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('fitbit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
+      // -----------------------------------------------------------
+      // 1) Force-refresh Todoist tasks (clear cache ➜ fetch fresh)
+      // -----------------------------------------------------------
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('todoist_all_tasks');
+      }
+
+      try {
+        const tasksRes = await fetch(`/api/integrations/todoist/tasks?all=true&cb=${Date.now()}`);
+        if (tasksRes.ok) {
+          const taskData = await tasksRes.json();
+          const allTasks: any[] = taskData.tasks || [];
+          setAllTodoistTasks(allTasks);
+
+          // Also update the daily list for the currently selected date
+          const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`;
+          setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
+
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('todoist_all_tasks', JSON.stringify({ tasks: allTasks, savedAt: Date.now() }));
+          }
+        } else {
+          console.error('Failed to refresh Todoist tasks');
+        }
+      } catch (err) {
+        console.error('Error refreshing Todoist tasks', err);
+      }
+
+      // -----------------------------------------------------------
+      // 2) Refresh Fitbit metrics if there are Fitbit-backed widgets
+      // -----------------------------------------------------------
+      const needFitbit = Object.values(widgetsByBucketRef.current)
+        .flat()
+        .some((w) => ["water", "steps"].includes(w.id) && w.dataSource === "fitbit");
+
+      if (needFitbit) {
+        // Skip cache entirely – always fetch fresh metrics
+        const res = await fetch(`/api/integrations/fitbit/metrics?cb=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          const obj = {
+            water: data.water || 0,
+            steps: data.steps || 0,
+            calories: data.calories || 0,
+          };
+          setFitbitData(obj);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "fitbit_metrics",
+              JSON.stringify({ ...obj, savedAt: Date.now() })
+            );
+          }
         }
       }
     } catch (err) {
-      console.error('Manual refresh failed', err);
+      console.error("Manual refresh failed", err);
     } finally {
       setIsRefreshing(false);
     }
-  },[user]);
+  }, [user, selectedDate]);
 
   const fetchTodoistTasks = useCallback(async (d: Date) => {
     try {
@@ -551,26 +591,99 @@ export function TaskBoardDashboard() {
     fetchAllTodoistTasks(selectedDate);
   }, [selectedDate, fetchAllTodoistTasks]);
 
-  // Load progress from localStorage once
+  // Load progress from localStorage or Supabase once on mount / user change
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = localStorage.getItem('widget_progress');
-    if (raw) {
-      try { setProgressByWidget(JSON.parse(raw)); } catch {}
+    async function loadProgress() {
+      console.log('Loading progress...');
+      let loaded = false;
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('widget_progress');
+        console.log('Raw localStorage progress:', raw);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            console.log('Parsed localStorage progress:', parsed);
+            setProgressByWidget(parsed);
+            loaded = true;
+          } catch (e) {
+            console.error('Failed to parse localStorage progress:', e);
+          }
+        }
+      }
+
+      if (!loaded && user) {
+        try {
+          const prefs = await getUserPreferencesClient();
+          console.log('User preferences:', prefs);
+          if (prefs?.progress_by_widget) {
+            console.log('Loading progress from Supabase:', prefs.progress_by_widget);
+            setProgressByWidget(prefs.progress_by_widget as Record<string, ProgressEntry>);
+            loaded = true;
+          }
+        } catch (err) {
+          console.error('Failed to load progress from Supabase', err);
+        }
+      }
+      
+      if (!loaded) {
+        console.log('No progress found in localStorage or Supabase');
+      }
     }
-  }, []);
+
+    loadProgress();
+  }, [user]);
+
+  // Debounced save of progress to Supabase (moved here to fix hoisting issue)
+  const saveProgress = async (progress: Record<string, ProgressEntry>) => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) return;
+    try {
+      const prefs = await getUserPreferencesClient();
+      if (prefs) {
+        await saveUserPreferences({
+          ...prefs,
+          progress_by_widget: progress,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save progress to Supabase', err);
+    }
+  };
+
+  const debouncedSaveProgressToSupabase = useRef(
+    debounce((progress: Record<string, ProgressEntry>) => {
+      saveProgress(progress);
+    }, 2000)
+  ).current;
 
   // Save progress whenever it changes
   useEffect(() => {
+    // Avoid overwriting stored data with an empty object on first mount
+    const isEmpty = Object.keys(progressByWidget).length === 0;
+    console.log('Progress save effect triggered, isEmpty:', isEmpty, 'progressByWidget:', progressByWidget);
+
+    if (isEmpty) return; // nothing meaningful to save yet
+
+    // ---------------- LocalStorage ------------------
     if (typeof window !== 'undefined') {
       localStorage.setItem('widget_progress', JSON.stringify(progressByWidget));
+      console.log('Saved progress to localStorage');
     }
-  }, [progressByWidget]);
+
+    // ---------------- Supabase ----------------------
+    if (user) {
+      console.log('User exists, debouncing save to Supabase');
+      debouncedSaveProgressToSupabase(progressByWidget);
+    }
+  }, [progressByWidget, user]);
 
   // Helper to get today string
   const todayStr = new Date().toISOString().slice(0,10);
 
   const incrementProgress = (w: WidgetInstance) => {
+    console.log('incrementProgress called for widget:', w.instanceId);
+    console.log('Current progressByWidget:', progressByWidget);
+    
     setProgressByWidget(prev => {
       const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
       let { value, streak, lastCompleted } = entry;
@@ -590,12 +703,15 @@ export function TaskBoardDashboard() {
         }
         newLast = todayStrGlobal;
       }
-      return { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
+      
+      const newProgress = { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
+      console.log('New progress state:', newProgress);
+      return newProgress;
     });
   };
 
   // Centralized function to save widgets, including to localStorage
-  const saveWidgets = async (widgetsToSave: Record<string, WidgetInstance[]>) => {
+  const saveWidgets = async (widgetsToSave: Record<string, WidgetInstance[]>, progressToSave?: Record<string, ProgressEntry>) => {
     // Always fetch the current user from Supabase to avoid race conditions
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
@@ -628,6 +744,7 @@ export function TaskBoardDashboard() {
         const savedPrefs = await saveUserPreferences({
           ...prefs,
           widgets_by_bucket: widgetsToSave,
+          progress_by_widget: progressToSave || progressByWidgetRef.current, // Include current progress
         });
         console.log('Widgets saved to Supabase successfully:', savedPrefs);
       }
@@ -641,8 +758,10 @@ export function TaskBoardDashboard() {
     debounce(() => {
       // Always use the latest state from the ref
       const latestWidgets = widgetsByBucketRef.current;
+      const latestProgress = progressByWidgetRef.current;
       console.log('Debounced save executing with widgets:', latestWidgets);
-      saveWidgets(latestWidgets);
+      console.log('Debounced save executing with progress:', latestProgress);
+      saveWidgets(latestWidgets, latestProgress);
     }, 2000)
   ).current;
 
@@ -657,7 +776,7 @@ export function TaskBoardDashboard() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ widgetsByBucket: widgetsByBucketRef.current }),
+        body: JSON.stringify({ widgetsByBucket: widgetsByBucketRef.current, progressByWidget }),
       });
 
       if (!response.ok) {
@@ -1251,6 +1370,8 @@ export function TaskBoardDashboard() {
     );
   }, []);
 
+
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -1529,7 +1650,16 @@ export function TaskBoardDashboard() {
                         })()}
 
                         {!( ['water','steps'].includes(w.id) && w.dataSource === 'fitbit') && (
-                          <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
+                          <button
+                            aria-label="Add one"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              incrementProgress(w);
+                            }}
+                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-indigo-600'} hover:scale-110 transition-transform`}
+                          >
+                            +
+                          </button>
                         )}
                       </div>
                     );

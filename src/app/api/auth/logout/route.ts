@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const { widgetsByBucket } = await request.json();
+  const { widgetsByBucket, progressByWidget } = await request.json();
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       console.log('API: Saving widgets for user:', user.id);
       const { error: saveError } = await supabase
         .from('user_preferences')
-        .update({ widgets_by_bucket: widgetsByBucket, updated_at: new Date().toISOString() })
+        .update({ widgets_by_bucket: widgetsByBucket, progress_by_widget: progressByWidget, updated_at: new Date().toISOString() })
         .eq('user_id', user.id);
 
       if (saveError) {

@@ -5,6 +5,7 @@ export interface UserPreferences {
   user_id: string;
   life_buckets: string[];
   widgets_by_bucket: Record<string, any[]>;
+  progress_by_widget?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }
@@ -32,6 +33,7 @@ export async function getUserPreferencesClient() {
         user_id: user.id,
         life_buckets: [],
         widgets_by_bucket: {},
+        progress_by_widget: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -47,7 +49,8 @@ export async function getUserPreferencesClient() {
         return {
           user_id: user.id,
           life_buckets: [],
-          widgets_by_bucket: {}
+          widgets_by_bucket: {},
+          progress_by_widget: {}
         };
       }
       
@@ -61,21 +64,24 @@ export async function getUserPreferencesClient() {
       return {
         user_id: user.id,
         life_buckets: [],
-        widgets_by_bucket: {}
+        widgets_by_bucket: {},
+        progress_by_widget: {}
       };
     }
     
     // Ensure widgets_by_bucket is present
     return {
       ...data,
-      widgets_by_bucket: data.widgets_by_bucket || {}
+      widgets_by_bucket: data.widgets_by_bucket || {},
+      progress_by_widget: data.progress_by_widget || {}
     };
   } catch (err) {
     console.error('Exception fetching user preferences:', err);
     return {
       user_id: user.id,
       life_buckets: [],
-      widgets_by_bucket: {}
+      widgets_by_bucket: {},
+      progress_by_widget: {}
     };
   }
 }
@@ -94,6 +100,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
     const safePreferences = {
       ...preferences,
       widgets_by_bucket: preferences.widgets_by_bucket || {},
+      progress_by_widget: preferences.progress_by_widget || {},
       updated_at: new Date().toISOString(),
     };
     
