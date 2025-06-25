@@ -76,6 +76,14 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Cloud,
+  CloudSun,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  Sun,
+  LayoutDashboard,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -192,6 +200,11 @@ const getTemplateColor = (id: string): string | null => {
   return templateColors[id] || null;
 };
 
+// Color to Tailwind background class map (500 tone)
+const BG_COLOR_CLASSES: Record<string,string> = {
+  blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
+};
+
 /**
  * TaskBoardDashboard
  * -----------------------------------------------------------------------------
@@ -243,6 +256,7 @@ export function TaskBoardDashboard() {
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
+  const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
   const [date, setDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
@@ -290,19 +304,38 @@ export function TaskBoardDashboard() {
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   
   const fetchIntegrationsData = useCallback( async () => {
-    // detect if any widget needs fitbit
     const needFitbit = Object.values(widgetsByBucketRef.current).flat().some(w=>['water','steps'].includes(w.id)&& w.dataSource==='fitbit');
     if(!needFitbit || !user) return;
+
+    // 1. Try cached value first (5-minute TTL)
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('fitbit_metrics');
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached.savedAt && Date.now() - cached.savedAt < 5 * 60 * 1000) {
+            setFitbitData({ water: cached.water, steps: cached.steps, calories: cached.calories });
+            return; // fresh enough → skip fetch
+          }
+        }
+      } catch {}
+    }
+
     setIsRefreshing(true);
-    try{
-       const res = await fetch('/api/integrations/fitbit/metrics');
-       if(res.ok){
-          const data = await res.json();
-          setFitbitData({water:data.water||0,steps:data.steps||0,calories:data.calories||0});
-          if(typeof window!=='undefined') localStorage.setItem('fitbit_metrics', JSON.stringify({water:data.water||0,steps:data.steps||0,calories:data.calories||0}));
-       }
-    }catch(err){console.error('Manual refresh failed',err);}finally{
-       setIsRefreshing(false);
+    try {
+      const res = await fetch('/api/integrations/fitbit/metrics');
+      if (res.ok) {
+        const data = await res.json();
+        const obj = { water: data.water || 0, steps: data.steps || 0, calories: data.calories || 0 };
+        setFitbitData(obj);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fitbit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
+        }
+      }
+    } catch (err) {
+      console.error('Manual refresh failed', err);
+    } finally {
+      setIsRefreshing(false);
     }
   },[user]);
 
@@ -325,21 +358,58 @@ export function TaskBoardDashboard() {
     }
   }, []);
 
-  const fetchAllTodoistTasks = useCallback(async () => {
+  const fetchAllTodoistTasks = useCallback(async (dateForDaily?: Date) => {
     try {
       setIsLoadingAllTasks(true);
+      setIsLoadingTasks(true);
+
+      // ---------- Try cached data first (1-minute TTL) ----------
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('todoist_all_tasks');
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (cached.savedAt && Date.now() - cached.savedAt < 60 * 1000) {
+              const allTasks: any[] = cached.tasks || [];
+              setAllTodoistTasks(allTasks);
+              if (dateForDaily) {
+                const iso = `${dateForDaily.getFullYear()}-${String(dateForDaily.getMonth() + 1).padStart(2,'0')}-${String(dateForDaily.getDate()).padStart(2,'0')}`;
+                setTodoistTasks(allTasks.filter(t=>t.due?.date===iso));
+              }
+              return; // fresh cache
+            }
+          }
+        } catch {}
+      }
+
       const res = await fetch('/api/integrations/todoist/tasks?all=true');
       if (!res.ok) {
         setAllTodoistTasks([]);
+        setTodoistTasks([]);
         return;
       }
       const data = await res.json();
-      setAllTodoistTasks(data.tasks || []);
+      const allTasks: any[] = data.tasks || [];
+      setAllTodoistTasks(allTasks);
+
+      // Derive the tasks for the selected day so we don't need a second request
+      if (dateForDaily) {
+        const iso = `${dateForDaily.getFullYear()}-${String(dateForDaily.getMonth() + 1).padStart(2, '0')}-${String(dateForDaily.getDate()).padStart(2, '0')}`;
+        const daily = allTasks.filter((t) => t.due?.date === iso);
+        setTodoistTasks(daily);
+      }
+
+      // Persist cache
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('todoist_all_tasks', JSON.stringify({ tasks: allTasks, savedAt: Date.now() }));
+      }
     } catch (err) {
-      console.error('Failed to load all Todoist tasks', err);
+      console.error('Failed to load Todoist tasks', err);
       setAllTodoistTasks([]);
+      setTodoistTasks([]);
     } finally {
       setIsLoadingAllTasks(false);
+      setIsLoadingTasks(false);
     }
   }, []);
 
@@ -476,11 +546,10 @@ export function TaskBoardDashboard() {
   // modify useEffect to use fetchIntegrationsData
   useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
 
-  // Fetch tasks whenever date changes
+  // Fetch tasks whenever date changes (single consolidated request)
   useEffect(() => {
-    fetchTodoistTasks(selectedDate);
-    fetchAllTodoistTasks();
-  }, [selectedDate, fetchTodoistTasks, fetchAllTodoistTasks]);
+    fetchAllTodoistTasks(selectedDate);
+  }, [selectedDate, fetchAllTodoistTasks]);
 
   // Load progress from localStorage once
   useEffect(() => {
@@ -1129,6 +1198,59 @@ export function TaskBoardDashboard() {
     setNewOpenTask('');
   };
 
+  // Fetch current weather using browser geolocation and open-meteo API (no key required)
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+    const fetchWeather = async (lat: number, lon: number) => {
+      try {
+        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const data = await resp.json();
+        if (data && data.current_weather) {
+          const code = data.current_weather.weathercode as number;
+          const tempC = data.current_weather.temperature as number;
+          const temp = tempC * 9 / 5 + 32; // convert to °F
+
+          // Map WMO weather codes to icons
+          const iconMap: Record<string, LucideIcon> = {
+            clear: Sun,
+            partly: CloudSun,
+            cloud: Cloud,
+            drizzle: CloudRain,
+            rain: CloudRain,
+            snow: CloudSnow,
+            thunder: CloudLightning,
+          };
+
+          const getIconForCode = (c: number): LucideIcon => {
+            if (c === 0) return iconMap.clear;
+            if ([1,2].includes(c)) return iconMap.partly;
+            if (c === 3) return iconMap.cloud;
+            if (c >= 45 && c <= 48) return iconMap.cloud;
+            if (c >= 51 && c <= 57) return iconMap.drizzle;
+            if (c >= 61 && c <= 67) return iconMap.rain;
+            if (c >= 71 && c <= 77) return iconMap.snow;
+            if (c >= 95) return iconMap.thunder;
+            return iconMap.cloud;
+          };
+
+          setWeather({ icon: getIconForCode(code), temp });
+        }
+      } catch (err) {
+        console.error('Failed to fetch weather', err);
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        fetchWeather(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {
+        // fallback: New York City
+        fetchWeather(40.7128, -74.006);
+      }
+    );
+  }, []);
+
   return (
     <div className="min-h-screen bg-violet-50">
 
@@ -1144,6 +1266,12 @@ export function TaskBoardDashboard() {
             <span>TaskBoard</span>
           </div>
           <div className="flex items-center gap-4">
+            {weather && (() => { const Icon = weather.icon; return (
+              <div className="flex items-center gap-1 text-gray-600 text-sm">
+                <Icon className="h-5 w-5" />
+                <span>{Math.round(weather.temp)}°</span>
+              </div>
+            ); })()}
             {/* Temporary cleanup button - remove after use */}
             {Object.values(widgetsByBucket).some(widgets => 
               widgets.some(w => w.instanceId?.startsWith('debug-'))
@@ -1171,9 +1299,8 @@ export function TaskBoardDashboard() {
             Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
           </h2>
           
-          {/* Bucket tabs */}
           <div
-            className="relative mt-10 flex items-start overflow-x-auto"
+            className="relative mt-10 flex items-start overflow-x-auto ml-[344px]"
             style={{ maxWidth: 'calc(100% - 344px)', zIndex: 4 }}
           >
             {buckets.length > 0 && buckets.map((b, idx) => (
@@ -1280,114 +1407,133 @@ export function TaskBoardDashboard() {
                   </div>
 
                   {/* Widget cards */}
-                  {getDisplayWidgets(activeBucket).map((w) => (
-                    <div key={w.instanceId} className="w-48 rounded-lg border bg-white p-3 shadow-sm relative group cursor-pointer" onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('Deleting widget:', w.instanceId);
-                          // Use callback pattern to ensure we're working with the latest state
-                          setWidgetsByBucket(prevWidgets => {
-                            const updatedWidgets = { ...prevWidgets };
-                            updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
-                            
-                            console.log('Widget deleted from bucket:', activeBucket);
-                            console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
-                            console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
-                            
-                            // Also update the ref immediately
-                            widgetsByBucketRef.current = updatedWidgets;
-                            
-                            // Force immediate save to localStorage
-                            if (typeof window !== 'undefined') {
-                              const dataToSave = {
-                                widgets: updatedWidgets,
-                                savedAt: new Date().toISOString()
-                              };
-                              localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                              console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                  {getDisplayWidgets(activeBucket).map((w) => {
+                    // Determine today's progress value and percentage towards target
+                    let todayVal = 0;
+                    if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
+                      todayVal = fitbitData.water;
+                    } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
+                      todayVal = fitbitData.steps;
+                    } else {
+                      const prog = progressByWidget[w.instanceId];
+                      todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
+                    }
+                    const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
+                    const goalMet = pct >= 100;
+
+                    // Background tint (5% opacity of widget color) when goal met
+                    const bgTintClasses: Record<string,string> = {
+                      blue:'bg-blue-500/5', green:'bg-green-500/5', red:'bg-red-500/5', orange:'bg-orange-500/5', purple:'bg-purple-500/5', indigo:'bg-indigo-500/5', amber:'bg-amber-500/5', teal:'bg-teal-500/5', rose:'bg-rose-500/5', cyan:'bg-cyan-500/5', yellow:'bg-yellow-500/5', sky:'bg-sky-500/5', emerald:'bg-emerald-500/5', violet:'bg-violet-500/5', lime:'bg-lime-500/5', fuchsia:'bg-fuchsia-500/5', gray:'bg-gray-500/5', slate:'bg-slate-500/5', stone:'bg-stone-500/5'
+                    };
+                    const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
+                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
+
+                    return (
+                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('Deleting widget:', w.instanceId);
+                            // Use callback pattern to ensure we're working with the latest state
+                            setWidgetsByBucket(prevWidgets => {
+                              const updatedWidgets = { ...prevWidgets };
+                              updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
+                              
+                              console.log('Widget deleted from bucket:', activeBucket);
+                              console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
+                              console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
+                              
+                              // Also update the ref immediately
+                              widgetsByBucketRef.current = updatedWidgets;
+                              
+                              // Force immediate save to localStorage
+                              if (typeof window !== 'undefined') {
+                                const dataToSave = {
+                                  widgets: updatedWidgets,
+                                  savedAt: new Date().toISOString()
+                                };
+                                localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+                                console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                              }
+                              
+                              return updatedWidgets;
+                            });
+                          }}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
+                          aria-label="Delete widget"
+                        >
+                          <X className="h-3 w-3 text-red-600" />
+                        </button>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            let IconComponent:any = null;
+                            if (typeof w.icon === 'string') {
+                              IconComponent = getIconComponent(w.icon);
+                            } else if (typeof w.icon === 'function') {
+                              IconComponent = w.icon;
                             }
-                            
-                            return updatedWidgets;
-                          });
-                        }}
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
-                        aria-label="Delete widget"
-                      >
-                        <X className="h-3 w-3 text-red-600" />
-                      </button>
-                      <div className="flex items-center gap-2">
+                            if (!IconComponent) {
+                              IconComponent = getIconComponent(w.id);
+                            }
+                            if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
+
+                            // Get color - fallback to widget template default if not set
+                            const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
+
+                            return (
+                              <div
+                                className={`w-8 h-8 rounded flex items-center justify-center ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-gray-500'}`}
+                              >
+                                <IconComponent className="h-5 w-5 text-white" />
+                              </div>
+                            );
+                          })()}
+                          <span className="text-sm font-medium truncate">{w.name}</span>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
+
                         {(() => {
-                          const colorClasses: Record<string,string> = {
-                            blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
-                          };
-                          let IconComponent:any = null;
-                          if (typeof w.icon === 'string') {
-                            IconComponent = getIconComponent(w.icon);
-                          } else if (typeof w.icon === 'function') {
-                            IconComponent = w.icon;
+                          // For water widgets with Fitbit data source, use Fitbit data
+                          let todayVal = 0;
+                          let isFitbitData = false;
+                          
+                          if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
+                            todayVal = fitbitData.water;
+                            isFitbitData = true;
+                          } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
+                            todayVal = fitbitData.steps;
+                            isFitbitData = true;
+                          } else {
+                            // Use manual progress tracking
+                            const prog = progressByWidget[w.instanceId];
+                            todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
                           }
-                          if (!IconComponent) {
-                            IconComponent = getIconComponent(w.id);
-                          }
-                          if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
-
-                          // Get color - fallback to widget template default if not set
-                          const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
-
+                          
+                          const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
+                          const prog = progressByWidget[w.instanceId];
+                          
                           return (
-                            <div
-                              className={`w-8 h-8 rounded flex items-center justify-center ${colorClasses[widgetColor] ?? 'bg-gray-500'}`}
-                            >
-                              <IconComponent className="h-5 w-5 text-white" />
+                            <div className="mt-3">
+                              <div className="h-1 rounded bg-gray-200">
+                                <div className={`h-1 rounded ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
+                                <span>
+                                  {todayVal} / {w.target}
+                                  {isFitbitData && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
+                                </span>
+                                {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
+                              </div>
                             </div>
                           );
                         })()}
-                        <span className="text-sm font-medium truncate">{w.name}</span>
+
+                        {!( ['water','steps'].includes(w.id) && w.dataSource === 'fitbit') && (
+                          <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
+                        )}
                       </div>
-                      <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
-
-                      {(() => {
-                        // For water widgets with Fitbit data source, use Fitbit data
-                        let todayVal = 0;
-                        let isFitbitData = false;
-                        
-                        if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
-                          todayVal = fitbitData.water;
-                          isFitbitData = true;
-                        } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
-                          todayVal = fitbitData.steps;
-                          isFitbitData = true;
-                        } else {
-                          // Use manual progress tracking
-                          const prog = progressByWidget[w.instanceId];
-                          todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                        }
-                        
-                        const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
-                        const prog = progressByWidget[w.instanceId];
-                        
-                        return (
-                          <div className="mt-3">
-                            <div className="h-1 rounded bg-gray-200">
-                              <div className="h-1 rounded bg-indigo-500" style={{ width: `${pct}%` }} />
-                            </div>
-                            <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-                              <span>
-                                {todayVal} / {w.target}
-                                {isFitbitData && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
-                              </span>
-                              {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {!( ['water','steps'].includes(w.id) && w.dataSource === 'fitbit') && (
-                        <button aria-label="Add one" onClick={(e)=>{e.stopPropagation(); incrementProgress(w);}} className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs">+</button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Add Widget card */}
                   <div className="w-48 rounded-lg border border-gray-100 bg-white p-3 shadow-sm flex flex-col items-center gap-2 cursor-pointer hover:bg-gray-50" onClick={() => setIsWidgetSheetOpen(true)}>
@@ -1405,7 +1551,7 @@ export function TaskBoardDashboard() {
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className="w-80 flex-shrink-0 -mt-10">
+          <aside className="order-first w-80 flex-shrink-0 -mt-10">
             <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
@@ -1594,7 +1740,7 @@ export function TaskBoardDashboard() {
 
         {/* Add Bucket Sheet */}
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-            <SheetContent side="right" className="w-[420px] sm:w-[500px]">
+            <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
               <SheetHeader>
                 <SheetTitle className="text-indigo-950">Add a new bucket</SheetTitle>
               </SheetHeader>
@@ -1670,7 +1816,7 @@ export function TaskBoardDashboard() {
 
         {/* Widget library sheet */}
         <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-          <SheetContent side="right" className="w-[800px]">
+          <SheetContent side="right" className="w-[800px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Add a Widget</SheetTitle>
             </SheetHeader>
