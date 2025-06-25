@@ -356,14 +356,33 @@ export function TaskBoardDashboard() {
     if (source.droppableId === destination.droppableId) return;
 
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
+      // Moving from the dated list ➜ open list (clear due date)
+      const moved = todoistTasks.find((t) => t.id.toString() === draggableId);
+      // Remove from the daily list locally
       setTodoistTasks((prev) => prev.filter((t) => t.id.toString() !== draggableId));
+
+      if (moved) {
+        // Insert at top of the open-task array locally (with cleared due)
+        const clearedDue = moved.due ? { ...moved.due, date: null } : { date: null };
+        const cleared = { ...moved, due: clearedDue };
+        setAllTodoistTasks((prev) => [cleared, ...prev.filter((t) => t.id.toString() !== draggableId)]);
+      }
+
       await updateTaskDueDate(draggableId, null);
     } else if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
+      // Moving from open ➜ dated list (set due to selected day)
       const moved = allTodoistTasks.find((t: any) => t.id.toString() === draggableId);
       if (moved) {
-        setTodoistTasks((prev) => [...prev, moved]);
-        await updateTaskDueDate(draggableId, selectedDateStr);
+        // Insert at top of the daily list locally
+        setTodoistTasks((prev) => [moved, ...prev]);
+
+        // Update all tasks array so the moved one now has the due date (it will be filtered out of open list)
+        const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
+        const updated = { ...moved, due: updatedDue };
+        setAllTodoistTasks((prev) => prev.map((t) => (t.id.toString() === draggableId ? updated : t)));
       }
+
+      await updateTaskDueDate(draggableId, selectedDateStr);
     }
 
     // Refresh lists to reflect latest server state
