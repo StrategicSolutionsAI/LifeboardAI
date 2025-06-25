@@ -1332,25 +1332,43 @@ export function TaskBoardDashboard() {
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</h4>
                   <Droppable droppableId="dailyTasks">
                     {(provided: any) => (
-                      (isLoadingTasks && todoistTasks.length === 0) ? (
-                        <p className="text-sm text-gray-500">Loading…</p>
-                      ) : todoistTasks.length === 0 ? (
-                        <p className="text-sm text-gray-500">No tasks</p>
-                      ) : (
-                        <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1">
-                          {todoistTasks.map((t:any, index:number)=> (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                              {(provided: any)=>(
-                                <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
-                                  <input type="checkbox" aria-label={t.content} checked={t.completed ?? false} onChange={() => completeTask(t.id.toString())} className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`} />
-                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                                </li>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </ul>
-                      )
+                      <ul
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="space-y-2 text-sm text-gray-700 max-h-40 overflow-y-auto pr-1"
+                      >
+                        {isLoadingTasks && todoistTasks.length === 0 ? (
+                          <li className="text-gray-500">Loading…</li>
+                        ) : null}
+
+                        {!isLoadingTasks && todoistTasks.length === 0 ? (
+                          <li className="text-gray-500">No tasks</li>
+                        ) : null}
+
+                        {todoistTasks.map((t: any, index: number) => (
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            {(provided: any) => (
+                              <li
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={provided.draggableProps.style}
+                                className="flex items-start gap-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={t.content}
+                                  checked={t.completed ?? false}
+                                  onChange={() => completeTask(t.id.toString())}
+                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                                />
+                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </ul>
                     )}
                   </Droppable>
 
@@ -1360,26 +1378,44 @@ export function TaskBoardDashboard() {
                   {/* Master tasks */}
                   <h4 className="text-sm font-medium text-gray-900 mb-2">All open tasks</h4>
                   <Droppable droppableId="openTasks">
-                    {(provided: any)=> (
-                      (isLoadingAllTasks && openTasksToShow.length === 0) ? (
-                        <p className="text-sm text-gray-500">Loading…</p>
-                      ) : openTasksToShow.length === 0 ? (
-                        <p className="text-sm text-gray-500">No tasks</p>
-                      ) : (
-                        <ul ref={provided.innerRef} {...provided.droppableProps} className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1">
-                          {openTasksToShow.map((t:any, index:number)=> (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                              {(provided: any)=>(
-                                <li ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} style={provided.draggableProps.style} className="flex items-start gap-2">
-                                  <input type="checkbox" aria-label={t.content} checked={t.completed ?? false} onChange={() => completeTask(t.id.toString())} className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`} />
-                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                                </li>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </ul>
-                      )
+                    {(provided: any) => (
+                      <ul
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="space-y-2 text-sm text-gray-700 flex-1 overflow-y-auto pr-1"
+                      >
+                        {isLoadingAllTasks && openTasksToShow.length === 0 ? (
+                          <li className="text-gray-500">Loading…</li>
+                        ) : null}
+
+                        {!isLoadingAllTasks && openTasksToShow.length === 0 ? (
+                          <li className="text-gray-500">No tasks</li>
+                        ) : null}
+
+                        {openTasksToShow.map((t: any, index: number) => (
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            {(provided: any) => (
+                              <li
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={provided.draggableProps.style}
+                                className="flex items-start gap-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={t.content}
+                                  checked={t.completed ?? false}
+                                  onChange={() => completeTask(t.id.toString())}
+                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                                />
+                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </ul>
                     )}
                   </Droppable>
                 </DragDropContext>
