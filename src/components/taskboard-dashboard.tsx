@@ -82,6 +82,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
+// Prevent Next.js server-side rendering issue (store not found)
+if (typeof window === "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { resetServerContext } = require("@hello-pangea/dnd");
+  resetServerContext();
+}
+
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
   Droplets,
