@@ -986,11 +986,15 @@ export function TaskBoardDashboard() {
     });
   };
 
-  const completeTask = async (taskId: string) => {
-    // Mark task as completed and move to bottom of its list(s)
+  const toggleTaskCompletion = async (taskId: string) => {
+    // Determine current completion state
+    const isCurrentlyCompleted =
+      todoistTasks.find((t) => t.id.toString() === taskId)?.completed ?? false;
+    const newCompleted = !isCurrentlyCompleted;
+
     const reorder = (arr: any[]) => {
       const updated = arr.map((t) =>
-        t.id.toString() === taskId ? { ...t, completed: true } : t
+        t.id.toString() === taskId ? { ...t, completed: newCompleted } : t
       );
       // sort: incomplete first, then completed (preserve relative order otherwise)
       return [
@@ -1002,17 +1006,20 @@ export function TaskBoardDashboard() {
     setTodoistTasks((prev) => reorder(prev));
     setAllTodoistTasks((prev) => reorder(prev));
 
-    // Track loading state (optional spinner)
     setIsCompletingTask((prev) => ({ ...prev, [taskId]: true }));
 
+    const endpoint = newCompleted
+      ? '/api/integrations/todoist/tasks/complete'
+      : '/api/integrations/todoist/tasks/reopen';
+
     try {
-      await fetch('/api/integrations/todoist/tasks/complete', {
+      await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId }),
       });
     } catch (err) {
-      console.error('Failed to complete Todoist task', err);
+      console.error('Failed to toggle Todoist task', err);
     } finally {
       setIsCompletingTask((prev) => {
         const { [taskId]: _removed, ...rest } = prev;
@@ -1359,7 +1366,7 @@ export function TaskBoardDashboard() {
                                   type="checkbox"
                                   aria-label={t.content}
                                   checked={t.completed ?? false}
-                                  onChange={() => completeTask(t.id.toString())}
+                                  onChange={() => toggleTaskCompletion(t.id.toString())}
                                   className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
                                 />
                                 <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
@@ -1406,7 +1413,7 @@ export function TaskBoardDashboard() {
                                   type="checkbox"
                                   aria-label={t.content}
                                   checked={t.completed ?? false}
-                                  onChange={() => completeTask(t.id.toString())}
+                                  onChange={() => toggleTaskCompletion(t.id.toString())}
                                   className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
                                 />
                                 <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
