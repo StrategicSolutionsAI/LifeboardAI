@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const body: any = {};
     if (dueDate === null) {
-      body.due_date = null;
+      body.due_string = 'no date';
     } else if (typeof dueDate === 'string') {
       body.due_date = dueDate; // YYYY-MM-DD
     }
