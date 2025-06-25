@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       // Include tasks that are due today or overdue (tasks with no due date are excluded)
       responseTasks = tasks.filter((t: any) => {
         if (!t.due?.date) return false;
-        return t.due.date <= date; // string compare works for YYYY-MM-DD
+        return t.due.date === date; // strict match for the selected date
       });
     }
 
