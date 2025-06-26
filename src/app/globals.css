@@ -138,3 +138,12 @@ body {
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Utility: hide native scrollbars (used for bucket-tab row) */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE & Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;            /* Chrome, Safari */
+}

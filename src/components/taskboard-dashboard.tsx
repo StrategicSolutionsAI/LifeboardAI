@@ -91,6 +91,7 @@ import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import TrendsPanel from "./trends-panel";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -312,6 +313,26 @@ export function TaskBoardDashboard() {
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   
+  // Dashboard inner subtabs (left panel)
+  const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Settings'>('Overview');
+  
+  // Debounced persistence of bucket order to Supabase
+  const debouncedSaveBucketsToSupabase = useRef(
+    debounce(async (ordered: string[]) => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs) {
+          await saveUserPreferences({
+            ...prefs,
+            life_buckets: ordered,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to save bucket order to Supabase', err);
+      }
+    }, 1500)
+  ).current;
+
   const fetchIntegrationsData = useCallback( async () => {
     if (!user) return; // must be signed in to fetch integration data
 
@@ -633,54 +654,10 @@ export function TaskBoardDashboard() {
     loadProgress();
   }, [user]);
 
-  // Debounced save of progress to Supabase (moved here to fix hoisting issue)
-  const saveProgress = async (progress: Record<string, ProgressEntry>) => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) return;
-    try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        await saveUserPreferences({
-          ...prefs,
-          progress_by_widget: progress,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to save progress to Supabase', err);
-    }
-  };
-
-  const debouncedSaveProgressToSupabase = useRef(
-    debounce((progress: Record<string, ProgressEntry>) => {
-      saveProgress(progress);
-    }, 2000)
-  ).current;
-
-  // Save progress whenever it changes
-  useEffect(() => {
-    // Avoid overwriting stored data with an empty object on first mount
-    const isEmpty = Object.keys(progressByWidget).length === 0;
-    console.log('Progress save effect triggered, isEmpty:', isEmpty, 'progressByWidget:', progressByWidget);
-
-    if (isEmpty) return; // nothing meaningful to save yet
-
-    // ---------------- LocalStorage ------------------
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('widget_progress', JSON.stringify(progressByWidget));
-      console.log('Saved progress to localStorage');
-    }
-
-    // ---------------- Supabase ----------------------
-    if (user) {
-      console.log('User exists, debouncing save to Supabase');
-      debouncedSaveProgressToSupabase(progressByWidget);
-    }
-  }, [progressByWidget, user]);
-
   // Helper to get today string
   const todayStr = new Date().toISOString().slice(0,10);
 
-  const incrementProgress = (w: WidgetInstance) => {
+  const incrementProgress = async (w: WidgetInstance) => {
     console.log('incrementProgress called for widget:', w.instanceId);
     console.log('Current progressByWidget:', progressByWidget);
     
@@ -708,6 +685,21 @@ export function TaskBoardDashboard() {
       console.log('New progress state:', newProgress);
       return newProgress;
     });
+
+    // ---------------- Supabase history upsert ----------------
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.from('widget_progress_history').upsert({
+          user_id: currentUser.id,
+          widget_instance_id: w.instanceId,
+          date: todayStrGlobal,
+          value: (progressByWidget[w.instanceId]?.value ?? 0) + 1,
+        }, { onConflict: 'user_id,widget_instance_id,date' });
+      }
+    } catch (err) {
+      console.error('Failed to upsert progress history', err);
+    }
   };
 
   // Centralized function to save widgets, including to localStorage
@@ -1370,10 +1362,32 @@ export function TaskBoardDashboard() {
     );
   }, []);
 
+  // ----------------------------------------------------------------------
+  // Tab row scroll fade state
+  // ----------------------------------------------------------------------
+  const tabsScrollRef = useRef<HTMLDivElement | null>(null);
+  const [showLeftTabFade, setShowLeftTabFade] = useState(false);
+  const [showRightTabFade, setShowRightTabFade] = useState(false);
 
+  useEffect(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const updateFades = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      setShowLeftTabFade(scrollLeft > 0);
+      setShowRightTabFade(scrollLeft + clientWidth < scrollWidth - 1);
+    };
+    updateFades();
+    el.addEventListener('scroll', updateFades);
+    window.addEventListener('resize', updateFades);
+    return () => {
+      el.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', updateFades);
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-violet-50">
+    <div className="min-h-screen bg-[#F6F6FC]">
 
 
       {/* ------------------------------------------------------------------ */}
@@ -1420,93 +1434,111 @@ export function TaskBoardDashboard() {
             Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
           </h2>
           
+          {/* Bucket tabs row (scrollable) */}
           <div
-            className="relative mt-10 flex items-start overflow-x-auto ml-[344px]"
-            style={{ maxWidth: 'calc(100% - 344px)', zIndex: 4 }}
+            className="relative z-20 mt-10"
+            /* Width matches the white widget panel: total minus sidebar (320px) + gap (24px) */
+            style={{ width: 'calc(100% - 344px)' }}
           >
-            {buckets.length > 0 && buckets.map((b, idx) => (
+            <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
+              {buckets.length > 0 && buckets.map((b, idx) => (
+                <button
+                  key={b}
+                  draggable
+                  onDragStart={() => setDragIndex(idx)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragIndex === null || dragIndex === idx) return;
+                    // reorder
+                    const updated = [...buckets];
+                    const [moved] = updated.splice(dragIndex, 1);
+                    updated.splice(idx, 0, moved);
+                    setBuckets(updated);
+                    setDragIndex(idx);
+                    // Persist reordering to localStorage & Supabase
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('life_buckets', JSON.stringify(updated));
+                    }
+                    debouncedSaveBucketsToSupabase(updated);
+                  }}
+                  onDragEnd={() => setDragIndex(null)}
+                  onClick={() => setActiveBucket(b)}
+                  style={{ 
+                    // Active tab always highest; otherwise cascade left-over-right
+                    zIndex: b === activeBucket ? 50 : 9 - idx,
+                    marginRight: '-10px'
+                  }}
+                  className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[13px] font-medium capitalize transition-colors ${
+                    b === activeBucket
+                      ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
+                      : 'bg-white text-[#7482FE] hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
               <button
-                key={b}
-                draggable
-                onDragStart={() => setDragIndex(idx)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (dragIndex === null || dragIndex === idx) return;
-                  // reorder
-                  const updated = [...buckets];
-                  const [moved] = updated.splice(dragIndex, 1);
-                  updated.splice(idx, 0, moved);
-                  setBuckets(updated);
-                  setDragIndex(idx);
-                  // persist reordering
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('life_buckets', JSON.stringify(updated));
-                  }
-                }}
-                onDragEnd={() => setDragIndex(null)}
-                onClick={() => setActiveBucket(b)}
+                onClick={() => setIsEditorOpen(true)}
                 style={{ 
-                  // Active tab always highest; otherwise cascade left-over-right
-                  zIndex: b === activeBucket ? 50 : 9 - idx,
+                  // "+" tab participates in the same stacking order (lowest, furthest right)
+                  zIndex: 0,
                   marginRight: '-10px'
                 }}
-                className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[11px] font-bold uppercase tracking-[0.05em] transition-colors ${
-                  b === activeBucket
-                    ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow-[1px_2px_4px_1px_rgba(32,35,64,0.1)]'
-                    : 'bg-white text-[#7482FE] hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]'
-                }`}
+                className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
               >
-                {b}
+                <span className="bg-gradient-to-r from-[#7482FE] to-[#909CFF] bg-clip-text text-transparent">
+                  +
+                </span>
               </button>
-            ))}
-            <button
-              onClick={() => setIsEditorOpen(true)}
-              style={{ 
-                // "+" tab participates in the same stacking order (lowest, furthest right)
-                zIndex: 0,
-                marginRight: '-10px'
-              }}
-              className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[1px_0_2px_rgba(0,0,0,0.05)]"
-            >
-              <span className="bg-gradient-to-r from-[#7482FE] to-[#909CFF] bg-clip-text text-transparent">
-                +
-              </span>
-            </button>
-            {/* bottom gray divider under all tabs */}
-            <div className="absolute bottom-0 left-0 w-full h-px bg-gray-200" style={{ zIndex: -1 }} />
-          </div>
+            </div>
+            {/* scroll container ends */}
+            {/* bottom gray divider under all tabs (fixed) */}
+            <div
+              className="pointer-events-none absolute bottom-0 left-0 h-px bg-gray-200"
+              style={{ zIndex: 60, width: '100%' }}
+            />
+            {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
+            {showLeftTabFade && (
+              <div
+                className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
+                style={{ zIndex: 70 }}
+              />
+            )}
+            {showRightTabFade && (
+              <div
+                className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
+                style={{ zIndex: 70 }}
+              />
+            )}
+            </div>
         </section>
 
         {/* Main content container */}
         <div className="mx-auto w-full max-w-7xl flex-1 px-6 pb-24 flex gap-6">
           {/* Left section: tabs and widgets */}
           <div className="flex-1">
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg rounded-tr-lg border-t border-gray-200 bg-white">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg border-t border-gray-200 bg-white shadow-sm">
               {/* Inner nav */}
               <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
-                {[
-                  "Overview",
-                  "Trends",
-                  "Logs",
-                  "Settings",
-                ].map((item, idx) => (
-                  <span
+                {(['Overview','Trends','Logs','Settings'] as const).map((item) => (
+                  <button
                     key={item}
-                    className={
-                      idx === 0
-                        ? "border-indigo-500 text-indigo-500 pb-3 border-b-2"
-                        : "text-gray-400"
-                    }
+                    onClick={() => setActiveSubTab(item)}
+                    className={`pb-3 border-b-2 transition-colors ${
+                      item === activeSubTab
+                        ? 'border-indigo-500 text-indigo-500'
+                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}
                   >
                     {item}
-                  </span>
+                  </button>
                 ))}
               </nav>
 
               {/* Content area */}
               <div className="flex-1 overflow-y-auto p-6">
                 {/* Widgets grid */}
-                <div className="flex flex-wrap gap-4">
+                <div className={activeSubTab === 'Overview' ? 'flex flex-wrap gap-4' : 'hidden'}>
                   {/* Refresh card */}
                   <div
                     onClick={isRefreshing ? undefined : fetchIntegrationsData}
@@ -1676,12 +1708,17 @@ export function TaskBoardDashboard() {
                     </div>
                   </div>
                 </div>
+
+                {activeSubTab === 'Trends' && (
+                  // Show trends only for widgets belonging to the currently selected bucket
+                  <TrendsPanel widgets={getDisplayWidgets(activeBucket)} />
+                )}
               </div>
             </div>
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className="order-first w-80 flex-shrink-0 -mt-10">
+          <aside className="w-80 flex-shrink-0">
             <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
