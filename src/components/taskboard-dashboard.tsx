@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import Image from "next/image";
 import { supabase } from "@/utils/supabase/client";
@@ -313,6 +313,8 @@ export function TaskBoardDashboard() {
   // Collapse state for task lists
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
+  // Collapse state for the new hourly planner
+  const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
   
   // Dashboard inner subtabs (left panel)
   const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Settings'>('Overview');
@@ -508,6 +510,151 @@ export function TaskBoardDashboard() {
     // Helper to remove a task by id from an array (immutably)
     const removeById = (arr: any[], id: string) => arr.filter((t) => t.id.toString() !== id);
 
+    // ------------------------------------------------------------------
+    // 1) Moves involving the hourly planner
+    // ------------------------------------------------------------------
+    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+      // Re-arrange or move between hours
+      setHourlyPlan((prev) => {
+        const next = { ...prev };
+        const srcHour = hourKey(source.droppableId);
+        const dstHour = hourKey(destination.droppableId);
+        const srcArr = [...next[srcHour]];
+        const [moved] = srcArr.splice(source.index, 1);
+        if (!moved) return prev;
+        next[srcHour] = srcArr;
+        const dstArr = [...next[dstHour]];
+        dstArr.splice(destination.index, 0, moved);
+        next[dstHour] = dstArr;
+        return next;
+      });
+      return;
+    }
+
+    if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
+      // Daily ➜ Hour slot (no due-date change)
+      const moved = todoistTasks[source.index];
+      if (!moved) return;
+
+      // Remove from daily list
+      setTodoistTasks((prev) => {
+        const next = [...prev];
+        next.splice(source.index, 1);
+        return next;
+      });
+
+      // Add to planner
+      const dstHour = hourKey(destination.droppableId);
+      setHourlyPlan((prev) => {
+        const next = { ...prev };
+        const arr = [...next[dstHour]];
+        arr.splice(destination.index, 0, moved);
+        next[dstHour] = arr;
+        return next;
+      });
+      return;
+    }
+
+    if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
+      // Hour slot ➜ Daily list
+      const srcHour = hourKey(source.droppableId);
+      const moved = hourlyPlan[srcHour][source.index];
+      if (!moved) return;
+
+      // Remove from planner
+      setHourlyPlan((prev) => {
+        const next = { ...prev };
+        const arr = [...next[srcHour]];
+        arr.splice(source.index, 1);
+        next[srcHour] = arr;
+        return next;
+      });
+
+      // Insert into daily list
+      setTodoistTasks((prev) => {
+        const next = [...prev];
+        next.splice(destination.index, 0, moved);
+        return next;
+      });
+      return;
+    }
+
+    if (source.droppableId === 'openTasks' && isHour(destination.droppableId)) {
+      // Open list ➜ Hour slot (needs due-date set to today)
+      const openVisible = allTodoistTasks.filter(
+        (t: any) => t.due?.date !== selectedDateStr
+      );
+      const moved = openVisible[source.index];
+      if (!moved) return;
+
+      const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
+      const updated = { ...moved, due: updatedDue };
+
+      // Update master list
+      setAllTodoistTasks((prev) => {
+        const without = removeById(prev, draggableId);
+        const openSubset: any[] = [];
+        const datedSubset: any[] = [];
+        without.forEach((task) => {
+          if (task.due?.date === selectedDateStr) datedSubset.push(task);
+          else openSubset.push(task);
+        });
+        datedSubset.push(updated);
+        return [...openSubset, ...datedSubset];
+      });
+
+      // Add to planner
+      const dstHour = hourKey(destination.droppableId);
+      setHourlyPlan((prev) => {
+        const next = { ...prev };
+        const arr = [...next[dstHour]];
+        arr.splice(destination.index, 0, updated);
+        next[dstHour] = arr;
+        return next;
+      });
+
+      await updateTaskDueDate(draggableId, selectedDateStr);
+      return;
+    }
+
+    if (isHour(source.droppableId) && destination.droppableId === 'openTasks') {
+      // Hour slot ➜ Open list (clear due-date)
+      const srcHour = hourKey(source.droppableId);
+      const moved = hourlyPlan[srcHour][source.index];
+      if (!moved) return;
+
+      const clearedDue = moved.due ? { ...moved.due, date: null } : { date: null };
+      const cleared = { ...moved, due: clearedDue };
+
+      // Remove from planner
+      setHourlyPlan((prev) => {
+        const next = { ...prev };
+        const arr = [...next[srcHour]];
+        arr.splice(source.index, 1);
+        next[srcHour] = arr;
+        return next;
+      });
+
+      // Insert into open list ui order
+      setAllTodoistTasks((prev) => {
+        const without = removeById(prev, draggableId);
+        const openSubset: any[] = [];
+        const datedSubset: any[] = [];
+        without.forEach((task) => {
+          if (task.due?.date === selectedDateStr) datedSubset.push(task);
+          else openSubset.push(task);
+        });
+        openSubset.splice(destination.index, 0, cleared);
+        return [...openSubset, ...datedSubset];
+      });
+
+      await updateTaskDueDate(draggableId, null);
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // 2) Existing logic (daily ⟷ open etc.)
+    // ------------------------------------------------------------------
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
       // -------------------------------------------
       // Move task from daily list ➜ open list
@@ -553,6 +700,10 @@ export function TaskBoardDashboard() {
       const moved = openVisible[source.index];
       if (!moved) return;
 
+      // Prepare updated copy with new due date
+      const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
+      const updated = { ...moved, due: updatedDue };
+
       // 1) Update allTodoistTasks (remove, then reinsert with due date) preserving order
       setAllTodoistTasks((prev) => {
         const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
@@ -573,10 +724,10 @@ export function TaskBoardDashboard() {
         return [...openSubset, ...datedSubset];
       });
 
-      // 2) Insert into daily list at drop position
+      // 2) Insert into daily list at drop position using the updated task
       setTodoistTasks((prev) => {
         const next = [...prev];
-        next.splice(destination.index, 0, moved);
+        next.splice(destination.index, 0, updated);
         return next;
       });
 
@@ -1120,8 +1271,10 @@ export function TaskBoardDashboard() {
   // Returns an array of the 7 Date objects for the week that contains `selectedDate`
   const getWeekDays = () => {
     const start = new Date(selectedDate);
-    // Move `start` back to Sunday of the current week
-    start.setDate(start.getDate() - start.getDay());
+    // Move `start` back to Monday of the current week (Monday = 0)
+    const day = start.getDay(); // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+    const diff = (day + 6) % 7; // converts Sunday->6, Monday->0, Tuesday->1, ...
+    start.setDate(start.getDate() - diff);
     const days: Date[] = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);
@@ -1387,11 +1540,50 @@ export function TaskBoardDashboard() {
     };
   }, []);
 
+  // Toggle for task views (right panel)
+  const [taskView, setTaskView] = useState<'Today'|'Upcoming'|'Master List'>('Today');
+
+  // ----------------------------------------------
+  // Hourly planner (7 AM → 5 PM)
+  // ----------------------------------------------
+  const hours = useMemo(() => {
+    return Array.from({ length: 11 }, (_, i) => {
+      const h = 7 + i; // 7-17
+      const disp = `${((h % 12) || 12)}${h < 12 ? 'AM' : 'PM'}`;
+      return disp;
+    });
+  }, []);
+
+  // Map of hour → tasks scheduled for that slot
+  const [hourlyPlan, setHourlyPlan] = useState<Record<string, any[]>>(() => {
+    const obj: Record<string, any[]> = {};
+    hours.forEach((h) => {
+      obj[h] = [];
+    });
+    return obj;
+  });
+
+  // Convenience: tasks in planner so we can hide them from the daily list
+  const assignedTaskIds = useMemo(() => {
+    return new Set(
+      Object.values(hourlyPlan)
+        .flat()
+        .map((t) => t.id.toString())
+    );
+  }, [hourlyPlan]);
+  const dailyVisibleTasks = todoistTasks.filter(
+    (t) => !assignedTaskIds.has(t.id.toString())
+  );
+
+  // Helpers for droppable id parsing
+  const isHour = (id: string) => id.startsWith('hour-');
+  const hourKey = (id: string) => id.replace('hour-', '');
+
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-20">
+    <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
 
       {/* Sidebar */}
-      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-8 gap-10 z-30">
+      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-6 z-30">
         {/* Home (active) */}
         <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
           <Home className="w-5 h-5 text-indigo-500" />
@@ -1420,7 +1612,7 @@ export function TaskBoardDashboard() {
       <div className="flex min-h-screen flex-col">
         {/* Header */}
         {/* Full-width header – pull left over the sidebar */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-6 -ml-20 w-[calc(100%+5rem)]">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
           <div className="flex items-center gap-1 text-2xl font-semibold">
             <span className="text-indigo-500">AI</span>
             <span>TaskBoard</span>
@@ -1454,7 +1646,7 @@ export function TaskBoardDashboard() {
         </header>
 
         {/* Greeting */}
-        <section className="mx-auto w-full max-w-7xl px-6 pt-6 sm:pt-10">
+        <section className="w-full pr-10 pt-6 sm:pt-10">
           <h2 className="text-base font-medium text-gray-800">
             Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
           </h2>
@@ -1462,8 +1654,8 @@ export function TaskBoardDashboard() {
           {/* Bucket tabs row (scrollable) */}
           <div
             className="relative z-20 mt-10"
-            /* Width matches the white widget panel: total minus sidebar (320px) + gap (24px) */
-            style={{ width: 'calc(100% - 344px)' }}
+            /* Width matches the white widget panel: total minus sidebar (400px) + gap (40px) */
+            style={{ width: 'calc(100% - 440px)' }}
           >
             <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
               {buckets.length > 0 && buckets.map((b, idx) => (
@@ -1539,7 +1731,7 @@ export function TaskBoardDashboard() {
         </section>
 
         {/* Main content container */}
-        <div className="mx-auto w-full max-w-7xl flex-1 px-6 pb-24 flex gap-6">
+        <div className="w-full flex-1 pr-10 pb-24 flex gap-10">
           {/* Left section: tabs and widgets */}
           <div className="flex-1">
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg border-t border-gray-200 bg-white shadow-sm">
@@ -1743,7 +1935,7 @@ export function TaskBoardDashboard() {
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className="w-80 flex-shrink-0">
+          <aside className="w-[400px] flex-shrink-0 -mt-12">
             <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
@@ -1761,7 +1953,7 @@ export function TaskBoardDashboard() {
                     onClick={() => handleDateChange(day)}
                     className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                       isSameDay(day, selectedDate)
-                        ? 'bg-indigo-500 text-white'
+                        ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -1771,57 +1963,82 @@ export function TaskBoardDashboard() {
                 ))}
               </div>
 
+              {/* Task view toggle */}
+              <div className="mt-4">
+                <div className="flex rounded-full border border-[#E2E6F6] bg-white p-1 w-full shadow-sm">
+                  {(['Today','Upcoming','Master List'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setTaskView(tab)}
+                      className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
+                        taskView === tab
+                          ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* To-do lists with drag & drop */}
               <div className="mt-6 flex-1 overflow-hidden flex flex-col">
                 <DragDropContext onDragEnd={handleDragEnd}>
-                  {/* Daily tasks */}
-                  <div
-                    className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                    onClick={() => setIsDailyCollapsed((c) => !c)}
-                  >
-                    <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
-                    {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                  </div>
+                  {taskView === 'Today' && (<>
+                  {/* Daily tasks (header + list share same droppable so header accepts drops) */}
                   <Droppable droppableId="dailyTasks">
                     {(provided: any) => (
-                      <ul
+                      <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
-                        style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
+                        className="flex flex-col"
                       >
-                        {isLoadingTasks && todoistTasks.length === 0 ? (
-                          <li className="text-gray-500">Loading…</li>
-                        ) : null}
+                        <div
+                          className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                          onClick={() => setIsDailyCollapsed((c) => !c)}
+                        >
+                          <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
+                          {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                        </div>
 
-                        {!isLoadingTasks && todoistTasks.length === 0 ? (
-                          <li className="text-gray-500">No tasks</li>
-                        ) : null}
+                        <ul
+                          className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
+                        >
+                          {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
+                            <li className="text-gray-500">Loading…</li>
+                          ) : null}
 
-                        {todoistTasks.map((t: any, index: number) => (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                            {(provided: any) => (
-                              <li
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                style={provided.draggableProps.style}
-                                className="flex items-start gap-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t.content}
-                                  checked={t.completed ?? false}
-                                  onChange={() => toggleTaskCompletion(t.id.toString())}
-                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                                />
-                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </ul>
+                          {!isLoadingTasks && dailyVisibleTasks.length === 0 ? (
+                            <li className="text-gray-500">No tasks</li>
+                          ) : null}
+
+                          {dailyVisibleTasks.map((t: any, index: number) => (
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                              {(provided: any) => (
+                                <li
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={provided.draggableProps.style}
+                                  className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t.content}
+                                    checked={t.completed ?? false}
+                                    onChange={() => toggleTaskCompletion(t.id.toString())}
+                                    className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                                  />
+                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
+                      </div>
                     )}
                   </Droppable>
 
@@ -1843,12 +2060,134 @@ export function TaskBoardDashboard() {
                     </div>
                   )}
                    
-                  {/* Divider */}
-                  <hr className="my-4" />
+                  {/* Divider removed */}
 
                   {/* Master tasks */}
                   <div
-                    className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                    className={`flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none ${(taskView as any)==='Today' ? 'hidden' : ''}`}
+                    onClick={() => setIsOpenCollapsed((c) => !c)}
+                  >
+                    <span>All open tasks</span>
+                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                  <Droppable droppableId="openTasks">
+                    {(provided: any) => (
+                      <ul
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200 ${(taskView as any)==='Today' ? 'hidden' : ''}`}
+                        style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
+                      >
+                        {isLoadingAllTasks && openTasksToShow.length === 0 ? (
+                          <li className="text-gray-500">Loading…</li>
+                        ) : null}
+
+                        {!isLoadingAllTasks && openTasksToShow.length === 0 ? (
+                          <li className="text-gray-500">No tasks</li>
+                        ) : null}
+
+                        {openTasksToShow.map((t: any, index: number) => (
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            {(provided: any) => (
+                              <li
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={provided.draggableProps.style}
+                                className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={t.content}
+                                  checked={t.completed ?? false}
+                                  onChange={() => toggleTaskCompletion(t.id.toString())}
+                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                                />
+                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </ul>
+                    )}
+                  </Droppable>
+
+                  {/* Add open task (hidden in Today view) */}
+                  {false && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add task…"
+                        value={newOpenTask}
+                        onChange={(e) => setNewOpenTask(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleAddOpenTask}
+                        className="text-sm text-indigo-600 hover:underline"
+                      >Add</button>
+                    </div>
+                  )}
+                  </>)}
+
+                  {taskView === 'Master List' && (<>
+                  {/* Divider removed */}
+
+                  {/* Today tasks header (droppable) */}
+                  <Droppable droppableId="dailyTasks">
+                    {(provided: any) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="flex flex-col mb-4"
+                      >
+                        <div
+                          className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                          onClick={() => setIsDailyCollapsed((c) => !c)}
+                        >
+                          <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
+                          {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                        </div>
+
+                        <ul
+                          className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
+                        >
+                          {dailyVisibleTasks.map((t: any, index: number) => (
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                              {(provided: any) => (
+                                <li
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={provided.draggableProps.style}
+                                  className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t.content}
+                                    checked={t.completed ?? false}
+                                    onChange={() => toggleTaskCompletion(t.id.toString())}
+                                    className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                                  />
+                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </ul>
+                      </div>
+                    )}
+                  </Droppable>
+
+                  {/* Divider removed */}
+
+                  {/* Master tasks */}
+                  <div
+                    className={`flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none ${(taskView as any)==='Today' ? 'hidden' : ''}`}
                     onClick={() => setIsOpenCollapsed((c) => !c)}
                   >
                     <span>All open tasks</span>
@@ -1878,7 +2217,7 @@ export function TaskBoardDashboard() {
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 style={provided.draggableProps.style}
-                                className="flex items-start gap-2"
+                                className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
                               >
                                 <input
                                   type="checkbox"
@@ -1913,6 +2252,56 @@ export function TaskBoardDashboard() {
                         className="text-sm text-indigo-600 hover:underline"
                       >Add</button>
                     </div>
+                  )}
+                  </>)}
+
+                  {taskView === 'Today' && (
+                    <>
+                      {/* Hourly Planner */}
+                      <div
+                        className="flex items-center justify-between text-sm font-medium text-gray-900 mt-4 mb-2 cursor-pointer select-none"
+                        onClick={() => setIsPlannerCollapsed((c) => !c)}
+                      >
+                        <span>Hourly Planner</span>
+                        {isPlannerCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <div
+                        className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        style={{ maxHeight: isPlannerCollapsed ? 0 : '16rem' }}
+                      >
+                        {hours.map((disp) => (
+                          <Droppable droppableId={`hour-${disp}`} key={disp}>
+                            {(provided: any) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className="flex items-start gap-2 py-1"
+                              >
+                                <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
+                                <ul className="flex-1 flex flex-col gap-2">
+                                  {hourlyPlan[disp].map((t: any, index: number) => (
+                                    <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                      {(provided: any) => (
+                                        <li
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          {...provided.dragHandleProps}
+                                          style={provided.draggableProps.style}
+                                          className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                        >
+                                          <span>{t.content}</span>
+                                        </li>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                </ul>
+                              </div>
+                            )}
+                          </Droppable>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </DragDropContext>
               </div>
