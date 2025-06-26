@@ -84,6 +84,7 @@ import {
   Sun,
   LayoutDashboard,
   Settings as SettingsIcon,
+  User,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -1387,15 +1388,39 @@ export function TaskBoardDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC]">
+    <div className="min-h-screen bg-[#F6F6FC] pl-20">
 
+      {/* Sidebar */}
+      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-8 gap-10 z-30">
+        {/* Home (active) */}
+        <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+          <Home className="w-5 h-5 text-indigo-500" />
+        </div>
+        {/* Profile */}
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+          <User className="w-5 h-5 text-gray-400" />
+        </div>
+        {/* Tasks */}
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+          <FileText className="w-5 h-5 text-gray-400" />
+        </div>
+        {/* Calendar */}
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+          <Calendar className="w-5 h-5 text-gray-400" />
+        </div>
+        {/* Search */}
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+          <Search className="w-5 h-5 text-gray-400" />
+        </div>
+      </div>
 
       {/* ------------------------------------------------------------------ */}
       {/* Main column */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex min-h-screen flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-6">
+        {/* Full-width header – pull left over the sidebar */}
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-6 -ml-20 w-[calc(100%+5rem)]">
           <div className="flex items-center gap-1 text-2xl font-semibold">
             <span className="text-indigo-500">AI</span>
             <span>TaskBoard</span>
