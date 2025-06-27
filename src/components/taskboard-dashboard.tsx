@@ -1268,6 +1268,29 @@ export function TaskBoardDashboard() {
     debouncedSaveToSupabase();
   }, [widgetsByBucket, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
 
+  // Save progress whenever it changes
+  useEffect(() => {
+    if (!isWidgetLoadComplete || !user) {
+      console.log('Skipping progress save - load not complete or no user', { isWidgetLoadComplete, user: !!user });
+      return; // Avoid saving before initial load or when logged out
+    }
+
+    console.log('Progress save effect triggered');
+
+    // Persist to localStorage immediately for fast reloads
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('widget_progress', JSON.stringify(progressByWidget));
+        console.log('Progress auto-saved to localStorage');
+      } catch (e) {
+        console.error('Failed to persist widget progress', e);
+      }
+    }
+
+    // Debounce Supabase save (re-use existing debounced function)
+    debouncedSaveToSupabase();
+  }, [progressByWidget, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
+
   async function loadBuckets() {
     let loadedFromLocal = false;
     if (typeof window !== 'undefined') {
@@ -2072,7 +2095,8 @@ export function TaskBoardDashboard() {
                             let IconComponent: any = null;
                             // If icon is stored as a string (its name), resolve via map
                             if (typeof w.icon === 'string') {
-                              IconComponent = getIconComponent(w.icon);
+                              const key = w.icon.replace(/^Lucide/, '');
+                              IconComponent = getIconComponent(key) || getIconComponent(w.icon);
                             }
                             // If icon is a function (React component), use directly
                             else if (typeof w.icon === 'function') {

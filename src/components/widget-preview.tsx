@@ -53,17 +53,24 @@ export function WidgetPreview({
 }) {
   let Icon: any = null;
   if (typeof widget.icon === 'string') {
-    Icon = (Icons as any)[widget.icon] ?? null;
+    const key = widget.icon.replace(/^Lucide/, '');
+    Icon = (Icons as any)[key] ?? (Icons as any)[widget.icon] ?? null;
   } else if (typeof widget.icon === 'function') {
     Icon = widget.icon;
   }
 
-  // Fallback to icon based on template id if unresolved or invalid
-  if (!Icon || typeof Icon !== 'function') {
+  // Fallback to icon based on template id if unresolved
+  if (!Icon) {
     Icon = idToIconMap[widget.id] ?? (Icons as any)[widget.id?.charAt(0).toUpperCase() + widget.id?.slice(1)] ?? null;
   }
 
-  const SafeIcon = typeof Icon === 'function' ? Icon : null;
+  // Lucide icons are React.forwardRef objects (typeof === 'object'), but they can be
+  // used directly as components. Treat any truthy value as a valid icon component.
+  const SafeIcon = Icon as any;
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('⧗ preview icon debug\tid:', widget.id, '\ticon prop:', widget.icon, '\tresolved:', Icon?.name ?? 'null');
+  }
 
   return (
     <div 
