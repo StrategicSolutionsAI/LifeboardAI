@@ -29,6 +29,18 @@ const colorClassMap: Record<string, string> = {
 
 const getColorClass = (color: string) => colorClassMap[color] || "bg-gray-500";
 
+// Mapping of widget template IDs to Lucide icons (minimal set used in preview)
+const idToIconMap: Record<string, any> = {
+  water: Icons.Droplets,
+  calories: Icons.Flame,
+  steps: Icons.Target,
+  weight: Icons.Scale,
+  heartrate: Icons.Heart,
+  sleep: Icons.Moon,
+  exercise: Icons.Activity,
+  caffeine: Icons.Coffee,
+};
+
 // Re-use a tiny version of the dashboard card so users can see changes instantly
 export function WidgetPreview({ 
   widget, 
@@ -48,7 +60,7 @@ export function WidgetPreview({
 
   // Fallback to icon based on template id if unresolved or invalid
   if (!Icon || typeof Icon !== 'function') {
-    Icon = (Icons as any)[widget.id?.charAt(0).toUpperCase() + widget.id?.slice(1)] ?? null;
+    Icon = idToIconMap[widget.id] ?? (Icons as any)[widget.id?.charAt(0).toUpperCase() + widget.id?.slice(1)] ?? null;
   }
 
   const SafeIcon = typeof Icon === 'function' ? Icon : null;
