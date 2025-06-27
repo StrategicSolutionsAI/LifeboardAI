@@ -30,7 +30,15 @@ const colorClassMap: Record<string, string> = {
 const getColorClass = (color: string) => colorClassMap[color] || "bg-gray-500";
 
 // Re-use a tiny version of the dashboard card so users can see changes instantly
-export function WidgetPreview({ widget }: { widget: WidgetInstance }) {
+export function WidgetPreview({ 
+  widget, 
+  draggable = false, 
+  onDragStart 
+}: { 
+  widget: WidgetInstance; 
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+}) {
   let Icon: any = widget.icon as any;
   if (typeof Icon === "string") {
     Icon = (Icons as any)[Icon] ?? null;
@@ -44,7 +52,12 @@ export function WidgetPreview({ widget }: { widget: WidgetInstance }) {
       : null;
 
   return (
-    <div className="w-48 rounded-lg border bg-white p-3 shadow-sm">
+    <div 
+      className={`w-48 rounded-lg border bg-white p-3 shadow-sm ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      data-widget-id={widget.instanceId}
+    >
       <div className="flex items-center gap-2">
         <div
           className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(

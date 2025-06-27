@@ -4,7 +4,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { supabase } from '@/utils/supabase/client';
 
 interface Point { date: string; value: number; }
-export default function WidgetTrendChart({ instanceId, name }: { instanceId: string; name: string }) {
+export default function WidgetTrendChart({ instanceId, name, rangeDays = 30 }: { instanceId: string; name: string; rangeDays?: number }) {
   const [data, setData] = useState<Point[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export default function WidgetTrendChart({ instanceId, name }: { instanceId: str
     const load = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(`/api/trends/${instanceId}`, {
+        const res = await fetch(`/api/trends/${instanceId}?days=${rangeDays}`, {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         });
         if (!res.ok) throw new Error(await res.text());
@@ -23,7 +23,7 @@ export default function WidgetTrendChart({ instanceId, name }: { instanceId: str
       }
     };
     load();
-  }, [instanceId]);
+  }, [instanceId, rangeDays]);
 
   if (error) {
     const short = error.replace(/<[^>]+>/g, '').slice(0, 120) + (error.length > 120 ? '…' : '');

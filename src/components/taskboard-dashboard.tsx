@@ -85,6 +85,7 @@ import {
   LayoutDashboard,
   Settings as SettingsIcon,
   User,
+  ListChecks,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -285,7 +286,7 @@ export function TaskBoardDashboard() {
   // Add a ref for progress too
   const progressByWidgetRef = useRef(progressByWidget);
   progressByWidgetRef.current = progressByWidget;
-  
+
   // Fitbit data state
   const [fitbitData, setFitbitData] = useState<Record<string, number>>(()=>{
     if (typeof window !== 'undefined'){
@@ -393,6 +394,92 @@ export function TaskBoardDashboard() {
               "fitbit_metrics",
               JSON.stringify({ ...obj, savedAt: Date.now() })
             );
+          }
+
+          // -----------------------------------------------------------
+          // 2a) Update widget progress & history for Fitbit-backed widgets
+          // -----------------------------------------------------------
+          try {
+            const todayStr = todayStrGlobal;
+
+            // Find all Fitbit widgets currently on the dashboard
+            const fitbitWidgets = Object.values(widgetsByBucketRef.current)
+              .flat()
+              .filter(
+                (w) => w.dataSource === "fitbit" && ["water", "steps"].includes(w.id)
+              );
+
+            if (fitbitWidgets.length) {
+              // Build updated progress map
+              const updatedProgress: Record<string, ProgressEntry> = {
+                ...progressByWidgetRef.current,
+              };
+
+              fitbitWidgets.forEach((w) => {
+                const val = w.id === "water" ? obj.water : obj.steps;
+                const existing =
+                  updatedProgress[w.instanceId] ?? {
+                    value: 0,
+                    date: todayStr,
+                    streak: 0,
+                    lastCompleted: "",
+                  };
+
+                // Reset value if stored date isn't today yet
+                if (existing.date !== todayStr) {
+                  existing.value = 0;
+                  existing.date = todayStr;
+                }
+
+                existing.value = val;
+                updatedProgress[w.instanceId] = existing;
+              });
+
+              // Update in-memory state
+              setProgressByWidget(updatedProgress);
+
+              // Persist to localStorage
+              if (typeof window !== "undefined") {
+                try {
+                  localStorage.setItem(
+                    "widget_progress",
+                    JSON.stringify(updatedProgress)
+                  );
+                } catch (e) {
+                  console.error("Failed to persist widget progress", e);
+                }
+              }
+
+              // Upsert daily snapshot into Supabase history table
+              const {
+                data: { user: currentUser },
+              } = await supabase.auth.getUser();
+              if (currentUser) {
+                const rows = fitbitWidgets.map((w) => ({
+                  user_id: currentUser.id,
+                  widget_instance_id: w.instanceId,
+                  date: todayStr,
+                  value: w.id === "water" ? obj.water : obj.steps,
+                }));
+
+                if (rows.length) {
+                  await supabase
+                    .from("widget_progress_history")
+                    .upsert(rows, {
+                      onConflict: "user_id,widget_instance_id,date",
+                    });
+                }
+              }
+
+              // Persist progress inside user_preferences (non-blocking)
+              try {
+                await saveWidgets(widgetsByBucketRef.current, updatedProgress);
+              } catch (e) {
+                console.error("Failed to save widget progress to preferences", e);
+              }
+            }
+          } catch (errFitbitProgress) {
+            console.error("Failed to update Fitbit widget progress", errFitbitProgress);
           }
         }
       }
@@ -831,6 +918,20 @@ export function TaskBoardDashboard() {
           newStreak = 1;
         }
         newLast = todayStrGlobal;
+
+        // Celebrate with confetti the moment the goal is hit (only when value just reached target)
+        if (value === w.target && typeof window !== 'undefined') {
+          // Dynamically import to avoid SSR issues
+          import('canvas-confetti').then((mod) => {
+            const confetti = mod.default;
+            // Fire a burst similar to the CodePen example
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 },
+            });
+          }).catch((err) => console.error('Failed to load confetti', err));
+        }
       }
       
       const newProgress = { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
@@ -1579,6 +1680,126 @@ export function TaskBoardDashboard() {
   const isHour = (id: string) => id.startsWith('hour-');
   const hourKey = (id: string) => id.replace('hour-', '');
 
+  // Add the convertWidgetToTask function after the createTask function (around line 1480)
+  const convertWidgetToTask = async (widget: WidgetInstance) => {
+    // Create a task content string from the widget
+    const taskContent = `${widget.name}: ${widget.target} ${widget.unit}`;
+    
+    // Create a task for today
+    await createTask(taskContent, selectedDateStr);
+  };
+
+  // -----------------------------------------------------------------------------
+  // Daily reset – archive yesterday's progress and zero-out for the new day
+  // -----------------------------------------------------------------------------
+  const checkAndResetWidgets = useCallback(() => {
+    const today = dateStr(new Date());
+    const prevProgress = progressByWidgetRef.current;
+    const updatedProgress: Record<string, ProgressEntry> = { ...prevProgress };
+    const toArchive: Array<[string, ProgressEntry]> = [];
+
+    // Identify entries from a previous day
+    Object.entries(prevProgress).forEach(([instanceId, entry]) => {
+      if (entry.date !== today) {
+        toArchive.push([instanceId, entry]);
+        updatedProgress[instanceId] = {
+          ...entry,
+          date: today,
+          value: 0,            // reset value for the new day
+        };
+      }
+    });
+
+    const archiveNeeded = toArchive.length > 0;
+    if (!archiveNeeded) return; // nothing to reset
+
+    // 1️⃣  Archive in Supabase (fire-and-forget)
+    (async () => {
+
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) return;
+        const rows = toArchive.map(([instanceId, entry]) => ({
+          user_id: currentUser.id,
+          widget_instance_id: instanceId,
+          date: entry.date,
+          value: entry.value,
+        }));
+        await supabase
+          .from('widget_progress_history')
+          .upsert(rows, { onConflict: 'user_id,widget_instance_id,date' });
+      } catch (err) {
+        console.error('Failed to archive progress history', err);
+      }
+    })();
+
+
+      // 2️⃣  Update local state and persistence
+      setProgressByWidget(updatedProgress);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('widget_progress', JSON.stringify(updatedProgress));
+        } catch (err) {
+          console.error('Failed to persist reset progress to localStorage', err);
+        }
+      }
+
+      // Persist to Supabase preferences as well
+      saveWidgets(widgetsByBucketRef.current, updatedProgress);
+
+    // 3️⃣  Clear integration caches and trigger fresh integration fetch (once per day)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('todoist_all_tasks');
+      localStorage.removeItem('fitbit_metrics');
+    }
+    fetchIntegrationsData();
+
+
+  }, [saveWidgets, fetchIntegrationsData]);
+
+  // Add a useEffect to check for resets when the component mounts and periodically
+  useEffect(() => {
+    // Check for resets immediately when component mounts
+    checkAndResetWidgets();
+    
+    // Set up an interval to check for resets periodically (every hour)
+    // This handles the case where the app is left open overnight
+    const intervalId = setInterval(checkAndResetWidgets, 60 * 60 * 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [checkAndResetWidgets]);
+
+  // Also add a check for date changes when the user interacts with the app
+  useEffect(() => {
+    // Check for resets when the selected date changes
+    checkAndResetWidgets();
+  }, [selectedDate, checkAndResetWidgets]);
+
+  // Re-evaluate reset once progress data has been loaded or changed (e.g., after localStorage load)
+  useEffect(() => {
+    checkAndResetWidgets();
+    // Dependency intentionally limited to top-level progress map to avoid deep comparisons
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressByWidget]);
+
+  // Add a visibility change listener to check for resets when the user returns to the tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndResetWidgets();
+      }
+    };
+    
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [checkAndResetWidgets]);
+
   return (
     <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
 
@@ -1800,40 +2021,52 @@ export function TaskBoardDashboard() {
 
                     return (
                       <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log('Deleting widget:', w.instanceId);
-                            // Use callback pattern to ensure we're working with the latest state
-                            setWidgetsByBucket(prevWidgets => {
-                              const updatedWidgets = { ...prevWidgets };
-                              updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
-                              
-                              console.log('Widget deleted from bucket:', activeBucket);
-                              console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
-                              console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
-                              
-                              // Also update the ref immediately
-                              widgetsByBucketRef.current = updatedWidgets;
-                              
-                              // Force immediate save to localStorage
-                              if (typeof window !== 'undefined') {
-                                const dataToSave = {
-                                  widgets: updatedWidgets,
-                                  savedAt: new Date().toISOString()
-                                };
-                                localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                                console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
-                              }
-                              
-                              return updatedWidgets;
-                            });
-                          }}
-                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-red-100 hover:bg-red-200 p-1"
-                          aria-label="Delete widget"
-                        >
-                          <X className="h-3 w-3 text-red-600" />
-                        </button>
+                                                  <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                convertWidgetToTask(w);
+                              }}
+                              className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1"
+                              aria-label="Convert to task"
+                            >
+                              <ListChecks className="h-3 w-3 text-indigo-600" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('Deleting widget:', w.instanceId);
+                                // Use callback pattern to ensure we're working with the latest state
+                                setWidgetsByBucket(prevWidgets => {
+                                  const updatedWidgets = { ...prevWidgets };
+                                  updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
+                                  
+                                  console.log('Widget deleted from bucket:', activeBucket);
+                                  console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
+                                  console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
+                                  
+                                  // Also update the ref immediately
+                                  widgetsByBucketRef.current = updatedWidgets;
+                                  
+                                  // Force immediate save to localStorage
+                                  if (typeof window !== 'undefined') {
+                                    const dataToSave = {
+                                      widgets: updatedWidgets,
+                                      savedAt: new Date().toISOString()
+                                    };
+                                    localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+                                    console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                                  }
+                                  
+                                  return updatedWidgets;
+                                });
+                              }}
+                              className="rounded-full bg-red-100 hover:bg-red-200 p-1"
+                              aria-label="Delete widget"
+                            >
+                              <X className="h-3 w-3 text-red-600" />
+                            </button>
+                          </div>
                         <div className="flex items-center gap-2">
                           {(() => {
                             let IconComponent:any = null;
