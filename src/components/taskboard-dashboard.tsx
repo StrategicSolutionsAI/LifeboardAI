@@ -2069,13 +2069,18 @@ export function TaskBoardDashboard() {
                           </div>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            let IconComponent:any = null;
+                            let IconComponent: any = null;
+                            // If icon is stored as a string (its name), resolve via map
                             if (typeof w.icon === 'string') {
                               IconComponent = getIconComponent(w.icon);
-                            } else if (typeof w.icon === 'function') {
+                            }
+                            // If icon is a function (React component), use directly
+                            else if (typeof w.icon === 'function') {
                               IconComponent = w.icon;
                             }
-                            if (!IconComponent) {
+
+                            // Handle cases where icon became a plain object `{}` after JSON serialization
+                            if (!IconComponent || typeof IconComponent !== 'function') {
                               IconComponent = getIconComponent(w.id);
                             }
                             if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;

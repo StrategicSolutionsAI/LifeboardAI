@@ -39,17 +39,19 @@ export function WidgetPreview({
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
 }) {
-  let Icon: any = widget.icon as any;
-  if (typeof Icon === "string") {
-    Icon = (Icons as any)[Icon] ?? null;
-  } else if (Icon && typeof Icon === "object" && "default" in Icon) {
-    Icon = (Icon as any).default;
+  let Icon: any = null;
+  if (typeof widget.icon === 'string') {
+    Icon = (Icons as any)[widget.icon] ?? null;
+  } else if (typeof widget.icon === 'function') {
+    Icon = widget.icon;
   }
 
-  const SafeIcon =
-    typeof Icon === "function" || (Icon && typeof Icon === "object" && Icon.$$typeof)
-      ? Icon
-      : null;
+  // Fallback to icon based on template id if unresolved or invalid
+  if (!Icon || typeof Icon !== 'function') {
+    Icon = (Icons as any)[widget.id?.charAt(0).toUpperCase() + widget.id?.slice(1)] ?? null;
+  }
+
+  const SafeIcon = typeof Icon === 'function' ? Icon : null;
 
   return (
     <div 
