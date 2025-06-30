@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
 import { format, addDays, isSameDay } from 'date-fns';
@@ -264,6 +265,8 @@ export function TaskBoardDashboard() {
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
+  // Ensures we only backfill yesterday's Fitbit totals once per session
+  const fetchedYesterdayRef = useRef(false);
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
   const [date, setDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -468,6 +471,34 @@ export function TaskBoardDashboard() {
                     .upsert(rows, {
                       onConflict: "user_id,widget_instance_id,date",
                     });
+
+                  // -------------------------------------------------------
+                  //  Back-fill yesterday's totals exactly once per session
+                  // -------------------------------------------------------
+                  if (!fetchedYesterdayRef.current) {
+                    fetchedYesterdayRef.current = true;
+                    try {
+                      const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
+                      if (resY.ok) {
+                        const dataY = await resY.json();
+                        const rowsY = fitbitWidgets.map((w) => ({
+                          user_id: currentUser.id,
+                          widget_instance_id: w.instanceId,
+                          date: yesterdayStrGlobal,
+                          value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
+                        }));
+                        if (rowsY.length) {
+                          await supabase
+                            .from("widget_progress_history")
+                            .upsert(rowsY, {
+                              onConflict: "user_id,widget_instance_id,date",
+                            });
+                        }
+                      }
+                    } catch (errYesterday) {
+                      console.error("Failed to backfill yesterday Fitbit history", errYesterday);
+                    }
+                  }
                 }
               }
 
@@ -844,7 +875,12 @@ export function TaskBoardDashboard() {
   };
 
   // modify useEffect to use fetchIntegrationsData
-  useEffect(()=>{fetchIntegrationsData(); const int=setInterval(fetchIntegrationsData,5*60*1000); return ()=>clearInterval(int);},[fetchIntegrationsData]);
+  // Run once immediately, then every 30 minutes to avoid Fitbit rate limits
+  useEffect(() => {
+    fetchIntegrationsData();
+    const int = setInterval(fetchIntegrationsData, 30 * 60 * 1000); // 30 min
+    return () => clearInterval(int);
+  }, [fetchIntegrationsData]);
 
   // Fetch tasks whenever date changes (single consolidated request)
   useEffect(() => {
@@ -1841,9 +1877,12 @@ export function TaskBoardDashboard() {
           <FileText className="w-5 h-5 text-gray-400" />
         </div>
         {/* Calendar */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+        <Link
+          href="/calendar"
+          className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100"
+        >
           <Calendar className="w-5 h-5 text-gray-400" />
-        </div>
+        </Link>
         {/* Search */}
         <div className="w-10 h-10 rounded-lg flex items-center justify-center">
           <Search className="w-5 h-5 text-gray-400" />

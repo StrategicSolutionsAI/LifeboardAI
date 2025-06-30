@@ -72,21 +72,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [summary, waterJson] = await Promise.all([
-      fetchFitbitDailySummary(accessToken, dateStr),
-      fetchFitbitWater(accessToken, dateStr),
-    ])
-
+    // Always attempt to fetch steps & calories
+    const summary = await fetchFitbitDailySummary(accessToken, dateStr)
     const steps = summary.summary?.steps ?? 0
     const calories = summary.summary?.caloriesOut ?? 0
 
-    // water is returned in millilitres; convert to cups (236.588 ml)
-    const waterMl = waterJson.summary?.water ?? 0
-    const waterCups = +(waterMl / 236.588).toFixed(1)
+    // Fetch water separately – if Fitbit rate-limits (429) or user has no nutrition scope,
+    // don't fail the whole request. Default to 0 cups and surface a warning instead.
+    let waterCups = 0
+    try {
+      const waterJson = await fetchFitbitWater(accessToken, dateStr)
+      const waterMl = waterJson.summary?.water ?? 0
+      waterCups = +(waterMl / 236.588).toFixed(1)
+    } catch (err: any) {
+      console.warn('Fitbit water fetch failed (non-fatal)', err?.message ?? err)
+    }
 
     return NextResponse.json({ steps, calories, water: waterCups })
   } catch (e: any) {
-    console.error('Failed to fetch Fitbit metrics', e)
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    console.error('Failed to fetch Fitbit summary', e)
+    const isRateLimited = /429/.test(e.message ?? "")
+    return NextResponse.json({ error: e.message }, { status: isRateLimited ? 429 : 500 })
   }
 } 
