@@ -84,8 +84,7 @@ export async function fetchGoogleFitSteps(accessToken: string, date: string) {
     aggregateBy: [
       {
         dataTypeName: 'com.google.step_count.delta',
-        dataSourceId:
-          'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps',
+
       },
     ],
     bucketByTime: { durationMillis: 24 * 60 * 60 * 1000 },
