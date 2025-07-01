@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { OnboardingLayout } from "@/components/onboarding-layout"
 
@@ -16,8 +17,27 @@ const integrations = [
 export default function OnboardingStep4() {
   const router = useRouter()
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([])
+  const [connectingGoogleFit, setConnectingGoogleFit] = useState(false)
+
+  const connectGoogleFit = async () => {
+    setConnectingGoogleFit(true)
+    try {
+      window.location.href = '/api/auth/googlefit?redirectUrl=/onboarding/4'
+    } catch (error) {
+      console.error('Error connecting to Google Fit:', error)
+      setConnectingGoogleFit(false)
+    }
+  }
 
   const toggleIntegration = (integrationId: string) => {
+    // For Google Fit, initiate OAuth
+    if (integrationId === 'google-fit') {
+      if (!connectingGoogleFit) {
+        connectGoogleFit()
+      }
+      return
+    }
+
     setSelectedIntegrations(prev => 
       prev.includes(integrationId) 
         ? prev.filter(i => i !== integrationId)
@@ -58,11 +78,15 @@ export default function OnboardingStep4() {
                 <div className="font-medium">{integration.name}</div>
                 <div className="text-sm text-gray-500">{integration.description}</div>
               </div>
-              <div className={`w-4 h-4 rounded-full border-2 ${
-                selectedIntegrations.includes(integration.id)
-                  ? "bg-indigo-500 border-indigo-500"
-                  : "border-gray-300"
-              }`} />
+              {integration.id === 'google-fit' && connectingGoogleFit ? (
+                <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+              ) : (
+                <div className={`w-4 h-4 rounded-full border-2 ${
+                  selectedIntegrations.includes(integration.id)
+                    ? "bg-indigo-500 border-indigo-500"
+                    : "border-gray-300"
+                }`} />
+              )}
             </div>
           </button>
         ))}

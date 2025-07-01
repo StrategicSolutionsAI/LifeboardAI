@@ -75,25 +75,45 @@ export async function GET(request: NextRequest) {
       // Continue anyway - we'll handle insert errors gracefully below
     }
 
-    // Store the tokens in the database
-    // Store the tokens in the database
+    // Store the tokens in the database, making sure we don't overwrite a valid
+    // refresh_token with `null` or `undefined` (Google often omits it on
+    // subsequent consent flows). This ensures the Calendar API can refresh
+    // expired access_tokens later on.
     let insertError = null;
     try {
+      let refreshTokenToStore: string | undefined = tokens.refresh_token ?? undefined;
+
+      // If Google did not send a refresh_token, keep the one already stored.
+      if (!refreshTokenToStore) {
+        const { data: existingRow } = await supabase
+          .from('user_integrations')
+          .select('refresh_token')
+          .eq('user_id', user.id)
+          .eq('provider', 'google_calendar')
+          .maybeSingle();
+
+        if (existingRow?.refresh_token) {
+          refreshTokenToStore = existingRow.refresh_token as string;
+        }
+      }
+
+      const tokenDataToStore = { ...tokens, refresh_token: refreshTokenToStore };
+
       const { error } = await supabase
         .from('user_integrations')
         .upsert({
           user_id: user.id,
           provider: 'google_calendar',
           access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token,
-          token_data: tokens,
+          refresh_token: refreshTokenToStore,
+          token_data: tokenDataToStore,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
       insertError = error;
     } catch (error) {
       console.error('Exception storing tokens:', error);
-      insertError = error;
+      insertError = error as PostgrestError | Error;
     }
 
     if (insertError) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Home, User, FileText, Calendar as CalendarIcon, Search, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase/client";
+import { TaskSidePanel } from "@/components/task-side-panel";
 
 // Load calendar grid on client to avoid SSR issues with date-fns
 const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: false });
@@ -18,9 +19,9 @@ export default function CalendarView() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
       {/* Sidebar */}
-      <div className="w-20 left-0 top-0 bottom-0 fixed bg-white border-r border-gray-100 flex flex-col items-center py-8 gap-10">
+      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-6 z-30">
         {/* Home */}
         <Link href="/dashboard" className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100">
           <Home className="w-5 h-5 text-gray-400" />
@@ -44,9 +45,9 @@ export default function CalendarView() {
       </div>
 
       {/* Main column */}
-      <div className="flex flex-col flex-1 ml-20">
+      <div className="flex min-h-screen flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
           <div className="flex items-center gap-1 text-2xl font-semibold">
             <span className="text-indigo-500">AI</span>
             <span>TaskBoard</span>
@@ -60,9 +61,16 @@ export default function CalendarView() {
           </button>
         </header>
 
-        {/* Calendar content */}
-        <div className="flex-1 p-10 overflow-auto">
-          <FullCalendar />
+        {/* Calendar + side panel */}
+        <div className="flex-1 pr-10 pt-6 sm:pt-10 overflow-auto">
+          <div className="flex gap-8">
+            <div className="flex-1">
+              <FullCalendar />
+            </div>
+            <div className="w-[400px] shrink-0 mt-12">
+              <TaskSidePanel />
+            </div>
+          </div>
         </div>
       </div>
     </div>

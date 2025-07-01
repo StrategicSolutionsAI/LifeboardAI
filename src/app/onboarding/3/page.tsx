@@ -50,6 +50,12 @@ const integrations: Integration[] = [
     icon: "⌚"
   },
   { 
+    id: "google-fit", 
+    name: "Google Fit", 
+    description: "Import activity and wellness metrics", 
+    icon: "📱" 
+  },
+  { 
     id: "todoist", 
     name: "Todoist", 
     description: "Sync tasks from your Todoist account", 
@@ -63,6 +69,7 @@ export default function OnboardingStep3() {
 
   const [connectingGoogle, setConnectingGoogle] = useState(false)
   const [connectingFitbit, setConnectingFitbit] = useState(false)
+  const [connectingGoogleFit, setConnectingGoogleFit] = useState(false)
   const [connectingTodoist, setConnectingTodoist] = useState(false)
   
   const connectGoogleCalendar = async () => {
@@ -87,6 +94,16 @@ export default function OnboardingStep3() {
     }
   }
   
+  const connectGoogleFit = async () => {
+    setConnectingGoogleFit(true)
+    try {
+      window.location.href = '/api/auth/googlefit?redirectUrl=/onboarding/3'
+    } catch (error) {
+      console.error('Error connecting to Google Fit:', error)
+      setConnectingGoogleFit(false)
+    }
+  }
+
   const connectTodoist = async () => {
     setConnectingTodoist(true)
     try {
@@ -111,6 +128,11 @@ export default function OnboardingStep3() {
     // For Fitbit, start OAuth
     if (integrationId === 'fitbit') {
       connectFitbit()
+      return
+    }
+    // For Google Fit, start OAuth
+    if (integrationId === 'google-fit') {
+      connectGoogleFit()
       return
     }
     // For Todoist, start OAuth
@@ -192,6 +214,8 @@ export default function OnboardingStep3() {
                   {integration.id === 'google-calendar' && connectingGoogle ? (
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
                   ) : integration.id === 'fitbit' && connectingFitbit ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
+                  ) : integration.id === 'google-fit' && connectingGoogleFit ? (
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
                   ) : integration.id === 'todoist' && connectingTodoist ? (
                     <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />

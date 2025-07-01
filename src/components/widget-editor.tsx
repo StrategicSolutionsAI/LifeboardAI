@@ -30,19 +30,26 @@ interface WidgetEditorProps {
 export default function WidgetEditorSheet({ widget, open, onClose, onSave }: WidgetEditorProps) {
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
+  const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
 
-  // Check if Fitbit is connected
+  // Check if Fitbit or Google Fit is connected
   useEffect(() => {
-    const checkFitbitConnection = async () => {
+    const checkConnections = async () => {
       try {
-        const response = await fetch('/api/integrations/status?provider=fitbit');
-        const data = await response.json();
-        setIsFitbitConnected(data.connected);
+        // Fitbit
+        const fitbitRes = await fetch('/api/integrations/status?provider=fitbit');
+        const fitbitData = await fitbitRes.json();
+        setIsFitbitConnected(fitbitData.connected);
+
+        // Google Fit
+        const gfRes = await fetch('/api/integrations/status?provider=googlefit');
+        const gfData = await gfRes.json();
+        setIsGoogleFitConnected(gfData.connected);
       } catch (error) {
-        console.error('Error checking Fitbit connection:', error);
+        console.error('Error checking integration connections:', error);
       }
     };
-    checkFitbitConnection();
+    checkConnections();
   }, []);
 
   // keep draft in sync when widget changes
@@ -74,7 +81,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
           </div>
 
           {/* Data Source Selector - Only for water widget with Fitbit connected */}
-          {['water','steps'].includes(draft.id) && isFitbitConnected && (
+          {['water','steps'].includes(draft.id) && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">Data Source</p>
               <div className="space-y-2">
@@ -83,23 +90,38 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
                     type="radio"
                     name="dataSource"
                     value="manual"
-                    checked={draft.dataSource !== 'fitbit'}
+                    checked={draft.dataSource === 'manual'}
                     onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
                     className="text-indigo-600"
                   />
                   <span className="text-sm">Manual tracking</span>
                 </label>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="dataSource"
-                    value="fitbit"
-                    checked={draft.dataSource === 'fitbit'}
-                    onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
-                    className="text-indigo-600"
-                  />
-                  <span className="text-sm">Fitbit (automatic)</span>
-                </label>
+                {isFitbitConnected && (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      value="fitbit"
+                      checked={draft.dataSource === 'fitbit'}
+                      onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm">Fitbit (automatic)</span>
+                  </label>
+                )}
+                {isGoogleFitConnected && (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      value="googlefit"
+                      checked={draft.dataSource === 'googlefit'}
+                      onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm">Google Fit (automatic)</span>
+                  </label>
+                )}
               </div>
               {draft.dataSource === 'fitbit' && (
                 <p className="text-xs text-gray-500 mt-1">

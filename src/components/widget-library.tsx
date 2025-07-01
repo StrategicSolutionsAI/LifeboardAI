@@ -668,10 +668,17 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
   useEffect(() => {
     const checkIntegrations = async () => {
       try {
+        // Fitbit
         const fitbitResponse = await fetch('/api/integrations/status?provider=fitbit');
         const fitbitData = await fitbitResponse.json();
         if (fitbitData.connected) {
           setConnectedIntegrations(prev => [...prev, 'fitbit']);
+        }
+        // Google Fit
+        const gfResponse = await fetch('/api/integrations/status?provider=googlefit');
+        const gfData = await gfResponse.json();
+        if (gfData.connected) {
+          setConnectedIntegrations(prev => [...prev, 'googlefit']);
         }
       } catch (error) {
         console.error('Error checking integrations:', error);
@@ -895,7 +902,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
             </div>
 
             {/* Data Source Selector - Only for water widget with Fitbit connected */}
-            {['water','steps'].includes(draftWidget.id) && connectedIntegrations.includes('fitbit') && (
+            {['water','steps'].includes(draftWidget.id) && (connectedIntegrations.includes('fitbit') || connectedIntegrations.includes('googlefit')) && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-gray-600">Data Source</p>
                 <div className="space-y-2">
@@ -921,6 +928,19 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     />
                     <span className="text-sm">Fitbit (automatic)</span>
                   </label>
+                  {connectedIntegrations.includes('googlefit') && (
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="dataSource"
+                        value="googlefit"
+                        checked={draftWidget.dataSource === 'googlefit'}
+                        onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
+                        className="text-indigo-600"
+                      />
+                      <span className="text-sm">Google Fit (automatic)</span>
+                    </label>
+                  )}
                 </div>
                 {draftWidget.dataSource === 'fitbit' && (
                   <p className="text-xs text-gray-500 mt-1">

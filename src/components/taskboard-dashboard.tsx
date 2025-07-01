@@ -297,7 +297,64 @@ export function TaskBoardDashboard() {
     }
     return {};
   });
+
+  // Google Fit data state
+  const [googleFitData, setGoogleFitData] = useState<Record<string, number>>(()=>{
+    if (typeof window !== 'undefined'){
+      try{ const stored=localStorage.getItem('googlefit_metrics'); if(stored) return JSON.parse(stored);}catch(e){}
+    }
+    return {};
+  });
+
   const [isLoadingFitbit, setIsLoadingFitbit] = useState(false);
+
+  // Fetch Google Fit metrics on mount & when widgets change
+  useEffect(() => {
+    const widgets = Object.values(widgetsByBucketRef.current).flat();
+    const needGF = widgets.some(
+      (w) => ["water", "steps"].includes(w.id) && w.dataSource === "googlefit"
+    );
+    if (!needGF) return;
+
+    let cancelled = false;
+    async function fetchGF() {
+      try {
+        const res = await fetch(`/api/integrations/googlefit/metrics?cb=${Date.now()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const obj: Record<string, number> = {
+          water: data.water || 0,
+          steps: data.steps || 0,
+        };
+        if (cancelled) return;
+        setGoogleFitData(obj);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('googlefit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
+        }
+
+        // Update progress for each Google Fit widget (only today)
+        const todayStr = todayStrGlobal;
+        const updated: Record<string, ProgressEntry> = { ...progressByWidgetRef.current };
+        widgets.forEach((w) => {
+          if (w.dataSource !== 'googlefit') return;
+          const val = w.id === 'water' ? obj.water : obj.steps;
+          const existing = updated[w.instanceId] ?? { value: 0, date: todayStr, streak: 0, lastCompleted: '' };
+          if (existing.date !== todayStr) existing.value = 0;
+          existing.value = val;
+          updated[w.instanceId] = existing;
+        });
+        setProgressByWidget(updated);
+      } catch (e) {
+        console.error('Failed to fetch Google Fit metrics', e);
+      }
+    }
+    fetchGF();
+    const id = setInterval(fetchGF, 1000 * 60 * 15); // refresh every 15min
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [widgetsByBucketRef.current]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Todoist task state
@@ -431,9 +488,7 @@ export function TaskBoardDashboard() {
                 // Reset value if stored date isn't today yet
                 if (existing.date !== todayStr) {
                   existing.value = 0;
-                  existing.date = todayStr;
                 }
-
                 existing.value = val;
                 updatedProgress[w.instanceId] = existing;
               });
@@ -556,7 +611,7 @@ export function TaskBoardDashboard() {
               setAllTodoistTasks(allTasks);
               if (dateForDaily) {
                 const iso = `${dateForDaily.getFullYear()}-${String(dateForDaily.getMonth() + 1).padStart(2,'0')}-${String(dateForDaily.getDate()).padStart(2,'0')}`;
-                setTodoistTasks(allTasks.filter(t=>t.due?.date===iso));
+                setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
               }
               return; // fresh cache
             }
@@ -611,6 +666,18 @@ export function TaskBoardDashboard() {
       });
     } catch (err) {
       console.error('Failed to update Todoist task', err);
+    }
+  };
+
+  const updateTaskDuration = async (taskId: string, duration: number) => {
+    try {
+      await fetch('/api/integrations/todoist/tasks/update-duration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, duration }),
+      });
+    } catch (err) {
+      console.error('Failed to update task duration', err);
     }
   };
 
@@ -1015,8 +1082,13 @@ export function TaskBoardDashboard() {
       Object.entries(widgetsToSave).forEach(([bucket, widgets]) => {
         console.log(`  Bucket "${bucket}": ${widgets.length} widgets`);
       });
+      
+      // Verify save by reading back
+      const savedData = localStorage.getItem('widgets_by_bucket');
+      const verified = JSON.parse(savedData!);
+      console.log('Verified save - savedAt:', verified.savedAt);
     }
-
+    
     // Save to Supabase
     try {
       const prefs = await getUserPreferencesClient();
@@ -1163,7 +1235,7 @@ export function TaskBoardDashboard() {
         } else {
           console.log('No widgets found in localStorage');
         }
-      } catch (e) {
+      } catch(e) {
         console.error('Failed to parse stored widgets', e);
       }
     }
@@ -1703,6 +1775,23 @@ export function TaskBoardDashboard() {
   // Toggle for task views (right panel)
   const [taskView, setTaskView] = useState<'Today'|'Upcoming'|'Master List'>('Today');
 
+  // ------------------------------------------------------------------
+  // Live "Now" time indicator
+  // ------------------------------------------------------------------
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
+
+  // Refresh every minute so the indicator stays in sync
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTime(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Display string for the current hour (e.g. "10AM") so we can match planner slot
+  const currentHourDisplay = useMemo(() => {
+    const h = currentTime.getHours();
+    return `${(h % 12 || 12)}${h < 12 ? 'AM' : 'PM'}`;
+  }, [currentTime]);
+
   // ----------------------------------------------
   // Hourly planner (7 AM → 5 PM)
   // ----------------------------------------------
@@ -1715,6 +1804,55 @@ export function TaskBoardDashboard() {
   }, []);
 
   // Map of hour → tasks scheduled for that slot
+  // Height (px) representing one-hour slot in the planner – used for sizing + resizing
+  const HOUR_HEIGHT = 48; // keep in sync with tailwind padding/line-height
+
+  // ------------------------------ Resize state ------------------------------
+  const [resizingTask, setResizingTask] = useState<{ taskId: string; hour: string } | null>(null);
+  const resizeStartRef = useRef<{ y: number; duration: number; taskId: string; hour: string } | null>(null);
+
+  function startResize(e: React.MouseEvent, hour: string, taskId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    const startY = e.clientY;
+    const task = hourlyPlan[hour].find((t: any) => t.id.toString() === taskId);
+    const startDuration = task?.duration ?? 60;
+    resizeStartRef.current = { y: startY, duration: startDuration, taskId, hour };
+    setResizingTask({ taskId, hour });
+
+    function onMove(ev: MouseEvent) {
+      if (!resizeStartRef.current) return;
+      const delta = ev.clientY - resizeStartRef.current.y;
+      const minutesDelta = (delta / HOUR_HEIGHT) * 60;
+      let newDur = Math.max(15, Math.round((resizeStartRef.current.duration + minutesDelta) / 15) * 15);
+      setHourlyPlan((prev) => {
+        const copy: Record<string, any[]> = { ...prev };
+        copy[hour] = copy[hour].map((t) =>
+          t.id.toString() === taskId ? { ...t, duration: newDur } : t
+        );
+        return copy;
+      });
+    }
+
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setResizingTask(null);
+      // Restore cursor
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (resizeStartRef.current) {
+        const { taskId: id, hour: hr } = resizeStartRef.current;
+        const task = hourlyPlan[hr].find((t: any) => t.id.toString() === id);
+        if (task) updateTaskDuration(id, task.duration ?? 60);
+      }
+      resizeStartRef.current = null;
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   const [hourlyPlan, setHourlyPlan] = useState<Record<string, any[]>>(() => {
     const obj: Record<string, any[]> = {};
     hours.forEach((h) => {
@@ -1811,6 +1949,7 @@ export function TaskBoardDashboard() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('todoist_all_tasks');
       localStorage.removeItem('fitbit_metrics');
+      localStorage.removeItem('googlefit_metrics');
     }
     fetchIntegrationsData();
 
@@ -2063,14 +2202,27 @@ export function TaskBoardDashboard() {
                   {getDisplayWidgets(activeBucket).map((w) => {
                     // Determine today's progress value and percentage towards target
                     let todayVal = 0;
+                    let isFitbitData = false;
+                    let isGoogleFitData = false;
+                    
                     if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
                       todayVal = fitbitData.water;
+                      isFitbitData = true;
                     } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
                       todayVal = fitbitData.steps;
+                      isFitbitData = true;
+                    } else if (w.id === 'water' && w.dataSource === 'googlefit' && googleFitData.water !== undefined) {
+                      todayVal = googleFitData.water;
+                      isGoogleFitData = true;
+                    } else if (w.id === 'steps' && w.dataSource === 'googlefit' && googleFitData.steps !== undefined) {
+                      todayVal = googleFitData.steps;
+                      isGoogleFitData = true;
                     } else {
+                      // Use manual progress tracking
                       const prog = progressByWidget[w.instanceId];
                       todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
                     }
+                    
                     const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                     const goalMet = pct >= 100;
 
@@ -2083,52 +2235,52 @@ export function TaskBoardDashboard() {
 
                     return (
                       <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
-                                                  <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                convertWidgetToTask(w);
-                              }}
-                              className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1"
-                              aria-label="Convert to task"
-                            >
-                              <ListChecks className="h-3 w-3 text-indigo-600" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('Deleting widget:', w.instanceId);
-                                // Use callback pattern to ensure we're working with the latest state
-                                setWidgetsByBucket(prevWidgets => {
-                                  const updatedWidgets = { ...prevWidgets };
-                                  updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
-                                  
-                                  console.log('Widget deleted from bucket:', activeBucket);
-                                  console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
-                                  console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
-                                  
-                                  // Also update the ref immediately
-                                  widgetsByBucketRef.current = updatedWidgets;
-                                  
-                                  // Force immediate save to localStorage
-                                  if (typeof window !== 'undefined') {
-                                    const dataToSave = {
-                                      widgets: updatedWidgets,
-                                      savedAt: new Date().toISOString()
-                                    };
-                                    localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                                    console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
-                                  }
-                                  
-                                  return updatedWidgets;
-                                });
-                              }}
-                              className="rounded-full bg-red-100 hover:bg-red-200 p-1"
-                              aria-label="Delete widget"
-                            >
-                              <X className="h-3 w-3 text-red-600" />
-                            </button>
-                          </div>
+                        <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              convertWidgetToTask(w);
+                            }}
+                            className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1"
+                            aria-label="Convert to task"
+                          >
+                            <ListChecks className="h-3 w-3 text-indigo-600" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('Deleting widget:', w.instanceId);
+                              // Use callback pattern to ensure we're working with the latest state
+                              setWidgetsByBucket(prevWidgets => {
+                                const updatedWidgets = { ...prevWidgets };
+                                updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
+                                
+                                console.log('Widget deleted from bucket:', activeBucket);
+                                console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
+                                console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
+                                
+                                // Also update the ref immediately
+                                widgetsByBucketRef.current = updatedWidgets;
+                                
+                                // Force immediate save to localStorage
+                                if (typeof window !== 'undefined') {
+                                  const dataToSave = {
+                                    widgets: updatedWidgets,
+                                    savedAt: new Date().toISOString()
+                                  };
+                                  localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+                                  console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
+                                }
+                                
+                                return updatedWidgets;
+                              });
+                            }}
+                            className="rounded-full bg-red-100 hover:bg-red-200 p-1"
+                            aria-label="Delete widget"
+                          >
+                            <X className="h-3 w-3 text-red-600" />
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2">
                           {(() => {
                             let IconComponent: any = null;
@@ -2164,22 +2316,6 @@ export function TaskBoardDashboard() {
                         <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
 
                         {(() => {
-                          // For water widgets with Fitbit data source, use Fitbit data
-                          let todayVal = 0;
-                          let isFitbitData = false;
-                          
-                          if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
-                            todayVal = fitbitData.water;
-                            isFitbitData = true;
-                          } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
-                            todayVal = fitbitData.steps;
-                            isFitbitData = true;
-                          } else {
-                            // Use manual progress tracking
-                            const prog = progressByWidget[w.instanceId];
-                            todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                          }
-                          
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
                           
@@ -2191,7 +2327,8 @@ export function TaskBoardDashboard() {
                               <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
                                 <span>
                                   {todayVal} / {w.target}
-                                  {isFitbitData && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
+                                  {w.dataSource === 'fitbit' && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
+                                   {w.dataSource === 'googlefit' && <span className="ml-1 text-[10px] text-green-600">Google Fit</span>}
                                 </span>
                                 {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
                               </div>
@@ -2199,7 +2336,7 @@ export function TaskBoardDashboard() {
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && w.dataSource === 'fitbit') && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -2316,7 +2453,7 @@ export function TaskBoardDashboard() {
                           ) : null}
 
                           {dailyVisibleTasks.map((t: any, index: number) => (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                               {(provided: any) => (
                                 <li
                                   ref={provided.innerRef}
@@ -2388,7 +2525,7 @@ export function TaskBoardDashboard() {
                         ) : null}
 
                         {openTasksToShow.map((t: any, index: number) => (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                             {(provided: any) => (
                               <li
                                 ref={provided.innerRef}
@@ -2457,7 +2594,7 @@ export function TaskBoardDashboard() {
                           style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
                         >
                           {dailyVisibleTasks.map((t: any, index: number) => (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                            <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                               {(provided: any) => (
                                 <li
                                   ref={provided.innerRef}
@@ -2511,7 +2648,7 @@ export function TaskBoardDashboard() {
                         ) : null}
 
                         {openTasksToShow.map((t: any, index: number) => (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                          <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                             {(provided: any) => (
                               <li
                                 ref={provided.innerRef}
@@ -2576,27 +2713,43 @@ export function TaskBoardDashboard() {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
-                                className="flex items-start gap-2 py-1"
+                                className="relative flex items-start gap-2 py-1 border-t border-dotted border-gray-200 first:border-t-0"
                               >
                                 <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
                                 <ul className="flex-1 flex flex-col gap-2">
                                   {hourlyPlan[disp].map((t: any, index: number) => (
-                                    <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                    <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                                       {(provided: any) => (
                                         <li
                                           ref={provided.innerRef}
                                           {...provided.draggableProps}
                                           {...provided.dragHandleProps}
-                                          style={provided.draggableProps.style}
-                                          className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                          style={{
+                                              ...provided.draggableProps.style,
+                                              ...(resizingTask?.taskId === t.id ? { transform: 'none', transition: 'none' } : {}),
+                                              height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
+                                            }}
+                                           className="relative flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
                                         >
                                           <span>{t.content}</span>
+                                            <div
+                                              onMouseDown={(e) => startResize(e, disp, t.id.toString())}
+                                              className="absolute -bottom-1 left-0 right-0 h-2 cursor-ns-resize bg-purple-200 hover:bg-purple-300 rounded-b-md"
+                                            />
                                         </li>
                                       )}
                                     </Draggable>
                                   ))}
                                   {provided.placeholder}
                                 </ul>
+                                {disp === currentHourDisplay && (
+                                  <div
+                                    className="absolute left-14 right-0 pointer-events-none"
+                                    style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
+                                  >
+                                    <div className="h-px bg-purple-500" />
+                                  </div>
+                                )}
                               </div>
                             )}
                           </Droppable>
