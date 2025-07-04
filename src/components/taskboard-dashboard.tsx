@@ -2034,7 +2034,7 @@ export function TaskBoardDashboard() {
       <div className="flex min-h-screen flex-col">
         {/* Header */}
         {/* Full-width header – pull left over the sidebar */}
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
           <div className="flex items-center gap-1 text-2xl font-semibold">
             <span className="text-indigo-500">AI</span>
             <span>TaskBoard</span>
@@ -2075,7 +2075,7 @@ export function TaskBoardDashboard() {
           
           {/* Bucket tabs row (scrollable) */}
           <div
-            className="relative z-20 mt-10"
+            className="relative z-10 mt-10"
             /* Width matches the white widget panel: total minus sidebar (400px) + gap (40px) */
             style={{ width: 'calc(100% - 440px)' }}
           >
