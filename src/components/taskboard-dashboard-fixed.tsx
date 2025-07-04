@@ -17,7 +17,9 @@ import {
   Droplets,
   Flame,
   Target,
+  Settings,
   Scale,
+  Bell,
   Heart,
   Moon,
   Activity,
@@ -267,22 +269,46 @@ export default function TaskBoardDashboard() {
   // Copy your existing state and functions here
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
-      {/* Sidebar */}
-      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-6 z-30">
-        {/* Sidebar content */}
-      </div>
+    <div className="h-screen bg-[#F6F6FC] flex flex-col relative">
+      {/* Header - Fixed at the top */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center px-6 z-50 shadow-sm">
+        <div className="flex items-center justify-between w-full">
+          <h1 className="text-xl font-semibold">Lifeboard</h1>
+          <div className="flex items-center space-x-4">
+            <button className="p-2 rounded-full hover:bg-gray-100">
+              <Search className="h-5 w-5 text-gray-500" />
+            </button>
+            <button className="p-2 rounded-full hover:bg-gray-100">
+              <Bell className="h-5 w-5 text-gray-500" />
+            </button>
+            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <User className="h-4 w-4 text-gray-600" />
+            </div>
+          </div>
+        </div>
+      </header>
 
-      {/* Main area with header and content */}
-      <div className="pt-16">
-        {/* Header */}
-        <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 flex items-center px-6 z-20">
-          {/* Header content */}
-        </header>
+      <div className="flex flex-1 pt-16 h-full overflow-hidden relative">
+        {/* Sidebar - Fixed position */}
+        <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex-shrink-0 flex flex-col items-center py-4 justify-between z-50 shadow-sm">
+          <div className="flex flex-col items-center gap-6">
+            {/* Add your existing sidebar icons here */}
+          </div>
+          
+          {/* Bottom section with settings */}
+          <div className="mb-6">
+            <Link 
+              href="/dashboard/settings" 
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
+              title="Settings"
+            >
+              <Settings className="h-6 w-6" />
+            </Link>
+          </div>
+        </div>
 
-        {/* Main content area */}
-        <div className="px-8 py-6">
-          {/* Dashboard content */}
+        {/* Main content area - Scrollable */}
+        <div className="flex-1 ml-20 overflow-y-auto bg-[#F6F6FC] p-6 h-full">
           <div className="flex gap-6">
             {/* Left column - widgets */}
             <div className="flex-1">
@@ -359,18 +385,6 @@ export default function TaskBoardDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Widget editor sheet */}
-      {typeof window !== 'undefined' && (
-        <WidgetEditorSheet 
-          widget={editingWidget}
-          open={editingWidget !== null}
-          onOpenChange={(open) => {
-            if (!open) setEditingWidget(null);
-          }}
-        />
-      )}
-
       {/* Bucket management sheet */}
       <Sheet open={isBucketSheetOpen} onOpenChange={setIsBucketSheetOpen}>
         <SheetContent side="right">
