@@ -10,7 +10,6 @@ import { format, addDays, isSameDay } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
-  Search,
   MessageSquare,
   LogOut,
   X,
@@ -85,7 +84,6 @@ import {
   Sun,
   LayoutDashboard,
   Settings as SettingsIcon,
-  User,
   ListChecks,
 } from "lucide-react";
 import { WidgetLibrary } from "./widget-library";
@@ -2007,14 +2005,7 @@ export function TaskBoardDashboard() {
         <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
           <Home className="w-5 h-5 text-indigo-500" />
         </div>
-        {/* Profile */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <User className="w-5 h-5 text-gray-400" />
-        </div>
-        {/* Tasks */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <FileText className="w-5 h-5 text-gray-400" />
-        </div>
+
         {/* Calendar */}
         <Link
           href="/calendar"
@@ -2022,10 +2013,7 @@ export function TaskBoardDashboard() {
         >
           <Calendar className="w-5 h-5 text-gray-400" />
         </Link>
-        {/* Search */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <Search className="w-5 h-5 text-gray-400" />
-        </div>
+
 
         {/* Settings */}
         <Link
