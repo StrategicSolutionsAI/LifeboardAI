@@ -6,7 +6,6 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   Home,
   User,
-  FileText,
   Calendar as CalendarIcon,
   Search,
   Bell,
@@ -42,16 +41,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <Home className={`w-5 h-5 ${iconColor(pathname === '/dashboard')}`} />
         </Link>
 
-        {/* Profile */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <User className="w-5 h-5 text-gray-400" />
-        </div>
-
-        {/* Tasks */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <FileText className="w-5 h-5 text-gray-400" />
-        </div>
-
         {/* Calendar */}
         <Link
           href="/calendar"
@@ -60,11 +49,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
         >
           <CalendarIcon className={`w-5 h-5 ${iconColor(pathname.startsWith('/calendar'))}`} />
         </Link>
-
-        {/* Search */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <Search className="w-5 h-5 text-gray-400" />
-        </div>
 
         {/* Settings - bottom */}
         <Link

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Home, User, FileText, Calendar as CalendarIcon, Search, LogOut } from "lucide-react";
+import { Home, Calendar as CalendarIcon, Settings, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase/client";
 import { TaskSidePanel } from "@/components/task-side-panel";
@@ -27,21 +27,14 @@ export default function CalendarView() {
           <Home className="w-5 h-5 text-gray-400" />
         </Link>
         {/* Profile */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <User className="w-5 h-5 text-gray-400" />
-        </div>
-        {/* Tasks */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <FileText className="w-5 h-5 text-gray-400" />
-        </div>
         {/* Calendar – active */}
         <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
           <CalendarIcon className="w-5 h-5 text-indigo-500" />
         </div>
-        {/* Search */}
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <Search className="w-5 h-5 text-gray-400" />
-        </div>
+        {/* Settings */}
+        <Link href="/dashboard/settings" className="mt-auto mb-4 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100">
+          <Settings className="w-5 h-5 text-gray-400" />
+        </Link>
       </div>
 
       {/* Main column */}
