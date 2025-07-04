@@ -43,6 +43,17 @@ export async function emailLogin(formData: FormData): Promise<void> {
   redirect('/dashboard')
 }
 
+// Google Fit auth
+export async function signInWithGoogleFit() {
+  try {
+    const { getGoogleFitAuthUrl } = await import('@/lib/googlefit/client')
+    const url = getGoogleFitAuthUrl()
+    return { url }
+  } catch (err: any) {
+    return { error: err?.message ?? 'Failed to initiate Google Fit authentication' }
+  }
+}
+
 // Simple email sign-up
 
 export async function emailSignUp(formData: FormData): Promise<void> {

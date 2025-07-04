@@ -77,8 +77,9 @@ export async function refreshGoogleFitToken(refreshToken: string) {
 export async function fetchGoogleFitSteps(accessToken: string, date: string) {
   // date format yyyy-MM-dd
   const [yyyy, mm, dd] = date.split('-').map(Number)
-  const startMs = Date.UTC(yyyy, mm - 1, dd, 0, 0, 0)
-  const endMs = Date.UTC(yyyy, mm - 1, dd, 23, 59, 59, 999)
+  // Use the user's local timezone to match what the Google Fit mobile app shows.
+  const startMs = new Date(yyyy, mm - 1, dd, 0, 0, 0, 0).getTime()
+  const endMs = new Date(yyyy, mm - 1, dd, 23, 59, 59, 999).getTime()
 
   const body = {
     aggregateBy: [
