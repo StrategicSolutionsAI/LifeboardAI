@@ -41,6 +41,7 @@
     "googleapis": "^150.0.1",
     "lucide-react": "^0.378.0",
     "next": "^14.2.0",
+    "openai": "^5.8.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "recharts": "^3.0.0",

@@ -90,6 +90,7 @@ import { WidgetLibrary } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import TrendsPanel from "./trends-panel";
@@ -2880,6 +2881,7 @@ export function TaskBoardDashboard() {
         </Sheet>
 
       </div>
+      <ChatBar />
     </div>
   );
 }

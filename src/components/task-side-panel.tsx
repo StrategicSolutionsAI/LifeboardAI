@@ -304,7 +304,7 @@ export function TaskSidePanel() {
   // -----------------------------------------------------------------------------
   return (
     <aside className="w-[400px] flex-shrink-0 -mt-12">
-      <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
+      <div className="rounded-lg border border-gray-100 bg-white p-6 shadow-sm h-full flex flex-col">
         {/* Month header */}
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">{format(date, "MMMM yyyy")}</h3>
@@ -315,7 +315,7 @@ export function TaskSidePanel() {
         </div>
 
         {/* Week strip */}
-        <div className="flex justify-between gap-2 overflow-x-auto pb-1">
+        <div className="flex justify-between gap-3 overflow-x-auto pb-2">
           {getWeekDays().map((day, idx) => (
             <button
               key={idx}
@@ -370,7 +370,7 @@ export function TaskSidePanel() {
                       </div>
 
                       <ul
-                        className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isDailyCollapsed ? 0 : "10rem" }}
                       >
                         {isLoadingTasks && dailyVisibleTasks.length === 0 && <li className="text-gray-500">Loading…</li>}
@@ -384,7 +384,7 @@ export function TaskSidePanel() {
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
                                 style={prov.draggableProps.style}
-                                className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
                               >
                                 <input
                                   type="checkbox"
@@ -439,7 +439,7 @@ export function TaskSidePanel() {
                     <ul
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                      className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
                       style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
                     >
                       {isLoadingAllTasks && openTasksToShow.length === 0 && <li className="text-gray-500">Loading…</li>}
@@ -453,7 +453,7 @@ export function TaskSidePanel() {
                               {...prov.draggableProps}
                               {...prov.dragHandleProps}
                               style={prov.draggableProps.style}
-                              className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                              className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
                             >
                               <input
                                 type="checkbox"
@@ -494,10 +494,10 @@ export function TaskSidePanel() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className="relative flex items-start gap-2 py-1 border-t border-dotted border-gray-200 first:border-t-0"
+                          className="relative flex items-start gap-3 py-4 min-h-[64px] border-t border-dotted border-[#E2E6F6] first:border-t-0"
                         >
                           <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
-                          <ul className="flex-1 flex flex-col gap-2">
+                          <ul className="flex-1 flex flex-col gap-3">
                             {hourlyPlan[disp].map((t: any, index: number) => (
                               <Draggable key={t.id} draggableId={t.id.toString()} index={index} isDragDisabled={!!resizingTask}>
                                 {(prov) => (
@@ -510,7 +510,7 @@ export function TaskSidePanel() {
                                       ...(resizingTask?.taskId === t.id ? { transform: "none", transition: "none" } : {}),
                                       height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
                                     }}
-                                    className="relative flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                    className="relative flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
                                   >
                                     <span>{t.content}</span>
                                     <div
@@ -527,7 +527,7 @@ export function TaskSidePanel() {
                           {/* current time indicator */}
                           {disp === currentHourDisplay && (
                             <div
-                              className="absolute left-14 right-0 pointer-events-none"
+                              className="absolute left-16 right-0 pointer-events-none"
                               style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
                             >
                               <div className="h-px bg-purple-500" />
