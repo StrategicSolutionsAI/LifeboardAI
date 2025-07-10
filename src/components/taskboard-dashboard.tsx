@@ -1867,31 +1867,20 @@ export function TaskBoardDashboard() {
   }
 
   const [hourlyPlan, setHourlyPlan] = useState<Record<string, any[]>>(() => {
-    // Attempt to load saved plan for the selected date from localStorage
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(`hourlyPlan-${selectedDateStr}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          // Ensure every hour key exists
-          hours.forEach((h) => {
-            if (!parsed[h]) parsed[h] = [];
-          });
-          return parsed;
-        }
-      } catch (err) {
-        console.error('Failed to parse stored hourly plan', err);
-      }
-    }
+    // Initialize empty plan; we'll hydrate from localStorage after mount to avoid SSR mismatch
     const obj: Record<string, any[]> = {};
-    hours.forEach((h) => {
-      obj[h] = [];
-    });
+    hours.forEach((h) => { obj[h] = []; });
     return obj;
   });
 
-  // Persist hourly plan to localStorage whenever it changes
+  const hasHydratedRef = useRef(false);
+
+  // Persist hourly plan to localStorage whenever it changes (after first hydration)
   useEffect(() => {
+    if (!hasHydratedRef.current) {
+      hasHydratedRef.current = true;
+      return;
+    }
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(`hourlyPlan-${selectedDateStr}`, JSON.stringify(hourlyPlan));
