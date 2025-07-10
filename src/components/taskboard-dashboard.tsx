@@ -1792,11 +1792,11 @@ export function TaskBoardDashboard() {
   }, [currentTime]);
 
   // ----------------------------------------------
-  // Hourly planner (7 AM → 5 PM)
+  // Hourly planner (7 AM → 9 PM)
   // ----------------------------------------------
   const hours = useMemo(() => {
-    return Array.from({ length: 11 }, (_, i) => {
-      const h = 7 + i; // 7-17
+    return Array.from({ length: 15 }, (_, i) => {
+      const h = 7 + i; // 7-21
       const disp = `${((h % 12) || 12)}${h < 12 ? 'AM' : 'PM'}`;
       return disp;
     });
@@ -2711,10 +2711,10 @@ export function TaskBoardDashboard() {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
-                                className="relative flex items-start gap-2 py-1 border-t border-dotted border-gray-200 first:border-t-0"
+                                className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
                               >
                                 <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
-                                <ul className="flex-1 flex flex-col gap-2">
+                                <ul className="flex-1 flex flex-col gap-3">
                                   {hourlyPlan[disp].map((t: any, index: number) => (
                                     <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
                                       {(provided: any) => (
@@ -2727,9 +2727,48 @@ export function TaskBoardDashboard() {
                                               ...(resizingTask?.taskId === t.id ? { transform: 'none', transition: 'none' } : {}),
                                               height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
                                             }}
-                                           className="relative flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                           className="relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
                                         >
-                                          <span>{t.content}</span>
+                                          <div className="flex items-start gap-2.5 w-full h-full min-h-[36px]">
+                                            <div className="flex-shrink-0 mt-1.5">
+                                              <div className="w-2 h-2 bg-[#8A96FF] rounded-full" />
+                                            </div>
+                                            <div className="flex flex-col w-full justify-center min-w-0">
+                                              {(() => {
+                                                // Calculate start time from the hour slot
+                                                const startHour12 = parseInt(disp.replace(/[^0-9]/g, '')) || 12;
+                                                const isPM = disp.includes("PM");
+                                                
+                                                // Calculate end time from duration
+                                                const dur = t.duration ?? 60;
+                                                const start24 = (startHour12 % 12) + (isPM ? 12 : 0);
+                                                const endTotal = start24 * 60 + dur;
+                                                const end24 = Math.floor(endTotal / 60);
+                                                const endMin = endTotal % 60;
+                                                const endHour12 = end24 > 12 ? end24 - 12 : (end24 === 0 ? 12 : end24);
+                                                const endIsPM = end24 >= 12;
+                                                
+                                                // Format time range appropriately
+                                                const startTime = `${startHour12}:00 ${isPM ? 'PM' : 'AM'}`;
+                                                const endTime = `${endHour12}:${endMin.toString().padStart(2, '0')} ${endIsPM ? 'PM' : 'AM'}`;
+                                                const timeRange = `${startTime} - ${endTime}`;
+                                                
+                                                // For very short tasks under 20 minutes, only show content if there's room
+                                                const showContent = dur >= 20;
+                                                
+                                                return (
+                                                  <>
+                                                    <div className="text-xs text-gray-500 leading-tight mb-0.5">{timeRange}</div>
+                                                    {showContent && (
+                                                      <div className="font-semibold truncate">
+                                                        {t.content}
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
                                             <div
                                               onMouseDown={(e) => startResize(e, disp, t.id.toString())}
                                               className="absolute -bottom-1 left-0 right-0 h-2 cursor-ns-resize bg-purple-200 hover:bg-purple-300 rounded-b-md"
@@ -2742,10 +2781,11 @@ export function TaskBoardDashboard() {
                                 </ul>
                                 {disp === currentHourDisplay && (
                                   <div
-                                    className="absolute left-14 right-0 pointer-events-none"
+                                    className="absolute inset-x-0 pointer-events-none flex items-center"
                                     style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
                                   >
-                                    <div className="h-px bg-purple-500" />
+                                    <span className="w-2.5 h-2.5 bg-[#8A96FF] rounded-full" />
+                                    <div className="flex-1 h-[2px] bg-[#8A96FF]" />
                                   </div>
                                 )}
                               </div>
