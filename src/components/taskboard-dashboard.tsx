@@ -1806,6 +1806,20 @@ export function TaskBoardDashboard() {
   // Height (px) representing one-hour slot in the planner – used for sizing + resizing
   const HOUR_HEIGHT = 48; // keep in sync with tailwind padding/line-height
 
+  // Ref for the scrollable hourly planner container
+  const plannerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll the planner so the current hour sits at the top
+  useEffect(() => {
+    if (taskView !== 'Today' || isPlannerCollapsed) return;
+    const container = plannerRef.current;
+    if (!container) return;
+    const target = container.querySelector<HTMLElement>(`[data-hour='${currentHourDisplay}']`);
+    if (target) {
+      container.scrollTop = target.offsetTop - container.offsetTop;
+    }
+  }, [currentHourDisplay, taskView, isPlannerCollapsed]);
+
   // ------------------------------ Resize state ------------------------------
   const [resizingTask, setResizingTask] = useState<{ taskId: string; hour: string } | null>(null);
   const resizeStartRef = useRef<{ y: number; duration: number; taskId: string; hour: string } | null>(null);
@@ -2693,7 +2707,12 @@ export function TaskBoardDashboard() {
 
                   {taskView === 'Today' && (
                     <>
-                      {/* Hourly Planner */}
+                      {/* Current Time Indicator */}
+            <div className="flex items-center gap-1 text-sm text-gray-600 mt-4">
+              <Clock size={14} className="text-indigo-500" />
+              <span>{format(currentTime, 'h:mm a')}</span>
+            </div>
+            {/* Hourly Planner */}
                       <div
                         className="flex items-center justify-between text-sm font-medium text-gray-900 mt-4 mb-2 cursor-pointer select-none"
                         onClick={() => setIsPlannerCollapsed((c) => !c)}
@@ -2702,7 +2721,7 @@ export function TaskBoardDashboard() {
                         {isPlannerCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                       </div>
                       <div
-                        className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        ref={plannerRef} className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isPlannerCollapsed ? 0 : '16rem' }}
                       >
                         {hours.map((disp) => (
@@ -2711,7 +2730,7 @@ export function TaskBoardDashboard() {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
-                                className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
+                                data-hour={disp} className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
                               >
                                 <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
                                 <ul className="flex-1 flex flex-col gap-3">
