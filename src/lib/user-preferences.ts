@@ -6,6 +6,7 @@ export interface UserPreferences {
   life_buckets: string[];
   widgets_by_bucket: Record<string, any[]>;
   progress_by_widget?: Record<string, any>;
+  hourly_plan?: Record<string, any[]>;
   created_at?: string;
   updated_at?: string;
 }
@@ -34,6 +35,7 @@ export async function getUserPreferencesClient() {
         life_buckets: [],
         widgets_by_bucket: {},
         progress_by_widget: {},
+        hourly_plan: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -50,7 +52,8 @@ export async function getUserPreferencesClient() {
           user_id: user.id,
           life_buckets: [],
           widgets_by_bucket: {},
-          progress_by_widget: {}
+          progress_by_widget: {},
+          hourly_plan: {}
         };
       }
       
@@ -69,11 +72,12 @@ export async function getUserPreferencesClient() {
       };
     }
     
-    // Ensure widgets_by_bucket is present
+    // Ensure required fields are present
     return {
       ...data,
       widgets_by_bucket: data.widgets_by_bucket || {},
-      progress_by_widget: data.progress_by_widget || {}
+      progress_by_widget: data.progress_by_widget || {},
+      hourly_plan: data.hourly_plan || {}
     };
   } catch (err) {
     console.error('Exception fetching user preferences:', err);
@@ -81,7 +85,8 @@ export async function getUserPreferencesClient() {
       user_id: user.id,
       life_buckets: [],
       widgets_by_bucket: {},
-      progress_by_widget: {}
+      progress_by_widget: {},
+      hourly_plan: {}
     };
   }
 }
@@ -101,6 +106,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       ...preferences,
       widgets_by_bucket: preferences.widgets_by_bucket || {},
       progress_by_widget: preferences.progress_by_widget || {},
+      hourly_plan: preferences.hourly_plan || {},
       updated_at: new Date().toISOString(),
     };
     

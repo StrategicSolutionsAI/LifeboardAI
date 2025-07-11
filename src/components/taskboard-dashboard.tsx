@@ -1854,6 +1854,7 @@ export function TaskBoardDashboard() {
       // Restore cursor
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+
       if (resizeStartRef.current) {
         const { taskId: id, hour: hr } = resizeStartRef.current;
         const task = hourlyPlan[hr].find((t: any) => t.id.toString() === id);
@@ -1866,52 +1867,130 @@ export function TaskBoardDashboard() {
     window.addEventListener('mouseup', onUp);
   }
 
+  // Load hourly plan from user preferences or initialize empty
   const [hourlyPlan, setHourlyPlan] = useState<Record<string, any[]>>(() => {
-    // Initialize empty plan; we'll hydrate from localStorage after mount to avoid SSR mismatch
+    // Start with empty plan structure
     const obj: Record<string, any[]> = {};
-    hours.forEach((h) => { obj[h] = []; });
+    hours.forEach((h) => {
+      obj[h] = [];
+    });
     return obj;
   });
-
-  const hasHydratedRef = useRef(false);
-
-  // Persist hourly plan to localStorage whenever it changes (after first hydration)
+  
+  // Removed manual saveHourlyPlan function
+  
+  // Automatically save hourly plan whenever it changes
   useEffect(() => {
-    if (!hasHydratedRef.current) {
-      hasHydratedRef.current = true;
-      return;
-    }
-    if (typeof window !== 'undefined') {
+    // Skip initial render
+    const saveChanges = async () => {
       try {
-        localStorage.setItem(`hourlyPlan-${selectedDateStr}`, JSON.stringify(hourlyPlan));
-      } catch (err) {
-        console.error('Failed to save hourly plan', err);
+        // Save to localStorage as fallback/temporary solution
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const localStorageKey = 'lifeboard_hourly_plan';
+        
+        // Get existing data from localStorage
+        const existingData = localStorage.getItem(localStorageKey);
+        const existingPlans = existingData ? JSON.parse(existingData) : {};
+        
+        // Update with new data
+        const updatedPlans = {
+          ...existingPlans,
+          [dateKey]: hourlyPlan
+        };
+        
+        // Save to localStorage
+        localStorage.setItem(localStorageKey, JSON.stringify(updatedPlans));
+        
+        // Try to save to Supabase if possible
+        try {
+          const prefs = await getUserPreferencesClient();
+          if (prefs) {
+            await saveUserPreferences({
+              ...prefs,
+              hourly_plan: updatedPlans
+            });
+          }
+        } catch (supabaseError) {
+          console.warn('Could not save hourly plan to Supabase (schema may need updating):', supabaseError);
+          console.log('Hourly plan saved to localStorage as fallback');
+        }
+        
+        console.log('✅ Hourly plan saved');
+      } catch (error) {
+        console.error('Failed to save hourly plan:', error);
       }
-    }
-  }, [hourlyPlan, selectedDateStr]);
-
-  // Load hourly plan when the selected date changes
+    };
+    
+    // Use a debounced save to avoid too many operations
+    const timeoutId = setTimeout(saveChanges, 500);
+    return () => clearTimeout(timeoutId);
+  }, [hourlyPlan, selectedDate]);
+  
+  // Load hourly plan for the selected date
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = localStorage.getItem(`hourlyPlan-${selectedDateStr}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
+    const loadHourlyPlan = async () => {
+      try {
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        let savedPlan = null;
+        
+        // First try to load from Supabase
+        try {
+          const prefs = await getUserPreferencesClient();
+          if (prefs && prefs.hourly_plan) {
+            savedPlan = prefs.hourly_plan[dateKey];
+            if (savedPlan) {
+              console.log('✅ Loaded hourly plan from Supabase for', dateKey);
+            }
+          }
+        } catch (supabaseError) {
+          console.warn('Could not load hourly plan from Supabase:', supabaseError);
+        }
+        
+        // If not found in Supabase, try localStorage
+        if (!savedPlan) {
+          const localStorageKey = 'lifeboard_hourly_plan';
+          const localData = localStorage.getItem(localStorageKey);
+          
+          if (localData) {
+            const localPlans = JSON.parse(localData);
+            savedPlan = localPlans[dateKey];
+            
+            if (savedPlan) {
+              console.log('✅ Loaded hourly plan from localStorage for', dateKey);
+            }
+          }
+        }
+        
+        if (savedPlan) {
+          // Merge saved plan with empty structure to ensure all hours exist
+          const obj: Record<string, any[]> = {};
+          hours.forEach((h) => {
+            obj[h] = savedPlan[h] || [];
+          });
+          setHourlyPlan(obj);
+        } else {
+          // Reset to empty plan if no saved data for this date
+          const obj: Record<string, any[]> = {};
+          hours.forEach((h) => {
+            obj[h] = [];
+          });
+          setHourlyPlan(obj);
+          console.log('No saved hourly plan found for', dateKey);
+        }
+      } catch (error) {
+        console.error('Failed to load hourly plan:', error);
+        
+        // Fallback to empty plan on error
+        const obj: Record<string, any[]> = {};
         hours.forEach((h) => {
-          if (!parsed[h]) parsed[h] = [];
+          obj[h] = [];
         });
-        setHourlyPlan(parsed);
-        return;
+        setHourlyPlan(obj);
       }
-    } catch (err) {
-      console.error('Failed to load stored hourly plan', err);
-    }
-    const empty: Record<string, any[]> = {};
-    hours.forEach((h) => {
-      empty[h] = [];
-    });
-    setHourlyPlan(empty);
-  }, [selectedDateStr]);
+    };
+    
+    loadHourlyPlan();
+  }, [selectedDate, hours]);
 
   // Convenience: tasks in planner so we can hide them from the daily list
   const assignedTaskIds = useMemo(() => {
