@@ -2381,6 +2381,127 @@ export function TaskBoardDashboard() {
                         <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
 
                         {(() => {
+                          // Special handling for birthday widgets
+                          if (w.id === 'birthdays') {
+                            if (w.birthdayData) {
+                              const birthDate = new Date(w.birthdayData.birthDate);
+                              const today = new Date();
+                              const currentYear = today.getFullYear();
+                              
+                              // Create this year's birthday
+                              const thisYearBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
+                              
+                              // If birthday already passed this year, show next year's
+                              const nextBirthday = thisYearBirthday < today 
+                                ? new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate())
+                                : thisYearBirthday;
+                              
+                              // Calculate days until birthday
+                              const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {w.birthdayData.friendName}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    {daysUntil === 0 ? '🎉 Today!' : 
+                                     daysUntil === 1 ? '🎂 Tomorrow' : 
+                                     `🗓️ ${daysUntil} days`}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3 text-xs text-gray-500">
+                                  Click to add birthday
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Special handling for events widgets
+                          if (w.id === 'social_events') {
+                            if (w.eventData) {
+                              const eventDate = new Date(w.eventData.eventDate);
+                              const today = new Date();
+                              const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {w.eventData.eventName}
+                                  </div>
+                                  {w.eventData.description && (
+                                    <div className="text-xs text-gray-600 mt-1">
+                                      {w.eventData.description}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    {daysUntil === 0 ? '🎉 Today!' : 
+                                     daysUntil === 1 ? '📅 Tomorrow' : 
+                                     daysUntil < 0 ? '✅ Past event' :
+                                     `📆 ${daysUntil} days`}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3 text-xs text-gray-500">
+                                  Click to add event
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Special handling for holidays widgets  
+                          if (w.id === 'holidays') {
+                            if (w.holidayData) {
+                              const holidayDate = new Date(w.holidayData.holidayDate);
+                              const today = new Date();
+                              const currentYear = today.getFullYear();
+                              
+                              // Create this year's holiday
+                              const thisYearHoliday = new Date(currentYear, holidayDate.getMonth(), holidayDate.getDate());
+                              
+                              // If holiday already passed this year, show next year's
+                              const nextHoliday = thisYearHoliday < today 
+                                ? new Date(currentYear + 1, holidayDate.getMonth(), holidayDate.getDate())
+                                : thisYearHoliday;
+                              
+                              const daysUntil = Math.ceil((nextHoliday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {w.holidayData.holidayName}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {holidayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                                  </div>
+                                  <div className="text-xs text-gray-600 mt-1">
+                                    {daysUntil === 0 ? '🎄 Today!' : 
+                                     daysUntil === 1 ? '🎁 Tomorrow' : 
+                                     `🗓️ ${daysUntil} days`}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3 text-xs text-gray-500">
+                                  Click to add holiday
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
                           
@@ -2401,7 +2522,7 @@ export function TaskBoardDashboard() {
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays'].includes(w.id) && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -2439,7 +2560,9 @@ export function TaskBoardDashboard() {
 
           {/* Right section: Calendar and To-do */}
           <aside className="w-[400px] flex-shrink-0 -mt-12">
-            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm h-full flex flex-col">
+            <div className={`rounded-lg border border-gray-100 bg-white p-4 shadow-sm flex flex-col ${
+              taskView === 'Today' ? 'min-h-full' : 'h-full'
+            }`}>
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
                 <div className="flex gap-1 text-gray-500">

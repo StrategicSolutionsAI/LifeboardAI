@@ -69,16 +69,146 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
         <div className="py-4 space-y-4 overflow-y-auto h-[calc(100vh-100px)]">
           <WidgetPreview widget={draft} />
 
-          {/* Target */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-gray-600">Daily target</p>
-            <div className="flex items-center gap-2">
-              <button aria-label="Decrease target" className="px-2 py-1 rounded bg-gray-100" onClick={() => setDraft(p => p ? { ...p, target: Math.max(0,p.target-1)}:p)}>-</button>
-              <input aria-label="Target value" type="number" value={draft.target} onChange={e=>setDraft(p=>p?{...p,target:Number(e.target.value)}:p)} className="w-16 text-center border rounded" />
-              <span className="text-sm text-gray-600">{draft.unit}</span>
-              <button className="px-2 py-1 rounded bg-gray-100" onClick={() => setDraft(p => p ? { ...p, target: p.target+1}:p)}>+</button>
+          {/* Birthday, Events, and Holiday specific fields */}
+          {draft.id === 'birthdays' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Friend's Name</p>
+                <input
+                  type="text"
+                  value={draft.birthdayData?.friendName || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    birthdayData: {
+                      ...p.birthdayData,
+                      friendName: e.target.value,
+                      birthDate: p.birthdayData?.birthDate || ''
+                    }
+                  } : p)}
+                  placeholder="Enter friend's name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Birth Date</p>
+                <input
+                  type="date"
+                  value={draft.birthdayData?.birthDate || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    birthdayData: {
+                      ...p.birthdayData,
+                      friendName: p.birthdayData?.friendName || '',
+                      birthDate: e.target.value
+                    }
+                  } : p)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
             </div>
-          </div>
+          ) : draft.id === 'social_events' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Event Name</p>
+                <input
+                  type="text"
+                  value={draft.eventData?.eventName || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    eventData: {
+                      ...p.eventData,
+                      eventName: e.target.value,
+                      eventDate: p.eventData?.eventDate || '',
+                      description: p.eventData?.description || ''
+                    }
+                  } : p)}
+                  placeholder="Enter event name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Event Date</p>
+                <input
+                  type="date"
+                  value={draft.eventData?.eventDate || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    eventData: {
+                      ...p.eventData,
+                      eventName: p.eventData?.eventName || '',
+                      eventDate: e.target.value,
+                      description: p.eventData?.description || ''
+                    }
+                  } : p)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Description (Optional)</p>
+                <textarea
+                  value={draft.eventData?.description || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    eventData: {
+                      ...p.eventData,
+                      eventName: p.eventData?.eventName || '',
+                      eventDate: p.eventData?.eventDate || '',
+                      description: e.target.value
+                    }
+                  } : p)}
+                  placeholder="Enter event description"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-20 resize-none"
+                />
+              </div>
+            </div>
+          ) : draft.id === 'holidays' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Holiday Name</p>
+                <input
+                  type="text"
+                  value={draft.holidayData?.holidayName || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    holidayData: {
+                      ...p.holidayData,
+                      holidayName: e.target.value,
+                      holidayDate: p.holidayData?.holidayDate || ''
+                    }
+                  } : p)}
+                  placeholder="Enter holiday name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Holiday Date</p>
+                <input
+                  type="date"
+                  value={draft.holidayData?.holidayDate || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    holidayData: {
+                      ...p.holidayData,
+                      holidayName: p.holidayData?.holidayName || '',
+                      holidayDate: e.target.value
+                    }
+                  } : p)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Target */
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">Daily target</p>
+              <div className="flex items-center gap-2">
+                <button aria-label="Decrease target" className="px-2 py-1 rounded bg-gray-100" onClick={() => setDraft(p => p ? { ...p, target: Math.max(0,p.target-1)}:p)}>-</button>
+                <input aria-label="Target value" type="number" value={draft.target} onChange={e=>setDraft(p=>p?{...p,target:Number(e.target.value)}:p)} className="w-16 text-center border rounded" />
+                <span className="text-sm text-gray-600">{draft.unit}</span>
+                <button className="px-2 py-1 rounded bg-gray-100" onClick={() => setDraft(p => p ? { ...p, target: p.target+1}:p)}>+</button>
+              </div>
+            </div>
+          )}
 
           {/* Data Source Selector - Only for water widget with Fitbit connected */}
           {['water','steps'].includes(draft.id) && (
@@ -142,7 +272,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
           </div>
 
           {/* Schedule */}
-          {draft.schedule && (
+          {draft.schedule && !['birthdays', 'social_events', 'holidays'].includes(draft.id) && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">Schedule</p>
               <div className="flex flex-wrap gap-2">

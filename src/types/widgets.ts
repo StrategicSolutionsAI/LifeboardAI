@@ -20,4 +20,20 @@ export interface WidgetInstance extends WidgetTemplate {
   rewardDollarPerGoal?: number;  // optional: dollars per achieved goal
   dataSource?: string;           // e.g. "Apple Health", "Manual"
   createdAt: string;             // ISO timestamp
+  // Birthday widget specific data
+  birthdayData?: {
+    friendName: string;          // name of the friend
+    birthDate: string;           // ISO date string (YYYY-MM-DD)
+  };
+  // Event widget specific data
+  eventData?: {
+    eventName: string;           // name of the event
+    eventDate: string;           // ISO date string (YYYY-MM-DD)
+    description?: string;        // optional event description
+  };
+  // Holiday widget specific data
+  holidayData?: {
+    holidayName: string;         // name of the holiday
+    holidayDate: string;         // ISO date string (YYYY-MM-DD)
+  };
 } 
