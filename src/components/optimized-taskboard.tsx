@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, memo, useCallback, Suspense } from "react"
+import { useProgressBar } from "@/hooks/use-progress-bar"
 import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/utils/supabase/client"
@@ -120,6 +121,7 @@ export function OptimizedTaskboard() {
     getWidgetsForBucket,
     getProgressForWidget
   } = useWidgets()
+
   
   const {
     dailyTasks,
@@ -128,6 +130,9 @@ export function OptimizedTaskboard() {
     createTask,
     toggleTaskCompletion
   } = useTasks(selectedDate)
+
+  // Show progress bar when any primary data is loading
+  useProgressBar(widgetsLoading || tasksLoading)
   
   // Get widgets for current bucket
   const currentWidgets = getWidgetsForBucket(activeBucket)
