@@ -2130,75 +2130,11 @@ export function TaskBoardDashboard() {
   }, [checkAndResetWidgets]);
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
-
-      {/* Sidebar */}
-      <div className="fixed left-0 top-16 bottom-0 w-20 bg-white border-r border-gray-100 flex flex-col items-center py-4 gap-6 z-30">
-        {/* Home (active) */}
-        <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
-          <Home className="w-5 h-5 text-indigo-500" />
-        </div>
-
-        {/* Calendar */}
-        <Link
-          href="/calendar"
-          className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100"
-        >
-          <Calendar className="w-5 h-5 text-gray-400" />
-        </Link>
-
-
-        {/* Settings */}
-        <Link
-          href="/dashboard/settings"
-          className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-gray-100"
-          title="Settings"
-        >
-          <SettingsIcon className="w-5 h-5 text-gray-400" />
-        </Link>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Main column */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="flex min-h-screen flex-col">
-        {/* Header */}
-        {/* Full-width header – pull left over the sidebar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
-          <div className="flex items-center gap-1 text-2xl font-semibold">
-            <span className="text-indigo-500">AI</span>
-            <span>TaskBoard</span>
-          </div>
-          <div className="flex items-center gap-4">
-            {weather && (() => { const Icon = weather.icon; return (
-              <div className="flex items-center gap-1 text-gray-600 text-sm">
-                <Icon className="h-5 w-5" />
-                <span>{Math.round(weather.temp)}°</span>
-              </div>
-            ); })()}
-            {/* Temporary cleanup button - remove after use */}
-            {Object.values(widgetsByBucket).some(widgets => 
-              widgets.some(w => w.instanceId?.startsWith('debug-'))
-            ) && (
-              <button 
-                onClick={cleanupDebugWidgets}
-                className="text-xs text-red-600 underline"
-              >
-                Clean Debug Widgets
-              </button>
-            )}
-            <button 
-              onClick={handleSignOut} 
-              disabled={isSigningOut}
-              className={`flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 ${isSigningOut ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              <LogOut className="h-5 w-5" />
-              Sign out
-            </button>
-          </div>
-        </header>
+    <div className="flex-1">
+      <div className="flex flex-col">
 
         {/* Greeting */}
-        <section className="w-full pr-10 pt-6 sm:pt-10">
+        <section className="w-full">
           <h2 className="text-base font-medium text-gray-800">
             Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
           </h2>
@@ -2206,7 +2142,6 @@ export function TaskBoardDashboard() {
           {/* Bucket tabs row (scrollable) */}
           <div
             className="relative z-10 mt-10"
-            /* Width matches the white widget panel: total minus sidebar (400px) + gap (40px) */
             style={{ width: 'calc(100% - 440px)' }}
           >
             <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
@@ -2264,7 +2199,7 @@ export function TaskBoardDashboard() {
             {/* bottom gray divider under all tabs (fixed) */}
             <div
               className="pointer-events-none absolute bottom-0 left-0 h-px bg-gray-200"
-              style={{ zIndex: 60, width: '100%' }}
+              style={{ zIndex: 60, width: 'calc(100% - 440px)' }}
             />
             {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
             {showLeftTabFade && (
@@ -2275,17 +2210,17 @@ export function TaskBoardDashboard() {
             )}
             {showRightTabFade && (
               <div
-                className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
-                style={{ zIndex: 70 }}
+                className="pointer-events-none absolute inset-y-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
+                style={{ zIndex: 70, right: '0px' }}
               />
             )}
             </div>
         </section>
 
         {/* Main content container */}
-        <div className="w-full flex-1 pr-10 pb-24 flex gap-10">
+        <div className="w-full flex-1 pb-24 flex gap-10">
           {/* Left section: tabs and widgets */}
-          <div className="flex-1">
+          <div className="flex-1" style={{ width: 'calc(100% - 440px)' }}>
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg border-t border-gray-200 bg-white shadow-sm">
               {/* Inner nav */}
               <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
@@ -2828,7 +2763,7 @@ export function TaskBoardDashboard() {
                       {/* Current Time Indicator */}
             <div className="flex items-center gap-1 text-sm text-gray-600 mt-4">
               <Clock size={14} className="text-indigo-500" />
-              <span>{format(currentTime, 'h:mm a')}</span>
+              <span suppressHydrationWarning>{format(currentTime, 'h:mm a')}</span>
             </div>
             {/* Hourly Planner */}
                       <div

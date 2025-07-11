@@ -14,6 +14,7 @@ interface OptimizedBucketTabsProps {
   selectedBucket: string
   onSelectBucket: (bucket: string) => void
   children?: React.ReactNode
+  className?: string
 }
 
 // Memoized tab button component
@@ -44,14 +45,13 @@ TabButton.displayName = "TabButton"
 export function OptimizedBucketTabs({ 
   selectedBucket, 
   onSelectBucket,
-  children
-}: OptimizedBucketTabsProps) {
+  className
+}: Omit<OptimizedBucketTabsProps, 'children'>) {
   // Use global cache for user preferences
   const { 
     data: userPrefs, 
     loading,
-    error,
-    updateOptimistically 
+    error
   } = useGlobalCache(
     'user-preferences',
     getUserPreferencesClient,
@@ -84,42 +84,27 @@ export function OptimizedBucketTabs({
   // Show error state
   if (error) {
     return (
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex space-x-8 h-[41px] items-center">
-          <span className="text-sm text-red-500">Failed to load buckets</span>
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex space-x-8 h-[41px] items-center">
+            <span className="text-sm text-red-500">Failed to load buckets</span>
+          </div>
         </div>
       </div>
     )
   }
   
   return (
-    <>
-      {/* Tab Navigation with smooth transitions */}
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex space-x-8 relative">
-          {userBuckets.map((bucket) => (
-            <TabButton
-              key={bucket}
-              bucket={bucket}
-              isSelected={selectedBucket === bucket}
-              onClick={() => handleBucketClick(bucket)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Dashboard Content for Selected Bucket */}
-      <div className="flex-1 p-6 transition-opacity duration-200">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Main Widgets Area */}
-            <div className="lg:col-span-3">
-              {children}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+    <div className={cn("w-full flex space-x-8 relative border-b border-gray-200", className)}>
+      {userBuckets.map((bucket: string) => (
+        <TabButton
+          key={bucket}
+          bucket={bucket}
+          isSelected={selectedBucket === bucket}
+          onClick={() => handleBucketClick(bucket)}
+        />
+      ))}
+    </div>
   )
 }
 
