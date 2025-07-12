@@ -2,6 +2,72 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme CSS Variables */
+:root {
+  /* Default indigo theme */
+  --theme-primary: #5271F8;
+  --theme-secondary: #7482FE;
+  --theme-accent: #909CFF;
+}
+
+/* Theme utility classes */
+.bg-theme-primary {
+  background-color: var(--theme-primary);
+}
+
+.bg-theme-secondary {
+  background-color: var(--theme-secondary);
+}
+
+.bg-theme-accent {
+  background-color: var(--theme-accent);
+}
+
+.text-theme-primary {
+  color: var(--theme-primary);
+}
+
+.text-theme-secondary {
+  color: var(--theme-secondary);
+}
+
+.text-theme-accent {
+  color: var(--theme-accent);
+}
+
+.border-theme-primary {
+  border-color: var(--theme-primary);
+}
+
+.border-theme-secondary {
+  border-color: var(--theme-secondary);
+}
+
+.border-theme-accent {
+  border-color: var(--theme-accent);
+}
+
+/* Gradient utility classes */
+.from-theme-primary {
+  --tw-gradient-from: var(--theme-primary);
+  --tw-gradient-to: rgb(from var(--theme-primary) r g b / 0);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.from-theme-secondary {
+  --tw-gradient-from: var(--theme-secondary);
+  --tw-gradient-to: rgb(from var(--theme-secondary) r g b / 0);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.to-theme-secondary {
+  --tw-gradient-to: var(--theme-secondary);
+}
+
+.to-theme-accent {
+  --tw-gradient-to: var(--theme-accent);
+}
+
 /* Circular font faces */
 @font-face {
   font-family: 'Circular';

@@ -4,154 +4,25 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { OnboardingLayout } from "@/components/onboarding-layout"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-
-interface Integration {
-  id: string
-  name: string
-  description: string
-  icon: string
-  comingSoon?: boolean
-}
-
-const integrations: Integration[] = [
-  { 
-    id: "google-calendar", 
-    name: "Google Calendar", 
-    description: "Sync your tasks and events with Google Calendar", 
-    icon: "🗓️" 
-  },
-  { 
-    id: "apple-calendar", 
-    name: "Apple Calendar", 
-    description: "Sync your tasks and events with Apple Calendar", 
-    icon: "📅",
-    comingSoon: true
-  },
-  { 
-    id: "notion", 
-    name: "Notion", 
-    description: "Link your Notion workspace and documents", 
-    icon: "📘",
-    comingSoon: true
-  },
-  { 
-    id: "slack", 
-    name: "Slack", 
-    description: "Get notifications directly in your Slack workspace", 
-    icon: "💬",
-    comingSoon: true
-  },
-  { 
-    id: "fitbit", 
-    name: "Fitbit", 
-    description: "Connect your Fitbit device to sync health and fitness data", 
-    icon: "⌚"
-  },
-  { 
-    id: "google-fit", 
-    name: "Google Fit", 
-    description: "Import activity and wellness metrics", 
-    icon: "📱" 
-  },
-  { 
-    id: "todoist", 
-    name: "Todoist", 
-    description: "Sync tasks from your Todoist account", 
-    icon: "✅" 
-  },
-]
+import { Check } from "lucide-react"
+import { themeColors, ThemeColor } from "@/lib/theme"
 
 export default function OnboardingStep3() {
   const router = useRouter()
-  const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([])
+  const [selectedTheme, setSelectedTheme] = useState<string>("indigo") // Default to indigo
 
-  const [connectingGoogle, setConnectingGoogle] = useState(false)
-  const [connectingFitbit, setConnectingFitbit] = useState(false)
-  const [connectingGoogleFit, setConnectingGoogleFit] = useState(false)
-  const [connectingTodoist, setConnectingTodoist] = useState(false)
-  
-  const connectGoogleCalendar = async () => {
-    setConnectingGoogle(true)
-    
-    try {
-      // Redirect to our API endpoint that will initiate Google OAuth flow
-      window.location.href = '/api/auth/google?redirectUrl=/onboarding/3'
-    } catch (error) {
-      console.error('Error connecting to Google Calendar:', error)
-      setConnectingGoogle(false)
+  const handleContinue = () => {
+    // Store selected theme in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user_theme', selectedTheme)
+      
+      // Store the full theme object for easier access
+      const selectedThemeData = themeColors.find(theme => theme.id === selectedTheme)
+      if (selectedThemeData) {
+        localStorage.setItem('theme_colors', JSON.stringify(selectedThemeData))
+      }
     }
-  }
-  
-  const connectFitbit = async () => {
-    setConnectingFitbit(true)
-    try {
-      window.location.href = '/api/auth/fitbit?redirectUrl=/onboarding/3'
-    } catch (error) {
-      console.error('Error connecting to Fitbit:', error)
-      setConnectingFitbit(false)
-    }
-  }
-  
-  const connectGoogleFit = async () => {
-    setConnectingGoogleFit(true)
-    try {
-      window.location.href = '/api/auth/googlefit?redirectUrl=/onboarding/3'
-    } catch (error) {
-      console.error('Error connecting to Google Fit:', error)
-      setConnectingGoogleFit(false)
-    }
-  }
-
-  const connectTodoist = async () => {
-    setConnectingTodoist(true)
-    try {
-      window.location.href = '/api/auth/todoist?redirectUrl=/onboarding/3'
-    } catch (error) {
-      console.error('Error connecting to Todoist:', error)
-      setConnectingTodoist(false)
-    }
-  }
-  
-  const toggleIntegration = (integrationId: string) => {
-    const integration = integrations.find(i => i.id === integrationId)
-    
-    // Don't allow selection of "coming soon" integrations
-    if (integration?.comingSoon) return
-    
-    // For Google Calendar, start the OAuth flow
-    if (integrationId === 'google-calendar') {
-      connectGoogleCalendar()
-      return
-    }
-    // For Fitbit, start OAuth
-    if (integrationId === 'fitbit') {
-      connectFitbit()
-      return
-    }
-    // For Google Fit, start OAuth
-    if (integrationId === 'google-fit') {
-      connectGoogleFit()
-      return
-    }
-    // For Todoist, start OAuth
-    if (integrationId === 'todoist') {
-      connectTodoist()
-      return
-    }
-    
-    // For other integrations, just toggle the selection
-    setSelectedIntegrations(prev => 
-      prev.includes(integrationId) 
-        ? prev.filter(i => i !== integrationId)
-        : [...prev, integrationId]
-    )
-  }
-
-  const handleNext = () => {
-    // Store selected integrations if needed, then navigate to dashboard
-    router.push("/dashboard")
+    router.push("/onboarding/4")
   }
 
   const handleBack = () => {
@@ -161,123 +32,88 @@ export default function OnboardingStep3() {
   return (
     <OnboardingLayout
       step={3}
-      title="Connect Your Tools"
-      subtitle="Integrate with your favorite services"
+      title="Choose Your Theme"
+      subtitle="Personalize your experience"
       description=""
-      buttonText="COMPLETE SETUP"
-      onNext={handleNext}
+      buttonText="CONTINUE"
+      onNext={handleContinue}
       onBack={handleBack}
-      isLastStep={true}
     >
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h2 className="text-[18px] font-medium text-[#171A1F]">Select integrations</h2>
-          <p className="text-[14px] text-[#565E6C]">Connect TaskBoard with your favorite tools</p>
+          <h2 className="text-[18px] font-medium text-[#171A1F]">Select your theme colors</h2>
+          <p className="text-[14px] text-[#565E6C]">Choose a color scheme that matches your style</p>
         </div>
         
-        <div className="grid grid-cols-1 gap-3">
-          {integrations.map((integration) => (
-            <div 
-              key={integration.id}
-              onClick={() => toggleIntegration(integration.id)}
+        <div className="grid grid-cols-1 gap-4">
+          {themeColors.map((theme) => (
+            <button
+              key={theme.id}
+              onClick={() => setSelectedTheme(theme.id)}
               className={cn(
-                "flex items-center p-4 rounded-lg border border-[#E5E7EB] transition-all",
-                integration.comingSoon 
-                  ? "opacity-70 cursor-not-allowed bg-[#F9F9FB]" 
-                  : selectedIntegrations.includes(integration.id)
-                    ? "border-[#5271F8] bg-[#EEF0FF]" 
-                    : "cursor-pointer hover:border-[#D1D5DB] bg-white"
+                "w-full p-4 rounded-lg border-2 transition-all text-left",
+                selectedTheme === theme.id
+                  ? "border-theme-primary bg-theme-primary bg-opacity-10"
+                  : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
               )}
             >
-              <div className="mr-3 text-2xl">{integration.icon}</div>
-              
-              <div className="flex-1">
-                <div className="flex items-center">
-                  <h3 className="text-[16px] font-medium text-[#171A1F]">
-                    {integration.name}
-                  </h3>
-                  {integration.comingSoon && (
-                    <span className="ml-2 px-2 py-0.5 text-[10px] font-medium text-[#6B7280] bg-[#F3F4F6] rounded-full">
-                      Coming Soon
-                    </span>
-                  )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {/* Color preview circles */}
+                  <div className="flex gap-1">
+                    <div 
+                      className="w-6 h-6 rounded-full border border-gray-200"
+                      style={{ backgroundColor: theme.primary }}
+                    />
+                    <div 
+                      className="w-6 h-6 rounded-full border border-gray-200"
+                      style={{ backgroundColor: theme.secondary }}
+                    />
+                    <div 
+                      className="w-6 h-6 rounded-full border border-gray-200"
+                      style={{ backgroundColor: theme.accent }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-[16px] font-medium text-[#171A1F]">{theme.name}</h3>
+                    <p className="text-[14px] text-[#6B7280]">{theme.description}</p>
+                  </div>
                 </div>
-                <p className="text-[14px] text-[#6B7280]">
-                  {integration.description}
-                </p>
+                
+                {/* Selection indicator */}
+                {selectedTheme === theme.id && (
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-primary">
+                    <Check className="w-4 h-4 text-white" />
+                  </div>
+                )}
               </div>
-
-              {!integration.comingSoon && (
-                <div className={cn(
-                  "flex items-center justify-center",
-                )}>
-                  {integration.id === 'google-calendar' && connectingGoogle ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
-                  ) : integration.id === 'fitbit' && connectingFitbit ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
-                  ) : integration.id === 'google-fit' && connectingGoogleFit ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
-                  ) : integration.id === 'todoist' && connectingTodoist ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#5271F8]" />
-                  ) : (
-                    <div className={cn(
-                      "w-6 h-6 flex items-center justify-center rounded-full",
-                      selectedIntegrations.includes(integration.id)
-                        ? "text-[#5271F8]" 
-                        : "text-[#D1D5DB]"
-                    )}>
-                      <CheckCircle2 
-                        className={cn(
-                          "w-5 h-5",
-                          selectedIntegrations.includes(integration.id)
-                            ? "opacity-100 stroke-[#5271F8] fill-[#EEF0FF]" 
-                            : "opacity-50 stroke-[#D1D5DB] fill-transparent"
-                        )}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            </button>
           ))}
         </div>
-
-        {/* Info text */}
-        <div className="flex flex-col gap-2 mt-2">
-          <p className="text-[12px] text-[#6B7280]">
-            Note: You can always manage your integrations later from settings
-          </p>
-          
-          <div className="flex justify-end mt-2">
-            <Button 
-              onClick={connectGoogleCalendar}
-              disabled={connectingGoogle}
-              className="bg-[#5271F8] hover:bg-[#4060E8] text-white text-sm px-4"
+        
+        {/* Preview section */}
+        <div className="flex flex-col gap-3 mt-4 p-4 bg-[#F9FAFB] rounded-lg border">
+          <h3 className="text-[16px] font-medium text-[#171A1F]">Preview</h3>
+          <div className="flex items-center gap-3">
+            <div 
+              className="px-4 py-2 rounded-full text-white text-sm font-medium"
+              style={{ backgroundColor: themeColors.find(t => t.id === selectedTheme)?.primary }}
             >
-              {connectingGoogle ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>Connect Google Calendar</>
-              )}
-            </Button>
-            <Button
-              onClick={connectTodoist}
-              disabled={connectingTodoist}
-              variant="secondary"
-              className="text-sm ml-2"
+              Primary Button
+            </div>
+            <div 
+              className="px-4 py-2 rounded-full text-white text-sm font-medium"
+              style={{ backgroundColor: themeColors.find(t => t.id === selectedTheme)?.secondary }}
             >
-              {connectingTodoist ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>Connect Todoist</>
-              )}
-            </Button>
+              Secondary
+            </div>
+            <div 
+              className="px-4 py-2 rounded-full text-white text-sm font-medium"
+              style={{ backgroundColor: themeColors.find(t => t.id === selectedTheme)?.accent }}
+            >
+              Accent
+            </div>
           </div>
         </div>
       </div>

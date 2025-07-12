@@ -52,7 +52,7 @@ export default function OnboardingStep1() {
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h2 className="text-[18px] font-medium text-[#171A1F]">Pick your life buckets</h2>
-          <p className="text-[14px] text-[#565E6C]">Select categories for your AI Taskboard</p>
+          <p className="text-[14px] text-[#565E6C]">Select categories for your Lifeboard AI</p>
         </div>
         
         <div className="flex flex-wrap gap-1.5">
@@ -63,7 +63,7 @@ export default function OnboardingStep1() {
               className={cn(
                 "py-3.5 px-3 rounded transition-all",
                 selectedBuckets.includes(bucket)
-                  ? "bg-[#EEF0FF] text-[#5271F8]"
+                  ? "bg-theme-primary bg-opacity-10 text-theme-primary"
                   : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]"
               )}
             >

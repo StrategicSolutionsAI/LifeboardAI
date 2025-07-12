@@ -118,8 +118,8 @@ export function DashboardLayout() {
       {/* Header */}
       <div className="w-full h-16 left-0 top-0 absolute bg-white border-b border-gray-100">
         <div className="flex items-center h-full px-6">
-          <div className="text-gray-900 text-xl font-medium tracking-tight">TaskBoard</div>
-          <div className="text-indigo-500 text-xl font-medium tracking-tight ml-0.5">AI</div>
+          <div className="text-theme-primary text-xl font-medium tracking-tight">Lifeboard</div>
+          <div className="text-gray-900 text-xl font-medium tracking-tight ml-0.5">AI</div>
           
           {/* Right side elements */}
           <div className="ml-auto flex items-center gap-4">

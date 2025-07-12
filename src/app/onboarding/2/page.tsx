@@ -137,12 +137,12 @@ export default function OnboardingStep2() {
             value={newBucketInput}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setNewBucketInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 border-[#E5E7EB] focus-visible:ring-[#5271F8] rounded"
+            className="flex-1 border-[#E5E7EB] focus-visible:ring-theme-primary rounded"
           />
           <Button 
             onClick={addCustomBucket} 
             type="button"
-            className="bg-[#5271F8] hover:bg-[#4060E8] text-white"
+            className="bg-theme-primary hover:bg-theme-secondary text-white"
           >
             <PlusCircle className="h-4 w-4 mr-2" />
             Add
@@ -158,7 +158,7 @@ export default function OnboardingStep2() {
               selectedBuckets.map((bucket) => (
                 <div 
                   key={bucket} 
-                  className="py-3.5 px-3 bg-[#EEF0FF] text-[#5271F8] rounded"
+                  className="py-3.5 px-3 bg-theme-primary bg-opacity-10 text-theme-primary rounded"
                   onClick={() => toggleBucket(bucket)}
                 >
                   <span className="text-xs font-medium">{bucket}</span>
@@ -182,7 +182,7 @@ export default function OnboardingStep2() {
                 className={cn(
                   "py-3.5 px-3 rounded transition-all",
                   selectedBuckets.includes(bucket)
-                    ? "bg-[#EEF0FF] text-[#5271F8]"
+                    ? "bg-theme-primary bg-opacity-10 text-theme-primary"
                     : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]"
                 )}
               >

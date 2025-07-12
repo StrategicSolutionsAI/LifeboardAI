@@ -76,6 +76,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Cloud,
   CloudSun,
   CloudRain,
@@ -271,6 +272,7 @@ export function TaskBoardDashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const widgetsByBucketRef = useRef(widgetsByBucket);
   widgetsByBucketRef.current = widgetsByBucket;
@@ -2726,15 +2728,30 @@ export function TaskBoardDashboard() {
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className="w-[400px] flex-shrink-0 -mt-12">
-            <div className={`rounded-lg border border-gray-100 bg-white p-4 shadow-sm flex flex-col ${
+          <aside className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out ${
+            isSidebarCollapsed ? 'w-12' : 'w-[400px]'
+          }`}>
+            <div className={`rounded-lg border border-gray-100 bg-white shadow-sm flex flex-col ${
               taskView === 'Today' ? 'min-h-full' : 'h-full'
-            }`}>
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
+            } ${isSidebarCollapsed ? 'p-2 overflow-hidden' : 'p-4'}`}>
+              <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                {!isSidebarCollapsed && (
+                  <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
+                )}
                 <div className="flex gap-1 text-gray-500">
-                  <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
-                  <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
+                  <button 
+                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                  >
+                    {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  {!isSidebarCollapsed && (
+                    <>
+                      <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
+                      <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -2746,7 +2763,7 @@ export function TaskBoardDashboard() {
                     onClick={() => handleDateChange(day)}
                     className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                       isSameDay(day, selectedDate)
-                        ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white'
+                        ? 'bg-gradient-to-r from-theme-secondary to-theme-accent text-white'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -2765,7 +2782,7 @@ export function TaskBoardDashboard() {
                       onClick={() => setTaskView(tab)}
                       className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                         taskView === tab
-                          ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow'
+                          ? 'bg-gradient-to-r from-theme-secondary to-theme-accent text-white shadow'
                           : 'text-gray-500 hover:bg-gray-50'
                       }`}
                     >

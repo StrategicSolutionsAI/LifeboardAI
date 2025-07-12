@@ -36,8 +36,8 @@ export function OnboardingLayout({
       <div className="w-full h-[84px] bg-white">
         <div className="w-full h-full px-10 flex items-center">
           <div className="flex items-center gap-0.5">
-            <span className="text-[#242849] text-[30px] font-medium">TaskBoard</span>
-            <span className="text-[#7482FE] text-[30px] font-medium">AI</span>
+            <span className="text-theme-primary text-[30px] font-medium">Lifeboard</span>
+            <span className="text-[#242849] text-[30px] font-medium">AI</span>
           </div>
         </div>
       </div>
@@ -51,7 +51,7 @@ export function OnboardingLayout({
         </div>
         
         {/* Main Content Card */}
-        <Card className="w-full p-8 bg-white rounded-lg shadow-sm border border-[#5271F8]">
+        <Card className="w-full p-8 bg-white rounded-lg shadow-sm border border-theme-primary">
           {children}
         </Card>
 
@@ -59,7 +59,7 @@ export function OnboardingLayout({
         <div className="w-full pt-12 flex justify-center">
           <Button 
             onClick={onNext} 
-            className="px-6 py-4 bg-gradient-to-r from-[#7482FE] to-[#909CFF] rounded-xl text-[#FFFEF7] uppercase font-bold text-base tracking-wider"
+            className="px-6 py-4 bg-gradient-to-r from-theme-secondary to-theme-accent rounded-xl text-[#FFFEF7] uppercase font-bold text-base tracking-wider"
           >
             {isLastStep ? "finish & go to dashboard" : (buttonText?.toLowerCase() || "continue")}
           </Button>

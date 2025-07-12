@@ -13,8 +13,8 @@ export default function Home() {
       {/* Navigation Header */}
       <nav className="relative z-10 flex items-center justify-between px-16 py-6">
         <div className="flex items-center space-x-2">
-          <span className="text-2xl font-bold text-indigo-600">AI</span>
-          <span className="text-2xl font-bold text-gray-800">TaskBoard</span>
+          <span className="text-2xl font-bold text-theme-primary">Lifeboard</span>
+          <span className="text-2xl font-bold text-gray-800">AI</span>
         </div>
         
         <div className="flex items-center space-x-8">
@@ -27,7 +27,7 @@ export default function Home() {
           <div className="flex items-center space-x-4 ml-8">
             <Link href="/login" className="text-gray-600 hover:text-gray-800">Login</Link>
             <Link href="/signup">
-              <Button className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-lg">
+              <Button className="bg-theme-primary hover:bg-theme-secondary text-white px-6 py-2 rounded-lg">
                 Sign Up
               </Button>
             </Link>
@@ -44,12 +44,12 @@ export default function Home() {
           </h1>
           
           <p className="text-xl text-gray-700 mb-12 leading-relaxed">
-            Life can get hectic, especially when you're managing a family. That's where AI Taskboard comes in. Our app is designed to help you stay organized and connected, powered by advanced AI technology.
+            Life can get hectic, especially when you're managing a family. That's where Lifeboard AI comes in. Our app is designed to help you stay organized and connected, powered by advanced AI technology.
           </p>
           
           <div className="flex items-center space-x-6">
             <Link href="/signup">
-              <Button className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-full text-lg font-medium">
+              <Button className="bg-theme-primary hover:bg-theme-secondary text-white px-8 py-4 rounded-full text-lg font-medium">
                 Try free trial
               </Button>
             </Link>

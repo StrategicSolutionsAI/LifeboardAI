@@ -21,8 +21,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const isActive = (cond: boolean) => (cond ? "bg-indigo-50" : "");
-  const iconColor = (cond: boolean) => (cond ? "text-indigo-500" : "text-gray-400");
+  const isActive = (cond: boolean) => (cond ? "bg-theme-primary bg-opacity-10" : "");
+  const iconColor = (cond: boolean) => (cond ? "text-theme-primary" : "text-gray-400");
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -64,8 +64,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-1 text-2xl font-semibold">
-            <span className="text-indigo-500">AI</span>
-            <span>TaskBoard</span>
+            <span className="text-theme-primary">Lifeboard</span>
+            <span>AI</span>
           </div>
           <div className="flex items-center space-x-4">
             <button className="p-2 rounded-full hover:bg-gray-100">
