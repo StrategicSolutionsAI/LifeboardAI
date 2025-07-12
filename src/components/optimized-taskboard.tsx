@@ -30,15 +30,20 @@ const WidgetCard = memo(({
   widget, 
   onRemove,
   onIncrement,
+  onEdit,
   progress
 }: { 
   widget: WidgetInstance
   onRemove: () => void
   onIncrement: () => void
+  onEdit: () => void
   progress: { value: number; streak: number; isToday: boolean }
 }) => {
   return (
-    <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 transition-all duration-200 hover:shadow-md">
+    <div 
+      className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 transition-all duration-200 hover:shadow-md cursor-pointer"
+      onClick={onEdit}
+    >
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-semibold text-gray-900">{widget.name}</h3>
@@ -49,7 +54,10 @@ const WidgetCard = memo(({
         <Button
           size="icon"
           variant="ghost"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
           className="h-8 w-8"
         >
           <X className="h-4 w-4" />
@@ -58,7 +66,10 @@ const WidgetCard = memo(({
       
       <div className="flex justify-center items-center h-24">
         <Button
-          onClick={onIncrement}
+          onClick={(e) => {
+            e.stopPropagation()
+            onIncrement()
+          }}
           className="h-16 w-16 rounded-full"
           variant="outline"
         >
@@ -107,6 +118,7 @@ export function OptimizedTaskboard() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false)
   const [isEditingWidget, setIsEditingWidget] = useState<WidgetInstance | null>(null)
+  const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null)
   
   // Use optimized hooks
   const {
@@ -156,10 +168,20 @@ export function OptimizedTaskboard() {
           dataSource: 'manual',
           createdAt: new Date().toISOString(),
           schedule: [true, true, true, true, true, true, true],
+          // Initialize specialized data for specific widget types
+          ...(widgetOrTemplate.id === 'birthdays' && { birthdayData: { friendName: '', birthDate: '' } }),
+          ...(widgetOrTemplate.id === 'social_events' && { eventData: { eventName: '', eventDate: '', description: '' } }),
+          ...(widgetOrTemplate.id === 'holidays' && { holidayData: { holidayName: '', holidayDate: '' } }),
+          ...(widgetOrTemplate.id === 'mood' && { moodData: { currentMood: undefined, moodNote: '', lastUpdated: '' } }),
+          ...(widgetOrTemplate.id === 'journal' && { journalData: { todaysEntry: '', lastEntryDate: '', entryCount: 0 } }),
+          ...(widgetOrTemplate.id === 'gratitude' && { gratitudeData: { gratitudeItems: [''], lastEntryDate: '', entryCount: 0 } }),
         }
     
     addWidget(activeBucket, newInstance)
     setIsWidgetSheetOpen(false)
+    // Automatically open editor for new widgets
+    setNewlyCreatedWidgetId(newInstance.instanceId)
+    setIsEditingWidget(newInstance)
   }, [activeBucket, addWidget])
   
   const handleRemoveWidget = useCallback((widgetId: string) => {
@@ -177,126 +199,109 @@ export function OptimizedTaskboard() {
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(today, i))
   
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center space-x-6">
-          <Link href="/">
-            <Image
-              src="/logo.png"
-              alt="Lifeboard AI"
-              width={150}
-              height={40}
-              className="h-8 w-auto"
-            />
-          </Link>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          {savingStatus === 'saving' && (
-            <div className="flex items-center text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Saving...
+    <>
+      <main className="max-w-7xl mx-auto w-full">
+        <div className="bg-white rounded-lg border border-gray-100 shadow-sm">
+          <div className="flex flex-col lg:flex-row gap-6 px-6 pt-6 pb-0">
+            <div className="flex-1">
+              <OptimizedBucketTabs
+                selectedBucket={activeBucket}
+                onSelectBucket={setActiveBucket}
+              />
             </div>
-          )}
-          {savingStatus === 'saved' && (
-            <div className="text-sm text-green-600">Saved</div>
-          )}
-          
-          <Button variant="ghost" size="icon" onClick={handleSignOut}>
-            <LogOut className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
-      
-      {/* Bucket Tabs */}
-      <OptimizedBucketTabs 
-        selectedBucket={activeBucket} 
-        onSelectBucket={setActiveBucket}
-      >
-        {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Widgets Grid */}
-          <div className="xl:col-span-2">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">{activeBucket} Dashboard</h2>
-              <Button 
-                onClick={() => setIsWidgetSheetOpen(true)}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Widget
-              </Button>
-            </div>
-            
-            {widgetsLoading ? (
-              <WidgetGridSkeleton count={3} />
-            ) : currentWidgets.length === 0 ? (
-              <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-                <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Plus className="h-6 w-6 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No widgets yet</h3>
-                <p className="text-gray-500 mb-4">Add your first widget to start tracking</p>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-6 px-6 pb-6 pt-0">
+            {/* Main content area - widgets */}
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900">{activeBucket} Widgets</h2>
                 <Button onClick={() => setIsWidgetSheetOpen(true)}>
+                  <Plus className="-ml-1 mr-2 h-5 w-5" />
                   Add Widget
                 </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentWidgets.map((widget) => (
-                  <WidgetCard
-                    key={widget.instanceId}
-                    widget={widget}
-                    onRemove={() => handleRemoveWidget(widget.instanceId)}
-                    onIncrement={() => handleIncrementProgress(widget)}
-                    progress={getProgressForWidget(widget.instanceId)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            {/* Calendar Widget */}
-            <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
-              <h3 className="font-semibold text-gray-900 mb-4">Calendar</h3>
-              <div className="grid grid-cols-7 gap-1 text-center">
-                {weekDays.map((day) => (
-                  <button
-                    key={day.toISOString()}
-                    onClick={() => setSelectedDate(day)}
-                    className={`
-                      p-2 rounded text-sm transition-colors
-                      ${isSameDay(day, selectedDate) 
-                        ? 'bg-blue-500 text-white' 
-                        : 'hover:bg-gray-100'
-                      }
-                      ${isSameDay(day, today) && !isSameDay(day, selectedDate)
-                        ? 'ring-2 ring-blue-500'
-                        : ''
-                      }
-                    `}
-                  >
-                    <div className="text-xs">{format(day, 'EEE')}</div>
-                    <div>{format(day, 'd')}</div>
-                  </button>
-                ))}
-              </div>
+              
+              {widgetsLoading ? (
+                <WidgetGridSkeleton count={3} />
+              ) : currentWidgets.length === 0 ? (
+                <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
+                  <div className="mx-auto w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                    <Plus className="h-6 w-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No widgets yet</h3>
+                  <p className="text-gray-500 mb-4">Add your first widget to start tracking</p>
+                  <Button onClick={() => setIsWidgetSheetOpen(true)}>
+                    Add Widget
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {currentWidgets.map((widget) => (
+                    <WidgetCard
+                      key={widget.instanceId}
+                      widget={widget}
+                      onRemove={() => handleRemoveWidget(widget.instanceId)}
+                      onIncrement={() => handleIncrementProgress(widget)}
+                      onEdit={() => {
+                        setNewlyCreatedWidgetId(null)
+                        setIsEditingWidget(widget)
+                      }}
+                      progress={getProgressForWidget(widget.instanceId)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             
-            {/* Tasks */}
-            <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Tasks for {format(selectedDate, 'MMM d')}
-              </h3>
+            {/* Right Sidebar */}
+            <div className="space-y-6 w-full lg:w-[300px] xl:w-[350px] shrink-0">
+              {/* Calendar Widget */}
+              <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
+                <h3 className="font-semibold text-gray-900 mb-4">Calendar</h3>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {weekDays.map((day) => (
+                    <button
+                      key={day.toISOString()}
+                      onClick={() => setSelectedDate(day)}
+                      className={`
+                        p-2 rounded text-sm transition-colors
+                        ${isSameDay(day, selectedDate) 
+                          ? 'bg-indigo-500 text-white' 
+                          : 'hover:bg-gray-100'
+                        }
+                        ${isSameDay(day, today) && !isSameDay(day, selectedDate)
+                          ? 'ring-2 ring-indigo-500'
+                          : ''
+                        }
+                      `}
+                    >
+                      <div className="text-xs">{format(day, 'EEE')}</div>
+                      <div>{format(day, 'd')}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Trends Panel */}
+                <Suspense fallback={
+                  <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 h-32 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  </div>
+                }>
+                  <TrendsPanel widgets={currentWidgets} />
+                </Suspense>
+              </div>
               
-              {tasksLoading ? (
-                <TaskListSkeleton count={3} />
-              ) : dailyTasks.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-8">No tasks for this day</p>
-              ) : (
+              {/* Tasks */}
+              <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  Tasks for {format(selectedDate, 'MMM d')}
+                </h3>
+                
+                {tasksLoading ? (
+                  <TaskListSkeleton count={3} />
+                ) : dailyTasks.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-8">No tasks for this day</p>
+                ) : (
                 <div className="space-y-2">
                   {dailyTasks.filter(t => !t.completed).map((task) => (
                     <TaskItem
@@ -308,18 +313,10 @@ export function OptimizedTaskboard() {
                 </div>
               )}
             </div>
-            
-            {/* Trends Panel */}
-            <Suspense fallback={
-              <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 h-32 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-              </div>
-            }>
-              <TrendsPanel widgets={currentWidgets} />
-            </Suspense>
           </div>
         </div>
-      </OptimizedBucketTabs>
+      </div>
+    </main>
       
       {/* Widget Library Sheet */}
       <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
@@ -339,11 +336,18 @@ export function OptimizedTaskboard() {
         <Suspense fallback={null}>
           <WidgetEditorSheet
             open={!!isEditingWidget}
-            onClose={() => setIsEditingWidget(null)}
-            widget={isEditingWidget}
-            onSave={(updates) => {
-              updateWidget(activeBucket, isEditingWidget.instanceId, updates)
+            onClose={() => {
               setIsEditingWidget(null)
+              setNewlyCreatedWidgetId(null)
+            }}
+            widget={isEditingWidget}
+            isNewWidget={isEditingWidget.instanceId === newlyCreatedWidgetId}
+            onSave={(updates) => {
+              if (isEditingWidget) {
+                updateWidget(activeBucket, isEditingWidget.instanceId, updates)
+              }
+              setIsEditingWidget(null)
+              setNewlyCreatedWidgetId(null)
             }}
           />
         </Suspense>
@@ -351,6 +355,6 @@ export function OptimizedTaskboard() {
       
       {/* Chat Bar */}
       <ChatBar />
-    </div>
+    </>
   )
 }

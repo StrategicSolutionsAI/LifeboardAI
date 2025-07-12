@@ -14,7 +14,7 @@ type Integration = {
   action: () => void
 }
 
-import { DashboardShell } from '@/components/dashboard-shell'
+import { SidebarLayout } from '@/components/sidebar-layout'
 
 export default function SettingsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([
@@ -68,8 +68,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <DashboardShell>
-      <div className="p-6 max-w-4xl mx-auto bg-gray-50 min-h-screen">
+    <SidebarLayout>
+      <div className="p-6 max-w-4xl mx-auto min-h-screen">
       <div className="flex items-center gap-3 mb-8">
         <Settings className="w-6 h-6 text-gray-600" />
         <h1 className="text-3xl font-bold">Settings</h1>
@@ -169,6 +169,6 @@ export default function SettingsPage() {
         </div>
       </div>
       </div>
-    </DashboardShell>
+    </SidebarLayout>
   )
 }

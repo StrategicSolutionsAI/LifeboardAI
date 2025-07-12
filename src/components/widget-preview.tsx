@@ -39,6 +39,13 @@ const idToIconMap: Record<string, any> = {
   sleep: Icons.Moon,
   exercise: Icons.Activity,
   caffeine: Icons.Coffee,
+  // Specialized widgets
+  birthdays: Icons.Cake,
+  social_events: Icons.PartyPopper,
+  holidays: Icons.Gift,
+  mood: Icons.Smile,
+  journal: Icons.Notebook,
+  gratitude: Icons.Sparkles,
 };
 
 // Re-use a tiny version of the dashboard card so users can see changes instantly
@@ -93,10 +100,97 @@ export function WidgetPreview({
         </div>
         <span className="text-sm font-medium truncate">{widget.name}</span>
       </div>
-      <p className="mt-1 text-xs text-gray-500 truncate">
-        Target: {widget.target} {widget.unit}
-      </p>
-      {widget.schedule && (
+      {/* Specialized widget content matching dashboard display */}
+      {widget.id === 'birthdays' && widget.birthdayData ? (
+        <div className="mt-1">
+          {widget.birthdayData.friendName && widget.birthdayData.birthDate ? (
+            <>
+              <p className="text-xs font-medium text-gray-700">{widget.birthdayData.friendName}</p>
+              <p className="text-xs text-gray-500">
+                {new Date(widget.birthdayData.birthDate).toLocaleDateString()}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">Click to add birthday</p>
+          )}
+        </div>
+      ) : widget.id === 'social_events' && widget.eventData ? (
+        <div className="mt-1">
+          {widget.eventData.eventName && widget.eventData.eventDate ? (
+            <>
+              <p className="text-xs font-medium text-gray-700">{widget.eventData.eventName}</p>
+              <p className="text-xs text-gray-500">
+                {new Date(widget.eventData.eventDate).toLocaleDateString()}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">Click to add event</p>
+          )}
+        </div>
+      ) : widget.id === 'holidays' && widget.holidayData ? (
+        <div className="mt-1">
+          {widget.holidayData.holidayName && widget.holidayData.holidayDate ? (
+            <>
+              <p className="text-xs font-medium text-gray-700">{widget.holidayData.holidayName}</p>
+              <p className="text-xs text-gray-500">
+                {new Date(widget.holidayData.holidayDate).toLocaleDateString()}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">Click to add holiday</p>
+          )}
+        </div>
+      ) : widget.id === 'mood' && widget.moodData ? (
+        <div className="mt-1">
+          {widget.moodData.currentMood ? (
+            <div className="flex items-center gap-1">
+              <span className="text-sm">
+                {['😢', '😕', '😐', '😊', '😁'][widget.moodData.currentMood - 1]}
+              </span>
+              <span className="text-xs text-gray-600">
+                {['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'][widget.moodData.currentMood - 1]}
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">Tap to log mood</p>
+          )}
+        </div>
+      ) : widget.id === 'journal' && widget.journalData ? (
+        <div className="mt-1">
+          {widget.journalData.todaysEntry ? (
+            <>
+              <p className="text-xs text-gray-700 truncate">
+                {widget.journalData.todaysEntry.slice(0, 50)}...
+              </p>
+              <p className="text-xs text-gray-500">
+                {widget.journalData.todaysEntry.split(' ').length} words
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">No entry today</p>
+          )}
+        </div>
+      ) : widget.id === 'gratitude' && widget.gratitudeData ? (
+        <div className="mt-1">
+          {widget.gratitudeData.gratitudeItems && widget.gratitudeData.gratitudeItems.length > 0 && widget.gratitudeData.gratitudeItems[0] ? (
+            <>
+              <p className="text-xs text-gray-700 truncate">
+                {widget.gratitudeData.gratitudeItems[0]}
+              </p>
+              <p className="text-xs text-gray-500">
+                {widget.gratitudeData.gratitudeItems.filter(item => item.trim()).length} items
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">What are you grateful for?</p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-gray-500 truncate">
+          Target: {widget.target} {widget.unit}
+        </p>
+      )}
+      {widget.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(widget.id) && (
         <p className="mt-1 text-[10px] text-gray-400 truncate">
           {widget.schedule
             .map((enabled, idx) => {

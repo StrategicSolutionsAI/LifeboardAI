@@ -13,6 +13,26 @@ const COLORS = [
 
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+// Common holiday suggestions with current year
+const getHolidaySuggestions = () => {
+  const currentYear = new Date().getFullYear();
+  return [
+    { name: "New Year's Day", date: `${currentYear}-01-01` },
+    { name: "Valentine's Day", date: `${currentYear}-02-14` },
+    { name: "St. Patrick's Day", date: `${currentYear}-03-17` },
+    { name: "Mother's Day", date: `${currentYear}-05-12` }, // 2nd Sunday in May (approx)
+    { name: "Memorial Day", date: `${currentYear}-05-27` }, // Last Monday in May (approx)
+    { name: "Father's Day", date: `${currentYear}-06-16` }, // 3rd Sunday in June (approx)
+    { name: "Independence Day", date: `${currentYear}-07-04` },
+    { name: "Labor Day", date: `${currentYear}-09-02` }, // 1st Monday in September (approx)
+    { name: "Halloween", date: `${currentYear}-10-31` },
+    { name: "Thanksgiving", date: `${currentYear}-11-28` }, // 4th Thursday in November (approx)
+    { name: "Christmas Eve", date: `${currentYear}-12-24` },
+    { name: "Christmas Day", date: `${currentYear}-12-25` },
+    { name: "New Year's Eve", date: `${currentYear}-12-31` },
+  ];
+};
+
 const getColorClass = (color: string): string => {
   const colorMap: Record<string, string> = {
     blue: "bg-blue-500", green: "bg-green-500", red: "bg-red-500", orange: "bg-orange-500", purple: "bg-purple-500", indigo: "bg-indigo-500", amber: "bg-amber-500", teal: "bg-teal-500", rose: "bg-rose-500", cyan: "bg-cyan-500", yellow: "bg-yellow-500", sky: "bg-sky-500", emerald: "bg-emerald-500", violet: "bg-violet-500", lime: "bg-lime-500", fuchsia: "bg-fuchsia-500", gray: "bg-gray-500", slate: "bg-slate-500", stone: "bg-stone-500"
@@ -25,9 +45,10 @@ interface WidgetEditorProps {
   open: boolean;
   onClose: () => void;
   onSave: (updated: WidgetInstance) => void;
+  isNewWidget?: boolean;
 }
 
-export default function WidgetEditorSheet({ widget, open, onClose, onSave }: WidgetEditorProps) {
+export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNewWidget = false }: WidgetEditorProps) {
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
@@ -63,7 +84,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-80">
         <SheetHeader>
-          <SheetTitle>Edit Widget</SheetTitle>
+          <SheetTitle>{isNewWidget ? 'Add Widget' : 'Edit Widget'}</SheetTitle>
         </SheetHeader>
 
         <div className="py-4 space-y-4 overflow-y-auto h-[calc(100vh-100px)]">
@@ -196,6 +217,231 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>
+              
+              {/* Holiday Suggestions */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Popular Holidays</p>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                  {getHolidaySuggestions().map((holiday) => (
+                    <button
+                      key={holiday.name}
+                      type="button"
+                      onClick={() => setDraft(p => p ? {
+                        ...p,
+                        holidayData: {
+                          holidayName: holiday.name,
+                          holidayDate: holiday.date
+                        }
+                      } : p)}
+                      className="text-left px-2 py-1 text-xs bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors"
+                    >
+                      {holiday.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">Click a suggestion to auto-fill</p>
+              </div>
+            </div>
+          ) : draft.id === 'mood' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">How are you feeling today?</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { emoji: '😢', label: 'Very Poor', value: 1 },
+                    { emoji: '😕', label: 'Poor', value: 2 },
+                    { emoji: '😐', label: 'Neutral', value: 3 },
+                    { emoji: '😊', label: 'Good', value: 4 },
+                    { emoji: '😁', label: 'Excellent', value: 5 }
+                  ].map((mood) => (
+                    <button
+                      key={mood.value}
+                      type="button"
+                      onClick={() => setDraft(p => p ? {
+                        ...p,
+                        moodData: {
+                          ...p.moodData,
+                          currentMood: mood.value,
+                          lastUpdated: new Date().toISOString(),
+                          moodNote: p.moodData?.moodNote || ''
+                        }
+                      } : p)}
+                      className={`flex flex-col items-center p-2 rounded-lg border transition-all ${
+                        draft.moodData?.currentMood === mood.value 
+                          ? 'border-indigo-500 bg-indigo-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-xl mb-1">{mood.emoji}</span>
+                      <span className="text-xs text-center">{mood.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Mood Note (Optional)</p>
+                <textarea
+                  value={draft.moodData?.moodNote || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    moodData: {
+                      ...p.moodData,
+                      currentMood: p.moodData?.currentMood || 3,
+                      lastUpdated: p.moodData?.lastUpdated || new Date().toISOString(),
+                      moodNote: e.target.value
+                    }
+                  } : p)}
+                  placeholder="What's affecting your mood today?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-16 resize-none"
+                />
+              </div>
+              
+              {draft.moodData?.currentMood && (
+                <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                  Current mood: {['😢 Very Poor', '😕 Poor', '😐 Neutral', '😊 Good', '😁 Excellent'][draft.moodData.currentMood - 1]}
+                </div>
+              )}
+            </div>
+          ) : draft.id === 'journal' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Today's Journal Entry</p>
+                <textarea
+                  value={draft.journalData?.todaysEntry || ''}
+                  onChange={e => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setDraft(p => p ? {
+                      ...p,
+                      journalData: {
+                        ...p.journalData,
+                        todaysEntry: e.target.value,
+                        lastEntryDate: e.target.value.trim() ? today : p.journalData?.lastEntryDate,
+                        entryCount: p.journalData?.entryCount || 1
+                      }
+                    } : p);
+                  }}
+                  placeholder="What's on your mind today? How are you feeling? What happened that was meaningful?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-32 resize-none"
+                />
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>
+                    {draft.journalData?.todaysEntry ? 
+                      `${draft.journalData.todaysEntry.split(' ').filter(word => word.length > 0).length} words` : 
+                      '0 words'
+                    }
+                  </span>
+                  <span>{new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Writing Prompts</p>
+                <div className="grid grid-cols-1 gap-1">
+                  {[
+                    "What are three things that went well today?",
+                    "How did I grow or learn something today?", 
+                    "What challenged me today and how did I handle it?",
+                    "What am I looking forward to tomorrow?",
+                    "Who or what am I grateful for right now?"
+                  ].map((prompt, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => {
+                        const currentEntry = draft.journalData?.todaysEntry || '';
+                        const newEntry = currentEntry + (currentEntry ? '\n\n' : '') + prompt + '\n';
+                        const today = new Date().toISOString().split('T')[0];
+                        setDraft(p => p ? {
+                          ...p,
+                          journalData: {
+                            ...p.journalData,
+                            todaysEntry: newEntry,
+                            lastEntryDate: today,
+                            entryCount: p.journalData?.entryCount || 1
+                          }
+                        } : p);
+                      }}
+                      className="text-left px-2 py-1 text-xs bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 transition-colors"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">Click a prompt to add it to your entry</p>
+              </div>
+            </div>
+          ) : draft.id === 'gratitude' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">What are you grateful for today?</p>
+                {(draft.gratitudeData?.gratitudeItems || []).map((item, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={e => {
+                        const newItems = [...(draft.gratitudeData?.gratitudeItems || [])];
+                        newItems[index] = e.target.value;
+                        setDraft(p => p ? {
+                          ...p,
+                          gratitudeData: {
+                            ...p.gratitudeData,
+                            gratitudeItems: newItems,
+                            lastEntryDate: new Date().toISOString().split('T')[0],
+                            entryCount: p.gratitudeData?.entryCount || 1
+                          }
+                        } : p);
+                      }}
+                      placeholder={`Gratitude item ${index + 1}`}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = (draft.gratitudeData?.gratitudeItems || []).filter((_, i) => i !== index);
+                        setDraft(p => p ? {
+                          ...p,
+                          gratitudeData: {
+                            ...p.gratitudeData,
+                            gratitudeItems: newItems,
+                            lastEntryDate: newItems.length > 0 ? new Date().toISOString().split('T')[0] : p.gratitudeData?.lastEntryDate,
+                            entryCount: p.gratitudeData?.entryCount || 1
+                          }
+                        } : p);
+                      }}
+                      className="px-2 py-2 text-red-500 hover:bg-red-50 rounded"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentItems = draft.gratitudeData?.gratitudeItems || [];
+                    if (currentItems.length < 5) {
+                      setDraft(p => p ? {
+                        ...p,
+                        gratitudeData: {
+                          ...p.gratitudeData,
+                          gratitudeItems: [...currentItems, ''],
+                          lastEntryDate: new Date().toISOString().split('T')[0],
+                          entryCount: p.gratitudeData?.entryCount || 1
+                        }
+                      } : p);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600 rounded-md text-sm transition-colors"
+                >
+                  + Add gratitude item
+                </button>
+                
+                <div className="text-xs text-gray-500">
+                  {draft.gratitudeData?.gratitudeItems?.length || 0} / 5 items
+                </div>
+              </div>
             </div>
           ) : (
             /* Target */
@@ -272,7 +518,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave }: Wid
           </div>
 
           {/* Schedule */}
-          {draft.schedule && !['birthdays', 'social_events', 'holidays'].includes(draft.id) && (
+          {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(draft.id) && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">Schedule</p>
               <div className="flex flex-wrap gap-2">

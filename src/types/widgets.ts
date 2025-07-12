@@ -36,4 +36,22 @@ export interface WidgetInstance extends WidgetTemplate {
     holidayName: string;         // name of the holiday
     holidayDate: string;         // ISO date string (YYYY-MM-DD)
   };
+  // Mood tracker specific data
+  moodData?: {
+    currentMood?: number;        // 1-5 scale (1=very poor, 5=excellent)
+    moodNote?: string;           // optional note about mood
+    lastUpdated?: string;        // ISO timestamp of last mood entry
+  };
+  // Journal widget specific data
+  journalData?: {
+    todaysEntry?: string;        // today's journal entry text
+    lastEntryDate?: string;      // ISO date string (YYYY-MM-DD) of last entry
+    entryCount?: number;         // total number of entries made
+  };
+  // Gratitude journal specific data
+  gratitudeData?: {
+    gratitudeItems?: string[];   // array of things grateful for today
+    lastEntryDate?: string;      // ISO date string (YYYY-MM-DD) of last entry
+    entryCount?: number;         // total number of gratitude entries
+  };
 } 

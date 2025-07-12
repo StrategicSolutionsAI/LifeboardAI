@@ -13,11 +13,39 @@ export function ChatBar() {
   const [input, setInput] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const helloTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Scroll to bottom whenever messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  // Schedule a "hello" assistant message every day at 11:55 AM CT (browser local time)
+  useEffect(() => {
+    function scheduleHello() {
+      // Clear any existing timeout
+      if (helloTimeoutRef.current) clearTimeout(helloTimeoutRef.current)
+
+      const now = new Date()
+      const target = new Date(now)
+      target.setHours(10, 0, 0, 0) // 10:00:00 local time
+      if (target.getTime() <= now.getTime()) {
+        // If already past today 11:55, schedule for tomorrow
+        target.setDate(target.getDate() + 1)
+      }
+      const msUntil = target.getTime() - now.getTime()
+      helloTimeoutRef.current = setTimeout(() => {
+        setMessages(prev => [...prev, { role: "assistant", content: "Hi Dalit, let me know if I can help you with anything" }])
+        // Reschedule for next day
+        scheduleHello()
+      }, msUntil)
+    }
+
+    scheduleHello()
+    return () => {
+      if (helloTimeoutRef.current) clearTimeout(helloTimeoutRef.current)
+    }
+  }, [])
 
   async function handleSend() {
     if (!input.trim()) return

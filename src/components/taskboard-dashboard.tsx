@@ -278,6 +278,7 @@ export function TaskBoardDashboard() {
   // Editing widget state
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
+  const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -1559,6 +1560,8 @@ export function TaskBoardDashboard() {
       }
       return updatedState;
     });
+    setEditingWidget(null);
+    setNewlyCreatedWidgetId(null);
   };
 
   const toggleTaskCompletion = async (taskId: string) => {
@@ -2299,7 +2302,7 @@ export function TaskBoardDashboard() {
                     const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
 
                     return (
-                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); }}>
+                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null); }}>
                         <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
@@ -2501,6 +2504,172 @@ export function TaskBoardDashboard() {
                             }
                           }
                           
+                          // Special handling for mood tracker widget
+                          if (w.id === 'mood') {
+                            const moodEmojis = ['😢', '😕', '😐', '😊', '😁'];
+                            const moodLabels = ['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'];
+                            
+                            if (w.moodData?.currentMood) {
+                              const moodIndex = w.moodData.currentMood - 1;
+                              const emoji = moodEmojis[moodIndex];
+                              const label = moodLabels[moodIndex];
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-2xl">{emoji}</span>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">{label}</div>
+                                      <div className="text-xs text-gray-500">Today's mood</div>
+                                    </div>
+                                  </div>
+                                  {w.moodData.moodNote && (
+                                    <div className="text-xs text-gray-600 mt-2 italic">
+                                      "{w.moodData.moodNote}"
+                                    </div>
+                                  )}
+                                  <div className="flex gap-1 mt-2">
+                                    {moodEmojis.map((emoji, index) => (
+                                      <span 
+                                        key={index} 
+                                        className={`text-xs ${index === moodIndex ? 'opacity-100' : 'opacity-30'}`}
+                                      >
+                                        {emoji}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-center">
+                                    <div className="text-2xl mb-2">😐</div>
+                                    <div className="text-xs text-gray-500">Tap to log mood</div>
+                                  </div>
+                                  <div className="flex gap-1 mt-2 justify-center">
+                                    {moodEmojis.map((emoji, index) => (
+                                      <span key={index} className="text-xs opacity-50">{emoji}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Special handling for journal widget
+                          if (w.id === 'journal') {
+                            const today = new Date().toISOString().split('T')[0];
+                            const hasEntryToday = w.journalData?.lastEntryDate === today;
+                            const entryPreview = w.journalData?.todaysEntry ? 
+                              w.journalData.todaysEntry.substring(0, 100) + (w.journalData.todaysEntry.length > 100 ? '...' : '') : '';
+                            
+                            if (hasEntryToday && w.journalData?.todaysEntry) {
+                              const wordCount = w.journalData.todaysEntry.split(' ').filter(word => word.length > 0).length;
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg">📖</span>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">Today's Entry</div>
+                                      <div className="text-xs text-gray-500">{wordCount} words</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-gray-700 italic bg-gray-50 p-2 rounded">
+                                    "{entryPreview}"
+                                  </div>
+                                  {w.journalData.entryCount && w.journalData.entryCount > 1 && (
+                                    <div className="text-xs text-gray-500 mt-2">
+                                      📚 {w.journalData.entryCount} total entries
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              const prompts = [
+                                "What are you grateful for today?",
+                                "How are you feeling right now?", 
+                                "What did you learn today?",
+                                "What's on your mind?",
+                                "Describe your day in three words."
+                              ];
+                              const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                              
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-center">
+                                    <div className="text-2xl mb-2">📝</div>
+                                    <div className="text-xs text-gray-500 mb-2">No entry today</div>
+                                    <div className="text-xs text-gray-600 italic px-2">
+                                      "{randomPrompt}"
+                                    </div>
+                                    {w.journalData?.entryCount && (
+                                      <div className="text-xs text-gray-500 mt-2">
+                                        📚 {w.journalData.entryCount} total entries
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+                          
+                          // Special handling for gratitude journal widget
+                          if (w.id === 'gratitude') {
+                            const today = new Date().toISOString().split('T')[0];
+                            const hasEntryToday = w.gratitudeData?.lastEntryDate === today;
+                            
+                            if (hasEntryToday && w.gratitudeData?.gratitudeItems?.length) {
+                              return (
+                                <div className="mt-3">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg">✨</span>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">Today's Gratitude</div>
+                                      <div className="text-xs text-gray-500">{w.gratitudeData.gratitudeItems.length} items</div>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {w.gratitudeData.gratitudeItems.slice(0, 2).map((item, index) => (
+                                      <div key={index} className="text-xs text-gray-700 flex items-start gap-1">
+                                        <span className="text-yellow-500 mt-0.5">•</span>
+                                        <span className="italic">"{item}"</span>
+                                      </div>
+                                    ))}
+                                    {w.gratitudeData.gratitudeItems.length > 2 && (
+                                      <div className="text-xs text-gray-500">
+                                        +{w.gratitudeData.gratitudeItems.length - 2} more...
+                                      </div>
+                                    )}
+                                  </div>
+                                  {w.gratitudeData.entryCount && w.gratitudeData.entryCount > 1 && (
+                                    <div className="text-xs text-gray-500 mt-2">
+                                      🙏 {w.gratitudeData.entryCount} grateful days
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3">
+                                  <div className="text-center">
+                                    <div className="text-2xl mb-2">🙏</div>
+                                    <div className="text-xs text-gray-500 mb-2">What are you grateful for?</div>
+                                    <div className="text-xs text-gray-600 italic">
+                                      Tap to add today's gratitude
+                                    </div>
+                                    {w.gratitudeData?.entryCount && (
+                                      <div className="text-xs text-gray-500 mt-2">
+                                        🙏 {w.gratitudeData.entryCount} grateful days
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          }
+                          
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
@@ -2522,7 +2691,7 @@ export function TaskBoardDashboard() {
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays'].includes(w.id) && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(w.id) && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -3001,7 +3170,11 @@ export function TaskBoardDashboard() {
           <WidgetEditorSheet 
             widget={editingWidget}
             open={editingWidget !== null}
-            onClose={() => setEditingWidget(null)}
+            onClose={() => {
+              setEditingWidget(null)
+              setNewlyCreatedWidgetId(null)
+            }}
+            isNewWidget={editingWidget?.instanceId === newlyCreatedWidgetId}
             onSave={handleSaveWidget}
           />
         )}
@@ -3102,12 +3275,23 @@ export function TaskBoardDashboard() {
                       dataSource: 'manual',
                       createdAt: new Date().toISOString(),
                       schedule: [true, true, true, true, true, true, true],
+                      // Initialize specialized data for specific widget types
+                      ...(widgetOrTemplate.id === 'birthdays' && { birthdayData: { friendName: '', birthDate: '' } }),
+                      ...(widgetOrTemplate.id === 'social_events' && { eventData: { eventName: '', eventDate: '', description: '' } }),
+                      ...(widgetOrTemplate.id === 'holidays' && { holidayData: { holidayName: '', holidayDate: '' } }),
+                      ...(widgetOrTemplate.id === 'mood' && { moodData: { currentMood: undefined, moodNote: '', lastUpdated: '' } }),
+                      ...(widgetOrTemplate.id === 'journal' && { journalData: { todaysEntry: '', lastEntryDate: '', entryCount: 0 } }),
+                      ...(widgetOrTemplate.id === 'gratitude' && { gratitudeData: { gratitudeItems: [''], lastEntryDate: '', entryCount: 0 } }),
                     };
                 const updated = { ...widgetsByBucket };
                 updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
                 setWidgetsByBucket(updated);
                 widgetsByBucketRef.current = updated; // Update the ref immediately
                 setIsWidgetSheetOpen(false);
+                // Automatically open editor for new widgets
+                setNewlyCreatedWidgetId(newInstance.instanceId);
+                setEditingWidget(newInstance);
+                setEditingBucket(activeBucket);
                 // Save immediately
                 debouncedSaveToSupabase();
               }}

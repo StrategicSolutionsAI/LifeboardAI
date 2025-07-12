@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { TaskBoardDashboard } from "@/components/taskboard-dashboard"
 import { OptimizedTaskboard } from "@/components/optimized-taskboard"
+import { SidebarLayout } from "@/components/sidebar-layout"
 import { Loader2 } from 'lucide-react'
 
 function DashboardContent() {
@@ -15,10 +16,18 @@ function DashboardContent() {
   const shouldUseOptimized = useOptimized !== false
   
   if (shouldUseOptimized) {
-    return <OptimizedTaskboard />
+    return (
+      <SidebarLayout>
+        <OptimizedTaskboard />
+      </SidebarLayout>
+    )
   }
   
-  return <TaskBoardDashboard />
+  return (
+    <SidebarLayout>
+      <TaskBoardDashboard />
+    </SidebarLayout>
+  )
 }
 
 function LoadingDashboard() {

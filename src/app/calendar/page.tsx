@@ -7,6 +7,12 @@ export const metadata: Metadata = {
 
 const CalendarView = dynamic(() => import("./CalendarView"), { ssr: false });
 
+import { SidebarLayout } from "@/components/sidebar-layout";
+
 export default function CalendarPage() {
-  return <CalendarView />;
+  return (
+    <SidebarLayout>
+      <CalendarView />
+    </SidebarLayout>
+  );
 }
