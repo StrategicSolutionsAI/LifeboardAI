@@ -54,4 +54,34 @@ export interface WidgetInstance extends WidgetTemplate {
     lastEntryDate?: string;      // ISO date string (YYYY-MM-DD) of last entry
     entryCount?: number;         // total number of gratitude entries
   };
+  // Meditation timer data
+  meditationData?: {
+    isActive?: boolean;         // whether timer is currently running
+    startTime?: number;         // timestamp when timer was started
+    duration?: number;          // duration in seconds
+    completedSessions?: number; // number of completed sessions
+    lastSessionDate?: string;   // ISO date string (YYYY-MM-DD) of last session
+    totalMinutes?: number;      // total minutes meditated
+    isPaused?: boolean;
+    elapsedBeforePause?: number;
+    completedToday?: boolean;
+  };
+  // Quit habit tracking data
+  quitHabitData?: {
+    habitName?: string;         // what habit they're quitting (e.g., "smoking", "drinking")
+    quitDate?: string;          // ISO date string (YYYY-MM-DD) when they quit
+    costPerDay?: number;        // optional: how much money spent per day on habit
+    currency?: string;          // currency symbol (default: "$")
+    relapses?: Array<{          // track any relapses
+      date: string;             // ISO date string when relapse occurred
+      note?: string;            // optional note about the relapse
+    }>;
+    milestones?: Array<{        // predefined milestones to celebrate
+      days: number;             // number of days for this milestone
+      label: string;            // milestone name (e.g., "1 Week", "1 Month")
+      achieved?: boolean;       // whether this milestone has been reached
+      achievedDate?: string;    // when it was achieved
+    }>;
+    motivationalNote?: string;  // personal motivation/reason for quitting
+  };
 } 

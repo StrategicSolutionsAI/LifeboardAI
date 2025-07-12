@@ -46,6 +46,7 @@ const idToIconMap: Record<string, any> = {
   mood: Icons.Smile,
   journal: Icons.Notebook,
   gratitude: Icons.Sparkles,
+  quit_habit: Icons.ShieldOff,
 };
 
 // Re-use a tiny version of the dashboard card so users can see changes instantly
@@ -191,6 +192,26 @@ export function WidgetPreview({
           ) : widget.id === 'holidays' && widget.holidayData ? (
             <div className="mt-1">
               <p className="text-xs text-gray-500">Click to add holiday</p>
+            </div>
+          ) : widget.id === 'quit_habit' && widget.quitHabitData ? (
+            <div className="mt-1">
+              {widget.quitHabitData.habitName && widget.quitHabitData.quitDate ? (
+                <div>
+                  <p className="text-xs font-medium text-gray-700">
+                    {(() => {
+                      const quitDate = new Date(widget.quitHabitData.quitDate);
+                      const today = new Date();
+                      const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                      return `${daysSince} days clean`;
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Quit {widget.quitHabitData.habitName}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">Click to set quit date</p>
+              )}
             </div>
           ) : null}
         </>

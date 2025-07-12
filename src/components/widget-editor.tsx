@@ -443,6 +443,158 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
                 </div>
               </div>
             </div>
+          ) : draft.id === 'quit_habit' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">What habit are you quitting?</p>
+                <input
+                  type="text"
+                  value={draft.quitHabitData?.habitName || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    quitHabitData: {
+                      ...p.quitHabitData,
+                      habitName: e.target.value,
+                      quitDate: p.quitHabitData?.quitDate || '',
+                      costPerDay: p.quitHabitData?.costPerDay || 0,
+                      currency: p.quitHabitData?.currency || '$',
+                      relapses: p.quitHabitData?.relapses || [],
+                      milestones: p.quitHabitData?.milestones || [],
+                      motivationalNote: p.quitHabitData?.motivationalNote || ''
+                    }
+                  } : p)}
+                  placeholder="e.g., smoking, drinking, social media"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Quit Date</p>
+                <input
+                  type="date"
+                  value={draft.quitHabitData?.quitDate || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    quitHabitData: {
+                      ...p.quitHabitData,
+                      habitName: p.quitHabitData?.habitName || '',
+                      quitDate: e.target.value,
+                      costPerDay: p.quitHabitData?.costPerDay || 0,
+                      currency: p.quitHabitData?.currency || '$',
+                      relapses: p.quitHabitData?.relapses || [],
+                      milestones: p.quitHabitData?.milestones || [],
+                      motivationalNote: p.quitHabitData?.motivationalNote || ''
+                    }
+                  } : p)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Daily Cost (Optional)</p>
+                <div className="flex gap-2">
+                  <select 
+                    value={draft.quitHabitData?.currency || '$'}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      quitHabitData: {
+                        ...p.quitHabitData,
+                        currency: e.target.value
+                      }
+                    } : p)}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm w-16"
+                  >
+                    <option value="$">$</option>
+                    <option value="€">€</option>
+                    <option value="£">£</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={draft.quitHabitData?.costPerDay || ''}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      quitHabitData: {
+                        ...p.quitHabitData,
+                        costPerDay: parseFloat(e.target.value) || 0
+                      }
+                    } : p)}
+                    placeholder="0.00"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <p className="text-xs text-gray-400">How much did you spend per day on this habit?</p>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Motivation (Optional)</p>
+                <textarea
+                  value={draft.quitHabitData?.motivationalNote || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    quitHabitData: {
+                      ...p.quitHabitData,
+                      motivationalNote: e.target.value
+                    }
+                  } : p)}
+                  placeholder="Why are you quitting? What motivates you to stay clean?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm h-20 resize-none"
+                />
+              </div>
+
+              {draft.quitHabitData?.quitDate && draft.quitHabitData?.habitName && (
+                <div className="space-y-3">
+                  <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                    <div className="font-medium mb-1">Preview:</div>
+                    <div>🚭 Quitting {draft.quitHabitData.habitName}</div>
+                    <div>📅 Since {new Date(draft.quitHabitData.quitDate).toLocaleDateString()}</div>
+                    <div className="text-green-600 font-medium">
+                      {(() => {
+                        const quitDate = new Date(draft.quitHabitData.quitDate);
+                        const today = new Date();
+                        const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                        return `${daysSince} days clean`;
+                      })()}
+                    </div>
+                    {draft.quitHabitData.costPerDay > 0 && (
+                      <div>💰 Daily savings: {draft.quitHabitData.currency}{draft.quitHabitData.costPerDay}</div>
+                    )}
+                  </div>
+                  
+                  <div className="border-t pt-3">
+                    <p className="text-xs font-medium text-gray-600 mb-2">Reset Options</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const confirmed = window.confirm('Reset your quit date to today? This will start your counter over.');
+                        if (confirmed) {
+                          setDraft(p => p ? {
+                            ...p,
+                            quitHabitData: {
+                              ...p.quitHabitData,
+                              quitDate: today,
+                              relapses: [
+                                ...(p.quitHabitData?.relapses || []),
+                                {
+                                  date: today,
+                                  note: 'Reset from widget editor'
+                                }
+                              ]
+                            }
+                          } : p);
+                        }
+                      }}
+                      className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors"
+                    >
+                      🔄 Reset to Today
+                    </button>
+                    <p className="text-xs text-gray-400 mt-1">Use if you had a setback and want to start fresh</p>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             /* Target */
             <div className="space-y-2">
@@ -518,7 +670,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
           </div>
 
           {/* Schedule */}
-          {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(draft.id) && (
+          {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(draft.id) && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">Schedule</p>
               <div className="flex flex-wrap gap-2">

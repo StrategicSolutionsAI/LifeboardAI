@@ -41,45 +41,232 @@ const WidgetCard = memo(({
 }) => {
   return (
     <div 
-      className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 transition-all duration-200 hover:shadow-md cursor-pointer"
+      className="bg-white rounded-lg border border-gray-100 shadow-sm p-4 transition-all duration-200 hover:shadow-md cursor-pointer min-h-[180px] flex flex-col"
       onClick={onEdit}
     >
       <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="font-semibold text-gray-900">{widget.name}</h3>
-          <p className="text-sm text-gray-500">
-            {progress.isToday ? `${progress.value} / ${widget.target}` : '0 / ' + widget.target}
-          </p>
+        <div className="flex-1">
+          <h3 className="font-semibold text-gray-900 mb-1">{widget.name}</h3>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500">
+              {progress.isToday ? `${progress.value} / ${widget.target}` : '0 / ' + widget.target}
+            </p>
+            {progress.isToday && progress.value >= widget.target && (
+              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                ✓ Complete
+              </span>
+            )}
+          </div>
+          {/* Progress Bar - only for numeric target widgets */}
+          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(widget.id) && (
+            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  progress.isToday && progress.value >= widget.target 
+                    ? 'bg-green-500' 
+                    : 'bg-blue-500'
+                }`}
+                style={{ 
+                  width: `${Math.min((progress.isToday ? progress.value : 0) / widget.target * 100, 100)}%` 
+                }}
+              />
+            </div>
+          )}
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={(e) => {
-            e.stopPropagation()
-            onRemove()
-          }}
-          className="h-8 w-8"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-1">
+          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(widget.id) && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                onIncrement()
+              }}
+              className="h-8 w-8 hover:bg-green-50 hover:text-green-600"
+              title="Quick increment"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove()
+            }}
+            className="h-8 w-8"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
-      <div className="flex justify-center items-center h-24">
-        <Button
-          onClick={(e) => {
-            e.stopPropagation()
-            onIncrement()
-          }}
-          className="h-16 w-16 rounded-full"
-          variant="outline"
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
+      {/* Specialized widget content */}
+      {widget.id === 'birthdays' && widget.birthdayData ? (
+        <div className="flex-1 flex items-center justify-center py-4">
+          {widget.birthdayData.friendName && widget.birthdayData.birthDate ? (
+            <div className="text-center">
+              <div className="text-lg font-bold text-purple-600 mb-1">🎂</div>
+              <div className="text-sm font-medium text-gray-900">{widget.birthdayData.friendName}</div>
+              <div className="text-xs text-gray-500">{new Date(widget.birthdayData.birthDate).toLocaleDateString()}</div>
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              Click to add birthday
+            </div>
+          )}
+        </div>
+      ) : widget.id === 'mood' && widget.moodData ? (
+        <div className="flex-1 flex items-center justify-center py-4">
+          {widget.moodData.currentMood ? (
+            <div className="text-center">
+              <div className="text-2xl mb-1">
+                {['😢', '😕', '😐', '😊', '😁'][widget.moodData.currentMood - 1]}
+              </div>
+              <div className="text-xs text-gray-600">
+                {['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'][widget.moodData.currentMood - 1]}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              Tap to log mood
+            </div>
+          )}
+        </div>
+      ) : widget.id === 'journal' && widget.journalData ? (
+        <div className="flex-1 flex items-center justify-center py-4">
+          {widget.journalData.todaysEntry ? (
+            <div className="text-center px-2">
+              <div className="text-lg mb-1">📝</div>
+              <div className="text-xs text-gray-700 truncate mb-1">
+                {widget.journalData.todaysEntry.slice(0, 40)}...
+              </div>
+              <div className="text-xs text-gray-500">
+                {widget.journalData.todaysEntry.split(' ').length} words
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              No entry today
+            </div>
+          )}
+        </div>
+      ) : widget.id === 'gratitude' && widget.gratitudeData ? (
+        <div className="flex-1 flex items-center justify-center py-4">
+          {widget.gratitudeData.gratitudeItems && widget.gratitudeData.gratitudeItems.length > 0 && widget.gratitudeData.gratitudeItems[0] ? (
+            <div className="text-center px-2">
+              <div className="text-lg mb-1">✨</div>
+              <div className="text-xs text-gray-700 truncate mb-1">
+                {widget.gratitudeData.gratitudeItems[0].slice(0, 30)}...
+              </div>
+              <div className="text-xs text-gray-500">
+                {widget.gratitudeData.gratitudeItems.filter(item => item.trim()).length} items
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              What are you grateful for?
+            </div>
+          )}
+        </div>
+      ) : widget.id === 'quit_habit' && widget.quitHabitData ? (
+        <div className="flex-1 flex items-center justify-center">
+          {widget.quitHabitData.habitName && widget.quitHabitData.quitDate ? (
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 mb-1">
+                {(() => {
+                  const quitDate = new Date(widget.quitHabitData.quitDate);
+                  const today = new Date();
+                  const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                  return daysSince;
+                })()}
+              </div>
+              <div className="text-xs text-gray-600 mb-2">
+                days clean
+                {(() => {
+                  const quitDate = new Date(widget.quitHabitData.quitDate);
+                  const today = new Date();
+                  const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  // Check for milestone achievements
+                  const milestones = [
+                    { days: 1, emoji: '🌟', label: 'First Day!' },
+                    { days: 7, emoji: '🎉', label: 'One Week!' },
+                    { days: 30, emoji: '🏆', label: 'One Month!' },
+                    { days: 90, emoji: '🎊', label: '3 Months!' },
+                    { days: 365, emoji: '👑', label: 'One Year!' }
+                  ];
+                  
+                  const achieved = milestones.filter(m => daysSince >= m.days);
+                  if (achieved.length > 0) {
+                    const latest = achieved[achieved.length - 1];
+                    return (
+                      <div className="text-xs text-amber-600 mt-1">
+                        {latest.emoji} {latest.label}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              {widget.quitHabitData.costPerDay && widget.quitHabitData.costPerDay > 0 && (
+                <div className="text-xs text-green-600 font-medium space-y-1">
+                  <div>
+                    💰 Saved: {widget.quitHabitData.currency || '$'}{(() => {
+                      const quitDate = new Date(widget.quitHabitData.quitDate);
+                      const today = new Date();
+                      const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                      return (daysSince * (widget.quitHabitData.costPerDay || 0)).toFixed(2);
+                    })()}
+                  </div>
+                  <div className="text-gray-500">
+                    {(() => {
+                      const weeklySavings = ((widget.quitHabitData.costPerDay || 0) * 7).toFixed(2);
+                      const monthlySavings = ((widget.quitHabitData.costPerDay || 0) * 30).toFixed(2);
+                      return `${widget.quitHabitData.currency || '$'}${weeklySavings}/week • ${widget.quitHabitData.currency || '$'}${monthlySavings}/month`;
+                    })()}
+                  </div>
+                </div>
+              )}
+              {widget.quitHabitData.motivationalNote && (
+                <div className="text-xs text-gray-600 italic mt-2 px-2 py-1 bg-blue-50 rounded">
+                  "{widget.quitHabitData.motivationalNote.slice(0, 50)}{widget.quitHabitData.motivationalNote.length > 50 ? '...' : ''}"
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              Click to set quit date
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex justify-center items-center h-24">
+          <Button
+            onClick={(e) => {
+              e.stopPropagation()
+              onIncrement()
+            }}
+            className="h-16 w-16 rounded-full"
+            variant="outline"
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
+      )}
       
       {progress.streak > 0 && (
-        <div className="mt-4 text-center text-sm text-gray-500">
-          {progress.streak} day streak
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span className="text-orange-500">🔥</span>
+            <span className="text-sm text-gray-600">{progress.streak} day streak</span>
+          </div>
+          {progress.streak >= 7 && (
+            <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+              {progress.streak >= 30 ? '🏆 Champion' : progress.streak >= 14 ? '⭐ Strong' : '🌟 Weekly'}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -175,6 +362,13 @@ export function OptimizedTaskboard() {
           ...(widgetOrTemplate.id === 'mood' && { moodData: { currentMood: undefined, moodNote: '', lastUpdated: '' } }),
           ...(widgetOrTemplate.id === 'journal' && { journalData: { todaysEntry: '', lastEntryDate: '', entryCount: 0 } }),
           ...(widgetOrTemplate.id === 'gratitude' && { gratitudeData: { gratitudeItems: [''], lastEntryDate: '', entryCount: 0 } }),
+          ...(widgetOrTemplate.id === 'quit_habit' && { quitHabitData: { habitName: '', quitDate: '', costPerDay: 0, currency: '$', relapses: [], milestones: [
+            { days: 1, label: '1 Day', achieved: false },
+            { days: 7, label: '1 Week', achieved: false },
+            { days: 30, label: '1 Month', achieved: false },
+            { days: 90, label: '3 Months', achieved: false },
+            { days: 365, label: '1 Year', achieved: false }
+          ], motivationalNote: '' } }),
         }
     
     addWidget(activeBucket, newInstance)
@@ -220,6 +414,84 @@ export function OptimizedTaskboard() {
                   Add Widget
                 </Button>
               </div>
+
+              {/* Summary Stats Row */}
+              {currentWidgets.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <span className="text-green-600 text-lg">✅</span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-green-900">Completed Today</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {(() => {
+                            const completedToday = currentWidgets.filter(widget => {
+                              const progress = getProgressForWidget(widget.instanceId);
+                              return progress.isToday && progress.value >= widget.target;
+                            }).length;
+                            return `${completedToday}/${currentWidgets.length}`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <span className="text-blue-600 text-lg">🔥</span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-blue-900">Best Streak</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          {(() => {
+                            const maxStreak = Math.max(...currentWidgets.map(widget => {
+                              const progress = getProgressForWidget(widget.instanceId);
+                              return progress.streak || 0;
+                            }), 0);
+                            return `${maxStreak} days`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <span className="text-purple-600 text-lg">⚡</span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-purple-900">Active Widgets</p>
+                        <p className="text-lg font-bold text-purple-600">{currentWidgets.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <span className="text-amber-600 text-lg">🎯</span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-amber-900">Success Rate</p>
+                        <p className="text-lg font-bold text-amber-600">
+                          {(() => {
+                            const completedToday = currentWidgets.filter(widget => {
+                              const progress = getProgressForWidget(widget.instanceId);
+                              return progress.isToday && progress.value >= widget.target;
+                            }).length;
+                            const rate = currentWidgets.length > 0 ? Math.round((completedToday / currentWidgets.length) * 100) : 0;
+                            return `${rate}%`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {widgetsLoading ? (
                 <WidgetGridSkeleton count={3} />
@@ -236,7 +508,29 @@ export function OptimizedTaskboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {currentWidgets.map((widget) => (
+                  {currentWidgets
+                    .sort((a, b) => {
+                      // Smart sorting: incomplete goals first, then by streak, then by name
+                      const progressA = getProgressForWidget(a.instanceId);
+                      const progressB = getProgressForWidget(b.instanceId);
+                      
+                      const completedA = progressA.isToday && progressA.value >= a.target;
+                      const completedB = progressB.isToday && progressB.value >= b.target;
+                      
+                      // Incomplete widgets first
+                      if (completedA !== completedB) {
+                        return completedA ? 1 : -1;
+                      }
+                      
+                      // Then by streak (higher streaks first)
+                      if (progressA.streak !== progressB.streak) {
+                        return (progressB.streak || 0) - (progressA.streak || 0);
+                      }
+                      
+                      // Finally by name
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((widget) => (
                     <WidgetCard
                       key={widget.instanceId}
                       widget={widget}
