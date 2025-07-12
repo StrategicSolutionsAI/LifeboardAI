@@ -11,7 +11,7 @@ export default function Login() {
 
         {/* Google */}
         <form action={signInWithGoogle} className="space-y-4">
-          <Button type="submit" className="w-full bg-red-500 hover:bg-red-600">
+          <Button type="submit" className="w-full text-white bg-[#8491FF] hover:bg-[#7482FE]">
             Continue with Google
           </Button>
         </form>
@@ -37,7 +37,7 @@ export default function Login() {
             placeholder="Password"
             className="w-full border border-gray-300 rounded-md px-3 py-2"
           />
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full text-white bg-[#8491FF] hover:bg-[#7482FE]">
             Continue
           </Button>
         </form>

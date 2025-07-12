@@ -2179,8 +2179,8 @@ export function TaskBoardDashboard() {
                   }}
                   className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[13px] font-medium capitalize transition-colors ${
                     b === activeBucket
-                      ? 'bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
-                      : 'bg-white text-[#7482FE] hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
+                      ? 'bg-theme-primary text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
+                      : 'bg-white text-theme-primary hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
                   }`}
                 >
                   {b}
@@ -2195,7 +2195,7 @@ export function TaskBoardDashboard() {
                 }}
                 className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
               >
-                <span className="bg-gradient-to-r from-[#7482FE] to-[#909CFF] bg-clip-text text-transparent">
+                <span className="text-theme-primary">
                   +
                 </span>
               </button>

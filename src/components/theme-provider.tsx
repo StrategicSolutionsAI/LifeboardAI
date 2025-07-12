@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { ThemeColor, getUserTheme, applyTheme } from '@/lib/theme'
 
 interface ThemeContextType {
@@ -12,10 +13,16 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeColor>(() => getUserTheme())
+  const pathname = usePathname()
+  
+  // Landing pages should not be affected by theme changes
+  const isLandingPage = pathname === '/' || pathname === '/login' || pathname === '/signup'
 
   const setTheme = (newTheme: ThemeColor) => {
     setThemeState(newTheme)
-    applyTheme(newTheme)
+    if (!isLandingPage) {
+      applyTheme(newTheme)
+    }
     
     if (typeof window !== 'undefined') {
       localStorage.setItem('user_theme', newTheme.id)
@@ -24,9 +31,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Apply theme on mount
-    applyTheme(theme)
-  }, [theme])
+    // Apply theme on mount only for app pages, not landing pages
+    if (!isLandingPage) {
+      applyTheme(theme)
+    }
+  }, [theme, isLandingPage])
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

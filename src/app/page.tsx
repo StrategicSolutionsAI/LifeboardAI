@@ -13,7 +13,7 @@ export default function Home() {
       {/* Navigation Header */}
       <nav className="relative z-10 flex items-center justify-between px-16 py-6">
         <div className="flex items-center space-x-2">
-          <span className="text-2xl font-bold text-theme-primary">Lifeboard</span>
+          <span className="text-2xl font-bold text-[#8491FF]">Lifeboard</span>
           <span className="text-2xl font-bold text-gray-800">AI</span>
         </div>
         
@@ -27,7 +27,7 @@ export default function Home() {
           <div className="flex items-center space-x-4 ml-8">
             <Link href="/login" className="text-gray-600 hover:text-gray-800">Login</Link>
             <Link href="/signup">
-              <Button className="bg-theme-primary hover:bg-theme-secondary text-white px-6 py-2 rounded-lg">
+              <Button className="text-white px-6 py-2 rounded-lg bg-[#8491FF] hover:bg-[#7482FE]">
                 Sign Up
               </Button>
             </Link>
@@ -49,7 +49,7 @@ export default function Home() {
           
           <div className="flex items-center space-x-6">
             <Link href="/signup">
-              <Button className="bg-theme-primary hover:bg-theme-secondary text-white px-8 py-4 rounded-full text-lg font-medium">
+              <Button className="text-white px-8 py-4 rounded-full text-lg font-medium bg-[#8491FF] hover:bg-[#7482FE]">
                 Try free trial
               </Button>
             </Link>

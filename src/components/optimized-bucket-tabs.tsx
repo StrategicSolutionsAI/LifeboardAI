@@ -32,8 +32,8 @@ const TabButton = memo(({
     className={cn(
       "py-4 px-2 text-xs font-medium tracking-wide border-b-2 transition-all duration-200",
       isSelected
-        ? "border-blue-600 text-blue-600"
-        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+        ? "border-theme-primary text-theme-primary"
+        : "border-transparent text-theme-secondary hover:text-theme-primary hover:border-theme-accent"
     )}
   >
     {bucket.toUpperCase()}

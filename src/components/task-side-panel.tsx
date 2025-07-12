@@ -322,7 +322,7 @@ export function TaskSidePanel() {
               onClick={() => handleDateChange(day)}
               className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                 isSameDay(day, selectedDate)
-                  ? "bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white"
+                  ? "bg-theme-primary text-white"
                   : "bg-gray-50 text-gray-700 hover:bg-gray-100"
               }`}
             >
@@ -341,8 +341,8 @@ export function TaskSidePanel() {
                 onClick={() => setTaskView(tab as any)}
                 className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                   taskView === tab
-                    ? "bg-gradient-to-r from-[#7482FE] to-[#909CFF] text-white shadow"
-                    : "text-gray-500 hover:bg-gray-50"
+                    ? "bg-theme-primary text-white shadow"
+                    : "text-theme-secondary hover:bg-gray-50 hover:text-theme-primary"
                 }`}
               >
                 {tab}

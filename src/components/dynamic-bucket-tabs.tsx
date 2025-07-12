@@ -74,8 +74,8 @@ export function DynamicBucketTabs({
               onClick={() => onSelectBucket(bucket)}
               className={`py-4 px-2 text-xs font-medium tracking-wide border-b-2 transition-colors ${
                 selectedBucket === bucket
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-theme-primary text-theme-primary'
+                  : 'border-transparent text-theme-secondary hover:text-theme-primary'
               }`}
             >
               {formatBucketName(bucket)}
@@ -97,10 +97,10 @@ export function DynamicBucketTabs({
                   {/* Add Widget Card */}
                   <Sheet open={isWidgetLibraryOpen} onOpenChange={setIsWidgetLibraryOpen}>
                     <SheetTrigger asChild>
-                      <Card className="border-2 border-dashed border-gray-300 hover:border-blue-500 cursor-pointer transition-colors group">
+                      <Card className="border-2 border-dashed border-gray-300 hover:border-theme-primary cursor-pointer transition-colors group">
                         <CardContent className="flex flex-col items-center justify-center p-8 min-h-[200px]">
-                          <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mb-4 transition-colors">
-                            <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                          <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-theme-primary group-hover:bg-opacity-10 flex items-center justify-center mb-4 transition-colors">
+                            <Plus className="w-6 h-6 text-gray-400 group-hover:text-theme-primary transition-colors" />
                           </div>
                           <h3 className="font-semibold text-gray-900 mb-2">Add a Widget</h3>
                           <p className="text-sm text-gray-500 text-center">

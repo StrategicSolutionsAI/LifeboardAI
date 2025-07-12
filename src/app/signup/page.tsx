@@ -27,7 +27,7 @@ export default function SignUp() {
 
         {/* Google */}
         <form action={signUpWithGoogle} className="space-y-4 mb-4">
-          <Button type="submit" className="w-full bg-red-500 hover:bg-red-600" disabled={submitting}>
+          <Button type="submit" className="w-full text-white bg-[#8491FF] hover:bg-[#7482FE]" disabled={submitting}>
             Continue with Google
           </Button>
         </form>
@@ -46,7 +46,7 @@ export default function SignUp() {
                 type="text"
                 id="name"
                 name="name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8491FF]"
               />
             </div>
           )}
@@ -59,7 +59,7 @@ export default function SignUp() {
               type="email"
               id="email"
               name="email"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8491FF]"
               required
             />
           </div>
@@ -72,12 +72,12 @@ export default function SignUp() {
               type="password"
               id="password"
               name="password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#8491FF]"
               required
             />
           </div>
           
-          <Button type="submit" className="w-full" disabled={submitting}>
+          <Button type="submit" className="w-full text-white bg-[#8491FF] hover:bg-[#7482FE]" disabled={submitting}>
             {isLogin ? "Sign In" : "Create Account"}
           </Button>
         </form>
@@ -85,7 +85,7 @@ export default function SignUp() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+            className="text-sm font-medium text-[#8491FF] hover:text-[#7482FE]"
           >
             {isLogin 
               ? "Don't have an account? Sign up" 
