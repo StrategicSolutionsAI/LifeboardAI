@@ -86,61 +86,118 @@ export function WidgetPreview({
       onDragStart={onDragStart}
       data-widget-id={widget.instanceId}
     >
-      <div className="flex items-center gap-2">
-        <div
-          className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
-            widget.color ?? "gray"
-          )}`}
-        >
-          {SafeIcon ? (
-            <SafeIcon className="h-4 w-4 text-white" />
-          ) : (
-            <span className="text-white text-xs">?</span>
-          )}
-        </div>
-        <span className="text-sm font-medium truncate">{widget.name}</span>
-      </div>
-      {/* Specialized widget content matching dashboard display */}
-      {widget.id === 'birthdays' && widget.birthdayData ? (
-        <div className="mt-1">
-          {widget.birthdayData.friendName && widget.birthdayData.birthDate ? (
-            <>
-              <p className="text-xs font-medium text-gray-700">{widget.birthdayData.friendName}</p>
-              <p className="text-xs text-gray-500">
-                {new Date(widget.birthdayData.birthDate).toLocaleDateString()}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">Click to add birthday</p>
-          )}
-        </div>
-      ) : widget.id === 'social_events' && widget.eventData ? (
-        <div className="mt-1">
-          {widget.eventData.eventName && widget.eventData.eventDate ? (
-            <>
-              <p className="text-xs font-medium text-gray-700">{widget.eventData.eventName}</p>
-              <p className="text-xs text-gray-500">
-                {new Date(widget.eventData.eventDate).toLocaleDateString()}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">Click to add event</p>
-          )}
-        </div>
-      ) : widget.id === 'holidays' && widget.holidayData ? (
-        <div className="mt-1">
-          {widget.holidayData.holidayName && widget.holidayData.holidayDate ? (
-            <>
-              <p className="text-xs font-medium text-gray-700">{widget.holidayData.holidayName}</p>
-              <p className="text-xs text-gray-500">
-                {new Date(widget.holidayData.holidayDate).toLocaleDateString()}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">Click to add holiday</p>
-          )}
-        </div>
-      ) : widget.id === 'mood' && widget.moodData ? (
+      {/* Social widgets with headline next to icon */}
+      {(widget.id === 'birthdays' && widget.birthdayData && widget.birthdayData.friendName) ? (
+        <>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
+                widget.color ?? "gray"
+              )}`}
+            >
+              {SafeIcon ? (
+                <SafeIcon className="h-4 w-4 text-white" />
+              ) : (
+                <span className="text-white text-xs">?</span>
+              )}
+            </div>
+            <span className="text-sm font-medium truncate">{widget.birthdayData.friendName}</span>
+          </div>
+          <div className="mt-1 pl-8">
+            <p className="text-xs text-gray-500">
+              {widget.birthdayData.birthDate ? new Date(widget.birthdayData.birthDate).toLocaleDateString() : 'Birthday not set'}
+            </p>
+          </div>
+        </>
+      ) : (widget.id === 'social_events' && widget.eventData && widget.eventData.eventName) ? (
+        <>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
+                widget.color ?? "gray"
+              )}`}
+            >
+              {SafeIcon ? (
+                <SafeIcon className="h-4 w-4 text-white" />
+              ) : (
+                <span className="text-white text-xs">?</span>
+              )}
+            </div>
+            <span className="text-sm font-medium truncate">{widget.eventData.eventName}</span>
+          </div>
+          <div className="mt-1 pl-8">
+            <p className="text-xs text-gray-500">
+              {widget.eventData.eventDate ? new Date(widget.eventData.eventDate).toLocaleDateString() : 'Event date not set'}
+            </p>
+          </div>
+        </>
+      ) : (widget.id === 'holidays' && widget.holidayData && widget.holidayData.holidayName) ? (
+        <>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
+                widget.color ?? "gray"
+              )}`}
+            >
+              {SafeIcon ? (
+                <SafeIcon className="h-4 w-4 text-white" />
+              ) : (
+                <span className="text-white text-xs">?</span>
+              )}
+            </div>
+            <span className="text-sm font-medium truncate">{widget.holidayData.holidayName}</span>
+          </div>
+          <div className="mt-1 pl-8">
+            <p className="text-xs text-gray-500">
+              {widget.holidayData.holidayDate ? new Date(widget.holidayData.holidayDate).toLocaleDateString() : 'Date not set'}
+            </p>
+          </div>
+        </>
+      ) : (
+        /* Regular widgets with standard layout */
+        <>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
+                widget.color ?? "gray"
+              )}`}
+            >
+              {SafeIcon ? (
+                <SafeIcon className="h-4 w-4 text-white" />
+              ) : (
+                <span className="text-white text-xs">?</span>
+              )}
+            </div>
+            {widget.id === 'birthdays' && widget.birthdayData && widget.birthdayData.friendName ? (
+              <span className="text-sm font-medium truncate">{widget.birthdayData.friendName}</span>
+            ) : widget.id === 'social_events' && widget.eventData && widget.eventData.eventName ? (
+              <span className="text-sm font-medium truncate">{widget.eventData.eventName}</span>
+            ) : widget.id === 'holidays' && widget.holidayData && widget.holidayData.holidayName ? (
+              <span className="text-sm font-medium truncate">{widget.holidayData.holidayName}</span>
+            ) : (
+              <span className="text-sm font-medium truncate">{widget.name}</span>
+            )}
+          </div>
+
+          {/* Empty states for social widgets */}
+          {widget.id === 'birthdays' && widget.birthdayData ? (
+            <div className="mt-1">
+              <p className="text-xs text-gray-500">Click to add birthday</p>
+            </div>
+          ) : widget.id === 'social_events' && widget.eventData ? (
+            <div className="mt-1">
+              <p className="text-xs text-gray-500">Click to add event</p>
+            </div>
+          ) : widget.id === 'holidays' && widget.holidayData ? (
+            <div className="mt-1">
+              <p className="text-xs text-gray-500">Click to add holiday</p>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Other specialized widget content */}
+      {widget.id === 'mood' && widget.moodData ? (
         <div className="mt-1">
           {widget.moodData.currentMood ? (
             <div className="flex items-center gap-1">
@@ -185,21 +242,7 @@ export function WidgetPreview({
             <p className="text-xs text-gray-500">What are you grateful for?</p>
           )}
         </div>
-      ) : (
-        <p className="mt-1 text-xs text-gray-500 truncate">
-          Target: {widget.target} {widget.unit}
-        </p>
-      )}
-      {widget.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(widget.id) && (
-        <p className="mt-1 text-[10px] text-gray-400 truncate">
-          {widget.schedule
-            .map((enabled, idx) => {
-              const labels = ["S","M","T","W","T","F","S"];
-              return enabled ? labels[idx] : "·";
-            })
-            .join(" ")}
-        </p>
-      )}
+      ) : null}
     </div>
   );
 } 

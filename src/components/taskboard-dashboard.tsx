@@ -2379,14 +2379,21 @@ export function TaskBoardDashboard() {
                               </div>
                             );
                           })()}
-                          <span className="text-sm font-medium truncate">{w.name}</span>
+                          {w.id === 'birthdays' && w.birthdayData && w.birthdayData.friendName ? (
+                            <span className="text-sm font-medium truncate">{w.birthdayData.friendName}</span>
+                          ) : w.id === 'social_events' && w.eventData ? (
+                            <span className="text-sm font-medium truncate">{w.eventData.eventName}</span>
+                          ) : w.id === 'holidays' && w.holidayData && w.holidayData.holidayName ? (
+                            <span className="text-sm font-medium truncate">{w.holidayData.holidayName}</span>
+                          ) : (
+                            <span className="text-sm font-medium truncate">{w.name}</span>
+                          )}
                         </div>
-                        <p className="mt-2 text-xs text-gray-500 truncate">{w.description}</p>
 
                         {(() => {
                           // Special handling for birthday widgets
                           if (w.id === 'birthdays') {
-                            if (w.birthdayData) {
+                            if (w.birthdayData && w.birthdayData.birthDate) {
                               const birthDate = new Date(w.birthdayData.birthDate);
                               const today = new Date();
                               const currentYear = today.getFullYear();
@@ -2403,11 +2410,8 @@ export function TaskBoardDashboard() {
                               const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                               
                               return (
-                                <div className="mt-3">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {w.birthdayData.friendName}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
+                                <div className="mt-2">
+                                  <div className="text-xs text-gray-500">
                                     {birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
                                   <div className="text-xs text-gray-600 mt-1">
@@ -2419,8 +2423,8 @@ export function TaskBoardDashboard() {
                               );
                             } else {
                               return (
-                                <div className="mt-3 text-xs text-gray-500">
-                                  Click to add birthday
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Click to add birthday details
                                 </div>
                               );
                             }
@@ -2428,22 +2432,19 @@ export function TaskBoardDashboard() {
                           
                           // Special handling for events widgets
                           if (w.id === 'social_events') {
-                            if (w.eventData) {
+                            if (w.eventData && w.eventData.eventDate) {
                               const eventDate = new Date(w.eventData.eventDate);
                               const today = new Date();
                               const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                               
                               return (
-                                <div className="mt-3">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {w.eventData.eventName}
-                                  </div>
+                                <div className="mt-2">
                                   {w.eventData.description && (
-                                    <div className="text-xs text-gray-600 mt-1">
+                                    <div className="text-xs text-gray-600">
                                       {w.eventData.description}
                                     </div>
                                   )}
-                                  <div className="text-xs text-gray-500 mt-1">
+                                  <div className="text-xs text-gray-500">
                                     {eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                   </div>
                                   <div className="text-xs text-gray-600 mt-1">
@@ -2456,8 +2457,8 @@ export function TaskBoardDashboard() {
                               );
                             } else {
                               return (
-                                <div className="mt-3 text-xs text-gray-500">
-                                  Click to add event
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Click to add event details
                                 </div>
                               );
                             }
@@ -2465,7 +2466,7 @@ export function TaskBoardDashboard() {
                           
                           // Special handling for holidays widgets  
                           if (w.id === 'holidays') {
-                            if (w.holidayData) {
+                            if (w.holidayData && w.holidayData.holidayDate) {
                               const holidayDate = new Date(w.holidayData.holidayDate);
                               const today = new Date();
                               const currentYear = today.getFullYear();
@@ -2477,15 +2478,12 @@ export function TaskBoardDashboard() {
                               const nextHoliday = thisYearHoliday < today 
                                 ? new Date(currentYear + 1, holidayDate.getMonth(), holidayDate.getDate())
                                 : thisYearHoliday;
-                              
+                                
                               const daysUntil = Math.ceil((nextHoliday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                               
                               return (
-                                <div className="mt-3">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {w.holidayData.holidayName}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
+                                <div className="mt-2">
+                                  <div className="text-xs text-gray-500">
                                     {holidayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
                                   <div className="text-xs text-gray-600 mt-1">
@@ -2497,8 +2495,8 @@ export function TaskBoardDashboard() {
                               );
                             } else {
                               return (
-                                <div className="mt-3 text-xs text-gray-500">
-                                  Click to add holiday
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Click to add holiday details
                                 </div>
                               );
                             }
