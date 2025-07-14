@@ -57,12 +57,12 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
               key={href}
               href={href}
               className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                active ? "bg-theme-primary bg-opacity-10" : "hover:bg-gray-100"
+                active ? "bg-theme-primary" : "hover:bg-gray-100"
               }`}
               aria-label={label}
             >
               <Icon
-                className={`w-5 h-5 ${active ? "text-theme-primary" : "text-gray-400"}`}
+                className={`w-5 h-5 ${active ? "text-white" : "text-gray-400"}`}
               />
             </Link>
           )
@@ -74,13 +74,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         <Link
           href="/dashboard/settings"
           className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 hover:bg-gray-100 ${
-            pathname?.startsWith("/dashboard/settings") ? "bg-theme-primary bg-opacity-10" : ""
+            pathname?.startsWith("/dashboard/settings") ? "bg-theme-primary" : ""
           }`}
           aria-label="Settings"
         >
           <Settings
             className={`w-5 h-5 ${
-              pathname?.startsWith("/dashboard/settings") ? "text-theme-primary" : "text-gray-400"
+              pathname?.startsWith("/dashboard/settings") ? "text-white" : "text-gray-400"
             }`}
           />
         </Link>

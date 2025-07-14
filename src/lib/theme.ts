@@ -5,6 +5,7 @@ export interface ThemeColor {
   secondary: string
   accent: string
   description: string
+  isCustom?: boolean
 }
 
 export const themeColors: ThemeColor[] = [
@@ -87,6 +88,69 @@ export function applyTheme(theme: ThemeColor) {
   root.style.setProperty('--theme-accent', theme.accent)
 }
 
+export function createCustomTheme(name: string, primary: string, secondary: string, accent: string): ThemeColor {
+  return {
+    id: `custom-${Date.now()}`,
+    name,
+    primary,
+    secondary,
+    accent,
+    description: "Custom theme",
+    isCustom: true
+  }
+}
+
+export function saveCustomTheme(theme: ThemeColor) {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const existingCustomThemes = getCustomThemes()
+    const updatedThemes = [...existingCustomThemes, theme]
+    localStorage.setItem('custom_themes', JSON.stringify(updatedThemes))
+    localStorage.setItem('theme_colors', JSON.stringify(theme))
+    localStorage.setItem('user_theme', theme.id)
+  } catch (error) {
+    console.error('Error saving custom theme:', error)
+  }
+}
+
+export function getCustomThemes(): ThemeColor[] {
+  if (typeof window === 'undefined') return []
+  
+  try {
+    const stored = localStorage.getItem('custom_themes')
+    return stored ? JSON.parse(stored) : []
+  } catch (error) {
+    console.error('Error loading custom themes:', error)
+    return []
+  }
+}
+
+export function getAllThemes(): ThemeColor[] {
+  return [...themeColors, ...getCustomThemes()]
+}
+
+export function deleteCustomTheme(themeId: string) {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const existingCustomThemes = getCustomThemes()
+    const updatedThemes = existingCustomThemes.filter(theme => theme.id !== themeId)
+    localStorage.setItem('custom_themes', JSON.stringify(updatedThemes))
+    
+    // If the deleted theme was active, switch to default
+    const currentTheme = localStorage.getItem('user_theme')
+    if (currentTheme === themeId) {
+      const defaultTheme = themeColors[0]
+      localStorage.setItem('user_theme', defaultTheme.id)
+      localStorage.setItem('theme_colors', JSON.stringify(defaultTheme))
+      applyTheme(defaultTheme)
+    }
+  } catch (error) {
+    console.error('Error deleting custom theme:', error)
+  }
+}
+
 export function getUserTheme(): ThemeColor {
   if (typeof window === 'undefined') return themeColors[0]
   
@@ -99,7 +163,8 @@ export function getUserTheme(): ThemeColor {
     
     const themeId = localStorage.getItem('user_theme')
     if (themeId) {
-      return getThemeColors(themeId)
+      const allThemes = getAllThemes()
+      return allThemes.find(theme => theme.id === themeId) || themeColors[0]
     }
   } catch (error) {
     console.error('Error loading user theme:', error)

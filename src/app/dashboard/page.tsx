@@ -11,9 +11,8 @@ function DashboardContent() {
   const searchParams = useSearchParams()
   const useOptimized = searchParams.get('optimized') === 'true'
   
-  // You can also check for a user preference or feature flag here
-  // For now, we'll use the optimized version by default
-  const shouldUseOptimized = useOptimized !== false
+  // Keep optimized version behind feature flag
+  const shouldUseOptimized = useOptimized
   
   if (shouldUseOptimized) {
     return (

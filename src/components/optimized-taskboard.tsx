@@ -1,10 +1,12 @@
 "use client"
 
-import React, { useState, memo, useCallback, Suspense } from "react"
+import React, { useState, memo, useCallback, useEffect, useRef, Suspense } from "react"
 import { useProgressBar } from "@/hooks/use-progress-bar"
 import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/utils/supabase/client"
+import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences"
+import { useGlobalCache } from "@/hooks/use-data-cache"
 import { format, addDays, isSameDay } from 'date-fns'
 import { 
   Plus, MessageSquare, LogOut, X, Loader2,
@@ -74,7 +76,7 @@ const WidgetCard = memo(({
           )}
         </div>
         <div className="flex gap-1">
-          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(widget.id) && (
+          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(widget.id) && (
             <Button
               size="icon"
               variant="ghost"
@@ -82,10 +84,17 @@ const WidgetCard = memo(({
                 e.stopPropagation()
                 onIncrement()
               }}
-              className="h-8 w-8 hover:bg-green-50 hover:text-green-600"
-              title="Quick increment"
+              className={widget.id === 'quit_habit' 
+                ? "h-8 w-8 hover:bg-green-50 hover:text-green-600 border border-green-200"
+                : "h-8 w-8 hover:bg-green-50 hover:text-green-600"
+              }
+              title={widget.id === 'quit_habit' ? "Check in - I'm still clean!" : "Quick increment"}
             >
-              <Plus className="h-4 w-4" />
+              {widget.id === 'quit_habit' ? (
+                <div className="text-sm font-bold text-green-600">✓</div>
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
             </Button>
           )}
           <Button
@@ -171,73 +180,82 @@ const WidgetCard = memo(({
           )}
         </div>
       ) : widget.id === 'quit_habit' && widget.quitHabitData ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col justify-center p-3">
           {widget.quitHabitData.habitName && widget.quitHabitData.quitDate ? (
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600 mb-1">
-                {(() => {
-                  const quitDate = new Date(widget.quitHabitData.quitDate);
-                  const today = new Date();
-                  const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
-                  return daysSince;
-                })()}
+            <div className="space-y-3">
+              {/* Header with icon and habit */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-sm">🚫</span>
+                <span className="font-medium text-gray-700">
+                  Quitting {widget.quitHabitData.habitName}
+                </span>
               </div>
-              <div className="text-xs text-gray-600 mb-2">
-                days clean
-                {(() => {
-                  const quitDate = new Date(widget.quitHabitData.quitDate);
-                  const today = new Date();
-                  const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
-                  
-                  // Check for milestone achievements
-                  const milestones = [
-                    { days: 1, emoji: '🌟', label: 'First Day!' },
-                    { days: 7, emoji: '🎉', label: 'One Week!' },
-                    { days: 30, emoji: '🏆', label: 'One Month!' },
-                    { days: 90, emoji: '🎊', label: '3 Months!' },
-                    { days: 365, emoji: '👑', label: 'One Year!' }
-                  ];
-                  
-                  const achieved = milestones.filter(m => daysSince >= m.days);
-                  if (achieved.length > 0) {
-                    const latest = achieved[achieved.length - 1];
-                    return (
-                      <div className="text-xs text-amber-600 mt-1">
-                        {latest.emoji} {latest.label}
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+              
+              {/* Since date */}
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="text-sm">📅</span>
+                <span>Since {new Date(widget.quitHabitData.quitDate).toLocaleDateString()}</span>
               </div>
+
+              {/* Days clean - main counter */}
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-green-600">
+                  {(() => {
+                    const quitDate = new Date(widget.quitHabitData.quitDate);
+                    const today = new Date();
+                    const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                    return daysSince;
+                  })()}
+                </span>
+                <span className="text-sm text-green-600 font-medium">days clean</span>
+                {progress.isToday && progress.value >= widget.target ? (
+                  <span className="text-green-500 text-sm ml-1" title="Checked in today">✓</span>
+                ) : null}
+              </div>
+
+              {/* Daily savings */}
               {widget.quitHabitData.costPerDay && widget.quitHabitData.costPerDay > 0 && (
-                <div className="text-xs text-green-600 font-medium space-y-1">
-                  <div>
-                    💰 Saved: {widget.quitHabitData.currency || '$'}{(() => {
-                      const quitDate = new Date(widget.quitHabitData.quitDate);
-                      const today = new Date();
-                      const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
-                      return (daysSince * (widget.quitHabitData.costPerDay || 0)).toFixed(2);
-                    })()}
-                  </div>
-                  <div className="text-gray-500">
-                    {(() => {
-                      const weeklySavings = ((widget.quitHabitData.costPerDay || 0) * 7).toFixed(2);
-                      const monthlySavings = ((widget.quitHabitData.costPerDay || 0) * 30).toFixed(2);
-                      return `${widget.quitHabitData.currency || '$'}${weeklySavings}/week • ${widget.quitHabitData.currency || '$'}${monthlySavings}/month`;
-                    })()}
-                  </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="text-sm">💰</span>
+                  <span>
+                    Daily savings: {widget.quitHabitData.currency || '$'}{widget.quitHabitData.costPerDay.toFixed(2)}
+                  </span>
                 </div>
               )}
-              {widget.quitHabitData.motivationalNote && (
-                <div className="text-xs text-gray-600 italic mt-2 px-2 py-1 bg-blue-50 rounded">
-                  "{widget.quitHabitData.motivationalNote.slice(0, 50)}{widget.quitHabitData.motivationalNote.length > 50 ? '...' : ''}"
-                </div>
-              )}
+
+              {/* Milestone achievement (only if achieved) */}
+              {(() => {
+                const quitDate = new Date(widget.quitHabitData.quitDate);
+                const today = new Date();
+                const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                
+                const milestones = [
+                  { days: 1, emoji: '🌟', label: 'First Day!' },
+                  { days: 3, emoji: '💪', label: '3 Days!' },
+                  { days: 7, emoji: '🎉', label: 'One Week!' },
+                  { days: 14, emoji: '⭐', label: 'Two Weeks!' },
+                  { days: 30, emoji: '🏆', label: 'One Month!' },
+                  { days: 90, emoji: '🎊', label: '3 Months!' },
+                  { days: 365, emoji: '👑', label: 'One Year!' }
+                ];
+                
+                const achieved = milestones.filter(m => daysSince >= m.days);
+                
+                if (achieved.length > 0) {
+                  const latest = achieved[achieved.length - 1];
+                  return (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-sm">{latest.emoji}</span>
+                      <span className="text-amber-600 font-medium">{latest.label}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ) : (
             <div className="text-center text-xs text-gray-500">
-              Click to set quit date
+              Click to set up habit tracking
             </div>
           )}
         </div>
@@ -301,13 +319,25 @@ const TaskItem = memo(({
 TaskItem.displayName = "TaskItem"
 
 export function OptimizedTaskboard() {
-  const [activeBucket, setActiveBucket] = useState("Health")
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false)
-  const [isEditingWidget, setIsEditingWidget] = useState<WidgetInstance | null>(null)
-  const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null)
+  // Track tab switching to show transitions
+  const [isTabSwitching, setIsTabSwitching] = useState(false)
+  // Use global cache for user preferences
+  const { 
+    data: userPrefs, 
+    loading: prefsLoading,
+    error: prefsError,
+    refetch: refetchPrefs
+  } = useGlobalCache(
+    'user-preferences',
+    getUserPreferencesClient,
+    { 
+      ttl: 10 * 60 * 1000, // 10 minutes cache
+      prefetch: true 
+    }
+  )
   
-  // Use optimized hooks
+  // Initialize activeBucket from localStorage only
+  // We'll sync with user preferences after loading
   const {
     widgetsByBucket,
     progressByWidget,
@@ -319,7 +349,99 @@ export function OptimizedTaskboard() {
     updateProgress,
     getWidgetsForBucket,
     getProgressForWidget
-  } = useWidgets()
+  } = useWidgets();
+
+  const [activeBucket, setActiveBucket] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("active_bucket");
+      console.log(`[DEBUG] Initializing state from localStorage. Found: ${saved}`);
+      if (saved) return saved;
+    }
+    console.log('[DEBUG] No value in localStorage. Initializing state to "Health".');
+    return "Health";
+  });
+  
+  // Custom setter that persists to localStorage and Supabase
+  // This is the main function that handles tab switching and ensures persistence
+  const updateActiveBucket = useCallback((bucket: string) => {
+    console.log(`[DEBUG] updateActiveBucket called. Attempting to switch to: ${bucket}`);
+    if (bucket === activeBucket) {
+      console.log('[DEBUG] Bucket is already active. No change.');
+      return;
+    }
+
+    setIsTabSwitching(true);
+    setActiveBucket(bucket);
+    console.log(`[DEBUG] Set activeBucket state to: ${bucket}`);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('active_bucket', bucket);
+        console.log(`[DEBUG] Wrote to localStorage: ${bucket}`);
+      } catch (error) {
+        console.error('[DEBUG] Error writing to localStorage:', error);
+      }
+    }
+
+    getUserPreferencesClient().then(freshPrefs => {
+      if (!freshPrefs) {
+        console.error('[DEBUG] Cannot save to Supabase: no fresh preferences found.');
+        return;
+      }
+      const updatedPrefs = { ...freshPrefs, active_bucket: bucket };
+      console.log(`[DEBUG] Preparing to save to Supabase:`, updatedPrefs);
+      saveUserPreferences(updatedPrefs)
+        .then(success => {
+          console.log(`[DEBUG] Supabase save ${success ? 'succeeded' : 'failed'}.`);
+          if (success) {
+            refetchPrefs();
+            console.log('[DEBUG] Refetched preferences after successful save.');
+          }
+        })
+        .catch(err => console.error('[DEBUG] Error saving to Supabase:', err));
+    });
+    
+    // 3. Document title update for better UX
+    if (typeof window !== 'undefined') {
+      document.title = `${bucket} - LifeboardAI Dashboard`;
+    }
+    
+    // End transition after a short delay for smooth UI
+    setTimeout(() => {
+      setIsTabSwitching(false);
+    }, 300); // Match this with CSS transition duration
+  }, [activeBucket, refetchPrefs]);
+  
+  // Extra effect to ensure activeBucket is added as a dependency
+  // This prevents stale closures in the activeBucket reference
+  useEffect(() => {
+    console.log('[Dashboard] Active bucket is now:', activeBucket);
+  }, [activeBucket]);
+  
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false)
+  const [isEditingWidget, setIsEditingWidget] = useState<WidgetInstance | null>(null)
+  const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null)
+  
+  // Effect to sync with Supabase preferences when they load.
+  useEffect(() => {
+    if (userPrefs && !prefsLoading) {
+      console.log(`[DEBUG] Sync effect running. Prefs loaded. Current activeBucket: ${activeBucket}`);
+      console.log(`[DEBUG] Supabase active_bucket: ${userPrefs.active_bucket}`);
+      
+      // If Supabase has a value and it's different from the current state, sync it.
+      if (userPrefs.active_bucket && userPrefs.active_bucket !== activeBucket) {
+        console.log(`[DEBUG] Syncing from Supabase: ${activeBucket} -> ${userPrefs.active_bucket}`);
+        setActiveBucket(userPrefs.active_bucket);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('active_bucket', userPrefs.active_bucket);
+          console.log(`[DEBUG] Updated localStorage with value from Supabase: ${userPrefs.active_bucket}`);
+        }
+      }
+    }
+  }, [userPrefs, prefsLoading]); // activeBucket is intentionally omitted to prevent state-loop
+  
+
 
   
   const {
@@ -383,9 +505,15 @@ export function OptimizedTaskboard() {
   }, [activeBucket, removeWidget])
   
   const handleIncrementProgress = useCallback((widget: WidgetInstance) => {
-    // Use increment if available in widget data, otherwise default to 1
-    const incrementValue = (widget as any).increment || 1
-    updateProgress(widget.instanceId, incrementValue)
+    if (widget.id === 'quit_habit') {
+      // For quit habit widgets, the "check-in" just confirms they're still clean
+      // We'll set progress to 1 to indicate they checked in today
+      updateProgress(widget.instanceId, 1)
+    } else {
+      // Use increment if available in widget data, otherwise default to 1
+      const incrementValue = (widget as any).increment || 1
+      updateProgress(widget.instanceId, incrementValue)
+    }
   }, [updateProgress])
   
   // Calendar helpers
@@ -396,159 +524,159 @@ export function OptimizedTaskboard() {
     <>
       <main className="max-w-7xl mx-auto w-full">
         <div className="bg-white rounded-lg border border-gray-100 shadow-sm">
-          <div className="flex flex-col lg:flex-row gap-6 px-6 pt-6 pb-0">
-            <div className="flex-1">
-              <OptimizedBucketTabs
-                selectedBucket={activeBucket}
-                onSelectBucket={setActiveBucket}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col lg:flex-row gap-6 px-6 pb-6 pt-0">
+          <div className="flex flex-col lg:flex-row gap-6 px-6 pt-6 pb-6">
             {/* Main content area - widgets */}
-            <div className="flex-1">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold text-gray-900">{activeBucket} Widgets</h2>
-                <Button onClick={() => setIsWidgetSheetOpen(true)}>
-                  <Plus className="-ml-1 mr-2 h-5 w-5" />
-                  Add Widget
-                </Button>
+            <div className="flex-1 min-w-0">
+              <div className="bg-white rounded-lg border border-gray-100 shadow-sm w-full">
+                <div className="p-6">
+                  <OptimizedBucketTabs
+                    selectedBucket={activeBucket}
+                    onSelectBucket={updateActiveBucket}
+                  />
+                  <div className="flex justify-between items-center mb-6 mt-6">
+                    <h2 className="text-2xl font-semibold text-gray-900">{activeBucket} Widgets</h2>
+                    <Button onClick={() => setIsWidgetSheetOpen(true)}>
+                      <Plus className="-ml-1 mr-2 h-5 w-5" />
+                      Add Widget
+                    </Button>
+                  </div>
+
+                  {/* Summary Stats Row */}
+                  {currentWidgets.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <span className="text-green-600 text-lg">✅</span>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-green-900">Completed Today</p>
+                            <p className="text-lg font-bold text-green-600">
+                              {(() => {
+                                const completedToday = currentWidgets.filter(widget => {
+                                  const progress = getProgressForWidget(widget.instanceId);
+                                  return progress.isToday && progress.value >= widget.target;
+                                }).length;
+                                return `${completedToday}/${currentWidgets.length}`;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-2 bg-blue-100 rounded-lg">
+                            <span className="text-blue-600 text-lg">🔥</span>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-blue-900">Best Streak</p>
+                            <p className="text-lg font-bold text-blue-600">
+                              {(() => {
+                                const maxStreak = Math.max(...currentWidgets.map(widget => {
+                                  const progress = getProgressForWidget(widget.instanceId);
+                                  return progress.streak || 0;
+                                }), 0);
+                                return `${maxStreak} days`;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <span className="text-purple-600 text-lg">⚡</span>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-purple-900">Active Widgets</p>
+                            <p className="text-lg font-bold text-purple-600">{currentWidgets.length}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <div className="p-2 bg-amber-100 rounded-lg">
+                            <span className="text-amber-600 text-lg">🎯</span>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-amber-900">Success Rate</p>
+                            <p className="text-lg font-bold text-amber-600">
+                              {(() => {
+                                const completedToday = currentWidgets.filter(widget => {
+                                  const progress = getProgressForWidget(widget.instanceId);
+                                  return progress.isToday && progress.value >= widget.target;
+                                }).length;
+                                const rate = currentWidgets.length > 0 ? Math.round((completedToday / currentWidgets.length) * 100) : 0;
+                                return `${rate}%`;
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(widgetsLoading || isTabSwitching) ? (
+                    <WidgetGridSkeleton count={3} />
+                  ) : currentWidgets.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
+                      <div className="mx-auto w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                        <Plus className="h-6 w-6 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No widgets yet</h3>
+                      <p className="text-gray-500 mb-4">Add your first widget to start tracking</p>
+                      <Button onClick={() => setIsWidgetSheetOpen(true)}>
+                        Add Widget
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {currentWidgets
+                        .sort((a, b) => {
+                          // Smart sorting: incomplete goals first, then by streak, then by name
+                          const progressA = getProgressForWidget(a.instanceId);
+                          const progressB = getProgressForWidget(b.instanceId);
+                          
+                          const completedA = progressA.isToday && progressA.value >= a.target;
+                          const completedB = progressB.isToday && progressB.value >= b.target;
+                          
+                          // Incomplete widgets first
+                          if (completedA !== completedB) {
+                            return completedA ? 1 : -1;
+                          }
+                          
+                          // Then by streak (higher streaks first)
+                          if (progressA.streak !== progressB.streak) {
+                            return (progressB.streak || 0) - (progressA.streak || 0);
+                          }
+                          
+                          // Finally by name
+                          return a.name.localeCompare(b.name);
+                        })
+                        .map((widget) => (
+                        <WidgetCard
+                          key={widget.instanceId}
+                          widget={widget}
+                          onRemove={() => handleRemoveWidget(widget.instanceId)}
+                          onIncrement={() => handleIncrementProgress(widget)}
+                          onEdit={() => {
+                            setNewlyCreatedWidgetId(null)
+                            setIsEditingWidget(widget)
+                          }}
+                          progress={getProgressForWidget(widget.instanceId)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {/* Summary Stats Row */}
-              {currentWidgets.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <span className="text-green-600 text-lg">✅</span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-green-900">Completed Today</p>
-                        <p className="text-lg font-bold text-green-600">
-                          {(() => {
-                            const completedToday = currentWidgets.filter(widget => {
-                              const progress = getProgressForWidget(widget.instanceId);
-                              return progress.isToday && progress.value >= widget.target;
-                            }).length;
-                            return `${completedToday}/${currentWidgets.length}`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <span className="text-blue-600 text-lg">🔥</span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-blue-900">Best Streak</p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {(() => {
-                            const maxStreak = Math.max(...currentWidgets.map(widget => {
-                              const progress = getProgressForWidget(widget.instanceId);
-                              return progress.streak || 0;
-                            }), 0);
-                            return `${maxStreak} days`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <span className="text-purple-600 text-lg">⚡</span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-purple-900">Active Widgets</p>
-                        <p className="text-lg font-bold text-purple-600">{currentWidgets.length}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <div className="p-2 bg-amber-100 rounded-lg">
-                        <span className="text-amber-600 text-lg">🎯</span>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-amber-900">Success Rate</p>
-                        <p className="text-lg font-bold text-amber-600">
-                          {(() => {
-                            const completedToday = currentWidgets.filter(widget => {
-                              const progress = getProgressForWidget(widget.instanceId);
-                              return progress.isToday && progress.value >= widget.target;
-                            }).length;
-                            const rate = currentWidgets.length > 0 ? Math.round((completedToday / currentWidgets.length) * 100) : 0;
-                            return `${rate}%`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {widgetsLoading ? (
-                <WidgetGridSkeleton count={3} />
-              ) : currentWidgets.length === 0 ? (
-                <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
-                  <div className="mx-auto w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                    <Plus className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No widgets yet</h3>
-                  <p className="text-gray-500 mb-4">Add your first widget to start tracking</p>
-                  <Button onClick={() => setIsWidgetSheetOpen(true)}>
-                    Add Widget
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {currentWidgets
-                    .sort((a, b) => {
-                      // Smart sorting: incomplete goals first, then by streak, then by name
-                      const progressA = getProgressForWidget(a.instanceId);
-                      const progressB = getProgressForWidget(b.instanceId);
-                      
-                      const completedA = progressA.isToday && progressA.value >= a.target;
-                      const completedB = progressB.isToday && progressB.value >= b.target;
-                      
-                      // Incomplete widgets first
-                      if (completedA !== completedB) {
-                        return completedA ? 1 : -1;
-                      }
-                      
-                      // Then by streak (higher streaks first)
-                      if (progressA.streak !== progressB.streak) {
-                        return (progressB.streak || 0) - (progressA.streak || 0);
-                      }
-                      
-                      // Finally by name
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map((widget) => (
-                    <WidgetCard
-                      key={widget.instanceId}
-                      widget={widget}
-                      onRemove={() => handleRemoveWidget(widget.instanceId)}
-                      onIncrement={() => handleIncrementProgress(widget)}
-                      onEdit={() => {
-                        setNewlyCreatedWidgetId(null)
-                        setIsEditingWidget(widget)
-                      }}
-                      progress={getProgressForWidget(widget.instanceId)}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
             
             {/* Right Sidebar */}
-            <div className="space-y-6 w-full lg:w-[300px] xl:w-[350px] shrink-0">
+            <div className="space-y-6 w-full lg:w-[300px] xl:w-[350px] flex-shrink-0 flex-grow-0">
               {/* Calendar Widget */}
               <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-4">
                 <h3 className="font-semibold text-gray-900 mb-4">Calendar</h3>

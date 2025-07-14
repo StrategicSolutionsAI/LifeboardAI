@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, memo, useCallback } from "react"
+import { useState, useEffect, memo, useCallback, useRef } from "react"
 import { getUserPreferencesClient } from "@/lib/user-preferences"
 import { Plus } from "lucide-react"
 import { BucketTabsSkeleton } from "./loading-skeletons"
@@ -69,12 +69,7 @@ export function OptimizedBucketTabs({
     onSelectBucket(bucket)
   }, [onSelectBucket])
   
-  // Effect to handle initial bucket selection
-  useEffect(() => {
-    if (!loading && userBuckets.length > 0 && !userBuckets.includes(selectedBucket)) {
-      onSelectBucket(userBuckets[0])
-    }
-  }, [userBuckets, selectedBucket, onSelectBucket, loading])
+
   
   // Show skeleton while loading
   if (loading && !userPrefs) {

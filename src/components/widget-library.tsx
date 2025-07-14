@@ -289,8 +289,8 @@ const widgetTemplates: WidgetTemplate[] = [
   },
   {
     id: "quit_habit",
-    name: "Quit Habit Tracker",
-    description: "Days since last cigarette/soda etc.",
+    name: "Habit You're Quitting",
+    description: "Track progress and milestones for breaking bad habits",
     icon: ShieldOff,
     category: "medical",
     color: "gray",

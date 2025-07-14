@@ -287,6 +287,35 @@ export function TaskBoardDashboard() {
   // ----------------------------------------------------------------------
   interface ProgressEntry { value:number; date:string; streak:number; lastCompleted:string; }
   const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
+
+  // ----------------------------------------------------------------------
+  // Persist active bucket selection
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    // Do nothing until a bucket is selected
+    if (!activeBucket) return;
+
+    // 1) LocalStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('active_bucket', activeBucket);
+      } catch (e) {
+        console.error('Failed to save active bucket to localStorage', e);
+      }
+    }
+
+    // 2) Supabase (fire & forget)
+    (async () => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs && prefs.active_bucket !== activeBucket) {
+          await saveUserPreferences({ ...prefs, active_bucket: activeBucket });
+        }
+      } catch (err) {
+        console.error('Failed to save active bucket to Supabase', err);
+      }
+    })();
+  }, [activeBucket]);
   
   // Add a ref for progress too
   const progressByWidgetRef = useRef(progressByWidget);
@@ -1410,7 +1439,8 @@ export function TaskBoardDashboard() {
           const parsed: string[] = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length) {
             setBuckets(parsed);
-            setActiveBucket(parsed[0]);
+            const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+            setActiveBucket(savedActive && parsed.includes(savedActive) ? savedActive : parsed[0]);
             loadedFromLocal = true;
           }
         }
@@ -1425,13 +1455,19 @@ export function TaskBoardDashboard() {
       const prefs = await getUserPreferencesClient();
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
         setBuckets(prefs.life_buckets);
-        setActiveBucket(prefs.life_buckets[0]);
+        const prefSaved = prefs.active_bucket as string | undefined;
+        const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+        const initialActive = prefSaved && prefs.life_buckets.includes(prefSaved)
+          ? prefSaved
+          : (localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0]);
+        setActiveBucket(initialActive);
       } else {
         // If no buckets found, set default buckets
         console.log('No buckets found, setting defaults');
         const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
         setBuckets(defaultBuckets);
-        setActiveBucket(defaultBuckets[0]);
+        const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
         
         // Save the default buckets
         if (typeof window !== 'undefined') {
@@ -1451,7 +1487,8 @@ export function TaskBoardDashboard() {
       // Set defaults on error too
       const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
       setBuckets(defaultBuckets);
-      setActiveBucket(defaultBuckets[0]);
+      const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
     }
   }
 

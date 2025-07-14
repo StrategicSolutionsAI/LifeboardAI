@@ -196,8 +196,20 @@ export function WidgetPreview({
           ) : widget.id === 'quit_habit' && widget.quitHabitData ? (
             <div className="mt-1">
               {widget.quitHabitData.habitName && widget.quitHabitData.quitDate ? (
-                <div>
-                  <p className="text-xs font-medium text-gray-700">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs">🚫</span>
+                    <p className="text-xs font-medium text-gray-700">
+                      Quitting {widget.quitHabitData.habitName}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs">📅</span>
+                    <p className="text-xs text-gray-500">
+                      Since {new Date(widget.quitHabitData.quitDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-green-600">
                     {(() => {
                       const quitDate = new Date(widget.quitHabitData.quitDate);
                       const today = new Date();
@@ -205,12 +217,17 @@ export function WidgetPreview({
                       return `${daysSince} days clean`;
                     })()}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Quit {widget.quitHabitData.habitName}
-                  </p>
+                  {widget.quitHabitData.costPerDay && widget.quitHabitData.costPerDay > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs">💰</span>
+                      <p className="text-xs text-gray-500">
+                        Daily savings: {widget.quitHabitData.currency || '$'}{widget.quitHabitData.costPerDay.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">Click to set quit date</p>
+                <p className="text-xs text-gray-500">Click to set up habit tracking</p>
               )}
             </div>
           ) : null}

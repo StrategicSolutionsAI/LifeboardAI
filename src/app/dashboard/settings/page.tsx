@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import { GoogleFitAuthButton } from '@/components/auth/google-fit-auth-button'
 import { signInWithGoogleFit } from '@/app/login/actions'
-import { Settings, Check, AlertCircle, ExternalLink, Palette } from 'lucide-react'
-import { themeColors, ThemeColor } from '@/lib/theme'
+import { Settings, Check, AlertCircle, ExternalLink, Palette, Plus, Trash2 } from 'lucide-react'
+import { themeColors, ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,40 @@ import { SidebarLayout } from '@/components/sidebar-layout'
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const [showCustomColorForm, setShowCustomColorForm] = useState(false)
+  const [customThemeName, setCustomThemeName] = useState('')
+  const [customPrimary, setCustomPrimary] = useState('#5271F8')
+  const [customSecondary, setCustomSecondary] = useState('#7482FE')
+  const [customAccent, setCustomAccent] = useState('#909CFF')
+  const [allThemes, setAllThemes] = useState<ThemeColor[]>(getAllThemes())
+
+  const handleCreateCustomTheme = () => {
+    if (!customThemeName.trim()) return
+    
+    const newTheme = createCustomTheme(
+      customThemeName.trim(),
+      customPrimary,
+      customSecondary,
+      customAccent
+    )
+    
+    saveCustomTheme(newTheme)
+    setTheme(newTheme)
+    setAllThemes(getAllThemes())
+    
+    // Reset form
+    setCustomThemeName('')
+    setCustomPrimary('#5271F8')
+    setCustomSecondary('#7482FE')
+    setCustomAccent('#909CFF')
+    setShowCustomColorForm(false)
+  }
+
+  const handleDeleteCustomTheme = (themeId: string) => {
+    deleteCustomTheme(themeId)
+    setAllThemes(getAllThemes())
+  }
+
   const [integrations, setIntegrations] = useState<Integration[]>([
     {
       id: 'google-fit',
@@ -121,7 +155,7 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 mb-4">Choose a color scheme that matches your style</p>
               
               <div className="grid grid-cols-1 gap-3">
-                {themeColors.map((colorTheme) => (
+                {allThemes.map((colorTheme) => (
                   <button
                     key={colorTheme.id}
                     onClick={() => setTheme(colorTheme)}
@@ -151,21 +185,180 @@ export default function SettingsPage() {
                         </div>
                         
                         <div>
-                          <h4 className="text-[16px] font-medium text-[#171A1F]">{colorTheme.name}</h4>
+                          <h4 className="text-[16px] font-medium text-[#171A1F]">
+                            {colorTheme.name}
+                            {colorTheme.isCustom && (
+                              <span className="ml-2 px-2 py-0.5 text-xs font-medium text-purple-600 bg-purple-100 rounded-full">
+                                Custom
+                              </span>
+                            )}
+                          </h4>
                           <p className="text-[14px] text-[#6B7280]">{colorTheme.description}</p>
                         </div>
                       </div>
                       
-                      {/* Selection indicator */}
-                      {theme.id === colorTheme.id && (
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-primary">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Delete button for custom themes */}
+                        {colorTheme.isCustom && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteCustomTheme(colorTheme.id)
+                            }}
+                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                            title="Delete custom theme"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        {/* Selection indicator */}
+                        {theme.id === colorTheme.id && (
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-primary">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </button>
                 ))}
+                
+                {/* Create Custom Theme Button */}
+                <button
+                  onClick={() => setShowCustomColorForm(!showCustomColorForm)}
+                  className="w-full p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-theme-primary transition-all text-left bg-gray-50 hover:bg-gray-100"
+                >
+                  <div className="flex items-center justify-center gap-2 text-gray-600 hover:text-theme-primary">
+                    <Plus className="w-5 h-5" />
+                    <span className="font-medium">Create Custom Theme</span>
+                  </div>
+                </button>
               </div>
+              
+              {/* Custom Color Form */}
+              {showCustomColorForm && (
+                <div className="mt-6 p-6 bg-gray-50 rounded-lg border">
+                  <h4 className="text-lg font-medium mb-4">Create Custom Theme</h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Theme Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customThemeName}
+                        onChange={(e) => setCustomThemeName(e.target.value)}
+                        placeholder="My Awesome Theme"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Primary Color
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="color"
+                            value={customPrimary}
+                            onChange={(e) => setCustomPrimary(e.target.value)}
+                            className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={customPrimary}
+                            onChange={(e) => setCustomPrimary(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Secondary Color
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="color"
+                            value={customSecondary}
+                            onChange={(e) => setCustomSecondary(e.target.value)}
+                            className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={customSecondary}
+                            onChange={(e) => setCustomSecondary(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Accent Color
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="color"
+                            value={customAccent}
+                            onChange={(e) => setCustomAccent(e.target.value)}
+                            className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={customAccent}
+                            onChange={(e) => setCustomAccent(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Live Preview */}
+                    <div className="mt-4 p-4 bg-white rounded-lg border">
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Preview</h5>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div 
+                          className="px-4 py-2 rounded-full text-white text-sm font-medium"
+                          style={{ backgroundColor: customPrimary }}
+                        >
+                          Primary
+                        </div>
+                        <div 
+                          className="px-4 py-2 rounded-full text-white text-sm font-medium"
+                          style={{ backgroundColor: customSecondary }}
+                        >
+                          Secondary
+                        </div>
+                        <div 
+                          className="px-4 py-2 rounded-full text-white text-sm font-medium"
+                          style={{ backgroundColor: customAccent }}
+                        >
+                          Accent
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={handleCreateCustomTheme}
+                        disabled={!customThemeName.trim()}
+                        className="px-4 py-2 bg-theme-primary text-white rounded-md hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Create Theme
+                      </button>
+                      <button
+                        onClick={() => setShowCustomColorForm(false)}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Preview section */}
               <div className="flex flex-col gap-3 mt-6 p-4 bg-[#F9FAFB] rounded-lg border">
