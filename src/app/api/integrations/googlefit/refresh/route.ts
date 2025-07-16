@@ -2,18 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import {
   refreshGoogleFitToken,
-  fetchGoogleFitSteps,
+  triggerGoogleFitSync,
+  checkGoogleFitDataSources,
   fetchGoogleFitStepsWithRetry,
 } from '@/lib/googlefit/client'
 
-export async function GET(request: NextRequest) {
-  const dateParam = request.nextUrl.searchParams.get('date')
-  const today = new Date()
-  const yyyy = today.getFullYear()
-  const mm = `${today.getMonth() + 1}`.padStart(2, '0')
-  const dd = `${today.getDate()}`.padStart(2, '0')
-  const dateStr = dateParam ?? `${yyyy}-${mm}-${dd}`
-
+export async function POST(request: NextRequest) {
   const supabase = supabaseServer()
   const {
     data: { user },
@@ -41,6 +35,7 @@ export async function GET(request: NextRequest) {
   const refreshToken = integration.refresh_token ?? ''
 
   try {
+    // Refresh token if needed
     const tokenData: any = integration.token_data || {}
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
@@ -59,20 +54,31 @@ export async function GET(request: NextRequest) {
           .eq('id', integration.id)
       }
     }
-  } catch (e) {
-    console.error('Error refreshing Google Fit token', e)
-  }
 
-  try {
-    // Use the improved retry mechanism for better data accuracy
-    const steps = await fetchGoogleFitStepsWithRetry(accessToken, dateStr)
-    return NextResponse.json({ steps })
+    // Try to trigger sync
+    const syncTriggered = await triggerGoogleFitSync(accessToken)
+    
+    // Check data sources
+    const dataSources = await checkGoogleFitDataSources(accessToken)
+    
+    // Get current steps with retry
+    const today = new Date().toISOString().split('T')[0]
+    const steps = await fetchGoogleFitStepsWithRetry(accessToken, today)
+
+    return NextResponse.json({
+      success: true,
+      syncTriggered,
+      steps,
+      dataSources: dataSources.length,
+      message: syncTriggered 
+        ? 'Data refresh attempted successfully' 
+        : 'Refresh attempted but sync trigger failed'
+    })
   } catch (e: any) {
-    console.error('Google Fit steps fetch failed', e)
-    const isRateLimited = /429/.test(e.message ?? '')
+    console.error('Google Fit refresh failed', e)
     return NextResponse.json(
       { error: e.message },
-      { status: isRateLimited ? 429 : 500 },
+      { status: 500 },
     )
   }
 }

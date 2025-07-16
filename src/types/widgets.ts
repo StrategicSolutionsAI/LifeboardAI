@@ -84,4 +84,19 @@ export interface WidgetInstance extends WidgetTemplate {
     }>;
     motivationalNote?: string;  // personal motivation/reason for quitting
   };
+  // Weight tracking data
+  weightData?: {
+    currentWeight?: number;       // current weight value
+    startingWeight?: number;      // weight when starting tracking
+    goalWeight?: number;          // target weight goal
+    unit?: string;               // 'lbs' or 'kg'
+    entries?: Array<{            // historical weight entries
+      date: string;              // ISO date string (YYYY-MM-DD)
+      weight: number;            // weight value
+      note?: string;             // optional note about the entry
+    }>;
+    lastEntryDate?: string;      // ISO date string of last entry
+    totalChange?: number;        // total weight change from starting weight
+    goalProgress?: number;       // percentage toward goal (0-100)
+  };
 } 

@@ -58,7 +58,8 @@ Key directories:
 - Code takes into account different environments: dev, test, and prod
 
 ## Development Workflow
-- After completing code changes, always refresh the server
+- After completing ANY task, ALWAYS restart the server
+- MANDATORY: Kill and restart server after every completed task
 - Preferred refresh method: Kill any existing servers and start a new one
   ```bash
   # Kill any running Next.js processes
@@ -71,3 +72,4 @@ Key directories:
   touch next.config.js
   ```
 - Always verify server has restarted and changes are visible
+- This must happen automatically after every task completion

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { GoogleFitAuthButton } from '@/components/auth/google-fit-auth-button'
 import { signInWithGoogleFit } from '@/app/login/actions'
 import { Settings, Check, AlertCircle, ExternalLink, Palette, Plus, Trash2 } from 'lucide-react'
@@ -20,6 +20,9 @@ type Integration = {
 import { SidebarLayout } from '@/components/sidebar-layout'
 
 export default function SettingsPage() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
   const { theme, setTheme } = useTheme()
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
   const [customThemeName, setCustomThemeName] = useState('')
@@ -81,6 +84,18 @@ export default function SettingsPage() {
       action: () => console.log('Connect Google Calendar')
     },
     {
+      id: 'withings',
+      name: 'Withings Smart Scale',
+      description: 'Sync your latest weight measurements',
+      icon: <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+        <svg className="w-6 h-6 text-orange-600" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M3 3h18v18H3V3zm2 2v14h14V5H5zm7 1a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 8z" />
+        </svg>
+      </div>,
+      connected: false,
+      action: () => { window.location.href = '/api/auth/withings?redirectUrl=/dashboard/settings' }
+    },
+    {
       id: 'slack',
       name: 'Slack',
       description: 'Get notifications and manage tasks from Slack',
@@ -93,6 +108,11 @@ export default function SettingsPage() {
       action: () => console.log('Connect Slack')
     }
   ])
+
+  // Avoid hydration mismatch – don't render UI until mounted on client
+  if (!mounted) {
+    return null
+  }
 
   const handleConnect = (integrationId: string) => {
     const integration = integrations.find((i: Integration) => i.id === integrationId)
@@ -156,11 +176,14 @@ export default function SettingsPage() {
               
               <div className="grid grid-cols-1 gap-3">
                 {allThemes.map((colorTheme) => (
-                  <button
+                  <div
                     key={colorTheme.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setTheme(colorTheme)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setTheme(colorTheme) } }}
                     className={cn(
-                      "w-full p-4 rounded-lg border-2 transition-all text-left",
+                      "w-full p-4 rounded-lg border-2 transition-all text-left cursor-pointer",
                       theme.id === colorTheme.id
                         ? "border-theme-primary bg-theme-primary bg-opacity-10"
                         : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
@@ -220,7 +243,7 @@ export default function SettingsPage() {
                         )}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
                 
                 {/* Create Custom Theme Button */}
@@ -262,12 +285,14 @@ export default function SettingsPage() {
                         <div className="flex gap-2 items-center">
                           <input
                             type="color"
+                            title="Choose primary color"
                             value={customPrimary}
                             onChange={(e) => setCustomPrimary(e.target.value)}
                             className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
                           />
                           <input
                             type="text"
+                            placeholder="#5271F8"
                             value={customPrimary}
                             onChange={(e) => setCustomPrimary(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
@@ -282,12 +307,14 @@ export default function SettingsPage() {
                         <div className="flex gap-2 items-center">
                           <input
                             type="color"
+                            title="Choose secondary color"
                             value={customSecondary}
                             onChange={(e) => setCustomSecondary(e.target.value)}
                             className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
                           />
                           <input
                             type="text"
+                            placeholder="#7482FE"
                             value={customSecondary}
                             onChange={(e) => setCustomSecondary(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
@@ -302,12 +329,14 @@ export default function SettingsPage() {
                         <div className="flex gap-2 items-center">
                           <input
                             type="color"
+                            title="Choose accent color"
                             value={customAccent}
                             onChange={(e) => setCustomAccent(e.target.value)}
                             className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
                           />
                           <input
                             type="text"
+                            placeholder="#909CFF"
                             value={customAccent}
                             onChange={(e) => setCustomAccent(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"

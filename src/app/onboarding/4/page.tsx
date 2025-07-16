@@ -56,6 +56,12 @@ const integrations: Integration[] = [
     icon: "📱" 
   },
   { 
+    id: "withings", 
+    name: "Withings Smart Scale", 
+    description: "Sync weight and body composition data from your Withings account", 
+    icon: "⚖️" 
+  },
+  { 
     id: "todoist", 
     name: "Todoist", 
     description: "Sync tasks from your Todoist account", 
@@ -71,6 +77,7 @@ export default function OnboardingStep4() {
   const [connectingFitbit, setConnectingFitbit] = useState(false)
   const [connectingGoogleFit, setConnectingGoogleFit] = useState(false)
   const [connectingTodoist, setConnectingTodoist] = useState(false)
+  const [connectingWithings, setConnectingWithings] = useState(false)
   
   const connectGoogleCalendar = async () => {
     setConnectingGoogle(true)
@@ -104,6 +111,16 @@ export default function OnboardingStep4() {
     }
   }
 
+  const connectWithings = async () => {
+    setConnectingWithings(true)
+    try {
+      window.location.href = '/api/auth/withings?redirectUrl=/onboarding/4'
+    } catch (error) {
+      console.error('Error connecting to Withings:', error)
+      setConnectingWithings(false)
+    }
+  }
+
   const connectTodoist = async () => {
     setConnectingTodoist(true)
     try {
@@ -133,6 +150,11 @@ export default function OnboardingStep4() {
     // For Google Fit, start OAuth
     if (integrationId === 'google-fit') {
       connectGoogleFit()
+      return
+    }
+    // For Withings, start OAuth
+    if (integrationId === 'withings') {
+      connectWithings()
       return
     }
     // For Todoist, start OAuth
@@ -215,6 +237,8 @@ export default function OnboardingStep4() {
                   ) : integration.id === 'fitbit' && connectingFitbit ? (
                     <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
                   ) : integration.id === 'google-fit' && connectingGoogleFit ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
+                  ) : integration.id === 'withings' && connectingWithings ? (
                     <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
                   ) : integration.id === 'todoist' && connectingTodoist ? (
                     <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />

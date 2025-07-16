@@ -52,6 +52,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
+  const [isWithingsConnected, setIsWithingsConnected] = useState(false);
 
   // Check if Fitbit or Google Fit is connected
   useEffect(() => {
@@ -66,6 +67,11 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
         const gfRes = await fetch('/api/integrations/status?provider=googlefit');
         const gfData = await gfRes.json();
         setIsGoogleFitConnected(gfData.connected);
+
+        // Withings
+        const wRes = await fetch('/api/integrations/status?provider=withings');
+        const wData = await wRes.json();
+        setIsWithingsConnected(wData.connected);
       } catch (error) {
         console.error('Error checking integration connections:', error);
       }
@@ -562,35 +568,267 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
                     )}
                   </div>
                   
-                  <div className="border-t pt-3">
-                    <p className="text-xs font-medium text-gray-600 mb-2">Reset Options</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const today = new Date().toISOString().split('T')[0];
-                        const confirmed = window.confirm('Reset your quit date to today? This will start your counter over.');
-                        if (confirmed) {
+                  <div className="border-t pt-3 space-y-3">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">Daily Check-in</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          const quitDate = new Date(draft.quitHabitData?.quitDate || '');
+                          const daysSince = Math.floor((new Date().getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                          
+                          // Add check-in milestone
                           setDraft(p => p ? {
                             ...p,
                             quitHabitData: {
                               ...p.quitHabitData,
-                              quitDate: today,
-                              relapses: [
-                                ...(p.quitHabitData?.relapses || []),
+                              milestones: [
+                                ...(p.quitHabitData?.milestones || []),
                                 {
-                                  date: today,
-                                  note: 'Reset from widget editor'
+                                  days: daysSince,
+                                  label: `Day ${daysSince} Check-in`,
+                                  achieved: true,
+                                  achievedDate: today
                                 }
                               ]
                             }
                           } : p);
-                        }
-                      }}
-                      className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors"
-                    >
-                      🔄 Reset to Today
-                    </button>
-                    <p className="text-xs text-gray-400 mt-1">Use if you had a setback and want to start fresh</p>
+                          
+                          // Show success message
+                          alert(`✅ Great job! You've successfully stayed clean for ${daysSince} days. Keep it up!`);
+                        }}
+                        className="text-xs px-4 py-2 bg-green-100 text-green-700 rounded border border-green-200 hover:bg-green-200 transition-colors font-medium"
+                      >
+                        ✅ Check In for Today
+                      </button>
+                      <p className="text-xs text-gray-400 mt-1">Mark your progress for today and celebrate your commitment</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">Reset Options</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          const confirmed = window.confirm('Reset your quit date to today? This will start your counter over.');
+                          if (confirmed) {
+                            setDraft(p => p ? {
+                              ...p,
+                              quitHabitData: {
+                                ...p.quitHabitData,
+                                quitDate: today,
+                                relapses: [
+                                  ...(p.quitHabitData?.relapses || []),
+                                  {
+                                    date: today,
+                                    note: 'Reset from widget editor'
+                                  }
+                                ]
+                              }
+                            } : p);
+                          }
+                        }}
+                        className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors"
+                      >
+                        🔄 Reset to Today
+                      </button>
+                      <p className="text-xs text-gray-400 mt-1">Use if you had a setback and want to start fresh</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : draft.id === 'weight' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Current Weight</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={draft.weightData?.currentWeight || ''}
+                    disabled={draft.dataSource === 'withings'}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      weightData: {
+                        ...p.weightData,
+                        currentWeight: parseFloat(e.target.value) || 0,
+                        unit: p.weightData?.unit || draft.unit || 'lbs'
+                      }
+                    } : p)}
+                    placeholder="Enter current weight"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                  <select 
+                    value={draft.weightData?.unit || draft.unit || 'lbs'}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      unit: e.target.value,
+                      weightData: {
+                        ...p.weightData,
+                        unit: e.target.value
+                      }
+                    } : p)}
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm w-20"
+                  >
+                    <option value="lbs">lbs</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Starting Weight (Optional)</p>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={draft.weightData?.startingWeight || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    weightData: {
+                      ...p.weightData,
+                      startingWeight: parseFloat(e.target.value) || 0
+                    }
+                  } : p)}
+                  placeholder="Starting weight for progress tracking"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600">Goal Weight (Optional)</p>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={draft.weightData?.goalWeight || ''}
+                  onChange={e => setDraft(p => p ? {
+                    ...p,
+                    weightData: {
+                      ...p.weightData,
+                      goalWeight: parseFloat(e.target.value) || 0
+                    }
+                  } : p)}
+                  placeholder="Target weight goal"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+
+              {/* Data Source Selector */}
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium text-gray-600">Data Source</p>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="weightDataSource"
+                      value="manual"
+                      checked={draft.dataSource === 'manual' || !draft.dataSource}
+                      onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
+                    />
+                    <span className="text-xs">Manual</span>
+                  </label>
+                  {isWithingsConnected && (
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="weightDataSource"
+                        value="withings"
+                        checked={draft.dataSource === 'withings'}
+                        onChange={() => setDraft(prev => prev ? { ...prev, dataSource: 'withings' } : prev)}
+                      />
+                      <span className="text-xs">Withings (Automatic)</span>
+                    </label>
+                  )}
+                  {!isWithingsConnected && (
+                    <p className="text-[10px] text-gray-400 ml-5">Connect Withings to enable automatic sync</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Log Entry */}
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium text-gray-600">Quick Log Entry</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="Weight"
+                    disabled={draft.dataSource === 'withings'}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    id="quick-weight-input"
+                  />
+                  <button
+                    type="button"
+                    disabled={draft.dataSource === 'withings'}
+                    onClick={() => {
+                      const input = document.getElementById('quick-weight-input') as HTMLInputElement;
+                      const weight = parseFloat(input.value);
+                      if (weight > 0) {
+                        const today = new Date().toISOString().split('T')[0];
+                        setDraft(p => p ? {
+                          ...p,
+                          weightData: {
+                            ...p.weightData,
+                            currentWeight: weight,
+                            entries: [
+                              ...(p.weightData?.entries || []),
+                              {
+                                date: today,
+                                weight: weight,
+                                note: 'Quick log entry'
+                              }
+                            ],
+                            lastEntryDate: today
+                          }
+                        } : p);
+                        input.value = '';
+                        alert(`Weight logged: ${weight} ${draft.weightData?.unit || draft.unit || 'lbs'}`);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-md text-sm border border-blue-200 hover:bg-blue-200 transition-colors"
+                  >
+                    Log
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400">Enter today's weight measurement</p>
+              </div>
+
+              {/* Weight Progress Display */}
+              {draft.weightData && (draft.weightData.currentWeight || draft.weightData.entries?.length) && (
+                <div className="space-y-3 border-t pt-3">
+                  <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                    <div className="font-medium mb-1">Weight Tracking Preview:</div>
+                    
+                    {draft.weightData.currentWeight && (
+                      <div>📊 Current: {draft.weightData.currentWeight} {draft.weightData.unit || draft.unit || 'lbs'}</div>
+                    )}
+                    
+                    {draft.weightData.startingWeight && draft.weightData.currentWeight && (
+                      <div className={
+                        draft.weightData.currentWeight < draft.weightData.startingWeight 
+                          ? "text-green-600" 
+                          : draft.weightData.currentWeight > draft.weightData.startingWeight 
+                          ? "text-orange-600" 
+                          : "text-gray-600"
+                      }>
+                        📈 Change: {(draft.weightData.currentWeight - draft.weightData.startingWeight > 0 ? '+' : '')}{(draft.weightData.currentWeight - draft.weightData.startingWeight).toFixed(1)} {draft.weightData.unit || draft.unit || 'lbs'}
+                      </div>
+                    )}
+                    
+                    {draft.weightData.goalWeight && draft.weightData.currentWeight && (
+                      <div className="text-blue-600">
+                        🎯 To Goal: {(draft.weightData.goalWeight - draft.weightData.currentWeight > 0 ? '+' : '')}{(draft.weightData.goalWeight - draft.weightData.currentWeight).toFixed(1)} {draft.weightData.unit || draft.unit || 'lbs'}
+                      </div>
+                    )}
+                    
+                    {draft.weightData.entries && draft.weightData.entries.length > 0 && (
+                      <div>📅 Entries: {draft.weightData.entries.length} logged</div>
+                    )}
                   </div>
                 </div>
               )}

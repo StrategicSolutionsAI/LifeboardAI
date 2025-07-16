@@ -60,7 +60,7 @@ const WidgetCard = memo(({
             )}
           </div>
           {/* Progress Bar - only for numeric target widgets */}
-          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(widget.id) && (
+          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'weight'].includes(widget.id) && (
             <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full transition-all duration-300 ${
@@ -76,7 +76,7 @@ const WidgetCard = memo(({
           )}
         </div>
         <div className="flex gap-1">
-          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(widget.id) && (
+          {!['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight'].includes(widget.id) && (
             <Button
               size="icon"
               variant="ghost"
@@ -95,6 +95,20 @@ const WidgetCard = memo(({
               ) : (
                 <Plus className="h-4 w-4" />
               )}
+            </Button>
+          )}
+          {widget.id === 'weight' && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                onIncrement() // This will trigger the weight logging through handleIncrementProgress
+              }}
+              className="h-8 w-8 hover:bg-purple-50 hover:text-purple-600 border border-purple-200"
+              title="Log weight entry"
+            >
+              <div className="text-sm font-bold text-purple-600">📝</div>
             </Button>
           )}
           <Button
@@ -256,6 +270,82 @@ const WidgetCard = memo(({
           ) : (
             <div className="text-center text-xs text-gray-500">
               Click to set up habit tracking
+            </div>
+          )}
+        </div>
+      ) : widget.id === 'weight' ? (
+        <div className="flex-1 flex flex-col justify-center p-3">
+          {widget.weightData?.currentWeight ? (
+            <div className="space-y-3">
+              {/* Header with icon */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-sm">⚖️</span>
+                <span className="font-medium text-gray-700">Weight Tracking</span>
+              </div>
+              
+              {/* Current weight - main display */}
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-purple-600">
+                  {widget.weightData.currentWeight}
+                </span>
+                <span className="text-sm text-purple-600 font-medium">
+                  {widget.weightData.unit || widget.unit || 'lbs'}
+                </span>
+                {progress.isToday && progress.value >= widget.target ? (
+                  <span className="text-purple-500 text-sm ml-1" title="Logged today">✓</span>
+                ) : null}
+              </div>
+
+              {/* Progress from starting weight */}
+              {widget.weightData.startingWeight && widget.weightData.currentWeight !== widget.weightData.startingWeight && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-sm">📈</span>
+                  <span className={
+                    widget.weightData.currentWeight < widget.weightData.startingWeight 
+                      ? "text-green-600 font-medium" 
+                      : "text-orange-600 font-medium"
+                  }>
+                    {widget.weightData.currentWeight < widget.weightData.startingWeight ? 'Lost' : 'Gained'}: {Math.abs(widget.weightData.currentWeight - widget.weightData.startingWeight).toFixed(1)} {widget.weightData.unit || widget.unit || 'lbs'}
+                  </span>
+                </div>
+              )}
+
+              {/* Goal progress */}
+              {widget.weightData.goalWeight && (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="text-sm">🎯</span>
+                  <span>
+                    Goal: {widget.weightData.goalWeight} {widget.weightData.unit || widget.unit || 'lbs'}
+                    {widget.weightData.currentWeight && (
+                      <span className="text-blue-600 ml-1">
+                        ({Math.abs(widget.weightData.goalWeight - widget.weightData.currentWeight).toFixed(1)} to go)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              {/* Last entry info */}
+              {widget.weightData.lastEntryDate && (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className="text-sm">📅</span>
+                  <span>Last logged: {new Date(widget.weightData.lastEntryDate).toLocaleDateString()}</span>
+                </div>
+              )}
+
+              {/* Entries count */}
+              {widget.weightData.entries && widget.weightData.entries.length > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-sm">📊</span>
+                  <span className="text-gray-600">
+                    {widget.weightData.entries.length} entries logged
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-xs text-gray-500">
+              Click to set up weight tracking
             </div>
           )}
         </div>
@@ -491,6 +581,16 @@ export function OptimizedTaskboard() {
             { days: 90, label: '3 Months', achieved: false },
             { days: 365, label: '1 Year', achieved: false }
           ], motivationalNote: '' } }),
+          ...(widgetOrTemplate.id === 'weight' && { weightData: { 
+            currentWeight: undefined, 
+            startingWeight: undefined, 
+            goalWeight: undefined, 
+            unit: widgetOrTemplate.unit || 'lbs', 
+            entries: [], 
+            lastEntryDate: '', 
+            totalChange: 0, 
+            goalProgress: 0 
+          } }),
         }
     
     addWidget(activeBucket, newInstance)
@@ -509,12 +609,44 @@ export function OptimizedTaskboard() {
       // For quit habit widgets, the "check-in" just confirms they're still clean
       // We'll set progress to 1 to indicate they checked in today
       updateProgress(widget.instanceId, 1)
+    } else if (widget.id === 'weight') {
+      // For weight widgets, we need to update the weightData, not just progress
+      const weight = prompt(`Enter today's weight (${widget.weightData?.unit || widget.unit || 'lbs'}):`);
+      if (weight && !isNaN(parseFloat(weight))) {
+        const today = new Date().toISOString().split('T')[0];
+        const newWeight = parseFloat(weight);
+        
+        const updatedWeightData = {
+          ...widget.weightData,
+          currentWeight: newWeight,
+          entries: [
+            ...(widget.weightData?.entries || []),
+            {
+              date: today,
+              weight: newWeight,
+              note: 'Quick log from widget'
+            }
+          ],
+          lastEntryDate: today,
+          unit: widget.weightData?.unit || widget.unit || 'lbs'
+        };
+        
+        // Update the widget with new weight data
+        updateWidget(activeBucket, widget.instanceId, {
+          weightData: updatedWeightData
+        });
+        
+        // Also update progress to mark as logged today
+        updateProgress(widget.instanceId, 1);
+        
+        alert(`✅ Weight logged: ${weight} ${widget.weightData?.unit || widget.unit || 'lbs'}`);
+      }
     } else {
       // Use increment if available in widget data, otherwise default to 1
       const incrementValue = (widget as any).increment || 1
       updateProgress(widget.instanceId, incrementValue)
     }
-  }, [updateProgress])
+  }, [updateProgress, updateWidget, activeBucket])
   
   // Calendar helpers
   const today = new Date()

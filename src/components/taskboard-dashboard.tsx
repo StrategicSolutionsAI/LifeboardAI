@@ -331,10 +331,14 @@ export function TaskBoardDashboard() {
 
   // Google Fit data state
   const [googleFitData, setGoogleFitData] = useState<Record<string, number>>(()=>{
-    if (typeof window !== 'undefined'){
-      try{ const stored=localStorage.getItem('googlefit_metrics'); if(stored) return JSON.parse(stored);}catch(e){}
-    }
-    return {};
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('googlefit_metrics') : null;
+    return stored ? JSON.parse(stored) : {};
+  });
+
+  // Withings weight (kg)
+  const [withingsData, setWithingsData] = useState<{ weightKg: number | null }>(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('withings_metrics') : null;
+    return stored ? JSON.parse(stored) : { weightKg: null };
   });
 
   const [isLoadingFitbit, setIsLoadingFitbit] = useState(false);
@@ -598,6 +602,57 @@ export function TaskBoardDashboard() {
           } catch (errFitbitProgress) {
             console.error("Failed to update Fitbit widget progress", errFitbitProgress);
           }
+        }
+      }
+
+      // -----------------------------------------------------------
+      // 3) Refresh Withings weight if weight widgets use Withings
+      // -----------------------------------------------------------
+      const needWithings = Object.values(widgetsByBucketRef.current)
+        .flat()
+        .some((w) => w.id === 'weight' && w.dataSource === 'withings');
+
+      if (needWithings) {
+        try {
+          const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`);
+          if (resW.ok) {
+            const dataW = await resW.json();
+            const kg = dataW.weightKg;
+            if (kg !== undefined && kg !== null) {
+              setWithingsData({ weightKg: kg });
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('withings_metrics', JSON.stringify({ weightKg: kg, savedAt: Date.now() }));
+              }
+
+              // Update widgets in memory
+              setWidgetsByBucket((prev) => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach((bucket) => {
+                  updated[bucket] = updated[bucket].map((w) => {
+                    if (w.id === 'weight' && w.dataSource === 'withings') {
+                      const unit = w.weightData?.unit || w.unit || 'lbs';
+                      const val = unit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
+                      return {
+                        ...w,
+                        weightData: {
+                          ...w.weightData,
+                          currentWeight: val,
+                          lastEntryDate: new Date().toISOString().split('T')[0],
+                          unit,
+                        },
+                      } as typeof w;
+                    }
+                    return w;
+                  });
+                });
+                return updated;
+              });
+            }
+          } else {
+            console.error('Failed to fetch Withings metrics');
+          }
+        } catch (errW) {
+          console.error('Error fetching Withings metrics', errW);
         }
       }
     } catch (err) {
@@ -1923,49 +1978,33 @@ export function TaskBoardDashboard() {
   
   // Automatically save hourly plan whenever it changes
   useEffect(() => {
-    // Skip initial render
-    const saveChanges = async () => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const localStorageKey = 'lifeboard_hourly_plan';
+
+    // 1) Persist immediately to localStorage so we never lose data on fast refreshes
+    try {
+      const existingData = localStorage.getItem(localStorageKey);
+      const existingPlans = existingData ? JSON.parse(existingData) : {};
+      const updatedPlans = { ...existingPlans, [dateKey]: hourlyPlan };
+      localStorage.setItem(localStorageKey, JSON.stringify(updatedPlans));
+    } catch (lsErr) {
+      console.error('Failed saving hourly plan to localStorage:', lsErr);
+    }
+
+    // 2) Debounce the Supabase save so we don't spam the database while the user drags tasks around
+    const supabaseDebounce = setTimeout(async () => {
       try {
-        // Save to localStorage as fallback/temporary solution
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const localStorageKey = 'lifeboard_hourly_plan';
-        
-        // Get existing data from localStorage
-        const existingData = localStorage.getItem(localStorageKey);
-        const existingPlans = existingData ? JSON.parse(existingData) : {};
-        
-        // Update with new data
-        const updatedPlans = {
-          ...existingPlans,
-          [dateKey]: hourlyPlan
-        };
-        
-        // Save to localStorage
-        localStorage.setItem(localStorageKey, JSON.stringify(updatedPlans));
-        
-        // Try to save to Supabase if possible
-        try {
-          const prefs = await getUserPreferencesClient();
-          if (prefs) {
-            await saveUserPreferences({
-              ...prefs,
-              hourly_plan: updatedPlans
-            });
-          }
-        } catch (supabaseError) {
-          console.warn('Could not save hourly plan to Supabase (schema may need updating):', supabaseError);
-          console.log('Hourly plan saved to localStorage as fallback');
+        const prefs = await getUserPreferencesClient();
+        if (prefs) {
+          await saveUserPreferences({ ...prefs, hourly_plan: JSON.parse(localStorage.getItem(localStorageKey) || '{}') });
+          console.log('✅ Hourly plan synced to Supabase');
         }
-        
-        console.log('✅ Hourly plan saved');
-      } catch (error) {
-        console.error('Failed to save hourly plan:', error);
+      } catch (sbErr) {
+        console.warn('Could not save hourly plan to Supabase (schema may need updating):', sbErr);
       }
-    };
-    
-    // Use a debounced save to avoid too many operations
-    const timeoutId = setTimeout(saveChanges, 500);
-    return () => clearTimeout(timeoutId);
+    }, 1000);
+
+    return () => clearTimeout(supabaseDebounce);
   }, [hourlyPlan, selectedDate]);
   
   // Load hourly plan for the selected date
@@ -2424,8 +2463,10 @@ export function TaskBoardDashboard() {
                             <span className="text-sm font-medium truncate">{w.eventData.eventName}</span>
                           ) : w.id === 'holidays' && w.holidayData && w.holidayData.holidayName ? (
                             <span className="text-sm font-medium truncate">{w.holidayData.holidayName}</span>
-                          ) : (
-                            <span className="text-sm font-medium truncate">{w.name}</span>
+                          ) : w.id === 'quit_habit' && w.quitHabitData && w.quitHabitData.habitName ? (
+                             <span className="text-sm font-medium truncate">{w.quitHabitData.habitName}</span>
+                           ) : (
+                             <span className="text-sm font-medium truncate">{w.name}</span>
                           )}
                         </div>
 
@@ -2652,6 +2693,66 @@ export function TaskBoardDashboard() {
                             }
                           }
                           
+                          // Special handling for quit habit tracker widget
+                          if (w.id === 'quit_habit') {
+                            if (w.quitHabitData && w.quitHabitData.habitName && w.quitHabitData.quitDate) {
+                              const quitDate = new Date(w.quitHabitData.quitDate);
+                              const today = new Date();
+                              const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                              const milestones = [
+                                { days: 1, emoji: '🌟', label: 'First Day!' },
+                                { days: 3, emoji: '💪', label: '3 Days!' },
+                                { days: 7, emoji: '🎉', label: 'One Week!' },
+                                { days: 14, emoji: '⭐', label: 'Two Weeks!' },
+                                { days: 30, emoji: '🏆', label: 'One Month!' },
+                                { days: 90, emoji: '🎊', label: '3 Months!' },
+                                { days: 365, emoji: '👑', label: 'One Year!' }
+                              ];
+                              const achieved = milestones.filter(m => daysSince >= m.days);
+                              const latestMilestone = achieved.length ? achieved[achieved.length - 1] : null;
+
+                              return (
+                                <div className="mt-3 space-y-2">
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-sm">🚫</span>
+                                    <span className="font-medium text-gray-700">
+                                      Quitting {w.quitHabitData.habitName}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                                    <span className="text-sm">📅</span>
+                                    <span>Since {quitDate.toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="text-2xl font-bold text-green-600">{daysSince}</span>
+                                    <span className="text-sm text-green-600 font-medium">days clean</span>
+                                  </div>
+                                  {w.quitHabitData.costPerDay && w.quitHabitData.costPerDay > 0 && (
+                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                      <span className="text-sm">💰</span>
+                                      <span>
+                                        Daily savings: {w.quitHabitData.currency || '$'}{w.quitHabitData.costPerDay.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {latestMilestone && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-sm">{latestMilestone.emoji}</span>
+                                      <span className="text-amber-600 font-medium">{latestMilestone.label}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3 text-xs text-gray-500 text-center">
+                                  Click to set up habit tracking
+                                </div>
+                              );
+                            }
+                          }
+
                           // Special handling for gratitude journal widget
                           if (w.id === 'gratitude') {
                             const today = new Date().toISOString().split('T')[0];
@@ -2707,6 +2808,51 @@ export function TaskBoardDashboard() {
                             }
                           }
                           
+                          // Special handling for weight tracking widget
+                          if (w.id === 'weight') {
+                            if (w.weightData && w.weightData.currentWeight !== undefined) {
+                              return (
+                                <div className="mt-3 space-y-1">
+                                  {/* Current weight */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs">⚖️</span>
+                                    <p className="text-xs font-medium text-gray-700">Current Weight</p>
+                                  </div>
+                                  <p className="text-lg font-bold text-purple-600">
+                                    {w.weightData.currentWeight} {w.weightData.unit || w.unit || 'lbs'}
+                                  </p>
+
+                                  {/* Change from starting weight */}
+                                  {w.weightData.startingWeight !== undefined && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs">📈</span>
+                                      <p
+                                        className={`text-xs ${w.weightData.currentWeight < w.weightData.startingWeight ? 'text-green-600' : w.weightData.currentWeight > w.weightData.startingWeight ? 'text-orange-600' : 'text-gray-600'}`}
+                                      >
+                                        {w.weightData.currentWeight < w.weightData.startingWeight ? 'Lost' : w.weightData.currentWeight > w.weightData.startingWeight ? 'Gained' : 'No change'}: {Math.abs(w.weightData.currentWeight - w.weightData.startingWeight).toFixed(1)} {w.weightData.unit || w.unit || 'lbs'}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Goal weight */}
+                                  {w.weightData.goalWeight !== undefined && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs">🎯</span>
+                                      <p className="text-xs text-blue-600">
+                                        Goal: {w.weightData.goalWeight} {w.weightData.unit || w.unit || 'lbs'}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="mt-3 text-xs text-gray-500 text-center">
+                                Click to set up weight tracking
+                              </div>
+                            );
+                          }
+
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
@@ -2728,7 +2874,7 @@ export function TaskBoardDashboard() {
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude'].includes(w.id) && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight'].includes(w.id) && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
