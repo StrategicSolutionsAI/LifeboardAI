@@ -614,7 +614,7 @@ export function TaskBoardDashboard() {
 
       if (needWithings) {
         try {
-          const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`);
+          const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`, { credentials: 'include' });
           if (resW.ok) {
             const dataW = await resW.json();
             const kg = dataW.weightKg;

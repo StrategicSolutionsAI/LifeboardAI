@@ -86,39 +86,62 @@ export async function refreshWithingsToken(refreshToken: string) {
 // Fetch latest (most recent) weight measurement in kilograms
 export async function fetchWithingsLatestWeight(accessToken: string) {
   const nowSec = Math.floor(Date.now() / 1000)
+  // Add 24 hours to end date to ensure we capture today's measurements regardless of timezone
+  const endDateSec = nowSec + (24 * 60 * 60)
   // Fetch last 7 days to ensure at least one measurement
   const params = new URLSearchParams({
     action: 'getmeas',
     meastype: '1', // weight
     category: '1',
     startdate: (nowSec - 7 * 24 * 60 * 60).toString(),
-    enddate: nowSec.toString(),
+    enddate: endDateSec.toString(),
   })
 
-  const response = await fetch(`https://wbsapi.withings.net/measure?${params.toString()}`, {
+  const response = await fetch(`https://wbsapi.withings.net/measure?${params}`, {
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      'Authorization': `Bearer ${accessToken}`,
     },
   })
 
   if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Withings weight fetch failed: ${response.status} ${text}`)
+    throw new Error(`Withings API error: ${response.status}`)
   }
 
   const data = await response.json()
-  if (data.status !== 0) {
-    throw new Error(`Withings API returned error status ${data.status}`)
+  
+  // Debug logging to see what measurements we're getting
+  console.log('Withings API response:', JSON.stringify(data, null, 2))
+  
+  if (data.status !== 0 || !data.body?.measuregrps) {
+    throw new Error('No weight measurements found')
   }
 
-  // data.body.measuregrps is an array, sorted ascending by date.
-  const groups = data.body?.measuregrps ?? []
-  if (!groups.length) return null
+  const groups = data.body.measuregrps
+  console.log(`Found ${groups.length} measurement groups`)
+  
+  // Log each measurement group with its date
+  groups.forEach((group: any, index: number) => {
+    const date = new Date(group.date * 1000)
+    console.log(`Group ${index}: Date ${date.toISOString()}, Measures:`, group.measures)
+  })
 
-  const latest = groups[groups.length - 1]
-  // Each group has measures array with value and unit (10^unit)
-  const weightMeasure = latest.measures?.find((m: any) => m.type === 1)
-  if (!weightMeasure) return null
+  // Sort groups by date to ensure we get the most recent (groups may not be pre-sorted)
+  const sortedGroups = groups.sort((a: any, b: any) => a.date - b.date)
+  
+  // Take the last group (most recent)
+  const latestGroup = sortedGroups[sortedGroups.length - 1]
+  const latestDate = new Date(latestGroup.date * 1000)
+  console.log(`Using latest group from: ${latestDate.toISOString()}`)
+  
+  // Find the weight measurement (type 1) in the latest group
+  const weightMeasure = latestGroup.measures.find((m: any) => m.type === 1)
+  if (!weightMeasure) {
+    throw new Error('No weight measurement in latest group')
+  }
+
+  // Convert from Withings format (value * 10^unit) to kg
   const weightKg = weightMeasure.value * Math.pow(10, weightMeasure.unit)
+  console.log(`Calculated weight: ${weightKg} kg`)
+  
   return weightKg
 } 

@@ -51,7 +51,9 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
 
           if (hasWithingsIntegration) {
             try {
-              const res = await fetch('/api/integrations/withings/metrics');
+              const res = await fetch('/api/integrations/withings/metrics', {
+            credentials: 'include',
+          });
               if (res.ok) {
                 const json = await res.json();
                 if (json.weightKg !== undefined && json.weightKg !== null) {
@@ -144,7 +146,7 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
                       onClick={() => {
                         // Force refresh weight
                         setWithingsWeight(null);
-                        fetch('/api/integrations/withings/metrics').then(async (res) => {
+                        fetch('/api/integrations/withings/metrics', { credentials: 'include' }).then(async (res) => {
                           if (res.ok) {
                             const json = await res.json();
                             if (json.weightKg !== undefined && json.weightKg !== null) {

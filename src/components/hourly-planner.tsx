@@ -1,0 +1,201 @@
+"use client";
+
+// Stand-alone hourly planner component reused by TaskSidePanel and Calendar Day view
+// -----------------------------------------------------------------------------
+// NOTE: For the initial extraction we only replicate the UI skeleton and resize /
+// drag-resize behaviour. Drag-and-drop between external lists will be wired up in
+// a follow-up step once IntegratedCalendar needs that capability.
+
+import React, { useMemo, useRef, useState, useEffect } from "react";
+import { useTasksContext } from "@/contexts/tasks-context";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
+
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
+interface PlannerItem {
+  /** Unique identifier */
+  id: string;
+  /** Display title */
+  content: string;
+  /** Duration in minutes (15-min increments, min 15) */
+  duration?: number;
+}
+
+// -----------------------------------------------------------------------------
+// Constants – 7 AM → 9 PM
+// -----------------------------------------------------------------------------
+const HOUR_HEIGHT = 48; // px that represents one hour
+const hours = Array.from({ length: 15 }, (_, i) => {
+  const h = 7 + i;
+  return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
+});
+
+// -----------------------------------------------------------------------------
+// Component
+// -----------------------------------------------------------------------------
+export default function HourlyPlanner({ className = "" }: { className?: string }) {
+  const {
+    dailyTasks,
+    batchUpdateTasks,
+  } = useTasksContext();
+  // Build hourly plan from dailyTasks
+  const hourlyPlan = useMemo(() => {
+    const plan: Record<string, PlannerItem[]> = {};
+    hours.forEach((h) => (plan[h] = []));
+    dailyTasks.forEach((t: any) => {
+      const slot = (t.hourSlot as string | undefined) ?? "7AM";
+      if (!plan[slot]) plan[slot] = [];
+      plan[slot].push({
+        id: t.id.toString(),
+        content: t.content,
+        duration: t.duration ?? 60,
+      });
+    });
+    return plan;
+  }, [dailyTasks]);
+
+  // Resize helpers ------------------------------------------------------------
+  const [resizingTask, setResizingTask] = useState<{
+    taskId: string;
+    hour: string;
+  } | null>(null);
+  const resizeStartRef = useRef<{
+    y: number;
+    duration: number;
+    taskId: string;
+    hour: string;
+  } | null>(null);
+
+  function startResize(e: React.MouseEvent, hour: string, taskId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const startY = e.clientY;
+    const task = hourlyPlan[hour].find((t) => t.id === taskId);
+    const startDuration = task?.duration ?? 60;
+    resizeStartRef.current = { y: startY, duration: startDuration, taskId, hour };
+    setResizingTask({ taskId, hour });
+
+    function onMove(ev: MouseEvent) {
+      if (!resizeStartRef.current) return;
+      const delta = ev.clientY - resizeStartRef.current.y;
+      // Round to nearest 15-min increment, minimum 15
+      const minutes = Math.max(
+        15,
+        Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / 15) * 15,
+      );
+      // Persist via context so other components update optimistically
+      batchUpdateTasks([
+        { taskId, updates: { duration: minutes } as any },
+      ]);
+
+    }
+
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setResizingTask(null);
+      resizeStartRef.current = null;
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  // Drag-and-drop within planner (reordering only)
+  function handleDragEnd(result: DropResult) {
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+    if (source.droppableId !== destination.droppableId) return; // ignore cross-hour for now
+
+    // Not persisted yet – purely visual order inside hour
+  }
+
+  // Current time indicator ----------------------------------------------------
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTime(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const currentHourDisplay = useMemo(() => {
+    const h = currentTime.getHours();
+    return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
+  }, [currentTime]);
+
+  // ---------------------------------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------------------------------
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        {hours.map((disp) => (
+          <Droppable key={disp} droppableId={`hour-${disp}`}>
+            {(provided) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
+              >
+                <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
+                <ul className="flex-1 flex flex-col gap-3">
+                  {hourlyPlan[disp].map((t, index) => (
+                    <Draggable key={t.id} draggableId={t.id} index={index} isDragDisabled={!!resizingTask}>
+                      {(prov) => (
+                        <li
+                          ref={prov.innerRef}
+                          {...prov.draggableProps}
+                          {...prov.dragHandleProps}
+                          style={{
+                            ...prov.draggableProps.style,
+                            ...(resizingTask?.taskId === t.id ? { transform: "none", transition: "none" } : {}),
+                            height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
+                          }}
+                          className="relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                        >
+                          <div className="flex items-start gap-2.5 w-full h-full min-h-[36px]">
+                            <div className="flex-shrink-0 mt-1.5">
+                              <div className="w-2 h-2 bg-[#8A96FF] rounded-full" />
+                            </div>
+                            <div className="flex flex-col w-full justify-center min-w-0">
+                              <div className="text-xs text-gray-500 leading-tight mb-0.5">
+                                {/* Simplified time-range label – start time same as slot */}
+                                {disp} – {/* End time computed from duration */}
+                              </div>
+                              <div className="font-semibold truncate">{t.content}</div>
+                            </div>
+                          </div>
+                          <div
+                            onMouseDown={(e) => startResize(e, disp, t.id)}
+                            className="absolute -bottom-1 left-0 right-0 h-2 cursor-ns-resize bg-purple-200 hover:bg-purple-300 rounded-b-md"
+                          />
+                        </li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </ul>
+
+                {/* Current-time indicator */}
+                {disp === currentHourDisplay && (
+                  <div
+                    className="absolute inset-x-0 pointer-events-none flex items-center"
+                    style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
+                  >
+                    <span className="w-2.5 h-2.5 bg-[#8A96FF] rounded-full" />
+                    <div className="flex-1 h-[2px] bg-[#8A96FF]" />
+                  </div>
+                )}
+              </div>
+            )}
+          </Droppable>
+        ))}
+      </DragDropContext>
+    </div>
+  );
+}

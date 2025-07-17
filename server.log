@@ -1,0 +1,134 @@
+
+> lifeboard-ai@0.9.0 dev
+> next dev
+
+  ▲ Next.js 14.2.30
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 951ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1150ms (557 modules)
+ GET / 200 in 1295ms
+ ✓ Compiled in 94ms (278 modules)
+ ✓ Compiled /api/integrations/withings/metrics in 374ms (421 modules)
+ ✓ Compiled (427 modules)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Authentication successful for user: 46af7c3e-c19c-44ef-b016-9db03836783f
+Integration debug: {
+  hasIntegration: true,
+  hasAccessToken: true,
+  hasRefreshToken: true,
+  updatedAt: '2025-07-17T17:18:53.233+00:00',
+  integrationError: undefined
+}
+Calling fetchWithingsLatestWeight with token: ca353e91cfa7f48dc572...
+Making Withings API request to: https://wbsapi.withings.net/measure?action=getmeas&meastype=1&category=1&startdate=1750185649&enddate=1752777649
+Using access token: ca353e91cfa7f48dc572...
+ GET /api/integrations/todoist/tasks?all=true&cb=1752777648633 200 in 1147ms
+ GET /api/integrations/googlefit/metrics?cb=1752777648655 200 in 1150ms
+ ✓ Compiled /api/integrations/fitbit/metrics in 73ms (430 modules)
+Withings API response status: 200
+Withings API response data: {
+  "status": 401,
+  "body": {},
+  "error": "XRequestID: Not provided invalid_token: The access token provided is invalid"
+}
+Withings API error details: {
+  status: 401,
+  body: {},
+  error: 'XRequestID: Not provided invalid_token: The access token provided is invalid',
+  fullResponse: {
+    status: 401,
+    body: {},
+    error: 'XRequestID: Not provided invalid_token: The access token provided is invalid'
+  }
+}
+Failed to fetch Withings metrics Error: Withings API returned error status 401: API error status 401
+    at fetchWithingsLatestWeight (webpack-internal:///(rsc)/./src/lib/withings/client.ts:139:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async GET (webpack-internal:///(rsc)/./src/app/api/integrations/withings/metrics/route.ts:92:26)
+    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:57228
+    at async eT.execute (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:46851)
+    at async eT.handle (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:58760)
+    at async doRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1366:42)
+    at async cacheEntry.responseCache.get.routeKind (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1588:28)
+    at async DevServer.renderToResponseWithComponentsImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1496:28)
+    at async DevServer.renderPageComponent (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1924:24)
+    at async DevServer.renderToResponseImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1962:32)
+    at async DevServer.pipeImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/next-server.js:272:17)
+    at async DevServer.handleRequestImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:818:17)
+    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:339:20
+    at async Span.traceAsyncFn (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/trace/trace.js:154:20)
+    at async DevServer.handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:336:24)
+    at async invokeRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:179:21)
+    at async handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:359:24)
+    at async requestHandlerImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:383:13)
+    at async Server.requestListener (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/start-server.js:141:13)
+Error details: {
+  message: 'Withings API returned error status 401: API error status 401',
+  stack: 'Error: Withings API returned error status 401: API error status 401\n' +
+    '    at fetchWithingsLatestWeight (webpack-internal:///(rsc)/./src/lib/withings/client.ts:139:15)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+    '    at async GET (webpack-internal:///(rsc)/./src/app/api/integrations/withings/metrics/route.ts:92:26)\n' +
+    '    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:57228\n' +
+    '    at async eT.execute (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:46851)\n' +
+    '    at async eT.handle (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:58760)\n' +
+    '    at async doRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1366:42)\n' +
+    '    at async cacheEntry.responseCache.get.routeKind (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1588:28)\n' +
+    '    at async DevServer.renderToResponseWithComponentsImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1496:28)\n' +
+    '    at async DevServer.renderPageComponent (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1924:24)\n' +
+    '    at async DevServer.renderToResponseImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1962:32)\n' +
+    '    at async DevServer.pipeImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:922:25)\n' +
+    '    at async NextNodeServer.handleCatchallRenderRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/next-server.js:272:17)\n' +
+    '    at async DevServer.handleRequestImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:818:17)\n' +
+    '    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:339:20\n' +
+    '    at async Span.traceAsyncFn (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/trace/trace.js:154:20)\n' +
+    '    at async DevServer.handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:336:24)\n' +
+    '    at async invokeRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:179:21)\n' +
+    '    at async handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:359:24)\n' +
+    '    at async requestHandlerImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:383:13)\n' +
+    '    at async Server.requestListener (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/start-server.js:141:13)',
+  name: 'Error'
+}
+Attempting to refresh Withings token due to invalid access token
+Attempting to refresh Withings token with refresh token: ad8cbba83b944ff98693...
+Using client_id: d565353adb...
+Withings token refresh response status: 200
+Withings token refresh response data: {
+  "status": 2554,
+  "error": "Not implemented"
+}
+Withings token refresh error details: {
+  status: 2554,
+  error: 'Not implemented',
+  errorMessage: 'Invalid refresh token - need to re-authenticate',
+  fullResponse: { status: 2554, error: 'Not implemented' }
+}
+Failed to refresh Withings token Error: Withings token refresh error status: 2554 - Invalid refresh token - need to re-authenticate
+    at refreshWithingsToken (webpack-internal:///(rsc)/./src/lib/withings/client.ts:96:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async GET (webpack-internal:///(rsc)/./src/app/api/integrations/withings/metrics/route.ts:109:35)
+    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:57228
+    at async eT.execute (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:46851)
+    at async eT.handle (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:58760)
+    at async doRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1366:42)
+    at async cacheEntry.responseCache.get.routeKind (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1588:28)
+    at async DevServer.renderToResponseWithComponentsImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1496:28)
+    at async DevServer.renderPageComponent (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1924:24)
+    at async DevServer.renderToResponseImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:1962:32)
+    at async DevServer.pipeImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/next-server.js:272:17)
+    at async DevServer.handleRequestImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/base-server.js:818:17)
+    at async /Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:339:20
+    at async Span.traceAsyncFn (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/trace/trace.js:154:20)
+    at async DevServer.handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/dev/next-dev-server.js:336:24)
+    at async invokeRender (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:179:21)
+    at async handleRequest (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:359:24)
+    at async requestHandlerImpl (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/router-server.js:383:13)
+    at async Server.requestListener (/Users/dalitbarrett/CascadeProjects/LifeboardAI/node_modules/next/dist/server/lib/start-server.js:141:13)
+Invalidated Withings tokens in database
+ GET /api/integrations/withings/metrics?cb=1752777648656 401 in 1763ms
+[?25h
