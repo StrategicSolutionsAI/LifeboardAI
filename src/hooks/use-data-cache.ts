@@ -14,6 +14,21 @@ interface CacheOptions {
 
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
 
+// Global cache for sharing between components
+const globalCache = new Map<string, CacheEntry<any>>()
+
+// Global cache invalidation function that can be called from anywhere
+export function invalidateTaskCaches() {
+  // Find and delete all task-related cache entries
+  const keysToDelete: string[] = []
+  globalCache.forEach((_, key) => {
+    if (key.startsWith('tasks-')) {
+      keysToDelete.push(key)
+    }
+  })
+  keysToDelete.forEach(key => globalCache.delete(key))
+}
+
 export function useDataCache<T>(
   key: string,
   fetcher: () => Promise<T>,
@@ -120,9 +135,6 @@ export function useDataCache<T>(
     invalidate
   }
 }
-
-// Global cache for sharing between components
-const globalCache = new Map<string, CacheEntry<any>>()
 
 // Hook for using global cache
 export function useGlobalCache<T>(

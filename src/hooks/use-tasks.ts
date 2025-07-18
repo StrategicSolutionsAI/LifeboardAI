@@ -90,33 +90,33 @@ export function useTasks(selectedDate?: Date) {
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed, due_date: dueDate })
+        body: JSON.stringify({ content: trimmed, dueDate })
       })
       
       if (!res.ok) throw new Error('Failed to create task')
       
-      const newTask = await res.json()
+      const { task } = await res.json()
       
       // Replace temp task with real task
       if (dueDate === dateStr) {
         updateDailyOptimistically(current => 
-          current?.map(t => t.id === tempId ? newTask : t) || []
+          current?.map((t: any) => t.id === tempId ? task : t) || []
         )
       }
       updateAllOptimistically(current => 
-        current?.map(t => t.id === tempId ? newTask : t) || []
+        current?.map((t: any) => t.id === tempId ? task : t) || []
       )
       
-      return newTask
+      return task
     } catch (error) {
       // Revert optimistic update on error
       if (dueDate === dateStr) {
         updateDailyOptimistically(current => 
-          current?.filter(t => t.id !== tempId) || []
+          current?.filter((t: any) => t.id !== tempId) || []
         )
       }
       updateAllOptimistically(current => 
-        current?.filter(t => t.id !== tempId) || []
+        current?.filter((t: any) => t.id !== tempId) || []
       )
       throw error
     }

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
+import { invalidateTaskCaches } from "@/hooks/use-data-cache";
 import { format, addDays, isSameDay } from 'date-fns';
 import {
   type LucideIcon,
@@ -1765,6 +1766,11 @@ export function TaskBoardDashboard() {
           });
         }
       }
+
+      // --------------------------------------------------
+      // 4. Invalidate task caches so calendar updates
+      // --------------------------------------------------
+      invalidateTaskCaches();
     } catch (err) {
       // --------------------------------------------------
       // 4. Roll back optimistic update on failure
