@@ -96,6 +96,8 @@ import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import TrendsPanel from "./trends-panel";
+import { TasksProvider } from "@/contexts/tasks-context";
+import HourlyPlanner from "./hourly-planner";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -2217,7 +2219,8 @@ export function TaskBoardDashboard() {
   }, [checkAndResetWidgets]);
 
   return (
-    <div className="flex-1">
+    <TasksProvider selectedDate={selectedDate}>
+      <div className="flex-1">
       <div className="flex flex-col">
 
         {/* Greeting */}
@@ -3273,93 +3276,7 @@ export function TaskBoardDashboard() {
                         ref={plannerRef} className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isPlannerCollapsed ? 0 : '16rem' }}
                       >
-                        {hours.map((disp) => (
-                          <Droppable droppableId={`hour-${disp}`} key={disp}>
-                            {(provided: any) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                data-hour={disp} className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
-                              >
-                                <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
-                                <ul className="flex-1 flex flex-col gap-3">
-                                  {hourlyPlan[disp].map((t: any, index: number) => (
-                                    <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                                      {(provided: any) => (
-                                        <li
-                                          ref={provided.innerRef}
-                                          {...provided.draggableProps}
-                                          {...provided.dragHandleProps}
-                                          style={{
-                                              ...provided.draggableProps.style,
-                                              ...(resizingTask?.taskId === t.id ? { transform: 'none', transition: 'none' } : {}),
-                                              height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
-                                            }}
-                                           className="relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
-                                        >
-                                          <div className="flex items-start gap-2.5 w-full h-full min-h-[36px]">
-                                            <div className="flex-shrink-0 mt-1.5">
-                                              <div className="w-2 h-2 bg-[#8A96FF] rounded-full" />
-                                            </div>
-                                            <div className="flex flex-col w-full justify-center min-w-0">
-                                              {(() => {
-                                                // Calculate start time from the hour slot
-                                                const startHour12 = parseInt(disp.replace(/[^0-9]/g, '')) || 12;
-                                                const isPM = disp.includes("PM");
-                                                
-                                                // Calculate end time from duration
-                                                const dur = t.duration ?? 60;
-                                                const start24 = (startHour12 % 12) + (isPM ? 12 : 0);
-                                                const endTotal = start24 * 60 + dur;
-                                                const end24 = Math.floor(endTotal / 60);
-                                                const endMin = endTotal % 60;
-                                                const endHour12 = end24 > 12 ? end24 - 12 : (end24 === 0 ? 12 : end24);
-                                                const endIsPM = end24 >= 12;
-                                                
-                                                // Format time range appropriately
-                                                const startTime = `${startHour12}:00 ${isPM ? 'PM' : 'AM'}`;
-                                                const endTime = `${endHour12}:${endMin.toString().padStart(2, '0')} ${endIsPM ? 'PM' : 'AM'}`;
-                                                const timeRange = `${startTime} - ${endTime}`;
-                                                
-                                                // For very short tasks under 20 minutes, only show content if there's room
-                                                const showContent = dur >= 20;
-                                                
-                                                return (
-                                                  <>
-                                                    <div className="text-xs text-gray-500 leading-tight mb-0.5">{timeRange}</div>
-                                                    {showContent && (
-                                                      <div className="font-semibold truncate">
-                                                        {t.content}
-                                                      </div>
-                                                    )}
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-                                          </div>
-                                            <div
-                                              onMouseDown={(e) => startResize(e, disp, t.id.toString())}
-                                              className="absolute -bottom-1 left-0 right-0 h-2 cursor-ns-resize bg-purple-200 hover:bg-purple-300 rounded-b-md"
-                                            />
-                                        </li>
-                                      )}
-                                    </Draggable>
-                                  ))}
-                                  {provided.placeholder}
-                                </ul>
-                                {disp === currentHourDisplay && (
-                                  <div
-                                    className="absolute inset-x-0 pointer-events-none flex items-center"
-                                    style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
-                                  >
-                                    <span className="w-2.5 h-2.5 bg-[#8A96FF] rounded-full" />
-                                    <div className="flex-1 h-[2px] bg-[#8A96FF]" />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </Droppable>
-                        ))}
+                        {!isPlannerCollapsed && <HourlyPlanner className="max-h-full" />}
                       </div>
                     </>
                   )}
@@ -3505,6 +3422,7 @@ export function TaskBoardDashboard() {
 
       </div>
       <ChatBar />
-    </div>
+      </div>
+    </TasksProvider>
   );
 }

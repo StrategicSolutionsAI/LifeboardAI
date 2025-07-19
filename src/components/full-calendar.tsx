@@ -21,6 +21,8 @@ import {
 } from "date-fns";
 
 import HourlyPlanner from "@/components/hourly-planner";
+import { useTasksContext } from "@/contexts/tasks-context";
+import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -57,7 +59,7 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist'; title: string; time?: string; allDay?: boolean; }
+interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; }
 
 interface FullCalendarProps {
   selectedDate?: Date;
@@ -70,6 +72,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const today = new Date();
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
+  
+  // Get tasks from context
+  const { allTasks } = useTasksContext();
+  
+  // Use calendar sync hook
+  const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
 
   const nextPeriod = () => {
     setCurrentDate((date) => {
@@ -196,7 +204,32 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         console.error('Failed to fetch Google events', err);
       }
 
-      // ---------------- Todoist Tasks ----------------
+      // ---------------- Lifeboard Hourly Tasks ----------------
+      // Add hourly scheduled tasks from the current context
+      const dateRange = [];
+      let currentDay = new Date(start);
+      while (currentDay <= end) {
+        const dateStr = format(currentDay, 'yyyy-MM-dd');
+        const dayEvents = getEventsForDate(dateStr);
+        
+        if (dayEvents.length > 0) {
+          if (!map[dateStr]) map[dateStr] = [];
+          dayEvents.forEach(event => {
+            map[dateStr].push({
+              source: 'lifeboard',
+              title: event.title,
+              time: event.time,
+              allDay: event.allDay || false,
+              taskId: event.taskId,
+              duration: event.duration
+            });
+          });
+        }
+        
+        currentDay = addDays(currentDay, 1);
+      }
+
+      // ---------------- Todoist Tasks (non-hourly) ----------------
       try {
         const resp = await fetch('/api/integrations/todoist/tasks?all=true');
         if (resp.ok) {
@@ -208,7 +241,16 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             // Only include tasks within the current date range
             if (dateStr >= timeMin.slice(0,10) && dateStr <= timeMax.slice(0,10)) {
               if (!map[dateStr]) map[dateStr] = [];
-              map[dateStr].push({ source: 'todoist', title: t.content ?? 'Task', time: t.due?.datetime ?? undefined });
+              
+              // Skip tasks that already have hourSlot (they're handled above as lifeboard events)
+              if (t.hourSlot) return;
+              
+              map[dateStr].push({ 
+                source: 'todoist', 
+                title: t.content ?? 'Task', 
+                time: t.due?.datetime ?? undefined,
+                taskId: t.id
+              });
             }
           });
         }
@@ -220,7 +262,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
 
     fetchEvents();
-  }, [currentDate, view]);
+  }, [currentDate, view, allTasks, getEventsForDate]);
 
   const getCellSize = () => {
     switch (view) {
@@ -326,20 +368,45 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 {dayEvents.length > 0 && (
                   <div className={`w-full ${view === 'week' ? 'space-y-1' : 'flex flex-wrap gap-0.5'}`}>
                     {view === 'week' ? (
-                      // Week view: show first few event titles
-                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => (
-                        <div key={i} className="text-xs p-0.5 rounded truncate w-full" style={{
-                          backgroundColor: ev.source === 'google' ? '#dbeafe' : '#e0e7ff',
-                          color: ev.source === 'google' ? '#1e40af' : '#3730a3'
-                        }}>
-                          {ev.title}
-                        </div>
-                      ))
+                      // Week view: show first few event titles with time
+                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
+                        const getEventStyle = (source: string) => {
+                          switch (source) {
+                            case 'google':
+                              return { backgroundColor: '#dbeafe', color: '#1e40af' };
+                            case 'lifeboard':
+                              return { backgroundColor: '#dcfce7', color: '#166534' };
+                            default:
+                              return { backgroundColor: '#e0e7ff', color: '#3730a3' };
+                          }
+                        };
+                        
+                        const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                        
+                        return (
+                          <div key={i} className="text-xs p-0.5 rounded truncate w-full" style={getEventStyle(ev.source)}>
+                            {timeDisplay && <span className="font-medium">{timeDisplay}</span>} {ev.title}
+                          </div>
+                        );
+                      })
                     ) : (
-                      // Month view: show dots
-                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => (
-                        <span key={i} className={`w-1.5 h-1.5 rounded-full ${ev.source === 'google' ? 'bg-blue-500' : 'bg-indigo-500'}`}></span>
-                      ))
+                      // Month view: show dots with different colors
+                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
+                        const getDotColor = (source: string) => {
+                          switch (source) {
+                            case 'google':
+                              return 'bg-blue-500';
+                            case 'lifeboard':
+                              return 'bg-green-500';
+                            default:
+                              return 'bg-indigo-500';
+                          }
+                        };
+                        
+                        return (
+                          <span key={i} className={`w-1.5 h-1.5 rounded-full ${getDotColor(ev.source)}`}></span>
+                        );
+                      })
                     )}
                     {dayEvents.length > 3 && (
                       <span className="text-xs text-gray-500">+{dayEvents.length - 3}</span>
@@ -366,19 +433,53 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </button>
             </div>
             <div className="space-y-3 max-h-80 overflow-auto">
-              {(eventsByDate[selectedModalDate] ?? []).map((ev: DayEvent, idx: number) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className={`mt-1 w-2 h-2 rounded-full ${ev.source === 'google' ? 'bg-blue-500' : 'bg-indigo-500'}`} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{ev.title}</p>
-                    {ev.time && (
-                      <p className="text-xs text-gray-500">
-                        {ev.allDay ? 'All day' : format(new Date(ev.time), 'h:mm a')}
-                      </p>
-                    )}
+              {(eventsByDate[selectedModalDate] ?? []).map((ev: DayEvent, idx: number) => {
+                const getDotColor = (source: string) => {
+                  switch (source) {
+                    case 'google':
+                      return 'bg-blue-500';
+                    case 'lifeboard':
+                      return 'bg-green-500';
+                    default:
+                      return 'bg-indigo-500';
+                  }
+                };
+                
+                const getSourceLabel = (source: string) => {
+                  switch (source) {
+                    case 'google':
+                      return 'Google Calendar';
+                    case 'lifeboard':
+                      return 'Hourly Schedule';
+                    case 'todoist':
+                      return 'Todoist';
+                    default:
+                      return source;
+                  }
+                };
+                
+                return (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source)}`} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-800">{ev.title}</p>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs">
+                          {getSourceLabel(ev.source)}
+                        </span>
+                        {ev.time && (
+                          <span>
+                            {ev.allDay ? 'All day' : format(new Date(ev.time), 'h:mm a')}
+                            {ev.duration && ev.source === 'lifeboard' && (
+                              <span className="ml-1">({ev.duration}min)</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {(eventsByDate[selectedModalDate]?.length ?? 0) === 0 && (
                 <p className="text-sm text-gray-500">No events</p>
               )}

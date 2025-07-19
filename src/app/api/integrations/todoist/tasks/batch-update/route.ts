@@ -1,0 +1,133 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseServer } from '@/utils/supabase/server';
+
+const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
+
+interface TaskUpdate {
+  taskId: string;
+  updates: {
+    content?: string;
+    duration?: number;
+    hourSlot?: string;
+    due?: { date: string };
+    [key: string]: any;
+  };
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { updates }: { updates: TaskUpdate[] } = await request.json();
+
+    if (!updates || !Array.isArray(updates)) {
+      return NextResponse.json({ error: 'Invalid updates format' }, { status: 400 });
+    }
+
+    const supabase = supabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Get Todoist access token
+    const { data: integration, error } = await supabase
+      .from('user_integrations')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .eq('provider', 'todoist')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Supabase error fetching todoist integration', error);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+
+    if (!integration?.access_token) {
+      return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
+    }
+
+    // Process each update
+    const results = [];
+    for (const update of updates) {
+      try {
+        // For Todoist API, we need to update the task content and description
+        // We'll store our custom fields (duration, hourSlot) in the task description
+        const currentTaskRes = await fetch(`${TODOIST_TASKS_ENDPOINT}/${update.taskId}`, {
+          headers: {
+            Authorization: `Bearer ${integration.access_token}`,
+          },
+        });
+
+        if (!currentTaskRes.ok) {
+          console.error(`Failed to fetch task ${update.taskId}`);
+          continue;
+        }
+
+        const currentTask = await currentTaskRes.json();
+        
+        // Parse existing metadata from description
+        let existingMeta = {};
+        if (currentTask.description) {
+          try {
+            const metaMatch = currentTask.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
+            if (metaMatch) {
+              existingMeta = JSON.parse(metaMatch[1]);
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }
+
+        // Merge updates with existing metadata
+        const newMeta = {
+          ...existingMeta,
+          ...(update.updates.duration && { duration: update.updates.duration }),
+          ...(update.updates.hourSlot && { hourSlot: update.updates.hourSlot }),
+        };
+
+        // Build new description with metadata
+        const baseDescription = currentTask.description?.replace(/\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]/g, '').trim() || '';
+        const newDescription = baseDescription + `\n[LIFEBOARD_META]${JSON.stringify(newMeta)}[/LIFEBOARD_META]`;
+
+        // Prepare update payload for Todoist
+        const todoistUpdate: any = {};
+        
+        if (update.updates.content) {
+          todoistUpdate.content = update.updates.content;
+        }
+        
+        if (update.updates.due) {
+          todoistUpdate.due_string = update.updates.due.date;
+        }
+
+        // Always update description to include metadata
+        todoistUpdate.description = newDescription.trim();
+
+        // Update task in Todoist
+        const updateRes = await fetch(`${TODOIST_TASKS_ENDPOINT}/${update.taskId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${integration.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(todoistUpdate),
+        });
+
+        if (updateRes.ok) {
+          results.push({ taskId: update.taskId, success: true });
+        } else {
+          const errorText = await updateRes.text();
+          console.error(`Failed to update task ${update.taskId}:`, errorText);
+          results.push({ taskId: update.taskId, success: false, error: errorText });
+        }
+      } catch (error) {
+        console.error(`Error updating task ${update.taskId}:`, error);
+        results.push({ taskId: update.taskId, success: false, error: error.message });
+      }
+    }
+
+    return NextResponse.json({ results });
+  } catch (error) {
+    console.error('Batch update error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

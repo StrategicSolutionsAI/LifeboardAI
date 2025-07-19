@@ -68,7 +68,50 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ weightKg })
   } catch (e: any) {
     console.error('Failed to fetch Withings metrics', e)
-    const isRateLimited = /429/.test(e.message ?? '')
-    return NextResponse.json({ error: e.message }, { status: isRateLimited ? 429 : 500 })
+    
+    // Handle specific error types
+    if (e.message === 'INVALID_TOKEN') {
+      // Try to refresh the token
+      try {
+        console.log('Attempting to refresh Withings token due to invalid token')
+        const newTokens = await refreshWithingsToken(refreshToken)
+        
+        // Update the token in the database
+        await supabase
+          .from('user_integrations')
+          .update({
+            access_token: newTokens.access_token,
+            refresh_token: newTokens.refresh_token ?? refreshToken,
+            token_data: newTokens,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', integration.id)
+        
+        // Retry the request with the new token
+        const weightKg = await fetchWithingsLatestWeight(newTokens.access_token)
+        return NextResponse.json({ weightKg })
+        
+      } catch (refreshError: any) {
+        console.error('Failed to refresh Withings token', refreshError)
+        
+        // Handle specific refresh errors
+        if (refreshError.message === 'REFRESH_TOKEN_EXPIRED' || refreshError.message === 'INVALID_REFRESH_TOKEN') {
+          return NextResponse.json({ 
+            error: 'Withings connection expired - please reconnect your account',
+            needsReauth: true
+          }, { status: 401 })
+        }
+        
+        return NextResponse.json({ 
+          error: 'Authentication failed - please try again or reconnect Withings' 
+        }, { status: 401 })
+      }
+    } else if (e.message === 'RATE_LIMITED') {
+      return NextResponse.json({ 
+        error: 'Rate limited - please try again later' 
+      }, { status: 429 })
+    } else {
+      return NextResponse.json({ error: e.message }, { status: 500 })
+    }
   }
 } 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Plus, Droplets, Flame, Target, Scale, TrendingUp, Activity, BarChart } from "lucide-react"
 import { WidgetLibrary } from "./widget-library"
+import { WithingsWeightWidget } from "./withings-weight-widget"
 
 interface HealthMetric {
   id: string
@@ -73,6 +74,21 @@ export function HealthWidgets() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {healthMetrics.map((metric) => {
           const Icon = metric.icon
+          
+          // Use Withings widget for weight metric
+          if (metric.id === 'weight') {
+            return (
+              <WithingsWeightWidget
+                key={metric.id}
+                className="col-span-1"
+                showControls={false}
+                unit="lbs"
+                goalWeight={145}
+                startingWeight={155}
+              />
+            )
+          }
+          
           return (
             <Card key={metric.id} className="p-4">
               <div className="flex items-center justify-between">

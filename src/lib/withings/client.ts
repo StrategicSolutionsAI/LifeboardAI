@@ -78,7 +78,14 @@ export async function refreshWithingsToken(refreshToken: string) {
 
   const data = await response.json()
   if (data.status !== 0) {
-    throw new Error(`Withings token refresh error status: ${data.status}`)
+    // Handle specific Withings error codes
+    if (data.status === 2554) {
+      throw new Error('REFRESH_TOKEN_EXPIRED')
+    } else if (data.status === 401) {
+      throw new Error('INVALID_REFRESH_TOKEN')
+    } else {
+      throw new Error(`Withings token refresh error status: ${data.status} - ${data.error || 'Unknown error'}`)
+    }
   }
   return data.body
 }
@@ -104,7 +111,7 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
   })
 
   if (!response.ok) {
-    throw new Error(`Withings API error: ${response.status}`)
+    throw new Error(`Withings API HTTP error: ${response.status}`)
   }
 
   const data = await response.json()
@@ -112,7 +119,18 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
   // Debug logging to see what measurements we're getting
   console.log('Withings API response:', JSON.stringify(data, null, 2))
   
-  if (data.status !== 0 || !data.body?.measuregrps) {
+  // Handle Withings API error responses
+  if (data.status !== 0) {
+    if (data.status === 401) {
+      throw new Error('INVALID_TOKEN')
+    } else if (data.status === 601) {
+      throw new Error('RATE_LIMITED')
+    } else {
+      throw new Error(`Withings API error: ${data.status} - ${data.error || 'Unknown error'}`)
+    }
+  }
+  
+  if (!data.body?.measuregrps) {
     throw new Error('No weight measurements found')
   }
 

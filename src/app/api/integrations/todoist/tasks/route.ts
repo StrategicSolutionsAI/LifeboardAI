@@ -53,11 +53,33 @@ export async function GET(request: NextRequest) {
 
     const tasks = await todoistRes.json();
 
-    let responseTasks = tasks;
+    // Parse metadata from task descriptions and enhance tasks
+    const enhancedTasks = tasks.map((task: any) => {
+      let metadata: { duration?: number; hourSlot?: string } = {};
+      
+      if (task.description) {
+        try {
+          const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
+          if (metaMatch) {
+            metadata = JSON.parse(metaMatch[1]);
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+      
+      return {
+        ...task,
+        duration: metadata.duration || 60, // Default 1 hour
+        hourSlot: metadata.hourSlot || '9AM', // Default 9 AM
+      };
+    });
+
+    let responseTasks = enhancedTasks;
 
     if (date && !allParam) {
       // Include tasks that are due today or overdue (tasks with no due date are excluded)
-      responseTasks = tasks.filter((t: any) => {
+      responseTasks = enhancedTasks.filter((t: any) => {
         if (!t.due?.date) return false;
         return t.due.date === date; // strict match for the selected date
       });

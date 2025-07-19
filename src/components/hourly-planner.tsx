@@ -44,19 +44,43 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
     dailyTasks,
     batchUpdateTasks,
   } = useTasksContext();
-  // Build hourly plan from dailyTasks
+  
+  // Build hourly plan from filtered daily tasks
   const hourlyPlan = useMemo(() => {
+    console.log('⏰ HourlyPlanner Debug:', {
+      dailyTasksCount: dailyTasks.length,
+      dailyTasks: dailyTasks.map(t => ({ id: t.id, content: t.content, hourSlot: t.hourSlot, due: t.due?.date }))
+    });
+    
     const plan: Record<string, PlannerItem[]> = {};
     hours.forEach((h) => (plan[h] = []));
-    dailyTasks.forEach((t: any) => {
-      const slot = (t.hourSlot as string | undefined) ?? "7AM";
-      if (!plan[slot]) plan[slot] = [];
+    dailyTasks.forEach((t) => {
+      let slot = (t.hourSlot as string | undefined) ?? "7AM";
+      // Clean up slot format - remove "hour-" prefix if present
+      slot = slot.replace('hour-', '');
+      
+      if (!plan[slot]) {
+        console.log('⚠️ Unknown slot format:', { slot, originalSlot: t.hourSlot, task: t.content });
+        slot = "7AM"; // fallback
+      }
+      
       plan[slot].push({
         id: t.id.toString(),
         content: t.content,
         duration: t.duration ?? 60,
       });
+      console.log('✅ Added task to slot:', { task: t.content, slot, originalSlot: t.hourSlot, id: t.id });
     });
+    
+    const planSummary = Object.entries(plan).map(([hour, tasks]) => ({ hour, count: tasks.length, tasks: tasks.map(t => t.content) }));
+    console.log('📋 Final hourly plan summary:', JSON.stringify(planSummary, null, 2));
+    
+    // Check if 8PM exists and has tasks
+    if (plan['8PM']) {
+      console.log('🌆 8PM slot found with tasks:', plan['8PM']);
+    } else {
+      console.log('⚠️ 8PM slot missing or empty');
+    }
     return plan;
   }, [dailyTasks]);
 
@@ -108,13 +132,31 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
     window.addEventListener("mouseup", onUp);
   }
 
-  // Drag-and-drop within planner (reordering only)
+  // Drag-and-drop within planner (supports cross-hour moves)
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    if (source.droppableId !== destination.droppableId) return; // ignore cross-hour for now
-
-    // Not persisted yet – purely visual order inside hour
+    
+    // If moving between different time slots, update the task's hourSlot
+    if (source.droppableId !== destination.droppableId) {
+      // Strip "hour-" prefix from droppableId to get the actual hour slot
+      const newHourSlot = destination.droppableId.replace('hour-', '');
+      
+      console.log('🔄 Moving task between time slots:', {
+        taskId: draggableId,
+        from: source.droppableId,
+        to: destination.droppableId,
+        newHourSlot
+      });
+      
+      // Update the task with the new time slot
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: newHourSlot } as any },
+      ]);
+    }
+    
+    // Note: Reordering within the same hour is handled visually by DnD
+    // but doesn't need persistence since Todoist doesn't support task ordering
   }
 
   // Current time indicator ----------------------------------------------------
@@ -133,7 +175,15 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
   // ---------------------------------------------------------------------------
   return (
     <div className={`space-y-2 ${className}`}>
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext 
+        onDragEnd={handleDragEnd}
+        onDragStart={(start) => {
+          console.log('📎 Drag started:', {
+            draggableId: start.draggableId,
+            source: start.source
+          });
+        }}
+      >
         {hours.map((disp) => (
           <Droppable key={disp} droppableId={`hour-${disp}`}>
             {(provided) => (

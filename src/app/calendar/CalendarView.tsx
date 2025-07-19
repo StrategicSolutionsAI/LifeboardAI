@@ -10,12 +10,17 @@ const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: 
 export default function CalendarView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const handleDateChange = (newDate: Date) => {
+    console.log('📅 Calendar date changed:', newDate);
+    setSelectedDate(newDate);
+  };
+
   return (
     <TasksProvider selectedDate={selectedDate}>
       <div className="w-full">
         <FullCalendar 
           selectedDate={selectedDate} 
-          onDateChange={setSelectedDate} 
+          onDateChange={handleDateChange} 
         />
       </div>
     </TasksProvider>

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
 interface Task {
@@ -20,8 +21,14 @@ interface TaskUpdate {
 // Custom hook for managing tasks with optimistic updates
 export function useTasks(selectedDate?: Date) {
   const dateStr = selectedDate 
-    ? selectedDate.toISOString().split('T')[0]
-    : new Date().toISOString().split('T')[0]
+    ? format(selectedDate, 'yyyy-MM-dd')
+    : format(new Date(), 'yyyy-MM-dd')
+  
+  console.log('📅 useTasks Debug:', {
+    selectedDate,
+    dateStr,
+    hasSelectedDate: !!selectedDate
+  });
   
   // Cache key includes date for date-specific tasks
   const dailyCacheKey = `tasks-daily-${dateStr}`
@@ -29,10 +36,20 @@ export function useTasks(selectedDate?: Date) {
   
   // Fetch daily tasks
   const dailyTasksFetcher = useCallback(async () => {
+    console.log('📅 Daily tasks fetcher called for date:', dateStr, 'cache key:', dailyCacheKey)
     const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
-    if (!res.ok) throw new Error('Failed to fetch daily tasks')
+    if (!res.ok) {
+      console.error('❌ Daily tasks API error:', res.status, res.statusText);
+      throw new Error('Failed to fetch daily tasks')
+    }
     const data = await res.json()
-    return Array.isArray(data) ? data : (data.tasks ?? [])
+    const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
+    console.log('📊 Daily tasks response:', {
+      url: `/api/integrations/todoist/tasks?date=${dateStr}`,
+      tasksCount: tasks.length,
+      tasks: tasks.map((t: any) => ({ id: t.id, content: t.content, due: t.due?.date, hourSlot: t.hourSlot }))
+    });
+    return tasks
   }, [dateStr])
   
   // Fetch all open tasks
