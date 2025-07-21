@@ -206,6 +206,31 @@ export function useTasks(selectedDate?: Date) {
     }
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   
+  // Optimistic task deletion
+  const deleteTask = useCallback(async (taskId: string) => {
+    // Update optimistically by removing the task
+    const updater = (tasks: Task[] | null) => 
+      tasks?.filter(t => t.id !== taskId) || []
+    
+    updateDailyOptimistically(updater)
+    updateAllOptimistically(updater)
+    
+    try {
+      const res = await fetch('/api/integrations/todoist/tasks/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      })
+      
+      if (!res.ok) throw new Error('Failed to delete task')
+    } catch (error) {
+      // On error, refetch to get correct state
+      refetchDaily()
+      refetchAll()
+      throw error
+    }
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
+  
   return {
     dailyTasks: dailyTasks || [],
     allTasks: allTasks || [],
@@ -214,6 +239,7 @@ export function useTasks(selectedDate?: Date) {
     createTask,
     toggleTaskCompletion,
     batchUpdateTasks,
+    deleteTask,
     refetch: () => {
       refetchDaily()
       refetchAll()

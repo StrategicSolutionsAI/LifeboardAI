@@ -23,6 +23,7 @@ import {
 import HourlyPlanner from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
+import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -74,7 +75,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
   
   // Get tasks from context
-  const { allTasks } = useTasksContext();
+  const { allTasks, batchUpdateTasks } = useTasksContext();
   
   // Use calendar sync hook
   const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
@@ -171,6 +172,33 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   const rows = getMatrix();
+
+  // Handle drag and drop for hourly planner
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { source, destination, draggableId } = result;
+
+    // Helper functions
+    const isHour = (id: string) => id.startsWith('hour-');
+    const hourKey = (id: string) => id.replace('hour-', '');
+
+    // Handle moves between hour slots
+    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+      // Hour slot → Different hour slot: Update the hourSlot
+      const dstHour = hourKey(destination.droppableId);
+      console.log('⏰ Moving task between hour slots:', { draggableId, dstHour });
+      
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: dstHour } as any }
+      ]).catch(error => {
+        console.error('Failed to update task hourSlot:', error);
+      });
+      return;
+    }
+
+    console.log('Drag ended:', result);
+  };
 
   // Sync propSelectedDate prop with currentDate state
   useEffect(() => {
@@ -338,7 +366,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </p>
           </div>
           
-          <HourlyPlanner className="max-h-[70vh] overflow-y-auto" />
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <HourlyPlanner className="max-h-[70vh] overflow-y-auto" />
+          </DragDropContext>
         </div>
       ) : (
         // Month and Week views: Use calendar grid

@@ -8,11 +8,10 @@
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useTasksContext } from "@/contexts/tasks-context";
+import { X } from "lucide-react";
 import {
-  DragDropContext,
   Droppable,
   Draggable,
-  type DropResult,
 } from "@hello-pangea/dnd";
 
 // -----------------------------------------------------------------------------
@@ -43,6 +42,7 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
   const {
     dailyTasks,
     batchUpdateTasks,
+    deleteTask,
   } = useTasksContext();
   
   // Build hourly plan from filtered daily tasks
@@ -54,8 +54,16 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
     
     const plan: Record<string, PlannerItem[]> = {};
     hours.forEach((h) => (plan[h] = []));
+    
+    // Only include tasks that have an hourSlot (are scheduled in the planner)
     dailyTasks.forEach((t) => {
-      let slot = (t.hourSlot as string | undefined) ?? "7AM";
+      // Skip tasks without hourSlot - they shouldn't appear in the hourly planner
+      if (!t.hourSlot) {
+        console.log('⏭️ Skipping task without hourSlot:', { task: t.content, id: t.id });
+        return;
+      }
+      
+      let slot = t.hourSlot as string;
       // Clean up slot format - remove "hour-" prefix if present
       slot = slot.replace('hour-', '');
       
@@ -132,32 +140,22 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
     window.addEventListener("mouseup", onUp);
   }
 
-  // Drag-and-drop within planner (supports cross-hour moves)
-  function handleDragEnd(result: DropResult) {
-    if (!result.destination) return;
-    const { source, destination, draggableId } = result;
+  // Remove task from hourly planner (with option to delete entirely)
+  const removeTaskFromPlanner = (taskId: string, permanentDelete = false) => {
+    console.log('🗑️ Removing task from planner:', { taskId, permanentDelete });
     
-    // If moving between different time slots, update the task's hourSlot
-    if (source.droppableId !== destination.droppableId) {
-      // Strip "hour-" prefix from droppableId to get the actual hour slot
-      const newHourSlot = destination.droppableId.replace('hour-', '');
-      
-      console.log('🔄 Moving task between time slots:', {
-        taskId: draggableId,
-        from: source.droppableId,
-        to: destination.droppableId,
-        newHourSlot
+    if (permanentDelete) {
+      // Permanently delete the task
+      deleteTask(taskId).catch(error => {
+        console.error('Failed to delete task:', error);
       });
-      
-      // Update the task with the new time slot
+    } else {
+      // Just clear the hourSlot to remove from planner
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: newHourSlot } as any },
+        { taskId, updates: { hourSlot: null } as any },
       ]);
     }
-    
-    // Note: Reordering within the same hour is handled visually by DnD
-    // but doesn't need persistence since Todoist doesn't support task ordering
-  }
+  };
 
   // Current time indicator ----------------------------------------------------
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -175,15 +173,6 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
   // ---------------------------------------------------------------------------
   return (
     <div className={`space-y-2 ${className}`}>
-      <DragDropContext 
-        onDragEnd={handleDragEnd}
-        onDragStart={(start) => {
-          console.log('📎 Drag started:', {
-            draggableId: start.draggableId,
-            source: start.source
-          });
-        }}
-      >
         {hours.map((disp) => (
           <Droppable key={disp} droppableId={`hour-${disp}`}>
             {(provided) => (
@@ -206,7 +195,7 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
                             ...(resizingTask?.taskId === t.id ? { transform: "none", transition: "none" } : {}),
                             height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
                           }}
-                          className="relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                          className="group relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
                         >
                           <div className="flex items-start gap-2.5 w-full h-full min-h-[36px]">
                             <div className="flex-shrink-0 mt-1.5">
@@ -219,6 +208,16 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
                               </div>
                               <div className="font-semibold truncate">{t.content}</div>
                             </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeTaskFromPlanner(t.id, true); // true = permanently delete
+                              }}
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded p-1 transition-opacity"
+                              title="Delete task permanently"
+                            >
+                              <X size={12} className="text-red-500" />
+                            </button>
                           </div>
                           <div
                             onMouseDown={(e) => startResize(e, disp, t.id)}
@@ -245,7 +244,6 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
             )}
           </Droppable>
         ))}
-      </DragDropContext>
     </div>
   );
 }
