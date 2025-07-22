@@ -96,7 +96,7 @@ import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import TrendsPanel from "./trends-panel";
-import { TasksProvider } from "@/contexts/tasks-context";
+import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
 
 // Icon mapping for serialization
@@ -260,7 +260,11 @@ const SUGGESTED_BUCKETS = [
   "Meals",
 ];
 
-export function TaskBoardDashboard() {
+// Inner component that uses TasksContext
+function TaskBoardDashboardInner() {
+  // Access tasks context for scheduled tasks
+  const { scheduledTasks, refetch, batchUpdateTasks } = useTasksContext();
+  
   const [buckets, setBuckets] = useState<string[]>([]);
   const [activeBucket, setActiveBucket] = useState<string>("");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -771,13 +775,26 @@ export function TaskBoardDashboard() {
   };
 
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+    console.log('🚀 DRAG EVENT DETECTED! handleDragEnd called');
+    console.log('🎯 Drag end triggered:', {
+      source: result.source,
+      destination: result.destination,
+      draggableId: result.draggableId
+    });
+    
+    if (!result.destination) {
+      console.log('❌ No destination, drag cancelled');
+      return;
+    }
+    
     const { source, destination, draggableId } = result;
+    
     // If dropped in the same list and at same index, do nothing
     if (
       source.droppableId === destination.droppableId &&
       source.index === destination.index
     ) {
+      console.log('↩️ Same position, no action needed');
       return;
     }
 
@@ -785,146 +802,97 @@ export function TaskBoardDashboard() {
     const removeById = (arr: any[], id: string) => arr.filter((t) => t.id.toString() !== id);
 
     // ------------------------------------------------------------------
-    // 1) Moves involving the hourly planner
+    // 1) Moves involving the hourly planner - now using TasksContext
     // ------------------------------------------------------------------
-    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-      // Re-arrange or move between hours
-      setHourlyPlan((prev) => {
-        const next = { ...prev };
-        const srcHour = hourKey(source.droppableId);
-        const dstHour = hourKey(destination.droppableId);
-        const srcArr = [...next[srcHour]];
-        const [moved] = srcArr.splice(source.index, 1);
-        if (!moved) return prev;
-        next[srcHour] = srcArr;
-        const dstArr = [...next[dstHour]];
-        dstArr.splice(destination.index, 0, moved);
-        next[dstHour] = dstArr;
-        return next;
-      });
-      return;
-    }
-
+    
+    // Note: The HourlyPlanner component now uses TasksContext, so we need to
+    // update tasks through the batch update API instead of local state
+    
     if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
-      // Daily ➜ Hour slot (no due-date change)
+      console.log('📅 Daily task ➜ Hour slot detected');
+      // Daily ➜ Hour slot - schedule the task
       const moved = todoistTasks[source.index];
-      if (!moved) return;
+      if (!moved) {
+        console.log('❌ No task found at source index');
+        return;
+      }
 
-      // Remove from daily list
-      setTodoistTasks((prev) => {
-        const next = [...prev];
-        next.splice(source.index, 1);
-        return next;
-      });
-
-      // Add to planner
       const dstHour = hourKey(destination.droppableId);
-      setHourlyPlan((prev) => {
-        const next = { ...prev };
-        const arr = [...next[dstHour]];
-        arr.splice(destination.index, 0, moved);
-        next[dstHour] = arr;
-        return next;
-      });
-      return;
-    }
-
-    if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
-      // Hour slot ➜ Daily list
-      const srcHour = hourKey(source.droppableId);
-      const moved = hourlyPlan[srcHour][source.index];
-      if (!moved) return;
-
-      // Remove from planner
-      setHourlyPlan((prev) => {
-        const next = { ...prev };
-        const arr = [...next[srcHour]];
-        arr.splice(source.index, 1);
-        next[srcHour] = arr;
-        return next;
-      });
-
-      // Insert into daily list
-      setTodoistTasks((prev) => {
-        const next = [...prev];
-        next.splice(destination.index, 0, moved);
-        return next;
-      });
+      console.log(`🕰️ Scheduling task "${moved.content}" to ${dstHour}`);
+      
+      try {
+        // Use batchUpdateTasks for optimistic updates
+        await batchUpdateTasks([{
+          taskId: draggableId,
+          updates: { hourSlot: dstHour, duration: 60 } // Default 60 minutes
+        }]);
+        
+        console.log(`✅ Scheduled task "${moved.content}" to ${dstHour}`);
+      } catch (error) {
+        console.error('Failed to schedule task:', error);
+      }
       return;
     }
 
     if (source.droppableId === 'openTasks' && isHour(destination.droppableId)) {
-      // Open list ➜ Hour slot (needs due-date set to today)
+      // Open list ➜ Hour slot - schedule the task and set due date
       const openVisible = allTodoistTasks.filter(
         (t: any) => t.due?.date !== selectedDateStr
       );
       const moved = openVisible[source.index];
       if (!moved) return;
 
-      const updatedDue = moved.due ? { ...moved.due, date: selectedDateStr } : { date: selectedDateStr };
-      const updated = { ...moved, due: updatedDue };
-
-      // Update master list
-      setAllTodoistTasks((prev) => {
-        const without = removeById(prev, draggableId);
-        const openSubset: any[] = [];
-        const datedSubset: any[] = [];
-        without.forEach((task) => {
-          if (task.due?.date === selectedDateStr) datedSubset.push(task);
-          else openSubset.push(task);
-        });
-        datedSubset.push(updated);
-        return [...openSubset, ...datedSubset];
-      });
-
-      // Add to planner
       const dstHour = hourKey(destination.droppableId);
-      setHourlyPlan((prev) => {
-        const next = { ...prev };
-        const arr = [...next[dstHour]];
-        arr.splice(destination.index, 0, updated);
-        next[dstHour] = arr;
-        return next;
-      });
-
-      await updateTaskDueDate(draggableId, selectedDateStr);
+      
+      try {
+        // Use batchUpdateTasks for optimistic updates
+        await batchUpdateTasks([{
+          taskId: draggableId,
+          updates: { 
+            hourSlot: dstHour, 
+            duration: 60 // Default 60 minutes
+          }
+        }]);
+        
+        // Also update the due date
+        await updateTaskDueDate(draggableId, selectedDateStr);
+        
+        console.log(`✅ Scheduled task "${moved.content}" from open list to ${dstHour}`);
+      } catch (error) {
+        console.error('Failed to schedule task from open list:', error);
+      }
       return;
     }
 
-    if (isHour(source.droppableId) && destination.droppableId === 'openTasks') {
-      // Hour slot ➜ Open list (clear due-date)
+    // Handle hour-to-hour moves (moving tasks between time slots)
+    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+      console.log('🕐 Hour ➜ Hour slot detected');
       const srcHour = hourKey(source.droppableId);
-      const moved = hourlyPlan[srcHour][source.index];
-      if (!moved) return;
-
-      const clearedDue = moved.due ? { ...moved.due, date: null } : { date: null };
-      const cleared = { ...moved, due: clearedDue };
-
-      // Remove from planner
-      setHourlyPlan((prev) => {
-        const next = { ...prev };
-        const arr = [...next[srcHour]];
-        arr.splice(source.index, 1);
-        next[srcHour] = arr;
-        return next;
-      });
-
-      // Insert into open list ui order
-      setAllTodoistTasks((prev) => {
-        const without = removeById(prev, draggableId);
-        const openSubset: any[] = [];
-        const datedSubset: any[] = [];
-        without.forEach((task) => {
-          if (task.due?.date === selectedDateStr) datedSubset.push(task);
-          else openSubset.push(task);
-        });
-        openSubset.splice(destination.index, 0, cleared);
-        return [...openSubset, ...datedSubset];
-      });
-
-      await updateTaskDueDate(draggableId, null);
+      const dstHour = hourKey(destination.droppableId);
+      
+      if (srcHour === dstHour) {
+        console.log('↩️ Same hour slot, no action needed');
+        return;
+      }
+      
+      console.log(`🔄 Moving task from ${srcHour} to ${dstHour}`);
+      
+      try {
+        // Use batchUpdateTasks for optimistic updates
+        await batchUpdateTasks([{
+          taskId: draggableId,
+          updates: { hourSlot: dstHour }
+        }]);
+        
+        console.log(`✅ Successfully moved task from ${srcHour} to ${dstHour}`);
+      } catch (error) {
+        console.error('Failed to move task between hours:', error);
+      }
       return;
     }
+
+    // Skip old hourly planner logic since HourlyPlanner component now handles
+    // its own drag and drop through TasksContext
 
     // ------------------------------------------------------------------
     // 2) Existing logic (daily ⟷ open etc.)
@@ -1742,12 +1710,25 @@ export function TaskBoardDashboard() {
       });
 
       if (!res.ok) {
-        console.error('Failed to create task', await res.text());
-        throw new Error('Todoist create failed');
+        const errorText = await res.text();
+        console.error('Failed to create task:', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorText,
+          requestBody: { content: trimmed, dueDate }
+        });
+        throw new Error(`Todoist create failed: ${res.status} ${errorText}`);
       }
 
       const { task } = await res.json();
       if (!task) throw new Error('No task returned');
+
+      console.log('✅ Task created successfully:', {
+        id: task.id,
+        content: task.content,
+        due: task.due,
+        dueDate
+      });
 
       task.completed = false;
 
@@ -2084,11 +2065,9 @@ export function TaskBoardDashboard() {
   // Convenience: tasks in planner so we can hide them from the daily list
   const assignedTaskIds = useMemo(() => {
     return new Set(
-      Object.values(hourlyPlan)
-        .flat()
-        .map((t) => t.id.toString())
+      scheduledTasks.map((t) => t.id.toString())
     );
-  }, [hourlyPlan]);
+  }, [scheduledTasks]);
   const dailyVisibleTasks = todoistTasks.filter(
     (t) => !assignedTaskIds.has(t.id.toString())
   );
@@ -2219,7 +2198,6 @@ export function TaskBoardDashboard() {
   }, [checkAndResetWidgets]);
 
   return (
-    <TasksProvider selectedDate={selectedDate}>
       <div className="flex-1">
       <div className="flex flex-col">
 
@@ -3005,7 +2983,7 @@ export function TaskBoardDashboard() {
                         </div>
 
                         <ul
-                          className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
                           style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
                         >
                           {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
@@ -3077,7 +3055,7 @@ export function TaskBoardDashboard() {
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200 ${(taskView as any)==='Today' ? 'hidden' : ''}`}
+                        className={`space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 ${(taskView as any)==='Today' ? 'hidden' : ''}`}
                         style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
                       >
                         {isLoadingAllTasks && openTasksToShow.length === 0 ? (
@@ -3154,7 +3132,7 @@ export function TaskBoardDashboard() {
                         </div>
 
                         <ul
-                          className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
                           style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
                         >
                           {dailyVisibleTasks.map((t: any, index: number) => (
@@ -3200,7 +3178,7 @@ export function TaskBoardDashboard() {
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
                       >
                         {isLoadingAllTasks && openTasksToShow.length === 0 ? (
@@ -3273,10 +3251,10 @@ export function TaskBoardDashboard() {
                         {isPlannerCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                       </div>
                       <div
-                        ref={plannerRef} className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
-                        style={{ maxHeight: isPlannerCollapsed ? 0 : '16rem' }}
+                        ref={plannerRef} className="space-y-2 pr-1 transition-[max-height] duration-200"
+                        style={{ maxHeight: isPlannerCollapsed ? 0 : 'none' }}
                       >
-                        {!isPlannerCollapsed && <HourlyPlanner className="max-h-full" />}
+                        {!isPlannerCollapsed && <HourlyPlanner className="" />}
                       </div>
                     </>
                   )}
@@ -3423,6 +3401,16 @@ export function TaskBoardDashboard() {
       </div>
       <ChatBar />
       </div>
+  );
+}
+
+// Main exported component that wraps with TasksProvider
+export function TaskBoardDashboard() {
+  const [selectedDate] = useState(new Date());
+  
+  return (
+    <TasksProvider selectedDate={selectedDate}>
+      <TaskBoardDashboardInner />
     </TasksProvider>
   );
 }
