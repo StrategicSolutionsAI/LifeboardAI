@@ -1,307 +1,152 @@
+/* eslint-disable */
 "use client";
 
-// Reusable sidebar component shared between Dashboard and Calendar pages
-// -------------------------------------------------------------------
-// This file is essentially a self-contained copy of the sidebar logic that
-// originally lived inside taskboard-dashboard.tsx.  Until we have a more
-// sophisticated shared state layer, duplicating the logic here is the most
-// pragmatic way to unblock reuse on the Calendar page without refactoring the
-// entire dashboard.  Once things stabilise we can DRY it up further.
-
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-} from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { format, addDays, isSameDay } from "date-fns";
-import {
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
-import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  type DropResult,
-} from "@hello-pangea/dnd";
-import { supabase } from "@/utils/supabase/client";
+import { ChevronRight, ChevronDown } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { useTasksContext } from "@/contexts/tasks-context";
+import HourlyPlanner from "./hourly-planner";
 
-// -----------------------------------------------------------------------------
-// Component
-// -----------------------------------------------------------------------------
+interface Task {
+  id: string | number;
+  content: string;
+  completed: boolean;
+  hourSlot?: string;
+}
+
 export function TaskSidePanel() {
-  /**
-   * Basic calendar / date state
-   */
+  // Basic calendar / date state
   const [date, setDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const selectedDateStr = `${selectedDate.getFullYear()}-${String(
     selectedDate.getMonth() + 1
   ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
 
-  function handleDateChange(newDate: Date) {
+  const handleDateChange = useCallback((newDate: Date) => {
     const d = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
     setDate(d);
     setSelectedDate(d);
-  }
+  }, []);
 
-  // Utility: the 7-day window centred on `date` (Mon-Sun style)
-  const getWeekDays = () => {
+  // Week days for the currently visible week
+  const weekDays = useMemo(() => {
     const start = new Date(date);
     start.setDate(start.getDate() - start.getDay()); // move to Sunday
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  };
+  }, [date]);
 
-  /**
-   * Todoist task fetching / state
-   */
-  const [todoistTasks, setTodoistTasks] = useState<any[]>([]);
-  const [allTodoistTasks, setAllTodoistTasks] = useState<any[]>([]);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
-  const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
+  // Use unified task context
+  const {
+    dailyVisibleTasks, // Tasks without hourSlot
+    allTasks,
+    loading,
+    createTask,
+    toggleTaskCompletion,
+    batchUpdateTasks,
+  } = useTasksContext();
 
-  async function fetchDailyTasks() {
-    setIsLoadingTasks(true);
-    try {
-      const iso = selectedDate.toISOString().split("T")[0];
-      const res = await fetch(`/api/integrations/todoist/tasks?date=${iso}`);
-      if (res.ok) {
-        const data = await res.json();
-        const tasks: any[] = Array.isArray(data) ? data : (data.tasks ?? []);
-        setTodoistTasks(tasks);
-      }
-    } finally {
-      setIsLoadingTasks(false);
-    }
-  }
+  // Filter tasks for display
+  const openTasksToShow = useMemo(() => 
+    allTasks.filter(t => !t.completed), 
+    [allTasks]
+  );
 
-  async function fetchAllOpenTasks() {
-    setIsLoadingAllTasks(true);
-    try {
-      const res = await fetch(`/api/integrations/todoist/tasks?all=true`);
-      if (res.ok) {
-        const data = await res.json();
-        const tasks: any[] = Array.isArray(data) ? data : (data.tasks ?? []);
-        setAllTodoistTasks(tasks);
-      }
-    } finally {
-      setIsLoadingAllTasks(false);
-    }
-  }
-
-  // Load tasks on mount + whenever the selected date changes
-  useEffect(() => {
-    fetchDailyTasks();
-  }, [selectedDate]);
-
-  useEffect(() => {
-    fetchAllOpenTasks();
-  }, []);
-
-  /**
-   * Derived subsets used in the UI
-   */
-  const dailyVisibleTasks = useMemo(() => (Array.isArray(todoistTasks) ? todoistTasks.filter((t) => !t.completed) : []), [todoistTasks]);
-  const openTasksToShow = useMemo(() => (Array.isArray(allTodoistTasks) ? allTodoistTasks.filter((t) => !t.completed) : []), [allTodoistTasks]);
-
-  /**
-   * New-task input helpers
-   */
+  // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
   const [newOpenTask, setNewOpenTask] = useState("");
 
-  async function createTask(content: string, dueDate: string | null) {
-    const trimmed = content.trim();
-    if (!trimmed) return;
-
-    const tempId = `temp-${Date.now()}`;
-    const optimistic: any = {
-      id: tempId,
-      content: trimmed,
-      completed: false,
-      due: dueDate ? { date: dueDate } : null,
-    };
-
-    setAllTodoistTasks((prev) => [optimistic, ...prev]);
-    if (dueDate) setTodoistTasks((prev) => [optimistic, ...prev]);
-
-    try {
-      const res = await fetch("/api/integrations/todoist/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: trimmed, dueDate }),
-      });
-      if (res.ok) {
-        const real = await res.json();
-        setAllTodoistTasks((prev) => prev.map((t) => (t.id === tempId ? real : t)));
-        setTodoistTasks((prev) => prev.map((t) => (t.id === tempId ? real : t)));
-      }
-    } catch {
-      // Roll back on failure
-      setAllTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
-      setTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
+  const handleAddDailyTask = async () => {
+    if (newDailyTask.trim()) {
+      await createTask(newDailyTask, selectedDateStr);
+      setNewDailyTask("");
     }
-  }
-
-  const handleAddDailyTask = () => {
-    createTask(newDailyTask, selectedDateStr);
-    setNewDailyTask("");
-  };
-  const handleAddOpenTask = () => {
-    createTask(newOpenTask, null);
-    setNewOpenTask("");
   };
 
-  /**
-   * Task completion toggle (optimistic)
-   */
-  async function toggleTaskCompletion(taskId: string) {
-    const isCompleted = allTodoistTasks.find((t) => t.id.toString() === taskId)?.completed ?? false;
-    const newVal = !isCompleted;
-
-    const update = (arr: any[]) =>
-      arr.map((t) => (t.id.toString() === taskId ? { ...t, completed: newVal } : t));
-
-    setAllTodoistTasks((prev) => update(prev));
-    setTodoistTasks((prev) => update(prev));
-
-    const endpoint = newVal ? "/api/integrations/todoist/tasks/complete" : "/api/integrations/todoist/tasks/reopen";
-    try {
-      await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
-    } catch {
-      // best-effort; leave UI as-is on error
+  const handleAddOpenTask = async () => {
+    if (newOpenTask.trim()) {
+      await createTask(newOpenTask, null);
+      setNewOpenTask("");
     }
-  }
+  };
 
-  /**
-   * Drag-and-drop between lists and hourly planner
-   */
-  const HOUR_HEIGHT = 48;
-  const hours = useMemo(() => Array.from({ length: 15 }, (_, i) => {
-    const h = 7 + i;
-    return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
-  }), []);
-
-  const [hourlyPlan, setHourlyPlan] = useState<Record<string, any[]>>(() => {
-    const obj: Record<string, any[]> = {};
-    hours.forEach((h) => (obj[h] = []));
-    return obj;
-  });
-
-  const [resizingTask, setResizingTask] = useState<{
-    taskId: string;
-    hour: string;
-  } | null>(null);
-  const resizeStartRef = useRef<{
-    y: number;
-    duration: number;
-    taskId: string;
-    hour: string;
-  } | null>(null);
-
-  function startResize(e: React.MouseEvent, hour: string, taskId: string) {
-    e.stopPropagation();
-    e.preventDefault();
-
-    const startY = e.clientY;
-    const task = hourlyPlan[hour].find((t) => t.id.toString() === taskId);
-    const startDuration = task?.duration ?? 60;
-    resizeStartRef.current = { y: startY, duration: startDuration, taskId, hour };
-    setResizingTask({ taskId, hour });
-
-    function onMove(ev: MouseEvent) {
-      if (!resizeStartRef.current) return;
-      const delta = ev.clientY - resizeStartRef.current.y;
-      const minutes = Math.max(15, Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / 15) * 15);
-      setHourlyPlan((prev) => {
-        const copy = { ...prev };
-        copy[hour] = copy[hour].map((t) =>
-          t.id.toString() === taskId ? { ...t, duration: minutes } : t
-        );
-        return copy;
-      });
-    }
-
-    async function onUp() {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      setResizingTask(null);
-
-      if (resizeStartRef.current) {
-        const { taskId: id, hour: hr } = resizeStartRef.current;
-        const task = hourlyPlan[hr].find((t) => t.id.toString() === id);
-        if (task) {
-          await fetch("/api/integrations/todoist/tasks/update-duration", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskId: id, duration: task.duration ?? 60 }),
-          });
-        }
-      }
-      resizeStartRef.current = null;
-    }
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }
-
+  // Unified drag and drop handler
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
 
-    // Simple case: same list reorder
-    if (source.droppableId === destination.droppableId) {
-      if (source.index === destination.index) return;
-      if (source.droppableId === "dailyTasks") {
-        setTodoistTasks((prev) => {
-          const copy = [...prev];
-          const [moved] = copy.splice(source.index, 1);
-          copy.splice(destination.index, 0, moved);
-          return copy;
-        });
-      } else if (source.droppableId === "openTasks") {
-        setAllTodoistTasks((prev) => {
-          const copy = [...prev];
-          const [moved] = copy.splice(source.index, 1);
-          copy.splice(destination.index, 0, moved);
-          return copy;
-        });
-      }
+    // Helper functions
+    const isHour = (id: string) => id.startsWith('hour-');
+    const hourKey = (id: string) => id.replace('hour-', '');
+
+    // Same list reorder - no API call needed for now
+    if (source.droppableId === destination.droppableId && source.index !== destination.index) {
+      // not implemented yet
       return;
     }
 
-    // Planner ↔ lists moves and list-to-list transfers elided for brevity
-    // ------------------------------------------------------------------
-    // For now we only support reordering within a single list in this
-    // shared component.  Dashboard keeps its full fidelity behaviour.
+    // Handle moves to/from hourly planner
+    if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
+      // Daily task → Hour slot: Set the hourSlot to schedule the task
+      const dstHour = hourKey(destination.droppableId);
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: dstHour } }
+      ]).catch(error => {
+        console.error('Failed to update task hourSlot:', error);
+      });
+      return;
+    }
+
+    if (source.droppableId === 'openTasks' && isHour(destination.droppableId)) {
+      // Open task → Hour slot: Set the hourSlot to schedule the task  
+      const dstHour = hourKey(destination.droppableId);
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: dstHour } }
+      ]).catch(error => {
+        console.error('Failed to update task hourSlot:', error);
+      });
+      return;
+    }
+
+    if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
+      // Hour slot → Daily list: Remove hourSlot to unschedule the task
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: undefined } }
+      ]).catch(error => {
+        console.error('Failed to remove task hourSlot:', error);
+      });
+      return;
+    }
+
+    if (isHour(source.droppableId) && destination.droppableId === 'openTasks') {
+      // Hour slot → Open list: Remove hourSlot to unschedule the task
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: undefined } }
+      ]).catch(error => {
+        console.error('Failed to remove task hourSlot:', error);
+      });
+      return;
+    }
+
+    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+      // Hour slot → Different hour slot: Update the hourSlot
+      const dstHour = hourKey(destination.droppableId);
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { hourSlot: dstHour } }
+      ]).catch(error => {
+        console.error('Failed to update task hourSlot:', error);
+      });
+      return;
+    }
   }
 
-  /** UI collapse controls */
+  // UI collapse controls
   const [taskView, setTaskView] = useState<"Today" | "Upcoming" | "Master List">("Today");
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
 
-  // Current time indicator for hourly planner
-  const [currentTime, setCurrentTime] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setCurrentTime(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-  const currentHourDisplay = useMemo(() => {
-    const h = currentTime.getHours();
-    return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
-  }, [currentTime]);
-
-  // -----------------------------------------------------------------------------
-  // RENDER
-  // -----------------------------------------------------------------------------
   return (
     <aside className="w-[400px] flex-shrink-0 -mt-12">
       <div className="rounded-lg border border-gray-100 bg-white p-6 shadow-sm h-full flex flex-col">
@@ -316,7 +161,7 @@ export function TaskSidePanel() {
 
         {/* Week strip */}
         <div className="flex justify-between gap-3 overflow-x-auto pb-2">
-          {getWeekDays().map((day, idx) => (
+          {weekDays.map((day, idx) => (
             <button
               key={idx}
               onClick={() => handleDateChange(day)}
@@ -352,7 +197,7 @@ export function TaskSidePanel() {
         </div>
 
         {/* Lists */}
-        <div className="mt-6 flex-1 overflow-hidden flex flex-col">
+        <div className="mt-6 flex-1 overflow-hidden flex flex-col" style={{ transform: 'none' }}>
           <DragDropContext onDragEnd={handleDragEnd}>
             {/* Today view */}
             {taskView === "Today" && (
@@ -373,11 +218,11 @@ export function TaskSidePanel() {
                         className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isDailyCollapsed ? 0 : "10rem" }}
                       >
-                        {isLoadingTasks && dailyVisibleTasks.length === 0 && <li className="text-gray-500">Loading…</li>}
-                        {!isLoadingTasks && dailyVisibleTasks.length === 0 && <li className="text-gray-500">No tasks</li>}
+                        {loading && dailyVisibleTasks.length === 0 && <li className="text-gray-500">Loading…</li>}
+                        {!loading && dailyVisibleTasks.length === 0 && <li className="text-gray-500">No tasks</li>}
 
-                        {dailyVisibleTasks.map((t: any, index: number) => (
-                          <Draggable key={t.id} draggableId={t.id.toString()} index={index} isDragDisabled={!!resizingTask}>
+                        {dailyVisibleTasks.map((t: Task, index: number) => (
+                          <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
                             {(prov) => (
                               <li
                                 ref={prov.innerRef}
@@ -423,7 +268,7 @@ export function TaskSidePanel() {
               </>
             )}
 
-            {/* Upcoming & Master List share the open-tasks list */}
+            {/* Master List view */}
             {taskView === "Master List" && (
               <>
                 <div
@@ -442,11 +287,11 @@ export function TaskSidePanel() {
                       className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
                       style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
                     >
-                      {isLoadingAllTasks && openTasksToShow.length === 0 && <li className="text-gray-500">Loading…</li>}
-                      {!isLoadingAllTasks && openTasksToShow.length === 0 && <li className="text-gray-500">No tasks</li>}
+                      {loading && openTasksToShow.length === 0 && <li className="text-gray-500">Loading…</li>}
+                      {!loading && openTasksToShow.length === 0 && <li className="text-gray-500">No tasks</li>}
 
-                      {openTasksToShow.map((t: any, index: number) => (
-                        <Draggable key={t.id} draggableId={t.id.toString()} index={index} isDragDisabled={!!resizingTask}>
+                      {openTasksToShow.map((t: Task, index: number) => (
+                        <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
                           {(prov) => (
                             <li
                               ref={prov.innerRef}
@@ -471,10 +316,27 @@ export function TaskSidePanel() {
                     </ul>
                   )}
                 </Droppable>
+
+                {/* Add new open task */}
+                {!isOpenCollapsed && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add task…"
+                      value={newOpenTask}
+                      onChange={(e) => setNewOpenTask(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddOpenTask()}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button onClick={handleAddOpenTask} className="text-sm text-indigo-600 hover:underline">
+                      Add
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
-            {/* Hourly planner (7 AM → 9 PM) */}
+            {/* Hourly planner - Unified component */}
             {taskView === "Today" && (
               <>
                 <div
@@ -485,98 +347,10 @@ export function TaskSidePanel() {
                   {isPlannerCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                 </div>
                 <div
-                  className="space-y-2 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                  className="overflow-y-auto pr-1 transition-[max-height] duration-200"
                   style={{ maxHeight: isPlannerCollapsed ? 0 : "16rem" }}
                 >
-                  {hours.map((disp) => (
-                    <Droppable key={disp} droppableId={`hour-${disp}`}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
-                        >
-                          <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
-                          <ul className="flex-1 flex flex-col gap-3">
-                            {hourlyPlan[disp].map((t: any, index: number) => (
-                              <Draggable key={t.id} draggableId={t.id.toString()} index={index} isDragDisabled={!!resizingTask}>
-                                {(prov) => (
-                                  <li
-                                    ref={prov.innerRef}
-                                    {...prov.draggableProps}
-                                    {...prov.dragHandleProps}
-                                    style={{
-                                      ...prov.draggableProps.style,
-                                      ...(resizingTask?.taskId === t.id ? { transform: "none", transition: "none" } : {}),
-                                      height: `${((t.duration ?? 60) / 60) * HOUR_HEIGHT}px`,
-                                    }}
-                                    className="relative flex items-start gap-2.5 px-3.5 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
-                                  >
-                                    <div className="flex items-start gap-2.5 w-full h-full min-h-[36px]">
-                                      <div className="flex-shrink-0 mt-1.5">
-                                        <div className="w-2 h-2 bg-[#8A96FF] rounded-full" />
-                                      </div>
-                                      <div className="flex flex-col w-full justify-center min-w-0">
-                                        {(() => {
-                                          // Calculate start time from the hour slot
-                                          const startHour12 = parseInt(disp.replace(/[^0-9]/g, '')) || 12;
-                                          const isPM = disp.includes("PM");
-                                          
-                                          // Calculate end time from duration
-                                          const dur = t.duration ?? 60;
-                                          const start24 = (startHour12 % 12) + (isPM ? 12 : 0);
-                                          const endTotal = start24 * 60 + dur;
-                                          const end24 = Math.floor(endTotal / 60);
-                                          const endMin = endTotal % 60;
-                                          const endHour12 = end24 > 12 ? end24 - 12 : (end24 === 0 ? 12 : end24);
-                                          const endIsPM = end24 >= 12;
-                                          
-                                          // Format time range appropriately
-                                          const startTime = `${startHour12}:00 ${isPM ? 'PM' : 'AM'}`;
-                                          const endTime = `${endHour12}:${endMin.toString().padStart(2, '0')} ${endIsPM ? 'PM' : 'AM'}`;
-                                          const timeRange = `${startTime} - ${endTime}`;
-                                          
-                                          // For very short tasks under 20 minutes, only show content if there's room
-                                          const showContent = dur >= 20;
-                                          
-                                          return (
-                                            <>
-                                              <div className="text-xs text-gray-500 leading-tight mb-0.5">{timeRange}</div>
-                                              {showContent && (
-                                                <div className="font-semibold truncate">
-                                                  {t.content}
-                                                </div>
-                                              )}
-                                            </>
-                                          );
-                                        })()} 
-                                      </div>
-                                    </div>
-                                    <div
-                                      onMouseDown={(e) => startResize(e, disp, t.id.toString())}
-                                      className="absolute -bottom-1 left-0 right-0 h-2 cursor-ns-resize bg-purple-200 hover:bg-purple-300 rounded-b-md"
-                                    />
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-
-                          {/* current time indicator */}
-                          {disp === currentHourDisplay && (
-                            <div
-                              className="absolute inset-x-0 pointer-events-none flex items-center"
-                              style={{ top: `${(currentTime.getMinutes() / 60) * 100}%` }}
-                            >
-                              <span className="w-2.5 h-2.5 bg-[#8A96FF] rounded-full" />
-                              <div className="flex-1 h-[2px] bg-[#8A96FF]" />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Droppable>
-                  ))}
+                  <HourlyPlanner showTimeIndicator={true} allowResize={true} />
                 </div>
               </>
             )}

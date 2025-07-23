@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
       
       return {
         ...task,
-        duration: metadata.duration || 60, // Default 1 hour
-        hourSlot: metadata.hourSlot || '9AM', // Default 9 AM
+        duration: metadata.duration, // Only include if exists
+        hourSlot: metadata.hourSlot, // Only include if exists - no default
       };
     });
 
@@ -95,7 +95,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, dueDate } = await request.json();
+    const { content, dueDate, due_date, hour_slot } = await request.json();
+    const actualDueDate = dueDate || due_date; // Support both formats
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content required' }, { status: 400 });
@@ -121,9 +122,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    const body: Record<string, string> = { content };
-    if (dueDate) {
-      body['due_date'] = dueDate; // YYYY-MM-DD
+    let taskContent = content;
+    if (hour_slot) {
+      taskContent = `${content} [LIFEBOARD_META]{\"hourSlot\":\"${hour_slot}\"}[/LIFEBOARD_META]`;
+    }
+
+    const body: Record<string, string> = { content: taskContent };
+    if (actualDueDate) {
+      body['due_date'] = actualDueDate; // YYYY-MM-DD
     }
 
     const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {

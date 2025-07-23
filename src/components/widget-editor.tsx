@@ -563,7 +563,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
                         return `${daysSince} days clean`;
                       })()}
                     </div>
-                    {draft.quitHabitData.costPerDay > 0 && (
+                    {draft.quitHabitData?.costPerDay && draft.quitHabitData.costPerDay > 0 && (
                       <div>💰 Daily savings: {draft.quitHabitData.currency}{draft.quitHabitData.costPerDay}</div>
                     )}
                   </div>

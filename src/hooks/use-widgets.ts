@@ -28,7 +28,6 @@ export function useWidgets() {
   const {
     data: userPrefs,
     loading: prefsLoading,
-    updateOptimistically: updatePrefsOptimistically,
     refetch: refetchPrefs
   } = useGlobalCache('user-preferences', getUserPreferencesClient, {
     ttl: 10 * 60 * 1000 // 10 minutes
@@ -75,16 +74,6 @@ export function useWidgets() {
       }
     }
     
-    // Update cache optimistically
-    updatePrefsOptimistically(current => {
-      if (!current) return null
-      return {
-        ...current,
-        widgets_by_bucket: widgets,
-        progress_by_widget: progress || current.progress_by_widget
-      }
-    })
-    
     // Save to Supabase
     try {
       const currentPrefs = await getUserPreferencesClient()
@@ -105,7 +94,7 @@ export function useWidgets() {
       setSavingStatus('error')
       setTimeout(() => setSavingStatus('idle'), 2000)
     }
-  }, [updatePrefsOptimistically])
+  }, [])
   
   // Debounced save function
   const debouncedSave = useRef(

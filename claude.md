@@ -56,20 +56,3 @@ Key directories:
 
 ## Environment Considerations
 - Code takes into account different environments: dev, test, and prod
-
-## Development Workflow
-- After completing ANY task, ALWAYS restart the server
-- MANDATORY: Kill and restart server after every completed task
-- Preferred refresh method: Kill any existing servers and start a new one
-  ```bash
-  # Kill any running Next.js processes
-  pkill -f "next"
-  # Start the server again
-  npm run dev
-  ```
-- Alternative: Touch configuration files to trigger refresh
-  ```bash
-  touch next.config.js
-  ```
-- Always verify server has restarted and changes are visible
-- This must happen automatically after every task completion

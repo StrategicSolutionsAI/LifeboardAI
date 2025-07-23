@@ -12,7 +12,8 @@ import {
   Settings,
   Search,
   Bell,
-  User
+  User,
+  Zap
 } from "lucide-react"
 import { supabase } from "@/utils/supabase/client"
 
@@ -23,6 +24,7 @@ interface SidebarLayoutProps {
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
+  { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
   { href: "/history", icon: History, label: "History" },

@@ -73,20 +73,32 @@ export async function POST(request: NextRequest) {
               existingMeta = JSON.parse(metaMatch[1]);
             }
           } catch (e) {
-            // Ignore parsing errors
+            console.warn(`Failed to parse metadata for task ${update.taskId}:`, e);
+            // Keep existing meta as empty object
           }
         }
 
         // Merge updates with existing metadata
         const newMeta = {
           ...existingMeta,
-          ...(update.updates.duration && { duration: update.updates.duration }),
-          ...(update.updates.hourSlot && { hourSlot: update.updates.hourSlot }),
+          ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
+          ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
         };
+
+        // Handle null values by removing them from metadata  
+        if (update.updates.hourSlot === null) {
+          delete newMeta.hourSlot;
+          console.log(`Removing hourSlot from task ${update.taskId}`);
+        }
+        if (update.updates.duration === null) {
+          delete newMeta.duration;
+          console.log(`Removing duration from task ${update.taskId}`);
+        }
 
         // Build new description with metadata
         const baseDescription = currentTask.description?.replace(/\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]/g, '').trim() || '';
         const newDescription = baseDescription + `\n[LIFEBOARD_META]${JSON.stringify(newMeta)}[/LIFEBOARD_META]`;
+        
 
         // Prepare update payload for Todoist
         const todoistUpdate: any = {};
@@ -113,15 +125,30 @@ export async function POST(request: NextRequest) {
         });
 
         if (updateRes.ok) {
-          results.push({ taskId: update.taskId, success: true });
+          const updatedTask = await updateRes.json();
+          console.log(`Successfully updated task ${update.taskId}`);
+          results.push({ 
+            taskId: update.taskId, 
+            success: true, 
+            updatedTask 
+          });
         } else {
           const errorText = await updateRes.text();
-          console.error(`Failed to update task ${update.taskId}:`, errorText);
-          results.push({ taskId: update.taskId, success: false, error: errorText });
+          console.error(`Failed to update task ${update.taskId}:`, {
+            status: updateRes.status,
+            error: errorText,
+            updates: update.updates
+          });
+          results.push({ 
+            taskId: update.taskId, 
+            success: false, 
+            error: errorText,
+            status: updateRes.status
+          });
         }
       } catch (error) {
         console.error(`Error updating task ${update.taskId}:`, error);
-        results.push({ taskId: update.taskId, success: false, error: error.message });
+        results.push({ taskId: update.taskId, success: false, error: error instanceof Error ? error.message : String(error) });
       }
     }
 

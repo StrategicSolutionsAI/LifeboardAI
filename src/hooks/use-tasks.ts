@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
@@ -24,11 +24,6 @@ export function useTasks(selectedDate?: Date) {
     ? format(selectedDate, 'yyyy-MM-dd')
     : format(new Date(), 'yyyy-MM-dd')
   
-  console.log('📅 useTasks Debug:', {
-    selectedDate,
-    dateStr,
-    hasSelectedDate: !!selectedDate
-  });
   
   // Cache key includes date for date-specific tasks
   const dailyCacheKey = `tasks-daily-${dateStr}`
@@ -36,28 +31,47 @@ export function useTasks(selectedDate?: Date) {
   
   // Fetch daily tasks
   const dailyTasksFetcher = useCallback(async () => {
-    console.log('📅 Daily tasks fetcher called for date:', dateStr, 'cache key:', dailyCacheKey)
-    const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
-    if (!res.ok) {
-      console.error('❌ Daily tasks API error:', res.status, res.statusText);
-      throw new Error('Failed to fetch daily tasks')
+    try {
+      const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error(`Daily tasks API error: ${res.status} ${res.statusText}`, errorText)
+        throw new Error(`Failed to fetch daily tasks: ${res.status} ${res.statusText}`)
+      }
+      const data = await res.json()
+      const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
+      return tasks
+    } catch (error) {
+      console.error('Network error fetching daily tasks:', error)
+      // Return empty array instead of throwing to prevent UI crashes
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.warn('Todoist integration may not be configured. Returning empty tasks.')
+        return []
+      }
+      throw error
     }
-    const data = await res.json()
-    const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
-    console.log('📊 Daily tasks response:', {
-      url: `/api/integrations/todoist/tasks?date=${dateStr}`,
-      tasksCount: tasks.length,
-      tasks: tasks.map((t: any) => ({ id: t.id, content: t.content, due: t.due?.date, hourSlot: t.hourSlot }))
-    });
-    return tasks
   }, [dateStr])
   
   // Fetch all open tasks
   const allTasksFetcher = useCallback(async () => {
-    const res = await fetch('/api/integrations/todoist/tasks?all=true')
-    if (!res.ok) throw new Error('Failed to fetch all tasks')
-    const data = await res.json()
-    return Array.isArray(data) ? data : (data.tasks ?? [])
+    try {
+      const res = await fetch('/api/integrations/todoist/tasks?all=true')
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error(`All tasks API error: ${res.status} ${res.statusText}`, errorText)
+        throw new Error(`Failed to fetch all tasks: ${res.status} ${res.statusText}`)
+      }
+      const data = await res.json()
+      return Array.isArray(data) ? data : (data.tasks ?? [])
+    } catch (error) {
+      console.error('Network error fetching all tasks:', error)
+      // Return empty array instead of throwing to prevent UI crashes
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.warn('Todoist integration may not be configured. Returning empty tasks.')
+        return []
+      }
+      throw error
+    }
   }, [])
   
   // Use data cache for both daily and all tasks
@@ -69,7 +83,7 @@ export function useTasks(selectedDate?: Date) {
     refetch: refetchDaily
   } = useDataCache<Task[]>(dailyCacheKey, dailyTasksFetcher, {
     ttl: 5 * 60 * 1000, // 5 minutes
-    prefetch: true
+    prefetch: false // Don't prefetch to avoid immediate errors on mount
   })
   
   const {
@@ -80,11 +94,11 @@ export function useTasks(selectedDate?: Date) {
     refetch: refetchAll
   } = useDataCache<Task[]>(allCacheKey, allTasksFetcher, {
     ttl: 10 * 60 * 1000, // 10 minutes
-    prefetch: true
+    prefetch: false // Don't prefetch to avoid immediate errors on mount
   })
   
   // Optimistic task creation
-  const createTask = useCallback(async (content: string, dueDate: string | null) => {
+  const createTask = useCallback(async (content: string, dueDate: string | null, hourSlot?: number) => {
     const trimmed = content.trim()
     if (!trimmed) return
     
@@ -107,7 +121,7 @@ export function useTasks(selectedDate?: Date) {
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed, dueDate })
+        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot }),
       })
       
       if (!res.ok) throw new Error('Failed to create task')
@@ -231,9 +245,22 @@ export function useTasks(selectedDate?: Date) {
     }
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   
+  // Properly filter tasks for different views
+  const dailyVisibleTasks = useMemo(() => 
+    (dailyTasks || []).filter(t => !t.completed && !t.hourSlot),
+    [dailyTasks]
+  );
+
+  const scheduledTasks = useMemo(() => 
+    (dailyTasks || []).filter(t => !t.completed && t.hourSlot),
+    [dailyTasks]
+  );
+
   return {
     dailyTasks: dailyTasks || [],
     allTasks: allTasks || [],
+    dailyVisibleTasks, // Tasks that should appear in daily list (no hourSlot)
+    scheduledTasks,    // Tasks that should appear in hourly planner (has hourSlot)
     loading: dailyLoading || allLoading,
     error: dailyError || allError,
     createTask,

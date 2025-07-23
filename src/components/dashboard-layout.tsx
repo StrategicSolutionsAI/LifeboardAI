@@ -185,7 +185,7 @@ export function DashboardLayout() {
       {/* Main Content Box with Floating Tabs */}
       <div className="relative max-w-6xl mx-auto mt-32 mb-16">
         {/* Bucket Tabs - Now floating above content */}
-        <div className="flex z-10 -translate-y-6">
+        <div className="flex z-10 -mt-6">
           <div className="px-6 py-2 bg-theme-primary rounded-t-lg flex justify-center items-center">
             <div className="text-white text-xs font-semibold uppercase tracking-wide">{selectedBoard}</div>
           </div>

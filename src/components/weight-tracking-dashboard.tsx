@@ -127,7 +127,7 @@ export function WeightTrackingDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {formatWeight(currentWeight || historyData?.stats.latest)}
+              {formatWeight(currentWeight || historyData?.stats.latest || null)}
             </div>
             {trend && (
               <div className="flex items-center gap-1 mt-1">
@@ -275,7 +275,7 @@ export function WeightTrackingDashboard({
       </Card>
 
       {/* Recent Measurements */}
-      {historyData?.measurements.length > 0 && (
+      {historyData?.measurements && historyData.measurements.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -285,7 +285,7 @@ export function WeightTrackingDashboard({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {historyData.measurements.slice(0, 5).map((measurement) => (
+              {historyData?.measurements?.slice(0, 5).map((measurement) => (
                 <div key={measurement.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <div className="font-medium">

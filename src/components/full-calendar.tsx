@@ -75,7 +75,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
   
   // Get tasks from context
-  const { allTasks, batchUpdateTasks } = useTasksContext();
+  const { allTasks, scheduledTasks, batchUpdateTasks } = useTasksContext();
   
   // Use calendar sync hook
   const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
@@ -173,7 +173,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const rows = getMatrix();
 
-  // Handle drag and drop for hourly planner
+  // Unified drag and drop handler for calendar day view
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
 
@@ -183,21 +183,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     const isHour = (id: string) => id.startsWith('hour-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
-    // Handle moves between hour slots
+    // Handle moves between hour slots in day view
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       // Hour slot → Different hour slot: Update the hourSlot
       const dstHour = hourKey(destination.droppableId);
-      console.log('⏰ Moving task between hour slots:', { draggableId, dstHour });
+      console.log('⏰ Moving task between hour slots in calendar day view:', { draggableId, dstHour });
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } as any }
+        { taskId: draggableId, updates: { hourSlot: dstHour } }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
       return;
     }
 
-    console.log('Drag ended:', result);
+    console.log('Unhandled drag operation in calendar:', result);
   };
 
   // Sync propSelectedDate prop with currentDate state
@@ -367,7 +367,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </div>
           
           <DragDropContext onDragEnd={handleDragEnd}>
-            <HourlyPlanner className="max-h-[70vh] overflow-y-auto" />
+            <HourlyPlanner 
+              className="max-h-[70vh] overflow-y-auto" 
+              showTimeIndicator={true}
+              allowResize={true}
+            />
           </DragDropContext>
         </div>
       ) : (

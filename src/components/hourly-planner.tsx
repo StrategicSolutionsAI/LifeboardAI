@@ -38,38 +38,39 @@ const hours = Array.from({ length: 15 }, (_, i) => {
 // -----------------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------------
-export default function HourlyPlanner({ className = "" }: { className?: string }) {
+interface HourlyPlannerProps {
+  className?: string;
+  showTimeIndicator?: boolean;
+  allowResize?: boolean;
+}
+
+export default function HourlyPlanner({ 
+  className = "", 
+  showTimeIndicator = true,
+  allowResize = true 
+}: HourlyPlannerProps) {
   const {
-    dailyTasks,
+    scheduledTasks,
     batchUpdateTasks,
     deleteTask,
   } = useTasksContext();
   
-  // Build hourly plan from filtered daily tasks
+  
+  // Build hourly plan from scheduled tasks
   const hourlyPlan = useMemo(() => {
-    console.log('⏰ HourlyPlanner Debug:', {
-      dailyTasksCount: dailyTasks.length,
-      dailyTasks: dailyTasks.map(t => ({ id: t.id, content: t.content, hourSlot: t.hourSlot, due: t.due?.date }))
-    });
-    
     const plan: Record<string, PlannerItem[]> = {};
     hours.forEach((h) => (plan[h] = []));
     
-    // Only include tasks that have an hourSlot (are scheduled in the planner)
-    dailyTasks.forEach((t) => {
-      // Skip tasks without hourSlot - they shouldn't appear in the hourly planner
-      if (!t.hourSlot) {
-        console.log('⏭️ Skipping task without hourSlot:', { task: t.content, id: t.id });
-        return;
-      }
-      
+    // Process only tasks that have been scheduled (have hourSlot)
+    scheduledTasks.forEach((t) => {
       let slot = t.hourSlot as string;
       // Clean up slot format - remove "hour-" prefix if present
       slot = slot.replace('hour-', '');
       
-      if (!plan[slot]) {
-        console.log('⚠️ Unknown slot format:', { slot, originalSlot: t.hourSlot, task: t.content });
-        slot = "7AM"; // fallback
+      // Validate slot exists in our hours array
+      if (!hours.includes(slot)) {
+        console.warn(`Invalid hourSlot "${slot}" for task "${t.content}", skipping`);
+        return;
       }
       
       plan[slot].push({
@@ -77,20 +78,10 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
         content: t.content,
         duration: t.duration ?? 60,
       });
-      console.log('✅ Added task to slot:', { task: t.content, slot, originalSlot: t.hourSlot, id: t.id });
     });
     
-    const planSummary = Object.entries(plan).map(([hour, tasks]) => ({ hour, count: tasks.length, tasks: tasks.map(t => t.content) }));
-    console.log('📋 Final hourly plan summary:', JSON.stringify(planSummary, null, 2));
-    
-    // Check if 8PM exists and has tasks
-    if (plan['8PM']) {
-      console.log('🌆 8PM slot found with tasks:', plan['8PM']);
-    } else {
-      console.log('⚠️ 8PM slot missing or empty');
-    }
     return plan;
-  }, [dailyTasks]);
+  }, [scheduledTasks, hours]);
 
   // Resize helpers ------------------------------------------------------------
   const [resizingTask, setResizingTask] = useState<{
@@ -140,20 +131,18 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
     window.addEventListener("mouseup", onUp);
   }
 
-  // Remove task from hourly planner (with option to delete entirely)
-  const removeTaskFromPlanner = (taskId: string, permanentDelete = false) => {
-    console.log('🗑️ Removing task from planner:', { taskId, permanentDelete });
+  // Remove task from hourly planner - simplified approach
+  const removeTaskFromPlanner = async (taskId: string) => {
+    if (!batchUpdateTasks) {
+      console.error('❌ batchUpdateTasks function not available!');
+      return;
+    }
     
-    if (permanentDelete) {
-      // Permanently delete the task
-      deleteTask(taskId).catch(error => {
-        console.error('Failed to delete task:', error);
-      });
-    } else {
-      // Just clear the hourSlot to remove from planner
-      batchUpdateTasks([
-        { taskId, updates: { hourSlot: null } as any },
-      ]);
+    try {
+      // Use the context method directly - this should handle optimistic updates
+      await batchUpdateTasks([{ taskId, updates: { hourSlot: undefined } }]);
+    } catch (error) {
+      console.error('❌ Failed to remove task from planner:', taskId, error);
     }
   };
 
@@ -177,12 +166,14 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
           <Droppable key={disp} droppableId={`hour-${disp}`}>
             {(provided) => (
               <div
-                ref={provided.innerRef}
-                {...provided.droppableProps}
                 className="relative flex items-start gap-3 py-3 min-h-[72px] border-t border-dashed border-[#C4D7FF] first:border-t-0"
               >
                 <span className="w-14 text-xs text-gray-500 shrink-0">{disp}</span>
-                <ul className="flex-1 flex flex-col gap-3">
+                <ul
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="flex-1 flex flex-col gap-3 min-h-[60px]"
+                >
                   {hourlyPlan[disp].map((t, index) => (
                     <Draggable key={t.id} draggableId={t.id} index={index} isDragDisabled={!!resizingTask}>
                       {(prov) => (
@@ -211,10 +202,10 @@ export default function HourlyPlanner({ className = "" }: { className?: string }
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                removeTaskFromPlanner(t.id, true); // true = permanently delete
+                                removeTaskFromPlanner(t.id);
                               }}
                               className="flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded p-1 transition-opacity"
-                              title="Delete task permanently"
+                              title="Remove from planner (move back to daily list)"
                             >
                               <X size={12} className="text-red-500" />
                             </button>
