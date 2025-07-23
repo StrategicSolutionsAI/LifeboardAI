@@ -99,6 +99,7 @@ import TrendsPanel from "./trends-panel";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
 import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget";
+import { MedicationTrackerWidget } from "./medication-tracker-simple";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -290,6 +291,7 @@ function TaskBoardDashboardInner() {
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
   const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null);
   const [nutritionWidgetOpen, setNutritionWidgetOpen] = useState(false);
+  const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -2373,6 +2375,9 @@ function TaskBoardDashboardInner() {
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
+                        } else if (w.id === 'medication') {
+                          // For medication widget, show a modal with the full medication tracker
+                          setMedicationWidgetOpen(true);
                         } else {
                           setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
                         }
@@ -3308,6 +3313,18 @@ function TaskBoardDashboardInner() {
             </SheetHeader>
             <div className="mt-6">
               <FatSecretNutritionWidget />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Medication Widget Modal */}
+        <Sheet open={medicationWidgetOpen} onOpenChange={setMedicationWidgetOpen}>
+          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-indigo-950">Medication Tracker</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6">
+              <MedicationTrackerWidget />
             </div>
           </SheetContent>
         </Sheet>
