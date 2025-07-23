@@ -156,6 +156,17 @@ const widgetTemplates: WidgetTemplate[] = [
     units: ["cups"]
   },
   {
+    id: "nutrition",
+    name: "Nutrition Search",
+    description: "Search foods and view nutrition data from FatSecret's database",
+    icon: Utensils,
+    category: "health",
+    color: "emerald",
+    defaultTarget: 1,
+    unit: "search",
+    units: ["search"]
+  },
+  {
     id: "mood",
     name: "Mood Tracker",
     description: "Log how you feel each day",

@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Plus, Droplets, Flame, Target, Scale, TrendingUp, Activity, BarChart } from "lucide-react"
 import { WidgetLibrary } from "./widget-library"
 import { WithingsWeightWidget } from "./withings-weight-widget"
+import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget"
 
 interface HealthMetric {
   id: string
@@ -57,6 +58,15 @@ export function HealthWidgets() {
       icon: Droplets,
       color: "text-blue-600",
       bgColor: "bg-blue-100"
+    },
+    {
+      id: "nutrition",
+      title: "NUTRITION",
+      value: "Search",
+      unit: "foods",
+      icon: Activity,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100"
     }
   ]
 
@@ -85,6 +95,16 @@ export function HealthWidgets() {
                 unit="lbs"
                 goalWeight={145}
                 startingWeight={155}
+              />
+            )
+          }
+          
+          // Use FatSecret widget for nutrition metric
+          if (metric.id === 'nutrition') {
+            return (
+              <FatSecretNutritionWidget
+                key={metric.id}
+                className="col-span-2"
               />
             )
           }

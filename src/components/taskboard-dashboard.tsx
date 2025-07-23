@@ -98,6 +98,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import TrendsPanel from "./trends-panel";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
+import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -288,6 +289,7 @@ function TaskBoardDashboardInner() {
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
   const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null);
+  const [nutritionWidgetOpen, setNutritionWidgetOpen] = useState(false);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -2367,7 +2369,14 @@ function TaskBoardDashboardInner() {
                     const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
 
                     return (
-                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null); }}>
+                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { 
+                        if (w.id === 'nutrition') {
+                          // For nutrition widget, show a modal with the full FatSecret widget
+                          setNutritionWidgetOpen(true);
+                        } else {
+                          setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
+                        }
+                      }}>
                         <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
@@ -2840,6 +2849,19 @@ function TaskBoardDashboardInner() {
                             );
                           }
 
+                          // Special handling for nutrition widget
+                          if (w.id === 'nutrition') {
+                            return (
+                              <div className="mt-3 text-center">
+                                <div className="text-2xl mb-2">🍎</div>
+                                <div className="text-xs text-gray-600 mb-1">Nutrition Search</div>
+                                <div className="text-xs text-gray-500">
+                                  Click to search foods
+                                </div>
+                              </div>
+                            );
+                          }
+
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
@@ -3277,6 +3299,18 @@ function TaskBoardDashboardInner() {
             onSave={handleSaveWidget}
           />
         )}
+
+        {/* Nutrition Widget Modal */}
+        <Sheet open={nutritionWidgetOpen} onOpenChange={setNutritionWidgetOpen}>
+          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-indigo-950">Nutrition Search</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6">
+              <FatSecretNutritionWidget />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Add Bucket Sheet */}
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
