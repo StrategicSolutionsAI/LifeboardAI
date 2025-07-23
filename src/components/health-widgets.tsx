@@ -7,7 +7,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Plus, Droplets, Flame, Target, Scale, TrendingUp, Activity, BarChart } from "lucide-react"
 import { WidgetLibrary } from "./widget-library"
 import { WithingsWeightWidget } from "./withings-weight-widget"
-import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget"
+import { NutritionSummaryWidget } from './nutrition-summary-widget'
+import { NutritionMealTracker } from './nutrition-meal-tracker'
 import { ExerciseWidget } from "./exercise-widget-simple"
 
 interface HealthMetric {
@@ -22,6 +23,7 @@ interface HealthMetric {
 
 export function HealthWidgets() {
   const [isWidgetLibraryOpen, setIsWidgetLibraryOpen] = useState(false)
+  const [nutritionModalOpen, setNutritionModalOpen] = useState(false)
   
   const healthMetrics: HealthMetric[] = [
     {
@@ -118,12 +120,12 @@ export function HealthWidgets() {
             )
           }
           
-          // Use FatSecret widget for nutrition metric
+          // Use Nutrition Summary Widget for nutrition metric in health tab
           if (metric.id === 'nutrition') {
             return (
-              <FatSecretNutritionWidget
+              <NutritionSummaryWidget
                 key={metric.id}
-                className="col-span-2"
+                onClick={() => setNutritionModalOpen(true)}
               />
             )
           }
@@ -312,6 +314,21 @@ export function HealthWidgets() {
             </SheetDescription>
           </SheetHeader>
           <WidgetLibrary />
+        </SheetContent>
+      </Sheet>
+
+      {/* Nutrition Modal */}
+      <Sheet open={nutritionModalOpen} onOpenChange={setNutritionModalOpen}>
+        <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-indigo-950">Daily Nutrition Tracker</SheetTitle>
+            <SheetDescription>
+              Track your daily meals and nutrition goals
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <NutritionMealTracker />
+          </div>
         </SheetContent>
       </Sheet>
     </div>

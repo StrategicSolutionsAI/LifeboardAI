@@ -88,7 +88,7 @@ import {
   Settings as SettingsIcon,
   ListChecks,
 } from "lucide-react";
-import { WidgetLibrary } from "./widget-library";
+import { WidgetLibrary, widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -98,7 +98,8 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import TrendsPanel from "./trends-panel";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
-import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget";
+import { NutritionMealTracker } from "./nutrition-meal-tracker";
+import { NutritionSummaryWidget } from "./nutrition-summary-widget";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
 import { ExerciseWidget } from "./exercise-widget-simple";
 
@@ -149,6 +150,7 @@ const iconMap: Record<string, LucideIcon> = {
   exercise: Activity,
   caffeine: Coffee,
   chores: CheckSquare,
+  nutrition: Utensils,
   mood: Smile,
   journal: Notebook,
   meditation: Brain,
@@ -204,6 +206,7 @@ const templateColors: Record<string, string> = {
   exercise: "teal",
   caffeine: "amber",
   chores: "amber",
+  nutrition: "emerald",
 };
 
 const getTemplateColor = (id: string): string | null => {
@@ -262,6 +265,57 @@ const SUGGESTED_BUCKETS = [
   "Travel",
   "Meals",
 ];
+
+// Migration function to update existing widgets to match current templates
+function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstance[]>): Record<string, WidgetInstance[]> {
+  const migratedWidgets = { ...widgetsByBucket };
+  let hasChanges = false;
+  
+  // Create a lookup map for templates
+  const templateMap = new Map<string, WidgetTemplate>();
+  widgetTemplates.forEach(template => {
+    templateMap.set(template.id, template);
+  });
+  
+  // Migrate widgets in each bucket
+  Object.keys(migratedWidgets).forEach(bucketName => {
+    const widgets = migratedWidgets[bucketName];
+    
+    widgets.forEach((widget, index) => {
+      const template = templateMap.get(widget.id);
+      if (template) {
+        // Check if widget needs migration
+        const needsNameUpdate = widget.name !== template.name;
+        const needsColorUpdate = (widget.color || '') !== template.color;
+        const needsIconUpdate = widget.icon !== template.icon;
+        
+        if (needsNameUpdate || needsColorUpdate || needsIconUpdate) {
+          console.log(`Migrating widget ${widget.id} in bucket ${bucketName}:`, {
+            oldName: widget.name,
+            newName: template.name,
+            oldColor: widget.color,
+            newColor: template.color
+          });
+          
+          // Update widget with template data
+          migratedWidgets[bucketName][index] = {
+            ...widget,
+            name: template.name,
+            color: template.color || 'gray',
+            icon: template.icon
+          };
+          hasChanges = true;
+        }
+      }
+    });
+  });
+  
+  if (hasChanges) {
+    console.log('Widget migration completed with changes');
+  }
+  
+  return migratedWidgets;
+}
 
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner() {
@@ -1320,7 +1374,10 @@ function TaskBoardDashboardInner() {
         
         if (dataIsDifferent) {
           console.log('Supabase widgets differ from localStorage, updating state...');
-          setWidgetsByBucket(prefs.widgets_by_bucket);
+          
+          // Migrate existing widgets to match current templates
+          const migratedWidgets = migrateWidgetsToTemplates(prefs.widgets_by_bucket);
+          setWidgetsByBucket(migratedWidgets);
           
           // --- NEW: ensure bucket list includes any bucket keys from widgets ---
           const widgetBuckets = Object.keys(prefs.widgets_by_bucket);
@@ -1350,10 +1407,15 @@ function TaskBoardDashboardInner() {
         }
       } else if (loadedFromLocal && Object.keys(localWidgets).length > 0) {
         console.log('No widgets in Supabase but found in localStorage, saving to Supabase...');
+        
+        // Migrate local widgets before saving to Supabase
+        const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
+        setWidgetsByBucket(migratedLocalWidgets);
+        
         if (prefs) {
           await saveUserPreferences({
             ...prefs,
-            widgets_by_bucket: localWidgets
+            widgets_by_bucket: migratedLocalWidgets
           });
         }
       } else {
@@ -2862,12 +2924,11 @@ function TaskBoardDashboardInner() {
                           // Special handling for nutrition widget
                           if (w.id === 'nutrition') {
                             return (
-                              <div className="mt-3 text-center">
-                                <div className="text-2xl mb-2">🍎</div>
-                                <div className="text-xs text-gray-600 mb-1">Nutrition Search</div>
-                                <div className="text-xs text-gray-500">
-                                  Click to search foods
-                                </div>
+                              <div className="mt-3 -m-3">
+                                <NutritionSummaryWidget 
+                                  className="border-0 shadow-none bg-transparent p-3"
+                                  onClick={() => setNutritionWidgetOpen(true)}
+                                />
                               </div>
                             );
                           }
@@ -3327,10 +3388,10 @@ function TaskBoardDashboardInner() {
         <Sheet open={nutritionWidgetOpen} onOpenChange={setNutritionWidgetOpen}>
           <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-indigo-950">Nutrition Search</SheetTitle>
+              <SheetTitle className="text-indigo-950">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <FatSecretNutritionWidget />
+              <NutritionMealTracker />
             </div>
           </SheetContent>
         </Sheet>

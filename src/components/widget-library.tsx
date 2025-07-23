@@ -157,14 +157,14 @@ const widgetTemplates: WidgetTemplate[] = [
   },
   {
     id: "nutrition",
-    name: "Nutrition Search",
-    description: "Search foods and view nutrition data from FatSecret's database",
+    name: "Daily Nutrition",
+    description: "Track your daily meals and nutrition intake with breakfast, lunch, dinner, and snacks",
     icon: Utensils,
     category: "health",
     color: "emerald",
     defaultTarget: 1,
-    unit: "search",
-    units: ["search"]
+    unit: "meals",
+    units: ["meals"]
   },
   {
     id: "mood",
@@ -1044,3 +1044,6 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
     </div>
   )
 }
+
+// Export the widget templates for use in other components
+export { widgetTemplates };
