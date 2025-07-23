@@ -100,6 +100,7 @@ import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
 import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
+import { ExerciseWidget } from "./exercise-widget-simple";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -292,6 +293,7 @@ function TaskBoardDashboardInner() {
   const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null);
   const [nutritionWidgetOpen, setNutritionWidgetOpen] = useState(false);
   const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
+  const [exerciseWidgetOpen, setExerciseWidgetOpen] = useState(false);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -2378,6 +2380,9 @@ function TaskBoardDashboardInner() {
                         } else if (w.id === 'medication') {
                           // For medication widget, show a modal with the full medication tracker
                           setMedicationWidgetOpen(true);
+                        } else if (w.id === 'exercise') {
+                          // For exercise widget, show a modal with the enhanced exercise tracker
+                          setExerciseWidgetOpen(true);
                         } else {
                           setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
                         }
@@ -2867,6 +2872,19 @@ function TaskBoardDashboardInner() {
                             );
                           }
 
+                          // Special handling for exercise widget
+                          if (w.id === 'exercise') {
+                            return (
+                              <div className="mt-3 text-center">
+                                <div className="text-2xl mb-2">💪</div>
+                                <div className="text-xs text-gray-600 mb-1">Exercise Tracker</div>
+                                <div className="text-xs text-gray-500">
+                                  Track workouts & goals
+                                </div>
+                              </div>
+                            );
+                          }
+
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
@@ -2888,7 +2906,7 @@ function TaskBoardDashboardInner() {
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight'].includes(w.id) && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -3325,6 +3343,18 @@ function TaskBoardDashboardInner() {
             </SheetHeader>
             <div className="mt-6">
               <MedicationTrackerWidget />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Exercise Widget Modal */}
+        <Sheet open={exerciseWidgetOpen} onOpenChange={setExerciseWidgetOpen}>
+          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-indigo-950">Exercise Tracker</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6">
+              <ExerciseWidget onClose={() => setExerciseWidgetOpen(false)} />
             </div>
           </SheetContent>
         </Sheet>

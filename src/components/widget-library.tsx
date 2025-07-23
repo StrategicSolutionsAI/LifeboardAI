@@ -135,14 +135,14 @@ const widgetTemplates: WidgetTemplate[] = [
   },
   {
     id: "exercise",
-    name: "Exercise Minutes",
-    description: "Track daily exercise time",
+    name: "Exercise Tracker",
+    description: "Track workouts, set weekly goals, and monitor fitness progress",
     icon: Activity,
     category: "health",
     color: "green",
-    defaultTarget: 30,
-    unit: "min",
-    units: ["min"]
+    defaultTarget: 3,
+    unit: "workouts",
+    units: ["workouts"]
   },
   {
     id: "caffeine",

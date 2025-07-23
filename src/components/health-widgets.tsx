@@ -8,6 +8,7 @@ import { Plus, Droplets, Flame, Target, Scale, TrendingUp, Activity, BarChart } 
 import { WidgetLibrary } from "./widget-library"
 import { WithingsWeightWidget } from "./withings-weight-widget"
 import { FatSecretNutritionWidget } from "./fatsecret-nutrition-widget"
+import { ExerciseWidget } from "./exercise-widget-simple"
 
 interface HealthMetric {
   id: string
@@ -60,6 +61,15 @@ export function HealthWidgets() {
       bgColor: "bg-blue-100"
     },
     {
+      id: "exercise",
+      title: "EXERCISE",
+      value: "0/3",
+      unit: "workouts",
+      icon: Activity,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100"
+    },
+    {
       id: "nutrition",
       title: "NUTRITION",
       value: "Search",
@@ -95,6 +105,15 @@ export function HealthWidgets() {
                 unit="lbs"
                 goalWeight={145}
                 startingWeight={155}
+              />
+            )
+          }
+          
+          // Use Exercise widget for exercise metric
+          if (metric.id === 'exercise') {
+            return (
+              <ExerciseWidget
+                key={metric.id}
               />
             )
           }
