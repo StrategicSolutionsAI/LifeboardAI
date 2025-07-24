@@ -2450,6 +2450,21 @@ function TaskBoardDashboardInner() {
                         }
                       }}>
                         <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Edit button for nutrition widget */}
+                          {w.id === 'nutrition' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingWidget(w); 
+                                setEditingBucket(activeBucket); 
+                                setNewlyCreatedWidgetId(null);
+                              }}
+                              className="rounded-full bg-green-100 hover:bg-green-200 p-1"
+                              aria-label="Edit widget settings"
+                            >
+                              <SettingsIcon className="h-3 w-3 text-green-600" />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

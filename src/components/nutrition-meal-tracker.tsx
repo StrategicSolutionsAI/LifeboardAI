@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, Apple, Utensils, Plus, Trash2, Coffee, Sun, Moon, Cookie, Target, Settings, Star, Heart } from 'lucide-react'
 import { FatSecretFood, FatSecretSearchResponse, FatSecretFoodDetail } from '@/lib/fatsecret/client'
+import { getCurrentLocalDate, formatDateForDisplay } from '@/lib/date-utils'
 
 interface FatSecretServing {
   calcium?: string
@@ -83,6 +84,15 @@ const MEAL_LABELS = {
   snacks: 'Snacks'
 }
 
+const QUICK_ADD_ITEMS = [
+  { id: 'water', name: '💧 Water (8oz)', calories: 0, category: 'snacks' as const },
+  { id: 'coffee', name: '☕ Black Coffee', calories: 5, category: 'breakfast' as const },
+  { id: 'banana', name: '🍌 Medium Banana', calories: 105, category: 'snacks' as const },
+  { id: 'apple', name: '🍎 Medium Apple', calories: 95, category: 'snacks' as const },
+  { id: 'protein-shake', name: '🥤 Protein Shake', calories: 150, category: 'snacks' as const },
+  { id: 'greek-yogurt', name: '🥛 Greek Yogurt', calories: 130, category: 'breakfast' as const }
+]
+
 export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FatSecretFood[]>([])
@@ -108,18 +118,33 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
   const [favoriteFoods, setFavoriteFoods] = useState<FavoriteFood[]>([])
   const [currentView, setCurrentView] = useState<'search' | 'meals' | 'goals'>('meals')
   const [showFavorites, setShowFavorites] = useState(false)
+  const [searchCache, setSearchCache] = useState<Map<string, FatSecretFood[]>>(new Map())
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [currentDate, setCurrentDate] = useState(() => getCurrentLocalDate())
 
-  // Load data from API on component mount
+  // Load data from API on component mount and when date changes
   useEffect(() => {
     loadMeals()
     loadNutritionGoals()
     loadFavoriteFoods()
-  }, [])
+  }, [currentDate])
+  
+  // Check for date changes every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const today = getCurrentLocalDate()
+      if (today !== currentDate) {
+        setCurrentDate(today)
+        // This will trigger the above useEffect to reload meals
+      }
+    }, 60000) // Check every minute
+    
+    return () => clearInterval(interval)
+  }, [currentDate])
   
   const loadMeals = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/nutrition/meals?date=${today}`)
+      const response = await fetch(`/api/nutrition/meals?date=${currentDate}`)
       if (response.ok) {
         const meals = await response.json()
         setDailyMeals(meals)
@@ -164,7 +189,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
     
     const timeoutId = setTimeout(() => {
       searchFoods(searchQuery)
-    }, 500) // 500ms delay
+    }, 300) // Reduced delay for better UX
     
     return () => clearTimeout(timeoutId)
   }, [searchQuery])
@@ -175,11 +200,17 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
       return
     }
 
+    // Check cache first for better performance
+    if (searchCache.has(query)) {
+      setSearchResults(searchCache.get(query) || [])
+      return
+    }
+
     setIsSearching(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/fatsecret/search?q=${encodeURIComponent(query)}&max_results=10`)
+      const response = await fetch(`/api/fatsecret/search?q=${encodeURIComponent(query)}&max_results=15`)
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -187,7 +218,11 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
       }
 
       const data: FatSecretSearchResponse = await response.json()
-      setSearchResults(data.foods?.food || [])
+      const results = data.foods?.food || []
+      
+      // Cache results for future use
+      setSearchCache(prev => new Map(prev).set(query, results))
+      setSearchResults(results)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
       setSearchResults([])
@@ -276,44 +311,64 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
     if (!selectedFood || !selectedServing) return
 
     try {
-      // Add meal to database
+      // Create optimistic meal entry
+      const optimisticMeal: MealFood = {
+        id: `temp-${Date.now()}`,
+        food_name: selectedFood.food.food_name,
+        serving: selectedServing,
+        quantity,
+        meal_type: selectedMeal,
+        added_at: new Date().toISOString()
+      }
+
+      // Optimistic update for immediate UI feedback
+      setDailyMeals(prev => ({
+        ...prev,
+        [selectedMeal]: [...prev[selectedMeal], optimisticMeal]
+      }))
+
       const response = await fetch('/api/nutrition/meals', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           food_id: selectedFood.food.food_id,
           food_name: selectedFood.food.food_name,
           serving: selectedServing,
           quantity,
-          meal_type: selectedMeal
+          meal_type: selectedMeal,
+          meal_date: currentDate
         })
       })
 
-      if (response.ok) {
-        const newMeal = await response.json()
-        
-        // Update local state
-        setDailyMeals(prev => ({
-          ...prev,
-          [selectedMeal]: [...prev[selectedMeal], newMeal]
-        }))
+      if (!response.ok) throw new Error('Failed to add meal')
 
-        // Update favorite food
-        await updateFavoriteFood(selectedFood.food.food_id, selectedFood.food.food_name, selectedServing)
+      const newMeal = await response.json()
+      
+      // Replace optimistic entry with real data
+      setDailyMeals(prev => ({
+        ...prev,
+        [selectedMeal]: prev[selectedMeal].map(meal => 
+          meal.id === optimisticMeal.id ? newMeal : meal
+        )
+      }))
 
-        // Reset form
-        setSelectedFood(null)
-        setSelectedServing(null)
-        setQuantity(1)
-        setSearchQuery('')
-        setSearchResults([])
-        setCurrentView('meals')
-      } else {
-        console.error('Failed to add meal')
-      }
+      // Update favorites
+      await updateFavoriteFood(selectedFood.food.food_id, selectedFood.food.food_name, selectedServing)
+
+      // Reset form
+      setSelectedFood(null)
+      setSelectedServing(null)
+      setQuantity(1)
+      setSearchQuery('')
+      setSearchResults([])
+      setCurrentView('meals')
     } catch (error) {
+      // Revert optimistic update on error
+      setDailyMeals(prev => ({
+        ...prev,
+        [selectedMeal]: prev[selectedMeal].filter(meal => !meal.id.startsWith('temp-'))
+      }))
+      setError('Failed to add food to meal')
       console.error('Error adding meal:', error)
     }
   }
@@ -334,6 +389,71 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
       }
     } catch (error) {
       console.error('Error removing meal:', error)
+    }
+  }
+
+  const quickAddItem = async (item: typeof QUICK_ADD_ITEMS[0]) => {
+    try {
+      const serving: FatSecretServing = {
+        calories: item.calories.toString(),
+        protein: '0',
+        carbohydrate: '0',
+        fat: '0',
+        serving_description: '1 serving',
+        serving_id: '1',
+        serving_url: '',
+        measurement_description: 'serving'
+      }
+
+      const optimisticMeal: MealFood = {
+        id: `temp-${Date.now()}`,
+        food_name: item.name,
+        serving,
+        quantity: 1,
+        meal_type: item.category,
+        added_at: new Date().toISOString()
+      }
+
+      // Optimistic update
+      setDailyMeals(prev => ({
+        ...prev,
+        [item.category]: [...prev[item.category], optimisticMeal]
+      }))
+
+      const response = await fetch('/api/nutrition/meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          food_id: item.id,
+          food_name: item.name,
+          serving,
+          quantity: 1,
+          meal_type: item.category,
+          meal_date: currentDate
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to add quick item')
+
+      const newMeal = await response.json()
+      
+      // Replace optimistic entry with real data
+      setDailyMeals(prev => ({
+        ...prev,
+        [item.category]: prev[item.category].map(meal => 
+          meal.id === optimisticMeal.id ? newMeal : meal
+        )
+      }))
+
+      setShowQuickAdd(false)
+    } catch (error) {
+      // Revert optimistic update on error
+      setDailyMeals(prev => ({
+        ...prev,
+        [item.category]: prev[item.category].filter(meal => !meal.id.startsWith('temp-'))
+      }))
+      setError('Failed to add quick item')
+      console.error('Error adding quick item:', error)
     }
   }
 
@@ -382,6 +502,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
   const dailyTotals = calculateDailyTotals()
 
   return (
+    <>
     <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -390,11 +511,15 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
         </CardTitle>
         <CardDescription>
           Track your daily meals and nutrition intake
+          <br />
+          <span className="text-sm font-medium text-primary">
+            {formatDateForDisplay(currentDate)}
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* View Toggle */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant={currentView === 'meals' ? 'default' : 'outline'}
             size="sm"
@@ -426,15 +551,26 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
           <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-sm">Today's Progress</h4>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCurrentView('goals')}
-                className="text-xs"
-              >
-                <Settings className="h-3 w-3 mr-1" />
-                Edit Goals
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowQuickAdd(true)}
+                  className="text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Quick Add
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentView('goals')}
+                  className="text-xs"
+                >
+                  <Settings className="h-3 w-3 mr-1" />
+                  Edit Goals
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               {/* Calories */}
@@ -944,5 +1080,43 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
         )}
       </CardContent>
     </Card>
+
+    {/* Quick Add Modal */}
+    {showQuickAdd && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <Card className="w-full max-w-md mx-4">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Apple className="h-5 w-5" />
+                Quick Add
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setShowQuickAdd(false)}>
+                ✕
+              </Button>
+            </div>
+            <CardDescription>
+              Add common foods quickly to your meals
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2">
+              {QUICK_ADD_ITEMS.map((item) => (
+                <Button
+                  key={item.id}
+                  variant="outline"
+                  className="justify-between h-auto p-3"
+                  onClick={() => quickAddItem(item)}
+                >
+                  <span>{item.name}</span>
+                  <Badge variant="secondary">{item.calories} cal</Badge>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+    </>
   )
 }

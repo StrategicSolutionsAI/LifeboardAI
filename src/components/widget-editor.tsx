@@ -908,7 +908,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
           </div>
 
           {/* Schedule */}
-          {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit'].includes(draft.id) && (
+          {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'nutrition'].includes(draft.id) && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-gray-600">Schedule</p>
               <div className="flex flex-wrap gap-2">

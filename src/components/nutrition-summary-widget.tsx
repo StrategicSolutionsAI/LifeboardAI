@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Apple, Coffee, Sun, Moon, Cookie } from 'lucide-react'
+import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface MealFood {
   id: string
@@ -67,7 +68,7 @@ export function NutritionSummaryWidget({ className, onClick }: NutritionSummaryW
 
   const loadMeals = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getCurrentLocalDate()
       const response = await fetch(`/api/nutrition/meals?date=${today}`)
       if (response.ok) {
         const meals = await response.json()
