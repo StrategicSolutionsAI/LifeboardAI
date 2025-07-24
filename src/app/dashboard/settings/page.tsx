@@ -1,21 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { GoogleFitAuthButton } from '@/components/auth/google-fit-auth-button'
-import { signInWithGoogleFit } from '@/app/login/actions'
-import { Settings, Check, AlertCircle, ExternalLink, Palette, Plus, Trash2 } from 'lucide-react'
+
+import { Settings, Check, AlertCircle, Palette, Plus, Trash2 } from 'lucide-react'
 import { themeColors, ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 
-type Integration = {
-  id: string
-  name: string
-  description: string
-  icon: React.ReactNode
-  connected: boolean
-  action: () => void
-}
+
 
 import { SidebarLayout } from '@/components/sidebar-layout'
 
@@ -58,72 +50,14 @@ export default function SettingsPage() {
     setAllThemes(getAllThemes())
   }
 
-  const [integrations, setIntegrations] = useState<Integration[]>([
-    {
-      id: 'google-fit',
-      name: 'Google Fit',
-      description: 'Connect to track your fitness activities and health metrics',
-      icon: <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-        <svg className="w-6 h-6 text-blue-600" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M17.99 17.99v-1.5h1.5v1.5h-1.5zm-12-6.5v-1.5h1.5v1.5h-1.5zm6-2.5a5.5 5.5 0 0 1 5.5 5.5h-1.5a4 4 0 0 0-4-4v-1.5zm-5.5 1.5v-1.5h1.5v1.5h-1.5zm3-3v-1.5h1.5v1.5h-1.5zm8 2a7.5 7.5 0 0 0-7.5-7.5v1.5a6 6 0 0 1 6 6h1.5zm-13-3v-1.5h1.5v1.5h-1.5zm3-3v-1.5h1.5v1.5h-1.5zm-3 0v-1.5h1.5v1.5h-1.5z"/>
-        </svg>
-      </div>,
-      connected: false,
-      action: signInWithGoogleFit
-    },
-    {
-      id: 'google-calendar',
-      name: 'Google Calendar',
-      description: 'Sync your calendar events and schedule',
-      icon: <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-        <svg className="w-6 h-6 text-red-600" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM7 12h5v5H7v-5z"/>
-        </svg>
-      </div>,
-      connected: false,
-      action: () => console.log('Connect Google Calendar')
-    },
-    {
-      id: 'withings',
-      name: 'Withings Smart Scale',
-      description: 'Sync your latest weight measurements',
-      icon: <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-        <svg className="w-6 h-6 text-orange-600" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M3 3h18v18H3V3zm2 2v14h14V5H5zm7 1a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 .001 6.001A3 3 0 0 0 12 8z" />
-        </svg>
-      </div>,
-      connected: false,
-      action: () => { window.location.href = '/api/auth/withings?redirectUrl=/dashboard/settings' }
-    },
-    {
-      id: 'slack',
-      name: 'Slack',
-      description: 'Get notifications and manage tasks from Slack',
-      icon: <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-        <svg className="w-6 h-6 text-purple-600" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M6 15a2 2 0 1 1-2-2h2v2zm1 0a2 2 0 0 1-2 2v-2h2zm-2-8a2 2 0 1 1 2-2v2H5zm0 1a2 2 0 0 1 2 2h2a4 4 0 0 0-4-4v2zm9-1a2 2 0 1 1-2-2 2 2 0 0 1 2 2zm-2 2a2 2 0 0 1 2-2V6a4 4 0 0 0-4 4h2zm-7 7a2 2 0 0 1 2-2v-2a4 4 0 0 0-4 4h2zm2-2a2 2 0 0 1-2 2v2a4 4 0 0 0 4-4h-2zm2-2a2 2 0 0 1-2-2H6a4 4 0 0 0 4 4v-2zm0 0a2 2 0 0 1 2 2h2a4 4 0 0 0-4-4v2z"/>
-        </svg>
-      </div>,
-      connected: false,
-      action: () => console.log('Connect Slack')
-    }
-  ])
+
 
   // Avoid hydration mismatch – don't render UI until mounted on client
   if (!mounted) {
     return null
   }
 
-  const handleConnect = (integrationId: string) => {
-    const integration = integrations.find((i: Integration) => i.id === integrationId)
-    if (integration) {
-      integration.action()
-      // In a real app, you would update the integration status after successful connection
-      setIntegrations((prev: Integration[]) => prev.map((i: Integration) => 
-        i.id === integrationId ? { ...i, connected: true } : i
-      ))
-    }
-  }
+
 
   return (
     <SidebarLayout>
@@ -417,48 +351,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Integrations Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-semibold">Integrations</h2>
-              <p className="text-gray-500">Connect your favorite apps and services</p>
-            </div>
-            <a 
-              href="#" 
-              className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-            >
-              View all integrations <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-          
-          <div className="space-y-4">
-            {integrations.map((integration: Integration) => (
-              <div key={integration.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                <div className="flex items-center gap-4">
-                  {integration.icon}
-                  <div>
-                    <h3 className="font-medium">{integration.name}</h3>
-                    <p className="text-sm text-gray-500">{integration.description}</p>
-                  </div>
-                </div>
-                {integration.connected ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <Check className="w-4 h-4" />
-                    <span className="text-sm font-medium">Connected</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleConnect(integration.id)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
-                  >
-                    Connect
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+
 
         {/* Advanced Settings */}
         <div className="bg-white p-6 rounded-xl shadow-sm border">

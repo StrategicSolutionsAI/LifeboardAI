@@ -39,6 +39,13 @@ const integrations: Integration[] = [
     authUrl: '/api/integrations/google/auth'
   },
   {
+    id: 'google-fit',
+    name: 'Google Fit',
+    description: 'Connect to track your fitness activities and health metrics',
+    icon: '🏃',
+    authUrl: '/api/auth/googlefit'
+  },
+  {
     id: 'fitbit',
     name: 'Fitbit',
     description: 'Track your fitness data and health metrics',
@@ -47,10 +54,17 @@ const integrations: Integration[] = [
   },
   {
     id: 'withings',
-    name: 'Withings',
+    name: 'Withings Smart Scale',
     description: 'Monitor your health data and body metrics',
     icon: '⚖️',
-    authUrl: '/api/integrations/withings/auth'
+    authUrl: '/api/auth/withings?redirectUrl=/integrations'
+  },
+  {
+    id: 'slack',
+    name: 'Slack',
+    description: 'Get notifications and manage tasks from Slack',
+    icon: '💬',
+    authUrl: '/api/integrations/slack/auth'
   }
 ]
 
