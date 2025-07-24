@@ -36,7 +36,7 @@ const integrations: Integration[] = [
     name: 'Google Calendar',
     description: 'View and manage your Google Calendar events',
     icon: '📅',
-    authUrl: '/api/integrations/google/auth'
+    authUrl: '/api/auth/google'
   },
   {
     id: 'google-fit',
@@ -50,7 +50,7 @@ const integrations: Integration[] = [
     name: 'Fitbit',
     description: 'Track your fitness data and health metrics',
     icon: '⌚',
-    authUrl: '/api/integrations/fitbit/auth'
+    authUrl: '/api/auth/fitbit'
   },
   {
     id: 'withings',
@@ -62,9 +62,9 @@ const integrations: Integration[] = [
   {
     id: 'slack',
     name: 'Slack',
-    description: 'Get notifications and manage tasks from Slack',
-    icon: '💬',
-    authUrl: '/api/integrations/slack/auth'
+    description: 'Get notifications and manage tasks from Slack (Coming Soon)',
+    icon: '💬'
+    // authUrl: '/api/integrations/slack/auth' // TODO: Implement Slack integration
   }
 ]
 

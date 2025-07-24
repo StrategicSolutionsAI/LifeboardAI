@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
       .eq('provider', provider)
       .maybeSingle();
 
+    console.log(`[STATUS] Checking integration for user ${user.id}, provider ${provider}:`, {
+      integration,
+      hasAccessToken: !!integration?.access_token,
+      error
+    });
+
     if (error) {
       console.error('Error fetching integration status:', error);
       return NextResponse.json({ 
@@ -41,12 +47,16 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Return the integration status
-    return NextResponse.json({
+    const result = {
       connected: !!integration?.access_token,
       lastUpdated: integration?.updated_at || null,
       integrationId: integration?.id || null
-    });
+    };
+
+    console.log(`[STATUS] Returning status for user ${user.id}, provider ${provider}:`, result);
+
+    // Return the integration status
+    return NextResponse.json(result);
     
   } catch (error) {
     console.error('Error in integration status endpoint:', error);
