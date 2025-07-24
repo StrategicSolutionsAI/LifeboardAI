@@ -109,10 +109,32 @@ export default function IntegrationsPage() {
       })
       
       if (response.ok) {
-        await fetchIntegrationStatuses()
+        // Update the status locally instead of refetching all statuses
+        setIntegrationStatuses(prev => ({
+          ...prev,
+          [integrationId]: { connected: false, message: 'Disconnected successfully' }
+        }))
+      } else {
+        // If disconnect failed, show error message
+        const errorData = await response.json()
+        setIntegrationStatuses(prev => ({
+          ...prev,
+          [integrationId]: { 
+            ...prev[integrationId], 
+            message: errorData.error || 'Failed to disconnect' 
+          }
+        }))
       }
     } catch (error) {
       console.error('Error disconnecting integration:', error)
+      // Update status to show error
+      setIntegrationStatuses(prev => ({
+        ...prev,
+        [integrationId]: { 
+          ...prev[integrationId], 
+          message: 'Error disconnecting integration' 
+        }
+      }))
     } finally {
       setRefreshing(null)
     }
@@ -123,13 +145,31 @@ export default function IntegrationsPage() {
     try {
       // Refresh the specific integration
       const response = await fetch(`/api/integrations/status?provider=${integrationId}`)
-      const data = await response.json()
-      setIntegrationStatuses(prev => ({
-        ...prev,
-        [integrationId]: data
-      }))
+      if (response.ok) {
+        const data = await response.json()
+        setIntegrationStatuses(prev => ({
+          ...prev,
+          [integrationId]: data
+        }))
+      } else {
+        // Handle refresh error
+        setIntegrationStatuses(prev => ({
+          ...prev,
+          [integrationId]: { 
+            ...prev[integrationId], 
+            message: 'Failed to refresh status' 
+          }
+        }))
+      }
     } catch (error) {
       console.error('Error refreshing integration:', error)
+      setIntegrationStatuses(prev => ({
+        ...prev,
+        [integrationId]: { 
+          ...prev[integrationId], 
+          message: 'Error refreshing integration' 
+        }
+      }))
     } finally {
       setRefreshing(null)
     }
@@ -152,7 +192,7 @@ export default function IntegrationsPage() {
         <div className="grid gap-6 md:grid-cols-2">
           {integrations.map((integration) => {
             const status = integrationStatuses[integration.id]
-            const isLoading = loading || refreshing === integration.id
+            const isLoading = refreshing === integration.id
 
             return (
               <Card key={integration.id} className="relative">
