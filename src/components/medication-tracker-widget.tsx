@@ -14,7 +14,7 @@ import {
   CheckCircle, 
   XCircle, 
   Edit,
-  Trash2
+  Settings
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -23,18 +23,32 @@ interface Medication {
   name: string
   dosage: string
   frequency: string
+  times: string[]
+  startDate?: string
+  refillDate?: string
   pillsRemaining?: number
   totalPills?: number
+  instructions?: string
   color: string
+  isActive: boolean
   nextDose?: string
 }
 
 interface MedicationTrackerWidgetProps {
   className?: string
   compact?: boolean
+  showControls?: boolean
 }
 
-export function MedicationTrackerWidget({ className, showControls = true, compact = false }: MedicationTrackerWidgetProps) {
+interface DoseLog {
+  id: string
+  medicationId: string
+  scheduledTime: string
+  takenTime?: string
+  status: 'taken' | 'skipped' | 'missed'
+}
+
+export function MedicationTrackerWidget({ className, compact = false }: MedicationTrackerWidgetProps) {
   const [medications, setMedications] = useState<Medication[]>([
     {
       id: "1",
@@ -68,7 +82,6 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
 
   const [doseLogs, setDoseLogs] = useState<DoseLog[]>([])
   const [isAddMedicationOpen, setIsAddMedicationOpen] = useState(false)
-  const [selectedMedication, setSelectedMedication] = useState<Medication | null>(null)
 
   // Get today's date string
   const today = new Date().toISOString().split('T')[0]
@@ -161,20 +174,20 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
             <Pill className="w-5 h-5 text-fuchsia-600" />
             <span>Medication Tracker</span>
           </CardTitle>
-          <Dialog open={isAddMedicationOpen} onOpenChange={setIsAddMedicationOpen}>
-            <DialogTrigger asChild>
+          <Sheet open={isAddMedicationOpen} onOpenChange={setIsAddMedicationOpen}>
+            <SheetTrigger asChild>
               <Button size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Medication
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Medication</DialogTitle>
-                <DialogDescription>
+            </SheetTrigger>
+            <SheetContent className="max-w-md">
+              <SheetHeader>
+                <SheetTitle>Add New Medication</SheetTitle>
+                <SheetDescription>
                   Add a new medication to track doses and refills
-                </DialogDescription>
-              </DialogHeader>
+                </SheetDescription>
+              </SheetHeader>
               <AddMedicationForm 
                 onSave={(med) => {
                   setMedications(prev => [...prev, { ...med, id: Date.now().toString() }])
@@ -182,21 +195,21 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                 }}
                 onCancel={() => setIsAddMedicationOpen(false)}
               />
-            </DialogContent>
-          </Dialog>
+            </SheetContent>
+          </Sheet>
         </div>
       </CardHeader>
 
       <CardContent>
-        <Tabs defaultValue="today" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="today">Today</TabsTrigger>
-            <TabsTrigger value="medications">Medications</TabsTrigger>
-            <TabsTrigger value="refills">Refills</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
+        <div className="w-full">
+          <div className="grid w-full grid-cols-4 mb-4">
+            <button className="p-2 text-sm font-medium border-b-2 border-blue-500">Today</button>
+            <button className="p-2 text-sm font-medium text-gray-500">Medications</button>
+            <button className="p-2 text-sm font-medium text-gray-500">Refills</button>
+            <button className="p-2 text-sm font-medium text-gray-500">History</button>
+          </div>
 
-          <TabsContent value="today" className="space-y-4">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="p-4">
                 <div className="flex items-center justify-between">
@@ -216,7 +229,12 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                     }
                   </div>
                 </div>
-                <Progress value={adherencePercentage} className="mt-2" />
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${adherencePercentage}%` }}
+                  />
+                </div>
               </Card>
 
               <Card className="p-4">
@@ -290,9 +308,9 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                 })}
               </div>
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="medications" className="space-y-4">
+          <div className="space-y-4" style={{ display: 'none' }}>
             <div className="grid gap-4">
               {medications.filter(med => med.isActive).map((medication) => (
                 <Card key={medication.id} className="p-4">
@@ -337,9 +355,9 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                 </Card>
               ))}
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="refills" className="space-y-4">
+          <div className="space-y-4" style={{ display: 'none' }}>
             {refillNeeded.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
@@ -380,9 +398,9 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                 })}
               </div>
             )}
-          </TabsContent>
+          </div>
 
-          <TabsContent value="history" className="space-y-4">
+          <div className="space-y-4" style={{ display: 'none' }}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4">
                 <h4 className="font-semibold text-gray-900 mb-3">7-Day Adherence</h4>
@@ -390,7 +408,6 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                   {Array.from({ length: 7 }, (_, i) => {
                     const date = new Date()
                     date.setDate(date.getDate() - i)
-                    const dateStr = date.toISOString().split('T')[0]
                     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
                     
                     // Mock adherence data
@@ -446,8 +463,8 @@ export function MedicationTrackerWidget({ className, showControls = true, compac
                 </div>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
@@ -482,7 +499,7 @@ function AddMedicationForm({ onSave, onCancel }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="name">Medication Name</Label>
+        <label htmlFor="name" className="text-sm font-medium">Medication Name</label>
         <Input
           id="name"
           value={formData.name}
@@ -492,7 +509,7 @@ function AddMedicationForm({ onSave, onCancel }: {
       </div>
 
       <div>
-        <Label htmlFor="dosage">Dosage</Label>
+        <label htmlFor="dosage" className="text-sm font-medium">Dosage</label>
         <Input
           id="dosage"
           placeholder="e.g., 10mg, 1 tablet"
@@ -503,26 +520,23 @@ function AddMedicationForm({ onSave, onCancel }: {
       </div>
 
       <div>
-        <Label htmlFor="frequency">Frequency</Label>
-        <Select value={formData.frequency} onValueChange={(value) => 
-          setFormData(prev => ({ ...prev, frequency: value }))
-        }>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Once daily">Once daily</SelectItem>
-            <SelectItem value="Twice daily">Twice daily</SelectItem>
-            <SelectItem value="Three times daily">Three times daily</SelectItem>
-            <SelectItem value="Four times daily">Four times daily</SelectItem>
-            <SelectItem value="As needed">As needed</SelectItem>
-          </SelectContent>
-        </Select>
+        <label htmlFor="frequency" className="text-sm font-medium">Frequency</label>
+        <select 
+          value={formData.frequency} 
+          onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))}
+          className="w-full p-2 border border-gray-300 rounded-md"
+        >
+          <option value="Once daily">Once daily</option>
+          <option value="Twice daily">Twice daily</option>
+          <option value="Three times daily">Three times daily</option>
+          <option value="Four times daily">Four times daily</option>
+          <option value="As needed">As needed</option>
+        </select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="totalPills">Total Pills</Label>
+          <label htmlFor="totalPills" className="text-sm font-medium">Total Pills</label>
           <Input
             id="totalPills"
             type="number"
@@ -531,7 +545,7 @@ function AddMedicationForm({ onSave, onCancel }: {
           />
         </div>
         <div>
-          <Label htmlFor="pillsRemaining">Pills Remaining</Label>
+          <label htmlFor="pillsRemaining" className="text-sm font-medium">Pills Remaining</label>
           <Input
             id="pillsRemaining"
             type="number"
@@ -542,21 +556,23 @@ function AddMedicationForm({ onSave, onCancel }: {
       </div>
 
       <div>
-        <Label htmlFor="instructions">Instructions (Optional)</Label>
-        <Textarea
+        <label htmlFor="instructions" className="text-sm font-medium">Instructions (Optional)</label>
+        <textarea
           id="instructions"
           placeholder="e.g., Take with food"
           value={formData.instructions}
           onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
+          className="w-full p-2 border border-gray-300 rounded-md resize-none"
+          rows={3}
         />
       </div>
 
-      <DialogFooter>
+      <div className="flex justify-end space-x-2 pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit">Add Medication</Button>
-      </DialogFooter>
+      </div>
     </form>
   )
 }

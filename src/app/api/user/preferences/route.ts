@@ -1,28 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { withErrorHandling, createApiError } from '@/lib/api-error-handler';
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = supabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const body = await request.json();
+async function postHandler(request: NextRequest) {
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw createApiError('User not authenticated', 401, 'AUTH_REQUIRED');
+  }
+  
+  const body = await request.json();
 
-    // Fetch existing preferences
-    const { data: existingPrefs, error: fetchError } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+  // Validate request body
+  if (!body || typeof body !== 'object') {
+    throw createApiError('Invalid request body', 400, 'INVALID_BODY');
+  }
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // Ignore 'not found' error
-      console.error('Error fetching existing preferences:', fetchError);
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
-    }
+  // Fetch existing preferences
+  const { data: existingPrefs, error: fetchError } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') { // Ignore 'not found' error
+    throw createApiError(
+      'Failed to fetch existing preferences', 
+      500, 
+      'DB_FETCH_ERROR', 
+      fetchError
+    );
+  }
 
     const existingBuckets = existingPrefs?.life_buckets || [];
     const existingWidgets = existingPrefs?.widgets_by_bucket || {};
@@ -65,44 +74,47 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (error) {
-      console.error('Error saving preferences:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error in save preferences endpoint:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (error) {
+    throw createApiError(
+      'Failed to save preferences', 
+      500, 
+      'DB_SAVE_ERROR', 
+      error
+    );
   }
+
+  return NextResponse.json(data);
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = supabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const { data, error } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // Not found is ok
-      console.error('Error fetching preferences:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json(data || { 
-      life_buckets: [], 
-      widgets_by_bucket: {} 
-    });
-  } catch (error) {
-    console.error('Error in get preferences endpoint:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+async function getHandler(request: NextRequest) {
+  const supabase = supabaseServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw createApiError('User not authenticated', 401, 'AUTH_REQUIRED');
   }
+  
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // Not found is ok
+    throw createApiError(
+      'Failed to fetch preferences', 
+      500, 
+      'DB_FETCH_ERROR', 
+      error
+    );
+  }
+
+  return NextResponse.json(data || { 
+    life_buckets: [], 
+    widgets_by_bucket: {} 
+  });
 }
+
+// Export handlers with error handling
+export const POST = withErrorHandling(postHandler, 'user/preferences/POST');
+export const GET = withErrorHandling(getHandler, 'user/preferences/GET');

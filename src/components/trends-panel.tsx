@@ -11,6 +11,8 @@ const ranges = [
 ] as const;
 
 export default function TrendsPanel({ widgets }: { widgets: WidgetInstance[] }) {
+  const [rangeDays, setRangeDays] = useState<number>(30);
+
   if (widgets.length === 0) {
     return (
       <div className="p-6 text-gray-500">
@@ -18,8 +20,6 @@ export default function TrendsPanel({ widgets }: { widgets: WidgetInstance[] }) 
       </div>
     );
   }
-
-  const [rangeDays, setRangeDays] = useState<number>(30);
 
   return (
     <div className="p-6">

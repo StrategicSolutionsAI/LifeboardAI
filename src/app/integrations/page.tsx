@@ -276,7 +276,7 @@ export default function IntegrationsPage() {
         <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h3 className="font-semibold text-blue-900 mb-2">Need Help?</h3>
           <p className="text-sm text-blue-800">
-            If you're having trouble connecting an integration, try refreshing the page or 
+            If you&apos;re having trouble connecting an integration, try refreshing the page or 
             disconnecting and reconnecting the service. Make sure you have the necessary 
             permissions enabled in your connected apps.
           </p>
