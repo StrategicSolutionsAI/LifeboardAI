@@ -2282,8 +2282,8 @@ function TaskBoardDashboardInner() {
           
           {/* Bucket tabs row (scrollable) */}
           <div
-            className="relative z-10 mt-10"
-            style={{ width: 'calc(100% - 440px)' }}
+            className="relative z-10 mt-10 transition-all duration-300 ease-in-out"
+            style={{ width: isSidebarCollapsed ? 'calc(100% - 88px)' : 'calc(100% - 440px)' }}
           >
             <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
               {buckets.length > 0 && buckets.map((b, idx) => (
