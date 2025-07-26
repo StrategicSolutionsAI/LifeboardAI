@@ -96,6 +96,7 @@ import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import TrendsPanel from "./trends-panel";
+import WidgetSelector from "./widget-selector";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import HourlyPlanner from "./hourly-planner";
 import { NutritionMealTracker } from "./nutrition-meal-tracker";
@@ -481,6 +482,10 @@ function TaskBoardDashboardInner() {
   
   // Dashboard inner subtabs (left panel)
   const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Settings'>('Overview');
+  
+  // Widget selection for filtering
+  const [selectedLogsWidget, setSelectedLogsWidget] = useState<string | 'all'>('all');
+  const [selectedSettingsWidget, setSelectedSettingsWidget] = useState<string | 'all'>('all');
   
   // Debounced persistence of bucket order to Supabase
   const debouncedSaveBucketsToSupabase = useRef(
@@ -2377,7 +2382,7 @@ function TaskBoardDashboardInner() {
 
               {/* Content area */}
               <div className="flex-1 overflow-y-auto p-6">
-                {/* Widgets grid */}
+                {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? 'flex flex-wrap gap-4' : 'hidden'}>
                   {/* Refresh card */}
                   <div
@@ -3011,8 +3016,163 @@ function TaskBoardDashboardInner() {
                 </div>
 
                 {activeSubTab === 'Trends' && (
-                  // Show trends only for widgets belonging to the currently selected bucket
-                  <TrendsPanel widgets={getDisplayWidgets(activeBucket)} />
+                  <TrendsPanel 
+                    widgets={getDisplayWidgets(activeBucket)} 
+                    bucketName={activeBucket}
+                  />
+                )}
+
+                {activeSubTab === 'Logs' && (
+                  <div>
+                    {/* Logs Header with Widget Selector */}
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-semibold">Widget Logs</h2>
+                      <WidgetSelector
+                        widgets={getDisplayWidgets(activeBucket)}
+                        selectedWidget={selectedLogsWidget}
+                        onWidgetChange={setSelectedLogsWidget}
+                        showAllOption={true}
+                        className="w-48"
+                      />
+                    </div>
+                    
+                    {/* Logs Content */}
+                    <div className="space-y-4">
+                      {getDisplayWidgets(activeBucket).length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                          <p>No widgets available to show logs for.</p>
+                          <p className="text-sm mt-2">Add some widgets to see their activity logs here.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-lg border border-gray-200 p-6">
+                          <h3 className="text-lg font-medium mb-4">
+                            {selectedLogsWidget === 'all' ? 'All Widget Activity' : 
+                             `${getDisplayWidgets(activeBucket).find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">Widget data updated</p>
+                                <p className="text-xs text-gray-500">2 minutes ago</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">Progress updated</p>
+                                <p className="text-xs text-gray-500">15 minutes ago</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
+                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">Goal target reached</p>
+                                <p className="text-xs text-gray-500">1 hour ago</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeSubTab === 'Settings' && (
+                  <div>
+                    {/* Settings Header with Widget Selector */}
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-semibold">Widget Settings</h2>
+                      <WidgetSelector
+                        widgets={getDisplayWidgets(activeBucket)}
+                        selectedWidget={selectedSettingsWidget}
+                        onWidgetChange={setSelectedSettingsWidget}
+                        showAllOption={true}
+                        className="w-48"
+                      />
+                    </div>
+                    
+                    {/* Settings Content */}
+                    <div className="space-y-6">
+                      {getDisplayWidgets(activeBucket).length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                          <p>No widgets available to configure.</p>
+                          <p className="text-sm mt-2">Add some widgets to manage their settings here.</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-6">
+                          {(selectedSettingsWidget === 'all' ? getDisplayWidgets(activeBucket) : getDisplayWidgets(activeBucket).filter(w => w.instanceId === selectedSettingsWidget)).map((widget) => (
+                            <div key={widget.instanceId} className="bg-white rounded-lg border border-gray-200 p-6">
+                              <div className="flex items-center gap-3 mb-4">
+                                <span className="text-2xl">{typeof widget.icon === 'string' ? widget.icon : '📊'}</span>
+                                <div>
+                                  <h3 className="text-lg font-medium">{widget.name}</h3>
+                                  <p className="text-sm text-gray-500">Widget ID: {widget.id}</p>
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
+                                  <input 
+                                    type="number" 
+                                    value={widget.target || 0}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    readOnly
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-6 h-6 rounded ${BG_COLOR_CLASSES[widget.color || 'indigo']}`}></div>
+                                    <span className="text-sm text-gray-600">{widget.color || 'indigo'}</span>
+                                  </div>
+                                </div>
+                                {widget.dataSource && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Source</label>
+                                    <span className="text-sm text-gray-600 capitalize">{widget.dataSource}</span>
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">Created</label>
+                                  <span className="text-sm text-gray-600">
+                                    {new Date().toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <button 
+                                  onClick={() => {
+                                    setEditingWidget(widget);
+                                    setIsWidgetSheetOpen(true);
+                                  }}
+                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mr-2"
+                                >
+                                  Edit Widget
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setWidgetsByBucket(prev => {
+                                      const updated = { ...prev };
+                                      Object.keys(updated).forEach(bucket => {
+                                        updated[bucket] = updated[bucket].filter(w => w.instanceId !== widget.instanceId);
+                                      });
+                                      return updated;
+                                    });
+                                  }}
+                                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                >
+                                  Remove Widget
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
