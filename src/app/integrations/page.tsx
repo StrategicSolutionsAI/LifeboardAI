@@ -100,6 +100,7 @@ export default function IntegrationsPage() {
   }
 
   const handleDisconnect = async (integrationId: string) => {
+    console.log('🔴 Disconnect button clicked for:', integrationId)
     setRefreshing(integrationId)
     try {
       const response = await fetch('/api/integrations/disconnect', {
@@ -141,33 +142,132 @@ export default function IntegrationsPage() {
   }
 
   const handleRefresh = async (integrationId: string) => {
+    console.log('🔄 Refresh button clicked for:', integrationId)
     setRefreshing(integrationId)
+    
     try {
-      // Refresh the specific integration
-      const response = await fetch(`/api/integrations/status?provider=${integrationId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setIntegrationStatuses(prev => ({
-          ...prev,
-          [integrationId]: data
-        }))
-      } else {
-        // Handle refresh error
-        setIntegrationStatuses(prev => ({
-          ...prev,
-          [integrationId]: { 
-            ...prev[integrationId], 
-            message: 'Failed to refresh status' 
+      let dataFetched = false
+      let dataResult = null
+      
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date()
+      const dateStr = today.toISOString().split('T')[0]
+      
+      // Fetch today's data based on integration type
+      switch (integrationId) {
+        case 'todoist':
+          console.log('📝 Fetching today\'s Todoist tasks...')
+          try {
+            const tasksResponse = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
+            if (tasksResponse.ok) {
+              dataResult = await tasksResponse.json()
+              console.log('📝 Todoist tasks fetched:', dataResult?.tasks?.length || 0, 'tasks')
+              dataFetched = true
+            }
+          } catch (error) {
+            console.error('Failed to fetch Todoist tasks:', error)
           }
-        }))
+          break
+          
+        case 'withings':
+          console.log('⚖️ Fetching latest Withings weight data...')
+          try {
+            const metricsResponse = await fetch('/api/integrations/withings/metrics')
+            if (metricsResponse.ok) {
+              dataResult = await metricsResponse.json()
+              console.log('⚖️ Withings data fetched:', dataResult?.weight ? `${dataResult.weight} kg` : 'No recent data')
+              dataFetched = true
+            }
+          } catch (error) {
+            console.error('Failed to fetch Withings data:', error)
+          }
+          break
+          
+        case 'fitbit':
+          console.log('⏱️ Fetching today\'s Fitbit data...')
+          try {
+            const metricsResponse = await fetch(`/api/integrations/fitbit/metrics?date=${dateStr}`)
+            if (metricsResponse.ok) {
+              dataResult = await metricsResponse.json()
+              console.log('⏱️ Fitbit data fetched:', {
+                steps: dataResult?.steps || 0,
+                calories: dataResult?.calories || 0,
+                distance: dataResult?.distance || 0
+              })
+              dataFetched = true
+            }
+          } catch (error) {
+            console.error('Failed to fetch Fitbit data:', error)
+          }
+          break
+          
+        case 'google-fit':
+          console.log('🏃 Fetching today\'s Google Fit data...')
+          try {
+            const metricsResponse = await fetch(`/api/integrations/googlefit/metrics?date=${dateStr}`)
+            if (metricsResponse.ok) {
+              dataResult = await metricsResponse.json()
+              console.log('🏃 Google Fit data fetched:', {
+                steps: dataResult?.steps || 0
+              })
+              dataFetched = true
+            }
+          } catch (error) {
+            console.error('Failed to fetch Google Fit data:', error)
+          }
+          break
+          
+        case 'google':
+          console.log('📅 Fetching today\'s Google Calendar events...')
+          try {
+            const eventsResponse = await fetch(`/api/integrations/google/calendar/events?date=${dateStr}`)
+            if (eventsResponse.ok) {
+              dataResult = await eventsResponse.json()
+              console.log('📅 Google Calendar events fetched:', dataResult?.events?.length || 0, 'events')
+              dataFetched = true
+            }
+          } catch (error) {
+            console.error('Failed to fetch Google Calendar events:', error)
+          }
+          break
+          
+        default:
+          console.log('ℹ️ No specific data endpoint for:', integrationId)
       }
+      
+      // Always refresh the integration status to update the "last updated" timestamp
+      console.log('📋 Updating integration status for:', integrationId)
+      const statusResponse = await fetch(`/api/integrations/status?provider=${integrationId}`)
+      
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        
+        // Update the status with success message if data was fetched
+        const updatedStatus = {
+          ...statusData,
+          lastUpdated: new Date().toISOString(),
+          message: dataFetched 
+            ? `Data refreshed successfully at ${new Date().toLocaleTimeString()}`
+            : statusData.message
+        }
+        
+        setIntegrationStatuses(prev => ({
+          ...prev,
+          [integrationId]: updatedStatus
+        }))
+        
+        console.log('✅ Refresh completed for:', integrationId, { dataFetched, hasData: !!dataResult })
+      } else {
+        throw new Error('Failed to update integration status')
+      }
+      
     } catch (error) {
       console.error('Error refreshing integration:', error)
       setIntegrationStatuses(prev => ({
         ...prev,
         [integrationId]: { 
           ...prev[integrationId], 
-          message: 'Error refreshing integration' 
+          message: `Refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
         }
       }))
     } finally {
@@ -230,8 +330,18 @@ export default function IntegrationsPage() {
                       </p>
                     )}
                     
-                    {status?.message && !status.connected && (
-                      <p className="text-sm text-red-600">{status.message}</p>
+                    {status?.message && (
+                      <p className={`text-sm ${
+                        status.connected 
+                          ? status.message.includes('successfully') 
+                            ? 'text-green-600' 
+                            : status.message.includes('failed') || status.message.includes('error')
+                              ? 'text-red-600'
+                              : 'text-muted-foreground'
+                          : 'text-red-600'
+                      }`}>
+                        {status.message}
+                      </p>
                     )}
 
                     <div className="flex gap-2">

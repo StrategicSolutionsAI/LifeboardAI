@@ -65,6 +65,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const weightKg = await fetchWithingsLatestWeight(accessToken)
+    
+    // Update the timestamp to show when we last successfully fetched data
+    await supabase
+      .from('user_integrations')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', integration.id)
+    
     return NextResponse.json({ weightKg })
   } catch (e: any) {
     console.error('Failed to fetch Withings metrics', e)
