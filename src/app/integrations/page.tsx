@@ -1,17 +1,28 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw } from 'lucide-react'
+// Using available UI components - Alert and Skeleton not available
+import { 
+  Loader2, 
+  CheckCircle, 
+  XCircle, 
+  ExternalLink, 
+  RefreshCw, 
+  AlertCircle,
+  Clock,
+  Activity
+} from 'lucide-react'
 
 interface IntegrationStatus {
   connected: boolean
   lastUpdated?: string
   integrationId?: string
   message?: string
+  error?: string
 }
 
 interface Integration {
@@ -72,25 +83,40 @@ export default function IntegrationsPage() {
   const [integrationStatuses, setIntegrationStatuses] = useState<Record<string, IntegrationStatus>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState<string | null>(null)
+  const [globalError, setGlobalError] = useState<string | null>(null)
 
-  const fetchIntegrationStatuses = async () => {
+  const fetchIntegrationStatuses = useCallback(async () => {
     setLoading(true)
+    setGlobalError(null)
     const statuses: Record<string, IntegrationStatus> = {}
     
-    for (const integration of integrations) {
-      try {
-        const response = await fetch(`/api/integrations/status?provider=${integration.id}`)
-        const data = await response.json()
-        statuses[integration.id] = data
-      } catch (error) {
-        console.error(`Error fetching ${integration.id} status:`, error)
-        statuses[integration.id] = { connected: false, message: 'Error fetching status' }
-      }
+    try {
+      const promises = integrations.map(async (integration) => {
+        try {
+          const response = await fetch(`/api/integrations/status?provider=${integration.id}`)
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+          }
+          const data = await response.json()
+          statuses[integration.id] = data
+        } catch (error) {
+          console.error(`Error fetching ${integration.id} status:`, error)
+          statuses[integration.id] = { 
+            connected: false, 
+            error: `Unable to check status` 
+          }
+        }
+      })
+      
+      await Promise.all(promises)
+      setIntegrationStatuses(statuses)
+    } catch (error) {
+      console.error('Error fetching integration statuses:', error)
+      setGlobalError('Unable to load integration statuses. Please refresh the page.')
+    } finally {
+      setLoading(false)
     }
-    
-    setIntegrationStatuses(statuses)
-    setLoading(false)
-  }
+  }, [])
 
   const handleConnect = async (integration: Integration) => {
     if (integration.authUrl) {
@@ -100,8 +126,18 @@ export default function IntegrationsPage() {
   }
 
   const handleDisconnect = async (integrationId: string) => {
-    console.log('🔴 Disconnect button clicked for:', integrationId)
     setRefreshing(integrationId)
+    
+    // Clear previous messages
+    setIntegrationStatuses(prev => ({
+      ...prev,
+      [integrationId]: { 
+        ...prev[integrationId], 
+        message: undefined,
+        error: undefined
+      }
+    }))
+    
     try {
       const response = await fetch('/api/integrations/disconnect', {
         method: 'POST',
@@ -110,30 +146,42 @@ export default function IntegrationsPage() {
       })
       
       if (response.ok) {
-        // Update the status locally instead of refetching all statuses
         setIntegrationStatuses(prev => ({
           ...prev,
-          [integrationId]: { connected: false, message: 'Disconnected successfully' }
+          [integrationId]: { 
+            connected: false, 
+            message: 'Successfully disconnected',
+            lastUpdated: new Date().toISOString()
+          }
         }))
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setIntegrationStatuses(prev => ({
+            ...prev,
+            [integrationId]: { 
+              ...prev[integrationId], 
+              message: undefined 
+            }
+          }))
+        }, 3000)
       } else {
-        // If disconnect failed, show error message
         const errorData = await response.json()
         setIntegrationStatuses(prev => ({
           ...prev,
           [integrationId]: { 
             ...prev[integrationId], 
-            message: errorData.error || 'Failed to disconnect' 
+            error: errorData.error || 'Failed to disconnect. Please try again.' 
           }
         }))
       }
     } catch (error) {
       console.error('Error disconnecting integration:', error)
-      // Update status to show error
       setIntegrationStatuses(prev => ({
         ...prev,
         [integrationId]: { 
           ...prev[integrationId], 
-          message: 'Error disconnecting integration' 
+          error: 'Network error. Please check your connection.' 
         }
       }))
     } finally {
@@ -141,124 +189,100 @@ export default function IntegrationsPage() {
     }
   }
 
-  const handleRefresh = async (integrationId: string) => {
-    console.log('🔄 Refresh button clicked for:', integrationId)
-    setRefreshing(integrationId)
+  const fetchIntegrationData = async (integrationId: string) => {
+    const today = new Date().toISOString().split('T')[0]
+    let endpoint = ''
+    let params = ''
+    
+    switch (integrationId) {
+      case 'todoist':
+        endpoint = '/api/integrations/todoist/tasks'
+        params = `?date=${today}`
+        break
+      case 'withings':
+        endpoint = '/api/integrations/withings/metrics'
+        break
+      case 'fitbit':
+        endpoint = '/api/integrations/fitbit/metrics'
+        params = `?date=${today}`
+        break
+      case 'google-fit':
+        endpoint = '/api/integrations/googlefit/metrics'
+        params = `?date=${today}`
+        break
+      case 'google':
+        endpoint = '/api/integrations/google/calendar/events'
+        params = `?date=${today}`
+        break
+      default:
+        return null
+    }
     
     try {
-      let dataFetched = false
-      let dataResult = null
+      const response = await fetch(`${endpoint}${params}`)
+      if (response.ok) {
+        return await response.json()
+      }
+      throw new Error(`HTTP ${response.status}`)
+    } catch (error) {
+      console.error(`Failed to fetch ${integrationId} data:`, error)
+      return null
+    }
+  }
+
+  const handleRefresh = async (integrationId: string) => {
+    setRefreshing(integrationId)
+    
+    // Clear previous messages
+    setIntegrationStatuses(prev => ({
+      ...prev,
+      [integrationId]: { 
+        ...prev[integrationId], 
+        message: undefined,
+        error: undefined
+      }
+    }))
+    
+    try {
+      // Fetch the actual data
+      const dataResult = await fetchIntegrationData(integrationId)
+      const dataFetched = dataResult !== null
       
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date()
-      const dateStr = today.toISOString().split('T')[0]
-      
-      // Fetch today's data based on integration type
-      switch (integrationId) {
-        case 'todoist':
-          console.log('📝 Fetching today\'s Todoist tasks...')
-          try {
-            const tasksResponse = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
-            if (tasksResponse.ok) {
-              dataResult = await tasksResponse.json()
-              console.log('📝 Todoist tasks fetched:', dataResult?.tasks?.length || 0, 'tasks')
-              dataFetched = true
-            }
-          } catch (error) {
-            console.error('Failed to fetch Todoist tasks:', error)
-          }
-          break
-          
-        case 'withings':
-          console.log('⚖️ Fetching latest Withings weight data...')
-          try {
-            const metricsResponse = await fetch('/api/integrations/withings/metrics')
-            if (metricsResponse.ok) {
-              dataResult = await metricsResponse.json()
-              console.log('⚖️ Withings data fetched:', dataResult?.weight ? `${dataResult.weight} kg` : 'No recent data')
-              dataFetched = true
-            }
-          } catch (error) {
-            console.error('Failed to fetch Withings data:', error)
-          }
-          break
-          
-        case 'fitbit':
-          console.log('⏱️ Fetching today\'s Fitbit data...')
-          try {
-            const metricsResponse = await fetch(`/api/integrations/fitbit/metrics?date=${dateStr}`)
-            if (metricsResponse.ok) {
-              dataResult = await metricsResponse.json()
-              console.log('⏱️ Fitbit data fetched:', {
-                steps: dataResult?.steps || 0,
-                calories: dataResult?.calories || 0,
-                distance: dataResult?.distance || 0
-              })
-              dataFetched = true
-            }
-          } catch (error) {
-            console.error('Failed to fetch Fitbit data:', error)
-          }
-          break
-          
-        case 'google-fit':
-          console.log('🏃 Fetching today\'s Google Fit data...')
-          try {
-            const metricsResponse = await fetch(`/api/integrations/googlefit/metrics?date=${dateStr}`)
-            if (metricsResponse.ok) {
-              dataResult = await metricsResponse.json()
-              console.log('🏃 Google Fit data fetched:', {
-                steps: dataResult?.steps || 0
-              })
-              dataFetched = true
-            }
-          } catch (error) {
-            console.error('Failed to fetch Google Fit data:', error)
-          }
-          break
-          
-        case 'google':
-          console.log('📅 Fetching today\'s Google Calendar events...')
-          try {
-            const eventsResponse = await fetch(`/api/integrations/google/calendar/events?date=${dateStr}`)
-            if (eventsResponse.ok) {
-              dataResult = await eventsResponse.json()
-              console.log('📅 Google Calendar events fetched:', dataResult?.events?.length || 0, 'events')
-              dataFetched = true
-            }
-          } catch (error) {
-            console.error('Failed to fetch Google Calendar events:', error)
-          }
-          break
-          
-        default:
-          console.log('ℹ️ No specific data endpoint for:', integrationId)
+      // Log results for debugging
+      if (dataFetched) {
+        const icon = integrations.find(i => i.id === integrationId)?.icon || '📊'
+        console.log(`${icon} Data fetched for ${integrationId}:`, dataResult)
       }
       
-      // Always refresh the integration status to update the "last updated" timestamp
-      console.log('📋 Updating integration status for:', integrationId)
+      // Update integration status
       const statusResponse = await fetch(`/api/integrations/status?provider=${integrationId}`)
       
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
         
-        // Update the status with success message if data was fetched
-        const updatedStatus = {
-          ...statusData,
-          lastUpdated: new Date().toISOString(),
-          message: dataFetched 
-            ? `Data refreshed successfully at ${new Date().toLocaleTimeString()}`
-            : statusData.message
-        }
-        
         setIntegrationStatuses(prev => ({
           ...prev,
-          [integrationId]: updatedStatus
+          [integrationId]: {
+            ...statusData,
+            lastUpdated: new Date().toISOString(),
+            message: dataFetched 
+              ? `Successfully refreshed` 
+              : 'Status updated'
+          }
         }))
         
-        console.log('✅ Refresh completed for:', integrationId, { dataFetched, hasData: !!dataResult })
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setIntegrationStatuses(prev => ({
+            ...prev,
+            [integrationId]: { 
+              ...prev[integrationId], 
+              message: undefined 
+            }
+          }))
+        }, 3000)
       } else {
-        throw new Error('Failed to update integration status')
+        throw new Error('Failed to update status')
       }
       
     } catch (error) {
@@ -267,7 +291,7 @@ export default function IntegrationsPage() {
         ...prev,
         [integrationId]: { 
           ...prev[integrationId], 
-          message: `Refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+          error: 'Failed to refresh. Please try again.' 
         }
       }))
     } finally {
@@ -277,107 +301,219 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     fetchIntegrationStatuses()
-  }, [])
+  }, [fetchIntegrationStatuses])
+
+  // Helper function to format relative time
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString()
+  }
+
+  // Helper to get appropriate message style
+  const getMessageStyle = (message: string, connected: boolean) => {
+    if (!message) return ''
+    
+    const lowerMessage = message.toLowerCase()
+    if (lowerMessage.includes('success') || lowerMessage.includes('refreshed')) {
+      return 'text-green-600 font-medium'
+    }
+    if (lowerMessage.includes('fail') || lowerMessage.includes('error')) {
+      return 'text-red-600 font-medium'
+    }
+    if (lowerMessage.includes('disconnect')) {
+      return 'text-amber-600'
+    }
+    return 'text-muted-foreground'
+  }
+
+  if (loading) {
+    return (
+      <SidebarLayout>
+        <div className="container mx-auto p-6 max-w-4xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Integrations</h1>
+            <p className="text-muted-foreground">
+              Connect your favorite apps and services to LifeboardAI
+            </p>
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-2">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gray-200 rounded animate-pulse" />
+                      <div>
+                        <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-2" />
+                        <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="w-20 h-6 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </SidebarLayout>
+    )
+  }
 
   return (
     <SidebarLayout>
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Integrations</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold">Integrations</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchIntegrationStatuses}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh All
+            </Button>
+          </div>
           <p className="text-muted-foreground">
-            Connect your favorite apps and services to LifeboardAI
+            Connect your favorite apps and services to sync data with LifeboardAI
           </p>
         </div>
+
+        {globalError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <span className="text-red-800 font-medium">Error</span>
+            </div>
+            <p className="text-red-700 mt-1">{globalError}</p>
+          </div>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           {integrations.map((integration) => {
             const status = integrationStatuses[integration.id]
             const isLoading = refreshing === integration.id
+            const isComingSoon = !integration.authUrl
 
             return (
-              <Card key={integration.id} className="relative">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{integration.icon}</span>
-                      <div>
-                        <CardTitle className="text-lg">{integration.name}</CardTitle>
-                        <CardDescription>{integration.description}</CardDescription>
+              <Card 
+                key={integration.id} 
+                className={`relative transition-all ${
+                  isComingSoon ? 'opacity-60' : ''
+                } ${isLoading ? 'scale-[0.99]' : ''}`}
+              >
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl mt-1">{integration.icon}</span>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {integration.name}
+                          {isComingSoon && (
+                            <Badge variant="secondary" className="text-xs">
+                              Coming Soon
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {integration.description}
+                        </CardDescription>
                       </div>
                     </div>
                     
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    ) : status?.connected ? (
-                      <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Connected
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Disconnected
-                      </Badge>
+                    {!isComingSoon && (
+                      <div className="ml-2">
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        ) : status?.connected ? (
+                          <Badge className="bg-green-500 hover:bg-green-600 text-white">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Not Connected
+                          </Badge>
+                        )}
+                      </div>
                     )}
                   </div>
                 </CardHeader>
 
-                <CardContent>
-                  <div className="space-y-3">
-                    {status?.lastUpdated && (
-                      <p className="text-sm text-muted-foreground">
-                        Last updated: {new Date(status.lastUpdated).toLocaleDateString()}
-                      </p>
-                    )}
-                    
-                    {status?.message && (
-                      <p className={`text-sm ${
-                        status.connected 
-                          ? status.message.includes('successfully') 
-                            ? 'text-green-600' 
-                            : status.message.includes('failed') || status.message.includes('error')
-                              ? 'text-red-600'
-                              : 'text-muted-foreground'
-                          : 'text-red-600'
-                      }`}>
-                        {status.message}
-                      </p>
-                    )}
-
-                    <div className="flex gap-2">
-                      {status?.connected ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRefresh(integration.id)}
-                            disabled={isLoading}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Refresh
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDisconnect(integration.id)}
-                            disabled={isLoading}
-                          >
-                            Disconnect
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect(integration)}
-                          disabled={isLoading || !integration.authUrl}
-                          className="w-full"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Connect {integration.name}
-                        </Button>
+                {!isComingSoon && (
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      {status?.connected && status?.lastUpdated && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>Last synced {formatRelativeTime(status.lastUpdated)}</span>
+                        </div>
                       )}
+                      
+                      {status?.message && (
+                        <p className={`text-sm ${getMessageStyle(status.message, status.connected)}`}>
+                          {status.message}
+                        </p>
+                      )}
+                      
+                      {status?.error && (
+                        <p className="text-sm text-red-600 font-medium">
+                          {status.error}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2">
+                        {status?.connected ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRefresh(integration.id)}
+                              disabled={isLoading}
+                              className="flex-1"
+                            >
+                              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                              Sync Data
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDisconnect(integration.id)}
+                              disabled={isLoading}
+                            >
+                              Disconnect
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            onClick={() => handleConnect(integration)}
+                            disabled={isLoading}
+                            className="w-full"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Connect {integration.name}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
             )
           })}
