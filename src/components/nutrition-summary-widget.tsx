@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card } from '@/components/ui/card'
-import { Apple, Coffee, Sun, Moon, Cookie } from 'lucide-react'
+import { Utensils, Coffee, Sun, Moon, Cookie } from 'lucide-react'
 import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface MealFood {
@@ -34,9 +33,18 @@ interface NutritionGoals {
 interface NutritionSummaryWidgetProps {
   className?: string
   onClick?: () => void
+  variant?: 'card' | 'embedded'
+  showControls?: boolean
+  compact?: boolean
 }
 
-export function NutritionSummaryWidget({ className, onClick }: NutritionSummaryWidgetProps) {
+export function NutritionSummaryWidget({ 
+  className, 
+  onClick, 
+  variant = 'card', 
+  showControls = true, 
+  compact = false 
+}: NutritionSummaryWidgetProps) {
   const [dailyMeals, setDailyMeals] = useState<DailyMeals>({
     breakfast: [],
     lunch: [],
@@ -128,61 +136,114 @@ export function NutritionSummaryWidget({ className, onClick }: NutritionSummaryW
   const calorieProgress = (dailyTotals.calories / nutritionGoals.calories) * 100
 
   const mealsWithFood = Object.entries(dailyMeals).filter(([_, foods]) => foods.length > 0)
+  const remainingCalories = nutritionGoals.calories - dailyTotals.calories
+  const isOverGoal = dailyTotals.calories > nutritionGoals.calories
+
+  // Determine progress color based on calorie intake
+  const getProgressColor = () => {
+    if (calorieProgress < 25) return 'low'
+    if (calorieProgress < 75) return 'medium' 
+    if (calorieProgress <= 100) return 'high'
+    return 'over'
+  }
+
+  // Determine status badge
+  const getStatusBadge = () => {
+    if (calorieProgress < 25) return { text: 'Low', variant: 'warning' as const }
+    if (calorieProgress < 75) return { text: 'On Track', variant: 'info' as const }
+    if (calorieProgress <= 100) return { text: 'Great', variant: 'success' as const }
+    return { text: 'Over Goal', variant: 'neutral' as const }
+  }
+
+  // Handle embedded variant (for taskboard)
+  if (variant === 'embedded') {
+    return (
+      <div className={`${className}`} onClick={onClick}>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-gray-900">
+                {Math.round(dailyTotals.calories)}
+              </span>
+              <span className="text-sm text-gray-500">/ {nutritionGoals.calories} cal</span>
+            </div>
+            {calorieProgress < 25 && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500 text-white">
+                Low
+              </span>
+            )}
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-1">
+            <div 
+              className={`h-1 rounded-full transition-all duration-300 ${
+                calorieProgress >= 100 ? "bg-blue-500" : 
+                calorieProgress >= 75 ? "bg-green-500" : 
+                calorieProgress >= 25 ? "bg-yellow-500" : "bg-gray-300"
+              }`}
+              style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+            />
+          </div>
+          {mealsWithFood.length > 0 && (
+            <div className="text-xs text-gray-500">
+              {mealsWithFood.length} meal{mealsWithFood.length !== 1 ? 's' : ''} logged
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
-      <Card className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${className}`} onClick={onClick}>
-        <div className="text-xs text-gray-500">Loading...</div>
-      </Card>
+      <div className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative animate-pulse">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-9 h-9 rounded-lg bg-green-500/90 shadow-sm">
+            <Utensils className="h-5 w-5 text-white m-2" />
+          </div>
+          <span className="text-sm font-medium truncate">Daily Nutrition</span>
+        </div>
+        <div className="w-20 h-8 bg-gray-200 rounded mb-2 mt-1"></div>
+        <div className="w-full h-1 bg-gray-100 rounded"></div>
+      </div>
     )
   }
 
   return (
-    <Card className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${className}`} onClick={onClick}>
-      <div className="space-y-2 mb-3">
-        {mealsWithFood.length === 0 ? (
-          <div className="text-xs text-gray-500">No meals logged today</div>
-        ) : (
-          mealsWithFood.map(([mealType, foods]) => {
-            const mealNutrition = calculateMealNutrition(foods)
-            return (
-              <div key={mealType} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  {getMealIcon(mealType)}
-                  <span className="text-gray-600">
-                    {getMealDisplayName(mealType)} ({foods.length} item{foods.length !== 1 ? 's' : ''})
-                  </span>
-                </div>
-                <span className="font-medium text-gray-800">
-                  {Math.round(mealNutrition.calories)} cal
-                </span>
-              </div>
-            )
-          })
+    <div 
+      className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-500/90 shadow-sm">
+          <Utensils className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-sm font-medium truncate">Daily Nutrition</span>
+      </div>
+      
+      <div className="mt-2 mb-1">
+        <span className="text-3xl font-black text-gray-900">
+          {Math.round(dailyTotals.calories)}
+        </span>
+        <span className="text-sm text-gray-500">
+          {" "}/ {nutritionGoals.calories}
+        </span>
+        {calorieProgress < 25 && (
+          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500 text-white">
+            Low
+          </span>
         )}
       </div>
-
-      <div className="border-t pt-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">Total Calories</span>
-          <span className="font-semibold">
-            {Math.round(dailyTotals.calories)} / {nutritionGoals.calories}
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-          <div 
-            className={`h-2 rounded-full transition-all duration-300 ${
-              calorieProgress < 50 ? 'bg-red-500' : 
-              calorieProgress < 80 ? 'bg-yellow-500' : 
-              calorieProgress <= 100 ? 'bg-green-500' : 'bg-blue-500'
-            }`}
-            style={{ width: `${Math.min(calorieProgress, 100)}%` }}
-          />
-        </div>
-        <div className="text-xs text-gray-500 mt-1">
-          {Math.round(calorieProgress)}% of daily goal
-        </div>
+      
+      <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
+        <div 
+          className={`h-1 rounded-full transition-all duration-300 ${
+            calorieProgress >= 100 ? "bg-blue-500" : 
+            calorieProgress >= 75 ? "bg-green-500" : 
+            calorieProgress >= 25 ? "bg-yellow-500" : "bg-gray-300"
+          }`}
+          style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+        />
       </div>
-    </Card>
+    </div>
   )
 }

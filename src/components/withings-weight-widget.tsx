@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Scale, RefreshCw, AlertCircle, CheckCircle2, Clock, TrendingUp, TrendingDown, Bell, BellOff } from 'lucide-react'
 import { useWithingsWeight } from '@/hooks/use-withings-weight'
 import { useWeightNotifications } from '@/hooks/use-weight-notifications'
+import { RefinedWidgetBase } from './refined-widget-base'
 import { cn } from '@/lib/utils'
 
 interface WithingsWeightWidgetProps {
@@ -116,194 +115,145 @@ export function WithingsWeightWidget({
 
   const StatusIcon = getStatusIcon()
 
+  // Calculate progress towards goal
+  const goalProgress = goalWeight && currentWeight && startingWeight 
+    ? ((startingWeight - currentWeight) / (startingWeight - goalWeight)) * 100 
+    : undefined
+
+  // Determine status badge
+  const getStatusBadge = () => {
+    if (!hasData) return { text: 'No Data', variant: 'neutral' as const }
+    if (!isConnected) return { text: 'Offline', variant: 'warning' as const }
+    if (error) return { text: 'Error', variant: 'danger' as const }
+    if (goalProgress && goalProgress >= 100) return { text: 'Goal Reached!', variant: 'success' as const }
+    if (goalProgress && goalProgress >= 75) return { text: 'Almost There', variant: 'info' as const }
+    return undefined
+  }
+
+  // Weight change indicator
+  const weightChangeDisplay = weightChange ? (
+    <div className="flex items-center gap-1 text-xs">
+      {weightChange > 0 ? (
+        <>
+          <TrendingUp className="w-3 h-3 text-red-500" />
+          <span className="text-red-500 font-medium">+{Math.abs(weightChange).toFixed(1)} {unit}</span>
+        </>
+      ) : (
+        <>
+          <TrendingDown className="w-3 h-3 text-green-500" />
+          <span className="text-green-500 font-medium">-{Math.abs(weightChange).toFixed(1)} {unit}</span>
+        </>
+      )}
+    </div>
+  ) : null
+
   return (
-    <Card className={cn('relative overflow-hidden', className)}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-            <Scale className="w-4 h-4" />
-            WEIGHT
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <div className="relative">
-                <Bell className="w-4 h-4 text-blue-600" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white font-bold">{unreadCount}</span>
-                </div>
-              </div>
-            )}
-            <button
-              onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-              className="p-1 hover:bg-gray-100 rounded"
-              title={notificationsEnabled ? 'Disable notifications' : 'Enable notifications'}
-            >
-              {notificationsEnabled ? (
-                <Bell className="w-4 h-4 text-blue-600" />
-              ) : (
-                <BellOff className="w-4 h-4 text-gray-400" />
-              )}
-            </button>
-            <StatusIcon className={cn('w-4 h-4', getStatusColor())} />
-            {isPolling && (
-              <RefreshCw className="w-3 h-3 text-blue-500 animate-spin" />
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        {/* Main Weight Display */}
-        <div className="space-y-4">
-          <div className="flex items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              {hasData && currentWeight ? (
-                <>
-                  <span className="text-2xl font-bold text-gray-900">
-                    {currentWeight}
-                  </span>
-                  <span className="text-sm text-gray-500">{unit}</span>
-                  {weightChange && (
-                    <div className="flex items-center gap-1">
-                      {weightChange > 0 ? (
-                        <TrendingUp className="w-3 h-3 text-red-500" />
-                      ) : (
-                        <TrendingDown className="w-3 h-3 text-green-500" />
-                      )}
-                      <span className={cn(
-                        'text-xs font-medium',
-                        weightChange > 0 ? 'text-red-500' : 'text-green-500'
-                      )}>
-                        {weightChange > 0 ? '+' : ''}{Math.abs(weightChange).toFixed(1)}
-                      </span>
-                    </div>
-                  )}
-                </>
-              ) : loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-16 h-8 bg-gray-200 animate-pulse rounded"></div>
-                  <span className="text-sm text-gray-500">{unit}</span>
-                </div>
-              ) : (
-                <span className="text-lg text-gray-400">No data</span>
-              )}
-            </div>
-
-            {showControls && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDetails(!showDetails)}
-                className="text-xs"
-              >
-                {showDetails ? 'Hide' : 'Details'}
-              </Button>
-            )}
-          </div>
-
-          {/* Progress to Goal */}
-          {goalWeight && currentWeight && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Progress to Goal</span>
-                <span>{Math.abs(progressToGoal || 0).toFixed(1)} {unit} {progressToGoal && progressToGoal > 0 ? 'to go' : 'past goal'}</span>
-              </div>
-              {totalProgress !== null && (
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={cn(
-                      'h-2 rounded-full transition-all duration-500',
-                      totalProgress >= 100 ? 'bg-green-500' : 'bg-blue-500'
-                    )}
-                    style={{ width: `${Math.min(Math.max(totalProgress, 0), 100)}%` }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Error State */}
-          {(error || weightData?.error) && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600" />
-                <span className="text-sm text-red-800">
-                  {weightData?.error || error?.message || 'Failed to load weight data'}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Details Panel */}
-          {showDetails && (
-            <div className="space-y-3 pt-3 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-gray-500">Status</span>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Badge variant={isConnected ? 'default' : 'secondary'} className="text-xs">
-                      {isConnected ? 'Connected' : 'Disconnected'}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-gray-500">Polling</span>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Badge variant={isPolling ? 'default' : 'secondary'} className="text-xs">
-                      {isPolling ? 'Active' : 'Stopped'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {lastFetchTime && (
-                <div className="text-xs text-gray-500">
-                  Last updated: {lastFetchTime.toLocaleTimeString()}
-                </div>
-              )}
-
-              {nextFetchIn && (
-                <div className="text-xs text-gray-500">
-                  Next update in: {formatNextFetch(nextFetchIn)}
-                </div>
-              )}
-
-              {showControls && (
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={refreshNow}
-                    disabled={loading}
-                    className="text-xs"
-                  >
-                    <RefreshCw className={cn('w-3 h-3 mr-1', loading && 'animate-spin')} />
-                    Refresh
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={isPolling ? stopPolling : startPolling}
-                    className="text-xs"
-                  >
-                    {isPolling ? 'Stop' : 'Start'} Auto-Update
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </CardContent>
-
-      {/* Loading Overlay */}
-      {loading && !hasData && (
-        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Loading weight data...
-          </div>
+    <RefinedWidgetBase
+      title="Weight Tracking"
+      icon={Scale}
+      iconColor="violet"
+      primaryValue={hasData && currentWeight ? currentWeight.toString() : "No data"}
+      primaryUnit={hasData && currentWeight ? unit : undefined}
+      secondaryLabel={goalProgress ? "Progress to Goal" : undefined}
+      secondaryValue={goalProgress ? `${Math.round(goalProgress)}%` : undefined}
+      progress={goalProgress}
+      progressColor={
+        goalProgress && goalProgress >= 100 ? 'complete' :
+        goalProgress && goalProgress >= 75 ? 'high' :
+        goalProgress && goalProgress >= 25 ? 'medium' : 'low'
+      }
+      statusBadge={getStatusBadge()}
+      onClick={onClick}
+      isLoading={loading}
+      className={className}
+      size={showControls ? "large" : "normal"}
+      variant={showControls ? "detailed" : "minimal"}
+    >
+      {/* Weight change indicator */}
+      {weightChangeDisplay && (
+        <div className="flex justify-center">
+          {weightChangeDisplay}
         </div>
       )}
-    </Card>
+
+      {/* Goal information */}
+      {goalWeight && hasData && (
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Current</span>
+            <span className="font-semibold">{currentWeight} {unit}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Goal</span>
+            <span className="font-semibold">{goalWeight} {unit}</span>
+          </div>
+          {progressToGoal && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">To Goal</span>
+              <span className="font-semibold text-blue-600">{Math.abs(progressToGoal).toFixed(1)} {unit}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notification controls */}
+      {unreadCount > 0 && (
+        <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-blue-600" />
+            <span className="text-xs text-blue-800">{unreadCount} new notification{unreadCount !== 1 ? 's' : ''}</span>
+          </div>
+          <button
+            onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {notificationsEnabled ? 'Disable' : 'Enable'}
+          </button>
+        </div>
+      )}
+
+      {/* Advanced controls for detailed view */}
+      {showControls && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshNow}
+              disabled={loading}
+              className="flex-1 text-xs relative overflow-hidden transition-all duration-200 hover:shadow-sm hover:scale-105 active:scale-95 group disabled:opacity-60"
+            >
+              <RefreshCw className={cn(
+                'w-3 h-3 mr-1 transition-transform duration-300',
+                loading ? 'animate-spin' : 'group-hover:rotate-180'
+              )} />
+              <span className="relative z-10 font-medium">
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </span>
+              {!loading && hasData && (
+                <div className="absolute inset-0 bg-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              )}
+              {error && (
+                <div className="absolute inset-0 bg-red-500/10" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={isPolling ? stopPolling : startPolling}
+              className="text-xs"
+            >
+              {isPolling ? 'Stop' : 'Start'} Auto-Update
+            </Button>
+          </div>
+          
+          {lastFetchTime && (
+            <div className="text-xs text-gray-500 text-center">
+              Last updated: {lastFetchTime.toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+      )}
+    </RefinedWidgetBase>
   )
 }
