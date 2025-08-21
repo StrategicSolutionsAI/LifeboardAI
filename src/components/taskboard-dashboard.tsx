@@ -479,6 +479,11 @@ function TaskBoardDashboardInner() {
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   // Collapse state for the new hourly planner
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
+  // Collapse state for upcoming task sections
+  const [isNext7DaysCollapsed, setIsNext7DaysCollapsed] = useState(false);
+  const [isNext2WeeksCollapsed, setIsNext2WeeksCollapsed] = useState(false);
+  const [isLaterCollapsed, setIsLaterCollapsed] = useState(false);
+  const [isNoDueDateCollapsed, setIsNoDueDateCollapsed] = useState(true);
   
   // Dashboard inner subtabs (left panel)
   const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Settings'>('Overview');
@@ -815,6 +820,64 @@ function TaskBoardDashboardInner() {
 
   const openTasksToShow = allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr);
 
+  // ----------------------------------------------------------------------
+  // Upcoming tasks filtering and grouping logic
+  // ----------------------------------------------------------------------
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  
+  const getTimeUntilDue = (dueDate: string | null) => {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const formatTimeUntilDue = (days: number | null) => {
+    if (days === null) return '';
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days === -1) return 'Yesterday';
+    if (days < 0) return `${Math.abs(days)} days ago`;
+    if (days === 7) return '1 week';
+    if (days < 7) return `${days} days`;
+    if (days < 14) return `${days} days`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks`;
+    return `${Math.floor(days / 30)} months`;
+  };
+
+  const upcomingTasks = allTodoistTasks.filter((t: any) => {
+    if (!t.due?.date) return false;
+    return t.due.date > todayStr;
+  });
+
+  const groupUpcomingTasks = () => {
+    const groups = {
+      next7Days: [] as any[],
+      next2Weeks: [] as any[],
+      later: [] as any[],
+      noDueDate: allTodoistTasks.filter((t: any) => !t.due?.date)
+    };
+
+    upcomingTasks.forEach((task: any) => {
+      const daysUntil = getTimeUntilDue(task.due?.date);
+      if (daysUntil !== null) {
+        if (daysUntil <= 7) {
+          groups.next7Days.push(task);
+        } else if (daysUntil <= 14) {
+          groups.next2Weeks.push(task);
+        } else {
+          groups.later.push(task);
+        }
+      }
+    });
+
+    return groups;
+  };
+
+  const upcomingTaskGroups = groupUpcomingTasks();
+
   const updateTaskDueDate = async (taskId: string, dueDate: string | null) => {
     try {
       await fetch('/api/integrations/todoist/tasks/update', {
@@ -1058,6 +1121,94 @@ function TaskBoardDashboardInner() {
       setAllTodoistTasks([...openSubset, ...datedSubset]);
     }
 
+    // ------------------------------------------------------------------
+    // 3) Upcoming task group drag and drop handling
+    // ------------------------------------------------------------------
+    const upcomingDroppableIds = ['next7Days', 'next2Weeks', 'later', 'noDueDate'];
+    
+    if (upcomingDroppableIds.includes(source.droppableId) || upcomingDroppableIds.includes(destination.droppableId)) {
+      console.log('🔄 Upcoming task drag detected');
+      
+      // Get the task being moved
+      let movedTask: any = null;
+      
+      // Find the task in the appropriate source group
+      if (source.droppableId === 'next7Days') {
+        movedTask = upcomingTaskGroups.next7Days[source.index];
+      } else if (source.droppableId === 'next2Weeks') {
+        movedTask = upcomingTaskGroups.next2Weeks[source.index];
+      } else if (source.droppableId === 'later') {
+        movedTask = upcomingTaskGroups.later[source.index];
+      } else if (source.droppableId === 'noDueDate') {
+        movedTask = upcomingTaskGroups.noDueDate[source.index];
+      } else if (source.droppableId === 'dailyTasks') {
+        movedTask = todoistTasks[source.index];
+      } else if (source.droppableId === 'openTasks') {
+        const openVisible = allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr);
+        movedTask = openVisible[source.index];
+      }
+      
+      if (!movedTask) {
+        console.log('❌ No task found in source group');
+        return;
+      }
+      
+      // Determine what date to set based on destination
+      let newDueDate: string | null = null;
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 8);
+      const nextMonth = new Date(today);
+      nextMonth.setDate(nextMonth.getDate() + 30);
+      
+      if (destination.droppableId === 'next7Days') {
+        newDueDate = tomorrow.toISOString().split('T')[0];
+      } else if (destination.droppableId === 'next2Weeks') {
+        newDueDate = nextWeek.toISOString().split('T')[0];
+      } else if (destination.droppableId === 'later') {
+        newDueDate = nextMonth.toISOString().split('T')[0];
+      } else if (destination.droppableId === 'noDueDate') {
+        newDueDate = null;
+      } else if (destination.droppableId === 'dailyTasks') {
+        newDueDate = selectedDateStr;
+      } else if (destination.droppableId === 'openTasks') {
+        newDueDate = null;
+      }
+      
+      // Update the task's due date
+      console.log(`📅 Updating task "${movedTask.content}" due date to: ${newDueDate}`);
+      
+      // Optimistically update the state
+      setAllTodoistTasks((prev) => {
+        return prev.map((task) => {
+          if (task.id.toString() === draggableId) {
+            const updatedDue = newDueDate ? { date: newDueDate } : null;
+            return { ...task, due: updatedDue };
+          }
+          return task;
+        });
+      });
+      
+      // Also update daily tasks if moving to/from daily
+      if (destination.droppableId === 'dailyTasks') {
+        setTodoistTasks((prev) => {
+          const updatedTask = { ...movedTask, due: { date: newDueDate } };
+          const next = [...prev];
+          next.splice(destination.index, 0, updatedTask);
+          return next;
+        });
+      } else if (source.droppableId === 'dailyTasks') {
+        setTodoistTasks((prev) => {
+          return prev.filter((task) => task.id.toString() !== draggableId);
+        });
+      }
+      
+      // Update the server
+      await updateTaskDueDate(draggableId, newDueDate);
+      console.log(`✅ Successfully moved task to ${destination.droppableId}`);
+    }
+
     // Optionally you can refresh from server, but keeping as-is to avoid flicker
     // fetchTodoistTasks(selectedDate);
     // fetchAllTodoistTasks();
@@ -1118,8 +1269,8 @@ function TaskBoardDashboardInner() {
     loadProgress();
   }, [user]);
 
-  // Helper to get today string
-  const todayStr = new Date().toISOString().slice(0,10);
+  // Helper to get today string  
+  const todayStrGlobal = new Date().toISOString().slice(0,10);
 
   const incrementProgress = async (w: WidgetInstance) => {
     console.log('incrementProgress called for widget:', w.instanceId);
@@ -2387,10 +2538,10 @@ function TaskBoardDashboardInner() {
                   {/* Refresh card */}
                   <div
                     onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                    className="w-48 rounded-lg border bg-white p-3 shadow-sm relative cursor-pointer hover:bg-gray-50"
+                    className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded flex items-center justify-center bg-indigo-500">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-indigo-500/90 shadow-sm">
                         {isRefreshing ? (
                           <Loader2 className="h-5 w-5 animate-spin text-white" />
                         ) : (
@@ -2440,7 +2591,7 @@ function TaskBoardDashboardInner() {
                     const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
 
                     return (
-                      <div key={w.instanceId} className={`w-48 rounded-lg border ${cardBgClass} p-3 shadow-sm relative group cursor-pointer`} onClick={() => { 
+                      <div key={w.instanceId} className={`w-48 rounded-xl border border-gray-100 ${cardBgClass} p-4 shadow-sm relative group cursor-pointer hover:shadow-md hover:border-gray-200 transition-all`} onClick={() => { 
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -2464,8 +2615,9 @@ function TaskBoardDashboardInner() {
                                 setEditingBucket(activeBucket); 
                                 setNewlyCreatedWidgetId(null);
                               }}
-                              className="rounded-full bg-green-100 hover:bg-green-200 p-1"
+                              className="rounded-full bg-green-100 hover:bg-green-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition"
                               aria-label="Edit widget settings"
+                              title="Edit settings"
                             >
                               <SettingsIcon className="h-3 w-3 text-green-600" />
                             </button>
@@ -2475,8 +2627,9 @@ function TaskBoardDashboardInner() {
                               e.stopPropagation();
                               convertWidgetToTask(w);
                             }}
-                            className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1"
+                            className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 transition"
                             aria-label="Convert to task"
+                            title="Convert to task"
                           >
                             <ListChecks className="h-3 w-3 text-indigo-600" />
                           </button>
@@ -2509,8 +2662,9 @@ function TaskBoardDashboardInner() {
                                 return updatedWidgets;
                               });
                             }}
-                            className="rounded-full bg-red-100 hover:bg-red-200 p-1"
+                            className="rounded-full bg-red-100 hover:bg-red-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 transition"
                             aria-label="Delete widget"
+                            title="Delete widget"
                           >
                             <X className="h-3 w-3 text-red-600" />
                           </button>
@@ -2539,7 +2693,7 @@ function TaskBoardDashboardInner() {
 
                             return (
                               <div
-                                className={`w-8 h-8 rounded flex items-center justify-center ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-gray-500'}`}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-gray-500'}`}
                               >
                                 <IconComponent className="h-5 w-5 text-white" />
                               </div>
@@ -2944,10 +3098,10 @@ function TaskBoardDashboardInner() {
                           // Special handling for nutrition widget
                           if (w.id === 'nutrition') {
                             return (
-                              <div className="mt-3 -m-3">
+                              <div className="mt-3">
                                 <NutritionSummaryWidget 
-                                  className="border-0 shadow-none bg-transparent p-3"
-                                  onClick={() => setNutritionWidgetOpen(true)}
+                                  variant="embedded"
+                                  className="p-0"
                                 />
                               </div>
                             );
@@ -2969,20 +3123,33 @@ function TaskBoardDashboardInner() {
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
-                          
+                           
                           return (
-                            <div className="mt-3">
-                              <div className="h-1 rounded bg-gray-200">
-                                <div className={`h-1 rounded ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+                            <div className="mt-2 mb-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg font-bold text-gray-900">
+                                    {todayVal}
+                                  </span>
+                                  <span className="text-sm text-gray-500">
+                                    / {w.target}
+                                  </span>
+                                </div>
+                                {prog?.streak >= 2 && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                    🔥 {prog.streak}
+                                  </span>
+                                )}
                               </div>
-                              <div className="mt-1 flex items-center justify-between text-[11px] text-gray-500">
-                                <span>
-                                  {todayVal} / {w.target}
-                                  {w.dataSource === 'fitbit' && <span className="ml-1 text-[10px] text-blue-500">Fitbit</span>}
-                                   {w.dataSource === 'googlefit' && <span className="ml-1 text-[10px] text-green-600">Google Fit</span>}
-                                </span>
-                                {prog?.streak >= 2 && (<span className="text-amber-500">🔥 {prog.streak}</span>)}
+                              <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
+                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
                               </div>
+                              {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
+                                <div className="text-right mt-1 mb-1">
+                                  {w.dataSource === 'fitbit' && <span className="text-xs text-blue-500">Fitbit</span>}
+                                  {w.dataSource === 'googlefit' && <span className="text-xs text-green-600">Google Fit</span>}
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
@@ -3264,35 +3431,65 @@ function TaskBoardDashboardInner() {
                         </div>
 
                         <ul
-                          className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
+                          className="space-y-3 pr-1 transition-[max-height] duration-200"
                           style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
                         >
                           {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                            <li className="text-gray-500">Loading…</li>
+                            <li className="text-gray-500 text-sm">Loading…</li>
                           ) : null}
 
                           {!isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                            <li className="text-gray-500">No tasks</li>
+                            <li className="text-gray-500 text-sm">No tasks</li>
                           ) : null}
 
                           {dailyVisibleTasks.map((t: any, index: number) => (
                             <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                              {(provided: any) => (
+                              {(provided: any, dragSnapshot: any) => (
                                 <li
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
                                   style={provided.draggableProps.style}
-                                  className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
+                                  className={`group flex items-start gap-3 px-4 py-3 
+                                    bg-card border border-border/60 
+                                    shadow-sm hover:shadow-md 
+                                    rounded-xl transition-all duration-200 
+                                    hover:border-primary/40 hover:bg-card/80
+                                    ${dragSnapshot.isDragging ? 'shadow-lg rotate-1 scale-105 border-primary/60' : ''}
+                                    ${t.completed ? 'opacity-60' : ''}
+                                  `}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    aria-label={t.content}
-                                    checked={t.completed ?? false}
-                                    onChange={() => toggleTaskCompletion(t.id.toString())}
-                                    className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                                  />
-                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                  {/* Enhanced status indicator */}
+                                  <div className="flex-shrink-0 mt-1">
+                                    <div 
+                                      className={`w-2.5 h-2.5 rounded-full ring-2 transition-all duration-200 cursor-pointer
+                                        ${t.completed 
+                                          ? 'bg-green-500 ring-green-500/20' 
+                                          : 'bg-primary ring-primary/20 hover:ring-primary/40'
+                                        }`}
+                                      onClick={() => toggleTaskCompletion(t.id.toString())}
+                                      title={t.completed ? 'Mark as pending' : 'Mark as complete'}
+                                    />
+                                  </div>
+                                  
+                                  <div className="flex flex-col w-full justify-center min-w-0">
+                                    {/* Task content with enhanced typography */}
+                                    <div className={`font-semibold truncate text-sm leading-tight transition-all duration-200
+                                      ${t.completed 
+                                        ? 'line-through text-card-foreground/50' 
+                                        : 'text-card-foreground group-hover:text-primary'
+                                      }`}>
+                                      {t.content}
+                                    </div>
+                                    
+                                    {/* Due date/time indicator */}
+                                    {t.due && (
+                                      <div className="text-xs font-medium text-primary/70 leading-tight mt-1 tracking-wide">
+                                        Due: {new Date(t.due.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        {t.due.datetime && ` at ${new Date(t.due.datetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+                                      </div>
+                                    )}
+                                  </div>
                                 </li>
                               )}
                             </Draggable>
@@ -3336,7 +3533,7 @@ function TaskBoardDashboardInner() {
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 ${(taskView as any)==='Today' ? 'hidden' : ''}`}
+                        className={`space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto ${(taskView as any)==='Today' ? 'hidden' : ''}`}
                         style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
                       >
                         {isLoadingAllTasks && openTasksToShow.length === 0 ? (
@@ -3459,7 +3656,7 @@ function TaskBoardDashboardInner() {
                       <ul
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
+                        className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
                         style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
                       >
                         {isLoadingAllTasks && openTasksToShow.length === 0 ? (
@@ -3537,6 +3734,189 @@ function TaskBoardDashboardInner() {
                       >
                         {!isPlannerCollapsed && <HourlyPlanner className="" />}
                       </div>
+                    </>
+                  )}
+
+                  {/* Upcoming Tasks View */}
+                  {taskView === 'Upcoming' && (
+                    <>
+                      {/* Next 7 Days */}
+                      <div
+                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                        onClick={() => setIsNext7DaysCollapsed((c) => !c)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>⚡</span>
+                          <span>Next 7 Days</span>
+                          <span className="text-xs text-gray-500">({upcomingTaskGroups.next7Days.length})</span>
+                        </span>
+                        {isNext7DaysCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <Droppable droppableId="next7Days">
+                        {(provided: any) => (
+                          <ul
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                            style={{ maxHeight: isNext7DaysCollapsed ? 0 : '12rem' }}
+                          >
+                            {upcomingTaskGroups.next7Days.length === 0 ? (
+                              <li className="text-gray-500">No tasks</li>
+                            ) : null}
+                            {upcomingTaskGroups.next7Days.map((t: any, index: number) => (
+                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                {(provided: any) => (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
+                                  >
+                                    <span className="flex-1">{t.content}</span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
+                                    </span>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </ul>
+                        )}
+                      </Droppable>
+
+                      {/* Next 2 Weeks */}
+                      <div
+                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
+                        onClick={() => setIsNext2WeeksCollapsed((c) => !c)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>📅</span>
+                          <span>Next 2 Weeks</span>
+                          <span className="text-xs text-gray-500">({upcomingTaskGroups.next2Weeks.length})</span>
+                        </span>
+                        {isNext2WeeksCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <Droppable droppableId="next2Weeks">
+                        {(provided: any) => (
+                          <ul
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                            style={{ maxHeight: isNext2WeeksCollapsed ? 0 : '12rem' }}
+                          >
+                            {upcomingTaskGroups.next2Weeks.length === 0 ? (
+                              <li className="text-gray-500">No tasks</li>
+                            ) : null}
+                            {upcomingTaskGroups.next2Weeks.map((t: any, index: number) => (
+                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                {(provided: any) => (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
+                                  >
+                                    <span className="flex-1">{t.content}</span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
+                                    </span>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </ul>
+                        )}
+                      </Droppable>
+
+                      {/* Later */}
+                      <div
+                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
+                        onClick={() => setIsLaterCollapsed((c) => !c)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>🗓️</span>
+                          <span>Later</span>
+                          <span className="text-xs text-gray-500">({upcomingTaskGroups.later.length})</span>
+                        </span>
+                        {isLaterCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <Droppable droppableId="later">
+                        {(provided: any) => (
+                          <ul
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                            style={{ maxHeight: isLaterCollapsed ? 0 : '12rem' }}
+                          >
+                            {upcomingTaskGroups.later.length === 0 ? (
+                              <li className="text-gray-500">No tasks</li>
+                            ) : null}
+                            {upcomingTaskGroups.later.map((t: any, index: number) => (
+                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                {(provided: any) => (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
+                                  >
+                                    <span className="flex-1">{t.content}</span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
+                                    </span>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </ul>
+                        )}
+                      </Droppable>
+
+                      {/* No Due Date */}
+                      <div
+                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
+                        onClick={() => setIsNoDueDateCollapsed((c) => !c)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>📋</span>
+                          <span>No Due Date</span>
+                          <span className="text-xs text-gray-500">({upcomingTaskGroups.noDueDate.length})</span>
+                        </span>
+                        {isNoDueDateCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <Droppable droppableId="noDueDate">
+                        {(provided: any) => (
+                          <ul
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                            style={{ maxHeight: isNoDueDateCollapsed ? 0 : '12rem' }}
+                          >
+                            {upcomingTaskGroups.noDueDate.length === 0 ? (
+                              <li className="text-gray-500">No tasks</li>
+                            ) : null}
+                            {upcomingTaskGroups.noDueDate.map((t: any, index: number) => (
+                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                                {(provided: any) => (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
+                                  >
+                                    <span className="flex-1">{t.content}</span>
+                                    <span className="text-xs text-gray-500 ml-2">No due date</span>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </ul>
+                        )}
+                      </Droppable>
                     </>
                   )}
                 </DragDropContext>
