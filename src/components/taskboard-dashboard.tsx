@@ -2466,8 +2466,8 @@ function TaskBoardDashboardInner() {
                   }}
                   className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[13px] font-medium capitalize transition-colors ${
                     b === activeBucket
-                      ? 'bg-theme-primary text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
-                      : 'bg-white text-theme-primary hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
+                      ? 'bg-indigo-600 text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
+                      : 'bg-white text-indigo-600 hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
                   }`}
                 >
                   {b}
@@ -2482,7 +2482,7 @@ function TaskBoardDashboardInner() {
                 }}
                 className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
               >
-                <span className="text-theme-primary">
+                <span className="text-indigo-600">
                   +
                 </span>
               </button>
@@ -3381,7 +3381,7 @@ function TaskBoardDashboardInner() {
                     onClick={() => handleDateChange(day)}
                     className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                       isSameDay(day, selectedDate)
-                        ? 'bg-gradient-to-r from-theme-secondary to-theme-accent text-white'
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -3400,7 +3400,7 @@ function TaskBoardDashboardInner() {
                       onClick={() => setTaskView(tab)}
                       className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                         taskView === tab
-                          ? 'bg-gradient-to-r from-theme-secondary to-theme-accent text-white shadow'
+                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow'
                           : 'text-gray-500 hover:bg-gray-50'
                       }`}
                     >
