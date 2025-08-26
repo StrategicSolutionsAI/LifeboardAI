@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Utensils, Coffee, Sun, Moon, Cookie } from 'lucide-react'
+import { Utensils, Coffee, Sun, Moon, Cookie, Apple } from 'lucide-react'
 import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface MealFood {

@@ -3,9 +3,10 @@
 
 import React, { useState, useMemo, useCallback } from "react";
 import { format, addDays, isSameDay } from "date-fns";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, AlertCircle, RefreshCw } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
+import { Skeleton } from "@/components/ui/skeleton";
 import HourlyPlanner from "./hourly-planner";
 
 interface Task {
@@ -13,6 +14,36 @@ interface Task {
   content: string;
   completed: boolean;
   hourSlot?: string;
+  due?: { date: string };
+}
+
+// Loading skeleton for tasks
+function TaskSkeleton() {
+  return (
+    <li className="widget-container flex items-start gap-3 px-4 py-4">
+      <Skeleton className="w-4 h-4 mt-0.5 rounded" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </li>
+  );
+}
+
+// Error display component
+function TaskError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-3 bg-theme-error-50 border border-theme-error-200 rounded-lg text-theme-error-700 text-sm">
+      <AlertCircle size={16} />
+      <span>Failed to load tasks</span>
+      <button 
+        onClick={onRetry}
+        className="ml-auto text-theme-error-600 hover:text-theme-error-700 underline"
+      >
+        Retry
+      </button>
+    </div>
+  );
 }
 
 export function TaskSidePanel() {
@@ -40,21 +71,27 @@ export function TaskSidePanel() {
   const {
     dailyVisibleTasks, // Tasks without hourSlot
     allTasks,
+    upcomingTasks,
     loading,
+    error,
     createTask,
     toggleTaskCompletion,
     batchUpdateTasks,
+    refetch,
   } = useTasksContext();
 
-  // Filter tasks for display
-  const openTasksToShow = useMemo(() => 
-    allTasks.filter(t => !t.completed), 
-    [allTasks]
-  );
+  // Filter tasks for display - show all open tasks, including those without due dates
+  const openTasksToShow = useMemo(() => {
+    // Include all non-completed tasks
+    return allTasks.filter(t => !t.completed);
+  }, [allTasks]);
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
   const [newOpenTask, setNewOpenTask] = useState("");
+  const [newUpcomingTask, setNewUpcomingTask] = useState("");
+  const [upcomingTaskDate, setUpcomingTaskDate] = useState("");
+  const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
 
   const handleAddDailyTask = async () => {
     if (newDailyTask.trim()) {
@@ -67,6 +104,23 @@ export function TaskSidePanel() {
     if (newOpenTask.trim()) {
       await createTask(newOpenTask, null);
       setNewOpenTask("");
+    }
+  };
+
+  const handleAddUpcomingTask = async () => {
+    if (newUpcomingTask.trim() && upcomingTaskDate) {
+      await createTask(newUpcomingTask, upcomingTaskDate);
+      setNewUpcomingTask("");
+      setUpcomingTaskDate("");
+    }
+  };
+
+  const handleToggleTaskCompletion = async (taskId: string) => {
+    setIsCompletingTask(prev => ({ ...prev, [taskId]: true }));
+    try {
+      await toggleTaskCompletion(taskId);
+    } finally {
+      setIsCompletingTask(prev => ({ ...prev, [taskId]: false }));
     }
   };
 
@@ -98,8 +152,8 @@ export function TaskSidePanel() {
       return;
     }
 
-    if (source.droppableId === 'openTasks' && isHour(destination.droppableId)) {
-      // Open task → Hour slot: Set the hourSlot to schedule the task  
+    if ((source.droppableId === 'openTasks' || source.droppableId === 'upcomingTasks') && isHour(destination.droppableId)) {
+      // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
       const dstHour = hourKey(destination.droppableId);
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
@@ -119,8 +173,8 @@ export function TaskSidePanel() {
       return;
     }
 
-    if (isHour(source.droppableId) && destination.droppableId === 'openTasks') {
-      // Hour slot → Open list: Remove hourSlot to unschedule the task
+    if (isHour(source.droppableId) && (destination.droppableId === 'openTasks' || destination.droppableId === 'upcomingTasks')) {
+      // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: undefined } }
       ]).catch(error => {
@@ -149,11 +203,11 @@ export function TaskSidePanel() {
 
   return (
     <aside className="w-[400px] flex-shrink-0 -mt-12">
-      <div className="rounded-lg border border-gray-100 bg-white p-6 shadow-sm h-full flex flex-col">
+      <div className="rounded-lg border border-theme-neutral-200 bg-theme-surface-raised p-6 shadow-sm h-full flex flex-col">
         {/* Month header */}
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-900">{format(date, "MMMM yyyy")}</h3>
-          <div className="flex gap-1 text-gray-500">
+          <h3 className="text-sm font-medium text-theme-text-primary">{format(date, "MMMM yyyy")}</h3>
+          <div className="flex gap-1 text-theme-text-tertiary">
             <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
             <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
           </div>
@@ -167,8 +221,8 @@ export function TaskSidePanel() {
               onClick={() => handleDateChange(day)}
               className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                 isSameDay(day, selectedDate)
-                  ? "bg-theme-primary text-white"
-                  : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+                  ? "bg-theme-primary-500 text-theme-text-inverse"
+                  : "bg-theme-neutral-100 text-theme-text-secondary hover:bg-theme-neutral-200"
               }`}
             >
               <span className="text-lg font-semibold leading-none">{format(day, "d")}</span>
@@ -179,15 +233,15 @@ export function TaskSidePanel() {
 
         {/* Toggle Today / Upcoming / Master */}
         <div className="mt-4">
-          <div className="flex rounded-full border border-[#E2E6F6] bg-white p-1 w-full shadow-sm">
+          <div className="flex rounded-full border border-theme-neutral-200 bg-theme-surface-raised p-1 w-full shadow-sm">
             {["Today", "Upcoming", "Master List"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setTaskView(tab as any)}
                 className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                   taskView === tab
-                    ? "bg-theme-primary text-white shadow"
-                    : "text-theme-secondary hover:bg-gray-50 hover:text-theme-primary"
+                    ? "bg-theme-primary-500 text-theme-text-inverse shadow"
+                    : "text-theme-text-secondary hover:bg-theme-hover hover:text-theme-primary-600"
                 }`}
               >
                 {tab}
@@ -197,7 +251,7 @@ export function TaskSidePanel() {
         </div>
 
         {/* Lists */}
-        <div className="mt-6 flex-1 overflow-hidden flex flex-col" style={{ transform: 'none' }}>
+        <div className="mt-6 flex-1 overflow-y-auto flex flex-col" style={{ transform: 'none' }}>
           <DragDropContext onDragEnd={handleDragEnd}>
             {/* Today view */}
             {taskView === "Today" && (
@@ -207,7 +261,7 @@ export function TaskSidePanel() {
                   {(provided) => (
                     <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col">
                       <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                        className="flex items-center justify-between text-sm font-medium text-theme-text-primary mb-2 cursor-pointer select-none"
                         onClick={() => setIsDailyCollapsed((c) => !c)}
                       >
                         <span>Todoist tasks on {format(selectedDate, "MMM d, yyyy")}</span>
@@ -215,34 +269,40 @@ export function TaskSidePanel() {
                       </div>
 
                       <ul
-                        className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                        className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
                         style={{ maxHeight: isDailyCollapsed ? 0 : "10rem" }}
                       >
-                        {loading && dailyVisibleTasks.length === 0 && <li className="text-gray-500">Loading…</li>}
-                        {!loading && dailyVisibleTasks.length === 0 && <li className="text-gray-500">No tasks</li>}
-
-                        {dailyVisibleTasks.map((t: Task, index: number) => (
-                          <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
-                            {(prov) => (
-                              <li
-                                ref={prov.innerRef}
-                                {...prov.draggableProps}
-                                {...prov.dragHandleProps}
-                                style={prov.draggableProps.style}
-                                className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t.content}
-                                  checked={t.completed ?? false}
-                                  onChange={() => toggleTaskCompletion(t.id.toString())}
-                                  className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
-                                />
-                                <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))}
+                        {error ? (
+                          <TaskError error={error} onRetry={refetch} />
+                        ) : loading && dailyVisibleTasks.length === 0 ? (
+                          Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                        ) : !loading && dailyVisibleTasks.length === 0 ? (
+                          <li className="text-theme-text-tertiary text-center py-4">No tasks for today</li>
+                        ) : (
+                          dailyVisibleTasks.map((t: Task, index: number) => (
+                            <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                              {(prov) => (
+                                <li
+                                  ref={prov.innerRef}
+                                  {...prov.draggableProps}
+                                  {...prov.dragHandleProps}
+                                  style={prov.draggableProps.style}
+                                  className="widget-container flex items-start gap-3 px-4 py-4"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t.content}
+                                    checked={t.completed ?? false}
+                                    disabled={isCompletingTask[t.id.toString()]}
+                                    onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                    className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
+                                  />
+                                  <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))
+                        )}
                         {provided.placeholder}
                       </ul>
                     </div>
@@ -258,11 +318,105 @@ export function TaskSidePanel() {
                       value={newDailyTask}
                       onChange={(e) => setNewDailyTask(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleAddDailyTask()}
-                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                      className="input-field flex-1 text-sm"
                     />
-                    <button onClick={handleAddDailyTask} className="text-sm text-indigo-600 hover:underline">
+                    <button onClick={handleAddDailyTask} className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline">
                       Add
                     </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Upcoming view */}
+            {taskView === "Upcoming" && (
+              <>
+                <div
+                  className="flex items-center justify-between text-sm font-medium text-theme-text-primary mb-2 cursor-pointer select-none"
+                  onClick={() => setIsOpenCollapsed((c) => !c)}
+                >
+                  <span>Upcoming tasks ({upcomingTasks.length})</span>
+                  {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                </div>
+
+                <Droppable droppableId="upcomingTasks">
+                  {(provided) => (
+                    <ul
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
+                      style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
+                    >
+                      {error ? (
+                        <TaskError error={error} onRetry={refetch} />
+                      ) : loading && upcomingTasks.length === 0 ? (
+                        Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                      ) : !loading && upcomingTasks.length === 0 ? (
+                        <li className="text-theme-text-tertiary text-center py-4">No upcoming tasks</li>
+                      ) : (
+                        upcomingTasks.map((t: Task, index: number) => (
+                          <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                            {(prov) => (
+                              <li
+                                ref={prov.innerRef}
+                                {...prov.draggableProps}
+                                {...prov.dragHandleProps}
+                                style={prov.draggableProps.style}
+                                className="flex items-start gap-3 px-4 py-4 bg-theme-surface-raised border border-theme-neutral-200 shadow-sm rounded-lg"
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={t.content}
+                                  checked={t.completed ?? false}
+                                  disabled={isCompletingTask[t.id.toString()]}
+                                  onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                  className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
+                                />
+                                <div className="flex-1">
+                                  <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
+                                  {t.due?.date && (
+                                    <div className="text-xs text-theme-text-tertiary mt-1">
+                                      Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                    </div>
+                                  )}
+                                </div>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))
+                      )}
+                      {provided.placeholder}
+                    </ul>
+                  )}
+                </Droppable>
+
+                {/* Add new upcoming task */}
+                {!isOpenCollapsed && (
+                  <div className="mt-2 space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Add upcoming task…"
+                      value={newUpcomingTask}
+                      onChange={(e) => setNewUpcomingTask(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && upcomingTaskDate && handleAddUpcomingTask()}
+                      className="input-field w-full text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={upcomingTaskDate}
+                        onChange={(e) => setUpcomingTaskDate(e.target.value)}
+                        min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
+                        className="input-field flex-1 text-sm"
+                      />
+                      <button 
+                        onClick={handleAddUpcomingTask}
+                        disabled={!newUpcomingTask.trim() || !upcomingTaskDate}
+                        className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline disabled:text-theme-text-quaternary disabled:no-underline"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
                 )}
               </>
@@ -271,12 +425,24 @@ export function TaskSidePanel() {
             {/* Master List view */}
             {taskView === "Master List" && (
               <>
-                <div
-                  className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                  onClick={() => setIsOpenCollapsed((c) => !c)}
-                >
-                  <span>All open tasks</span>
-                  {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                <div className="flex items-center justify-between text-sm font-medium text-theme-text-primary mb-2">
+                  <div 
+                    className="flex items-center gap-2 cursor-pointer select-none flex-1"
+                    onClick={() => setIsOpenCollapsed((c) => !c)}
+                  >
+                    <span>All open tasks ({openTasksToShow.length})</span>
+                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      refetch();
+                    }}
+                    className="p-1 hover:bg-theme-hover rounded transition-colors"
+                    title="Refresh tasks"
+                  >
+                    <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                  </button>
                 </div>
 
                 <Droppable droppableId="openTasks">
@@ -284,34 +450,50 @@ export function TaskSidePanel() {
                     <ul
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
-                      style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
+                      className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
+                      style={{ maxHeight: isOpenCollapsed ? 0 : "24rem" }}
                     >
-                      {loading && openTasksToShow.length === 0 && <li className="text-gray-500">Loading…</li>}
-                      {!loading && openTasksToShow.length === 0 && <li className="text-gray-500">No tasks</li>}
-
-                      {openTasksToShow.map((t: Task, index: number) => (
-                        <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
-                          {(prov) => (
-                            <li
-                              ref={prov.innerRef}
-                              {...prov.draggableProps}
-                              {...prov.dragHandleProps}
-                              style={prov.draggableProps.style}
-                              className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
-                            >
-                              <input
-                                type="checkbox"
-                                aria-label={t.content}
-                                checked={t.completed ?? false}
-                                onChange={() => toggleTaskCompletion(t.id.toString())}
-                                className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
-                              />
-                              <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
-                            </li>
-                          )}
-                        </Draggable>
-                      ))}
+                      {error ? (
+                        <TaskError error={error} onRetry={refetch} />
+                      ) : loading && openTasksToShow.length === 0 ? (
+                        Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                      ) : !loading && openTasksToShow.length === 0 ? (
+                        <li className="text-theme-text-tertiary text-center py-4">
+                          <div>No open tasks</div>
+                          <div className="text-xs mt-1">This shows all active tasks from Todoist</div>
+                        </li>
+                      ) : (
+                        openTasksToShow.map((t: Task, index: number) => (
+                          <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                            {(prov) => (
+                              <li
+                                ref={prov.innerRef}
+                                {...prov.draggableProps}
+                                {...prov.dragHandleProps}
+                                style={prov.draggableProps.style}
+                                className="flex items-start gap-3 px-4 py-4 bg-theme-surface-raised border border-theme-neutral-200 shadow-sm rounded-lg"
+                              >
+                                <input
+                                  type="checkbox"
+                                  aria-label={t.content}
+                                  checked={t.completed ?? false}
+                                  disabled={isCompletingTask[t.id.toString()]}
+                                  onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                  className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
+                                />
+                                <div className="flex-1">
+                                  <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
+                                  {t.due?.date && (
+                                    <div className="text-xs text-theme-text-tertiary mt-1">
+                                      Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                    </div>
+                                  )}
+                                </div>
+                              </li>
+                            )}
+                          </Draggable>
+                        ))
+                      )}
                       {provided.placeholder}
                     </ul>
                   )}
@@ -326,9 +508,9 @@ export function TaskSidePanel() {
                       value={newOpenTask}
                       onChange={(e) => setNewOpenTask(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleAddOpenTask()}
-                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                      className="input-field flex-1 text-sm"
                     />
-                    <button onClick={handleAddOpenTask} className="text-sm text-indigo-600 hover:underline">
+                    <button onClick={handleAddOpenTask} className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline">
                       Add
                     </button>
                   </div>
@@ -340,7 +522,7 @@ export function TaskSidePanel() {
             {taskView === "Today" && (
               <>
                 <div
-                  className="flex items-center justify-between text-sm font-medium text-gray-900 mt-4 mb-2 cursor-pointer select-none"
+                  className="flex items-center justify-between text-sm font-medium text-theme-text-primary mt-4 mb-2 cursor-pointer select-none"
                   onClick={() => setIsPlannerCollapsed((c) => !c)}
                 >
                   <span>Hourly Planner</span>

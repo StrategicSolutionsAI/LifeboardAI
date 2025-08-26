@@ -4,7 +4,6 @@ export interface UserPreferences {
   id?: string;
   user_id: string;
   life_buckets: string[];
-  active_bucket?: string;
   widgets_by_bucket: Record<string, any[]>;
   progress_by_widget?: Record<string, any>;
   hourly_plan?: Record<string, any[]>;
@@ -34,7 +33,6 @@ export async function getUserPreferencesClient() {
       const initialPrefs = {
         user_id: user.id,
         life_buckets: [],
-        active_bucket: "Health", // Default active bucket
         widgets_by_bucket: {},
         progress_by_widget: {},
         hourly_plan: {},
@@ -53,7 +51,6 @@ export async function getUserPreferencesClient() {
         return {
           user_id: user.id,
           life_buckets: [],
-          active_bucket: "Health",
           widgets_by_bucket: {},
           progress_by_widget: {},
           hourly_plan: {}
@@ -70,7 +67,6 @@ export async function getUserPreferencesClient() {
       return {
         user_id: user.id,
         life_buckets: [],
-        active_bucket: "Health",
         widgets_by_bucket: {},
         progress_by_widget: {}
       };
@@ -88,7 +84,6 @@ export async function getUserPreferencesClient() {
     return {
       user_id: user.id,
       life_buckets: [],
-      active_bucket: "Health",
       widgets_by_bucket: {},
       progress_by_widget: {},
       hourly_plan: {}

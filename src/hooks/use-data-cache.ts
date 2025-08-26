@@ -17,7 +17,7 @@ const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
 // Global cache for sharing between components
 const globalCache = new Map<string, CacheEntry<any>>()
 
-// Global cache invalidation function that can be called from anywhere
+// Global cache invalidation functions that can be called from anywhere
 export function invalidateTaskCaches() {
   // Find and delete all task-related cache entries
   const keysToDelete: string[] = []
@@ -27,6 +27,44 @@ export function invalidateTaskCaches() {
     }
   })
   keysToDelete.forEach(key => globalCache.delete(key))
+}
+
+// Invalidate all integration-related caches
+export function invalidateIntegrationCaches(integrationId?: string) {
+  const keysToDelete: string[] = []
+  globalCache.forEach((_, key) => {
+    // If specific integration ID provided, only clear that integration's cache
+    if (integrationId) {
+      if (key.includes(integrationId) || 
+          key.startsWith(`${integrationId}-`) ||
+          key.endsWith(`-${integrationId}`) ||
+          key.includes(`/${integrationId}/`)) {
+        keysToDelete.push(key)
+      }
+    } else {
+      // Clear all integration-related caches
+      if (key.includes('todoist') || 
+          key.includes('withings') || 
+          key.includes('fitbit') || 
+          key.includes('google') || 
+          key.includes('nutrition') ||
+          key.includes('weight') ||
+          key.includes('metrics') ||
+          key.includes('calendar') ||
+          key.includes('events')) {
+        keysToDelete.push(key)
+      }
+    }
+  })
+  keysToDelete.forEach(key => globalCache.delete(key))
+  console.log(`🗑️ Invalidated ${keysToDelete.length} cache entries${integrationId ? ` for ${integrationId}` : ''}`)
+}
+
+// Invalidate all caches (nuclear option)
+export function invalidateAllCaches() {
+  const count = globalCache.size
+  globalCache.clear()
+  console.log(`🗑️ Cleared all ${count} cache entries`)
 }
 
 export function useDataCache<T>(

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { emailSignUp, emailLogin, signUpWithGoogle } from '@/app/login/actions'
 
-export default function SignUp() {
+function SignUpContent() {
   const [isLogin, setIsLogin] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const searchParams = useSearchParams()
@@ -104,5 +104,13 @@ export default function SignUp() {
         </div>
       </Card>
     </div>
+  )
+}
+
+export default function SignUp() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <SignUpContent />
+    </Suspense>
   )
 }

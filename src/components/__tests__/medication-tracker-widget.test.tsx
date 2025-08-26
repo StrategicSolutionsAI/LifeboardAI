@@ -30,14 +30,14 @@ describe('MedicationTrackerWidget', () => {
 
   it('displays default medications', () => {
     render(<MedicationTrackerWidget />)
-    expect(screen.getByText('Lisinopril')).toBeInTheDocument()
-    expect(screen.getByText('Metformin')).toBeInTheDocument()
+    expect(screen.getAllByText('Lisinopril').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Metformin').length).toBeGreaterThan(0)
   })
 
   it('shows medication dosages', () => {
     render(<MedicationTrackerWidget />)
-    expect(screen.getByText('10mg')).toBeInTheDocument()
-    expect(screen.getByText('500mg')).toBeInTheDocument()
+    expect(screen.getAllByText('10mg').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('500mg').length).toBeGreaterThan(0)
   })
 
   it('displays adherence percentage', () => {

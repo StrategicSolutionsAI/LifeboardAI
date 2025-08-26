@@ -16,6 +16,7 @@ import {
   Clock,
   Activity
 } from 'lucide-react'
+import { invalidateIntegrationCaches } from '@/hooks/use-data-cache'
 
 interface IntegrationStatus {
   connected: boolean
@@ -85,10 +86,29 @@ export default function IntegrationsPage() {
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [globalError, setGlobalError] = useState<string | null>(null)
 
-  const fetchIntegrationStatuses = useCallback(async () => {
+  // Keyboard shortcut for refresh (⌘R or Ctrl+R)
+  useEffect(() => {
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'r' && !loading) {
+        event.preventDefault()
+        fetchIntegrationStatuses(true)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyboard)
+    return () => document.removeEventListener('keydown', handleKeyboard)
+  }, [loading])
+
+  const fetchIntegrationStatuses = useCallback(async (invalidateCache = false) => {
     setLoading(true)
     setGlobalError(null)
     const statuses: Record<string, IntegrationStatus> = {}
+    
+    // If this is a manual refresh, invalidate all integration caches
+    if (invalidateCache) {
+      invalidateIntegrationCaches()
+      console.log('🔄 Manual refresh - invalidated all integration caches')
+    }
     
     try {
       const promises = integrations.map(async (integration) => {
@@ -252,6 +272,10 @@ export default function IntegrationsPage() {
       if (dataFetched) {
         const icon = integrations.find(i => i.id === integrationId)?.icon || '📊'
         console.log(`${icon} Data fetched for ${integrationId}:`, dataResult)
+        
+        // Invalidate cache for this integration so dashboard shows fresh data
+        invalidateIntegrationCaches(integrationId)
+        console.log(`🔄 Cache invalidated for ${integrationId} - dashboard will show fresh data`)
       }
       
       // Update integration status
@@ -382,11 +406,27 @@ export default function IntegrationsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchIntegrationStatuses}
+              onClick={() => fetchIntegrationStatuses(true)}
               disabled={loading}
+              className="relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+              aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'}
+              title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (⌘R)'}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh All
+              <RefreshCw 
+                className={`h-4 w-4 mr-2 transition-transform duration-300 ${
+                  loading ? 'animate-spin' : 'group-hover:rotate-180'
+                }`}
+                aria-hidden="true"
+              />
+              <span className="relative z-10">
+                {loading ? 'Refreshing...' : 'Refresh All'}
+              </span>
+              {/* Screen reader only status */}
+              <span className="sr-only">
+                {loading ? 'Please wait while we refresh your integrations' : 'Click to refresh all integration data'}
+              </span>
+              {/* Subtle background animation on hover */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
             </Button>
           </div>
           <p className="text-muted-foreground">
@@ -486,10 +526,22 @@ export default function IntegrationsPage() {
                               size="sm"
                               onClick={() => handleRefresh(integration.id)}
                               disabled={isLoading}
-                              className="flex-1"
+                              className="flex-1 relative overflow-hidden transition-all duration-200 hover:shadow-sm hover:scale-[1.02] active:scale-[0.98] group disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                              Sync Data
+                              <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${
+                                isLoading ? 'animate-spin' : 'group-hover:rotate-180'
+                              }`} />
+                              <span className="relative z-10 text-xs font-medium">
+                                {isLoading ? 'Syncing...' : 'Sync Data'}
+                              </span>
+                              {/* Success feedback for completed sync */}
+                              {status?.message?.toLowerCase().includes('success') && (
+                                <div className="absolute inset-0 bg-green-500/10 animate-pulse" />
+                              )}
+                              {/* Error feedback */}
+                              {status?.error && (
+                                <div className="absolute inset-0 bg-red-500/10" />
+                              )}
                             </Button>
                             <Button
                               variant="destructive"

@@ -94,9 +94,14 @@ function DefaultErrorFallback({ error, retry }: ErrorFallbackProps) {
               <p className="text-xs text-red-700 font-mono">{error.message}</p>
             </div>
           )}
-          <Button onClick={retry} className="w-full">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
+          <Button 
+            onClick={retry} 
+            className="w-full relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] group"
+          >
+            <RefreshCw className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:rotate-180" />
+            <span className="relative z-10 font-medium">Try Again</span>
+            {/* Subtle shimmer effect on hover */}
+            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
           </Button>
         </CardContent>
       </Card>

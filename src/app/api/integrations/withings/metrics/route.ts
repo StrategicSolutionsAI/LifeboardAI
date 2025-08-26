@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { fetchWithingsLatestWeight, refreshWithingsToken } from '@/lib/withings/client'
+import { logger } from '@/lib/logger'
+import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
+import { withErrorHandling } from '@/lib/api-error-handler'
 
-export async function GET(request: NextRequest) {
+async function handler(request: NextRequest | Request) {
+  // Ensure we have a NextRequest
+  const nextRequest = request instanceof Request ? 
+    new NextRequest(request.url, { 
+      method: request.method, 
+      headers: request.headers,
+      body: request.body 
+    }) : 
+    request
+  const requestLogger = logger.forRequest(nextRequest, { operation: 'get-withings-metrics' })
+  
+  requestLogger.info('Starting Withings metrics request')
+  
   const supabase = supabaseServer()
   const {
     data: { user },
@@ -21,8 +36,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (!effectiveUser) {
+    requestLogger.warn('Request without authentication')
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
+
+  requestLogger.debug('User authenticated', { userId: effectiveUser.id })
 
   // Fetch integration row
   const { data: integration, error: integrationError } = await supabase
@@ -32,39 +50,76 @@ export async function GET(request: NextRequest) {
     .eq('provider', 'withings')
     .maybeSingle()
 
-  if (integrationError || !integration?.access_token) {
+  if (integrationError) {
+    requestLogger.error('Failed to fetch integration', { userId: effectiveUser.id }, integrationError)
+    return NextResponse.json({ error: 'Failed to fetch integration' }, { status: 500 })
+  }
+
+  if (!integration?.access_token) {
+    requestLogger.warn('Withings integration not found or missing token', { userId: effectiveUser.id })
     return NextResponse.json({ error: 'Withings not connected' }, { status: 400 })
   }
+
+  // Create integration-specific error handler
+  const errorHandler = createIntegrationErrorHandler({
+    provider: 'withings',
+    userId: effectiveUser.id,
+    integrationId: integration.id,
+    operation: 'get-metrics'
+  })
+
+  requestLogger.info('Integration found', { 
+    integrationId: integration.id,
+    hasAccessToken: !!integration.access_token,
+    hasRefreshToken: !!integration.refresh_token
+  })
 
   let accessToken = integration.access_token
   const refreshToken = integration.refresh_token ?? ''
 
-  // Check expiry similar to fitbit
+  // Check token expiry and refresh if needed
   try {
     const tokenData: any = integration.token_data || {}
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
       const expiresAt = updated + tokenData.expires_in * 1000
-      if (Date.now() > expiresAt - 60 * 1000) {
-        const newTokens = await refreshWithingsToken(refreshToken)
-        accessToken = newTokens.access_token
-        await supabase
-          .from('user_integrations')
-          .update({
-            access_token: newTokens.access_token,
-            refresh_token: newTokens.refresh_token ?? refreshToken,
-            token_data: newTokens,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', integration.id)
+      const willExpireSoon = Date.now() > expiresAt - 60 * 1000
+      
+      if (willExpireSoon) {
+        requestLogger.info('Token will expire soon, refreshing preemptively', {
+          expiresAt: new Date(expiresAt).toISOString(),
+          integrationId: integration.id
+        })
+        
+        const refreshResult = await errorHandler.handleTokenRefresh(
+          refreshWithingsToken,
+          refreshToken,
+          integration.id
+        )
+        
+        if (refreshResult.success && refreshResult.newTokens) {
+          accessToken = refreshResult.newTokens.access_token
+          requestLogger.info('Token refreshed successfully', { integrationId: integration.id })
+        } else if (refreshResult.error) {
+          requestLogger.warn('Preemptive token refresh failed, will try with current token', {
+            integrationId: integration.id
+          }, refreshResult.error)
+          // Continue with current token - might still work
+        }
       }
     }
   } catch (e) {
-    console.error('Error refreshing Withings token', e)
+    requestLogger.warn('Error during token expiry check', { integrationId: integration.id }, e as Error)
+    // Continue with current token
   }
 
+  // Fetch metrics with retry logic and error handling
   try {
-    const weightKg = await fetchWithingsLatestWeight(accessToken)
+    const weightKg = await errorHandler.withRetry(async () => {
+      return await requestLogger.timeOperation('fetch-withings-weight', async () => {
+        return await fetchWithingsLatestWeight(accessToken)
+      })
+    })
     
     // Update the timestamp to show when we last successfully fetched data
     await supabase
@@ -72,53 +127,61 @@ export async function GET(request: NextRequest) {
       .update({ updated_at: new Date().toISOString() })
       .eq('id', integration.id)
     
-    return NextResponse.json({ weightKg })
-  } catch (e: any) {
-    console.error('Failed to fetch Withings metrics', e)
+    requestLogger.info('Successfully fetched Withings metrics', {
+      integrationId: integration.id,
+      weightKg
+    })
     
-    // Handle specific error types
-    if (e.message === 'INVALID_TOKEN') {
-      // Try to refresh the token
-      try {
-        console.log('Attempting to refresh Withings token due to invalid token')
-        const newTokens = await refreshWithingsToken(refreshToken)
-        
-        // Update the token in the database
-        await supabase
-          .from('user_integrations')
-          .update({
-            access_token: newTokens.access_token,
-            refresh_token: newTokens.refresh_token ?? refreshToken,
-            token_data: newTokens,
-            updated_at: new Date().toISOString(),
+    return NextResponse.json({ weightKg })
+    
+  } catch (error: any) {
+    // Handle token errors with automatic refresh
+    if (error.message === 'INVALID_TOKEN') {
+      requestLogger.warn('Invalid token detected, attempting refresh', {
+        integrationId: integration.id
+      })
+      
+      const refreshResult = await errorHandler.handleTokenRefresh(
+        refreshWithingsToken,
+        refreshToken,
+        integration.id
+      )
+      
+      if (refreshResult.success && refreshResult.newTokens) {
+        // Retry with new token
+        try {
+          const weightKg = await requestLogger.timeOperation('fetch-withings-weight-retry', async () => {
+            return await fetchWithingsLatestWeight(refreshResult.newTokens!.access_token)
           })
-          .eq('id', integration.id)
-        
-        // Retry the request with the new token
-        const weightKg = await fetchWithingsLatestWeight(newTokens.access_token)
-        return NextResponse.json({ weightKg })
-        
-      } catch (refreshError: any) {
-        console.error('Failed to refresh Withings token', refreshError)
-        
-        // Handle specific refresh errors
-        if (refreshError.message === 'REFRESH_TOKEN_EXPIRED' || refreshError.message === 'INVALID_REFRESH_TOKEN') {
-          return NextResponse.json({ 
-            error: 'Withings connection expired - please reconnect your account',
-            needsReauth: true
-          }, { status: 401 })
+          
+          // Update success timestamp
+          await supabase
+            .from('user_integrations')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', integration.id)
+          
+          requestLogger.info('Successfully fetched Withings metrics after token refresh', {
+            integrationId: integration.id,
+            weightKg
+          })
+          
+          return NextResponse.json({ weightKg })
+          
+        } catch (retryError) {
+          requestLogger.error('Failed to fetch metrics even after token refresh', {
+            integrationId: integration.id
+          }, retryError as Error)
+          return errorHandler.handleError(retryError)
         }
-        
-        return NextResponse.json({ 
-          error: 'Authentication failed - please try again or reconnect Withings' 
-        }, { status: 401 })
+      } else {
+        // Token refresh failed
+        return errorHandler.handleError(refreshResult.error || error)
       }
-    } else if (e.message === 'RATE_LIMITED') {
-      return NextResponse.json({ 
-        error: 'Rate limited - please try again later' 
-      }, { status: 429 })
-    } else {
-      return NextResponse.json({ error: e.message }, { status: 500 })
     }
+    
+    // Handle other errors
+    return errorHandler.handleError(error)
   }
-} 
+}
+
+export const GET = withErrorHandling(handler, 'withings-metrics') 

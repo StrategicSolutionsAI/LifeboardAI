@@ -29,10 +29,12 @@ function WidgetErrorFallback({ error, retry }: WidgetErrorFallbackProps) {
             variant="outline" 
             size="sm" 
             onClick={retry}
-            className="text-xs"
+            className="text-xs relative overflow-hidden transition-all duration-200 hover:shadow-sm hover:scale-105 active:scale-95 group"
           >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Retry
+            <RefreshCw className="h-3 w-3 mr-1 transition-transform duration-300 group-hover:rotate-180" />
+            <span className="relative z-10 font-medium">Retry</span>
+            {/* Subtle hover effect */}
+            <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
           </Button>
         </div>
         {process.env.NODE_ENV === 'development' && error && (

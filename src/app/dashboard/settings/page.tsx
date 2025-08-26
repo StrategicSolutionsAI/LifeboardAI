@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 
-import { Settings, Check, AlertCircle, Palette, Plus, Trash2 } from 'lucide-react'
-import { themeColors, ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme } from '@/lib/theme'
+import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3 } from 'lucide-react'
+import { themeColors, ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +17,7 @@ export default function SettingsPage() {
 
   const { theme, setTheme } = useTheme()
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
+  const [editingTheme, setEditingTheme] = useState<ThemeColor | null>(null)
   const [customThemeName, setCustomThemeName] = useState('')
   const [customPrimary, setCustomPrimary] = useState('#5271F8')
   const [customSecondary, setCustomSecondary] = useState('#7482FE')
@@ -38,16 +39,59 @@ export default function SettingsPage() {
     setAllThemes(getAllThemes())
     
     // Reset form
-    setCustomThemeName('')
-    setCustomPrimary('#5271F8')
-    setCustomSecondary('#7482FE')
-    setCustomAccent('#909CFF')
-    setShowCustomColorForm(false)
+    resetForm()
   }
 
   const handleDeleteCustomTheme = (themeId: string) => {
     deleteCustomTheme(themeId)
     setAllThemes(getAllThemes())
+  }
+
+  const handleEditTheme = (themeToEdit: ThemeColor) => {
+    setEditingTheme(themeToEdit)
+    setCustomThemeName(themeToEdit.name)
+    setCustomPrimary(themeToEdit.primary)
+    setCustomSecondary(themeToEdit.secondary)
+    setCustomAccent(themeToEdit.accent)
+    setShowCustomColorForm(true)
+  }
+
+  const handleUpdateCustomTheme = () => {
+    if (!editingTheme || !customThemeName.trim()) return
+    
+    const updatedTheme = updateCustomTheme(editingTheme.id, {
+      name: customThemeName.trim(),
+      primary: customPrimary,
+      secondary: customSecondary,
+      accent: customAccent
+    })
+    
+    if (updatedTheme) {
+      setAllThemes(getAllThemes())
+      if (theme.id === editingTheme.id) {
+        setTheme(updatedTheme)
+      }
+    }
+    
+    // Reset form
+    resetForm()
+  }
+
+  const resetForm = () => {
+    setCustomThemeName('')
+    setCustomPrimary('#5271F8')
+    setCustomSecondary('#7482FE')
+    setCustomAccent('#909CFF')
+    setShowCustomColorForm(false)
+    setEditingTheme(null)
+  }
+
+  const handleFormSubmit = () => {
+    if (editingTheme) {
+      handleUpdateCustomTheme()
+    } else {
+      handleCreateCustomTheme()
+    }
   }
 
 
@@ -155,18 +199,30 @@ export default function SettingsPage() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {/* Delete button for custom themes */}
+                        {/* Edit and Delete buttons for custom themes */}
                         {colorTheme.isCustom && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteCustomTheme(colorTheme.id)
-                            }}
-                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                            title="Delete custom theme"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditTheme(colorTheme)
+                              }}
+                              className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                              title="Edit custom theme"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteCustomTheme(colorTheme.id)
+                              }}
+                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                              title="Delete custom theme"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                         
                         {/* Selection indicator */}
@@ -195,7 +251,9 @@ export default function SettingsPage() {
               {/* Custom Color Form */}
               {showCustomColorForm && (
                 <div className="mt-6 p-6 bg-gray-50 rounded-lg border">
-                  <h4 className="text-lg font-medium mb-4">Create Custom Theme</h4>
+                  <h4 className="text-lg font-medium mb-4">
+                    {editingTheme ? 'Edit Custom Theme' : 'Create Custom Theme'}
+                  </h4>
                   
                   <div className="space-y-4">
                     <div>
@@ -306,14 +364,14 @@ export default function SettingsPage() {
                     
                     <div className="flex gap-3 pt-4">
                       <button
-                        onClick={handleCreateCustomTheme}
+                        onClick={handleFormSubmit}
                         disabled={!customThemeName.trim()}
                         className="px-4 py-2 bg-theme-primary text-white rounded-md hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Create Theme
+                        {editingTheme ? 'Update Theme' : 'Create Theme'}
                       </button>
                       <button
-                        onClick={() => setShowCustomColorForm(false)}
+                        onClick={resetForm}
                         className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
                       >
                         Cancel

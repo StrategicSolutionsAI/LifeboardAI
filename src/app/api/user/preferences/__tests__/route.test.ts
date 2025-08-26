@@ -4,32 +4,47 @@
 import { NextRequest } from 'next/server'
 import { GET, POST } from '../route'
 
-// Mock supabase server
-jest.mock('@/utils/supabase/server', () => ({
-  supabaseServer: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn(),
-        })),
-      })),
-      upsert: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: jest.fn(),
-        })),
-      })),
-    })),
+// Dynamic delegates used by the chain mocks
+let currentSelectSingle: jest.Mock<any, any> = jest.fn()
+let currentUpsertSingle: jest.Mock<any, any> = jest.fn()
+
+// Stable chain objects
+const selectChain = {
+  eq: jest.fn(() => ({
+    single: (...args: any[]) => currentSelectSingle(...args),
   })),
+}
+
+const upsertChain = {
+  select: jest.fn(() => ({
+    single: (...args: any[]) => currentUpsertSingle(...args),
+  })),
+}
+
+// Stable mock instance
+const supabaseMockInstance = {
+  auth: {
+    getUser: jest.fn(),
+  },
+  from: jest.fn(() => ({
+    select: jest.fn(() => selectChain),
+    upsert: jest.fn(() => upsertChain),
+  })),
+}
+
+// Mock supabase server to always return the same instance
+jest.mock('@/utils/supabase/server', () => ({
+  supabaseServer: jest.fn(() => supabaseMockInstance),
 }))
 
 describe('/api/user/preferences', () => {
-  const mockSupabase = require('@/utils/supabase/server').supabaseServer()
+  const mockSupabase = supabaseMockInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
+    // Reset delegates to no-op resolved values by default
+    currentSelectSingle = jest.fn().mockResolvedValue({ data: null, error: null })
+    currentUpsertSingle = jest.fn().mockResolvedValue({ data: null, error: null })
   })
 
   describe('GET', () => {
@@ -48,11 +63,11 @@ describe('/api/user/preferences', () => {
       const mockUser = { id: 'test-user-id' }
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
       
-      const mockSingle = jest.fn().mockResolvedValue({ 
+      // Not found case
+      currentSelectSingle = jest.fn().mockResolvedValue({ 
         data: null, 
-        error: { code: 'PGRST116' } // Not found error
+        error: { code: 'PGRST116' },
       })
-      mockSupabase.from().select().eq().single = mockSingle
 
       const request = new NextRequest('http://localhost:3000/api/user/preferences')
       const response = await GET(request)
@@ -74,11 +89,10 @@ describe('/api/user/preferences', () => {
 
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
       
-      const mockSingle = jest.fn().mockResolvedValue({ 
+      currentSelectSingle = jest.fn().mockResolvedValue({ 
         data: mockPreferences, 
-        error: null
+        error: null,
       })
-      mockSupabase.from().select().eq().single = mockSingle
 
       const request = new NextRequest('http://localhost:3000/api/user/preferences')
       const response = await GET(request)
@@ -114,19 +128,17 @@ describe('/api/user/preferences', () => {
 
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
       
-      // Mock no existing preferences
-      const mockSelectSingle = jest.fn().mockResolvedValue({ 
+      // No existing prefs
+      currentSelectSingle = jest.fn().mockResolvedValue({ 
         data: null, 
-        error: { code: 'PGRST116' }
+        error: { code: 'PGRST116' },
       })
-      mockSupabase.from().select().eq().single = mockSelectSingle
 
-      // Mock successful upsert
-      const mockUpsertSingle = jest.fn().mockResolvedValue({ 
+      // Successful upsert
+      currentUpsertSingle = jest.fn().mockResolvedValue({ 
         data: { user_id: mockUser.id, ...newPreferences }, 
-        error: null
+        error: null,
       })
-      mockSupabase.from().upsert().select().single = mockUpsertSingle
 
       const request = new NextRequest('http://localhost:3000/api/user/preferences', {
         method: 'POST',

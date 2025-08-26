@@ -46,3 +46,6 @@ Sentry.init({
     }
   }
 });
+
+// Required for Sentry navigation instrumentation
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

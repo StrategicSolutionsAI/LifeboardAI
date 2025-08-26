@@ -6,10 +6,12 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
-  Plus,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
+import { Skeleton } from "@/components/ui/skeleton";
 import HourlyPlanner from "./hourly-planner";
 
 interface TaskboardDashboardContentProps {
@@ -17,15 +19,47 @@ interface TaskboardDashboardContentProps {
   onDateChange: (date: Date) => void;
 }
 
+// Loading skeleton for tasks
+function TaskSkeleton() {
+  return (
+    <li className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg">
+      <Skeleton className="w-4 h-4 mt-0.5 rounded" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </li>
+  );
+}
+
+// Error display component
+function TaskError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+      <AlertCircle size={16} />
+      <span>Failed to load tasks</span>
+      <button 
+        onClick={onRetry}
+        className="ml-auto text-red-600 hover:text-red-800 underline"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export function TaskboardDashboardContent({ selectedDate, onDateChange }: TaskboardDashboardContentProps) {
   // Use unified task context
   const {
     dailyVisibleTasks,
     allTasks: allTodoistTasks,
+    upcomingTasks,
     loading: isLoadingTasks,
+    error,
     createTask,
     toggleTaskCompletion,
     batchUpdateTasks,
+    refetch,
   } = useTasksContext();
 
   // Use dailyVisibleTasks from context (no hourSlot)
@@ -41,6 +75,8 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState('');
   const [newOpenTask, setNewOpenTask] = useState('');
+  const [newUpcomingTask, setNewUpcomingTask] = useState('');
+  const [upcomingTaskDate, setUpcomingTaskDate] = useState('');
   const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
 
   // Date navigation
@@ -72,6 +108,14 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
     if (newOpenTask.trim()) {
       await createTask(newOpenTask.trim(), null);
       setNewOpenTask('');
+    }
+  };
+
+  const handleAddUpcomingTask = async () => {
+    if (newUpcomingTask.trim() && upcomingTaskDate) {
+      await createTask(newUpcomingTask, upcomingTaskDate);
+      setNewUpcomingTask('');
+      setUpcomingTaskDate('');
     }
   };
 
@@ -107,8 +151,8 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
       return;
     }
 
-    if (source.droppableId === 'openTasks' && isHour(destination.droppableId)) {
-      // Open task → Hour slot: Set the hourSlot to schedule the task  
+    if ((source.droppableId === 'openTasks' || source.droppableId === 'upcomingTasks') && isHour(destination.droppableId)) {
+      // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
       const dstHour = hourKey(destination.droppableId);
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
@@ -128,8 +172,8 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
       return;
     }
 
-    if (isHour(source.droppableId) && destination.droppableId === 'openTasks') {
-      // Hour slot → Open list: Remove hourSlot to unschedule the task
+    if (isHour(source.droppableId) && (destination.droppableId === 'openTasks' || destination.droppableId === 'upcomingTasks')) {
+      // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: undefined } }
       ]).catch(error => {
@@ -150,10 +194,9 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
     }
   };
 
-  const openTasksToShow = useMemo(() => 
-    allTodoistTasks.filter(t => !t.completed), 
-    [allTodoistTasks]
-  );
+  const openTasksToShow = useMemo(() => {
+    return allTodoistTasks.filter(t => !t.completed);
+  }, [allTodoistTasks]);
 
   return (
     <aside className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out ${
@@ -220,7 +263,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
             </div>
 
             {/* Lists */}
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-y-auto flex flex-col">
               <DragDropContext onDragEnd={handleDragEnd}>
                 {/* Today view */}
                 {taskView === "Today" && (
@@ -241,32 +284,37 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
                             className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
                             style={{ maxHeight: isDailyCollapsed ? 0 : "10rem" }}
                           >
-                            {isLoadingTasks && todoistTasks.length === 0 && <li className="text-gray-500">Loading…</li>}
-                            {!isLoadingTasks && todoistTasks.length === 0 && <li className="text-gray-500">No tasks</li>}
-
-                            {todoistTasks.map((t: any, index: number) => (
-                              <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
-                                {(prov) => (
-                                  <li
-                                    ref={prov.innerRef}
-                                    {...prov.draggableProps}
-                                    {...prov.dragHandleProps}
-                                    style={prov.draggableProps.style}
-                                    className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      aria-label={t.content}
-                                      checked={t.completed ?? false}
-                                      disabled={isCompletingTask[t.id]}
-                                      onChange={() => handleToggleTaskCompletion(t.id.toString())}
-                                      className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
-                                    />
-                                    <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
+                            {error ? (
+                              <TaskError error={error} onRetry={refetch} />
+                            ) : isLoadingTasks && todoistTasks.length === 0 ? (
+                              Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                            ) : !isLoadingTasks && todoistTasks.length === 0 ? (
+                              <li className="text-gray-500 text-center py-4">No tasks for today</li>
+                            ) : (
+                              todoistTasks.map((t: any, index: number) => (
+                                <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                                  {(prov) => (
+                                    <li
+                                      ref={prov.innerRef}
+                                      {...prov.draggableProps}
+                                      {...prov.dragHandleProps}
+                                      style={prov.draggableProps.style}
+                                      className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        aria-label={t.content}
+                                        checked={t.completed ?? false}
+                                        disabled={isCompletingTask[t.id]}
+                                        onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                        className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
+                                      />
+                                      <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
+                                    </li>
+                                  )}
+                                </Draggable>
+                              ))
+                            )}
                             {provided.placeholder}
                           </ul>
                         </div>
@@ -292,15 +340,121 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
                   </>
                 )}
 
-                {/* Master List view */}
-                {taskView === "Master List" && (
+                {/* Upcoming view */}
+                {taskView === "Upcoming" && (
                   <>
                     <div
                       className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
                       onClick={() => setIsOpenCollapsed((c) => !c)}
                     >
-                      <span>All open tasks</span>
+                      <span>Upcoming tasks ({upcomingTasks.length})</span>
                       {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                    </div>
+
+                    <Droppable droppableId="upcomingTasks">
+                      {(provided) => (
+                        <ul
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
+                        >
+                          {error ? (
+                            <TaskError error={error} onRetry={refetch} />
+                          ) : isLoadingTasks && upcomingTasks.length === 0 ? (
+                            Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                          ) : !isLoadingTasks && upcomingTasks.length === 0 ? (
+                            <li className="text-gray-500 text-center py-4">No upcoming tasks</li>
+                          ) : (
+                            upcomingTasks.map((t: any, index: number) => (
+                              <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                                {(prov) => (
+                                  <li
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    style={prov.draggableProps.style}
+                                    className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      aria-label={t.content}
+                                      checked={t.completed ?? false}
+                                      disabled={isCompletingTask[t.id]}
+                                      onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                      className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
+                                    />
+                                    <div className="flex-1">
+                                      <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
+                                      {t.due?.date && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
+                          {provided.placeholder}
+                        </ul>
+                      )}
+                    </Droppable>
+
+                    {/* Add new upcoming task */}
+                    {!isOpenCollapsed && (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Add upcoming task…"
+                          value={newUpcomingTask}
+                          onChange={(e) => setNewUpcomingTask(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && upcomingTaskDate && handleAddUpcomingTask()}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="date"
+                            value={upcomingTaskDate}
+                            onChange={(e) => setUpcomingTaskDate(e.target.value)}
+                            min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
+                            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                          />
+                          <button 
+                            onClick={handleAddUpcomingTask}
+                            disabled={!newUpcomingTask.trim() || !upcomingTaskDate}
+                            className="text-sm text-indigo-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Master List view */}
+                {taskView === "Master List" && (
+                  <>
+                    <div className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2">
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer select-none flex-1"
+                        onClick={() => setIsOpenCollapsed((c) => !c)}
+                      >
+                        <span>All open tasks ({openTasksToShow.length})</span>
+                        {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          refetch();
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title="Refresh tasks"
+                      >
+                        <RefreshCw size={14} className={isLoadingTasks ? "animate-spin" : ""} />
+                      </button>
                     </div>
 
                     <Droppable droppableId="openTasks">
@@ -309,34 +463,46 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
                           ref={provided.innerRef}
                           {...provided.droppableProps}
                           className="space-y-3 text-sm text-gray-700 overflow-y-auto pr-1 transition-[max-height] duration-200"
-                          style={{ maxHeight: isOpenCollapsed ? 0 : "12rem" }}
+                          style={{ maxHeight: isOpenCollapsed ? 0 : "24rem" }}
                         >
-                          {isLoadingTasks && openTasksToShow.length === 0 && <li className="text-gray-500">Loading…</li>}
-                          {!isLoadingTasks && openTasksToShow.length === 0 && <li className="text-gray-500">No tasks</li>}
-
-                          {openTasksToShow.map((t: any, index: number) => (
-                            <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
-                              {(prov) => (
-                                <li
-                                  ref={prov.innerRef}
-                                  {...prov.draggableProps}
-                                  {...prov.dragHandleProps}
-                                  style={prov.draggableProps.style}
-                                  className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    aria-label={t.content}
-                                    checked={t.completed ?? false}
-                                    disabled={isCompletingTask[t.id]}
-                                    onChange={() => handleToggleTaskCompletion(t.id.toString())}
-                                    className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
-                                  />
-                                  <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
-                                </li>
-                              )}
-                            </Draggable>
-                          ))}
+                          {error ? (
+                            <TaskError error={error} onRetry={refetch} />
+                          ) : isLoadingTasks && openTasksToShow.length === 0 ? (
+                            Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                          ) : !isLoadingTasks && openTasksToShow.length === 0 ? (
+                            <li className="text-gray-500 text-center py-4">No open tasks</li>
+                          ) : (
+                            openTasksToShow.map((t: any, index: number) => (
+                              <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                                {(prov) => (
+                                  <li
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    style={prov.draggableProps.style}
+                                    className="flex items-start gap-3 px-4 py-4 bg-white border border-black/10 shadow-sm rounded-lg"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      aria-label={t.content}
+                                      checked={t.completed ?? false}
+                                      disabled={isCompletingTask[t.id]}
+                                      onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                      className={`${t.completed ? "accent-purple-600" : "accent-indigo-500"} mt-0.5`}
+                                    />
+                                    <div className="flex-1">
+                                      <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
+                                      {t.due?.date && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
                           {provided.placeholder}
                         </ul>
                       )}

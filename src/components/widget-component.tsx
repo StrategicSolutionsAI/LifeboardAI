@@ -1,5 +1,6 @@
 import React from 'react';
 import { WidgetInstance } from '@/types/widgets';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const WidgetComponent = ({ 
     widget,
@@ -17,10 +18,17 @@ const WidgetComponent = ({
     progress: any
 }) => {
   return (
-    <div className="p-4 border rounded-lg bg-white shadow-sm">
-      <h3 className="font-bold">{widget.name}</h3>
-      <p className="text-sm text-gray-500">{widget.description}</p>
-    </div>
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{widget.name}</CardTitle>
+        {widget.description ? (
+          <CardDescription>{widget.description}</CardDescription>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {/* Widget content placeholder; individual widget components will control their inner content */}
+      </CardContent>
+    </Card>
   );
 };
 

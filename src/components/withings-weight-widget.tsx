@@ -163,7 +163,6 @@ export function WithingsWeightWidget({
         goalProgress && goalProgress >= 25 ? 'medium' : 'low'
       }
       statusBadge={getStatusBadge()}
-      onClick={onClick}
       isLoading={loading}
       className={className}
       size={showControls ? "large" : "normal"}

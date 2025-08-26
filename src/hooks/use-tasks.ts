@@ -62,7 +62,8 @@ export function useTasks(selectedDate?: Date) {
         throw new Error(`Failed to fetch all tasks: ${res.status} ${res.statusText}`)
       }
       const data = await res.json()
-      return Array.isArray(data) ? data : (data.tasks ?? [])
+      const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
+      return tasks
     } catch (error) {
       console.error('Network error fetching all tasks:', error)
       // Return empty array instead of throwing to prevent UI crashes
@@ -93,7 +94,7 @@ export function useTasks(selectedDate?: Date) {
     updateOptimistically: updateAllOptimistically,
     refetch: refetchAll
   } = useDataCache<Task[]>(allCacheKey, allTasksFetcher, {
-    ttl: 10 * 60 * 1000, // 10 minutes
+    ttl: 2 * 60 * 1000, // 2 minutes - shorter cache for Master List
     prefetch: false // Don't prefetch to avoid immediate errors on mount
   })
   
@@ -102,22 +103,8 @@ export function useTasks(selectedDate?: Date) {
     const trimmed = content.trim()
     if (!trimmed) return
     
-    const tempId = `temp-${Date.now()}`
-    const optimisticTask: Task = {
-      id: tempId,
-      content: trimmed,
-      completed: false,
-      due: dueDate ? { date: dueDate } : undefined,
-      created_at: new Date().toISOString()
-    }
-    
-    // Update cache optimistically
-    if (dueDate === dateStr) {
-      updateDailyOptimistically(current => [...(current || []), optimisticTask])
-    }
-    updateAllOptimistically(current => [...(current || []), optimisticTask])
-    
     try {
+      // Call API first to get the real task
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,27 +115,21 @@ export function useTasks(selectedDate?: Date) {
       
       const { task } = await res.json()
       
-      // Replace temp task with real task
+      console.log('✅ Task created, adding to cache:', task.id)
+      
+      // Add real task to cache immediately
       if (dueDate === dateStr) {
-        updateDailyOptimistically(current => 
-          current?.map((t: any) => t.id === tempId ? task : t) || []
-        )
+        updateDailyOptimistically(current => {
+          const updated = [...(current || []), task]
+          console.log('📋 Added real task to daily cache, now has:', updated.length, 'tasks')
+          return updated
+        })
       }
-      updateAllOptimistically(current => 
-        current?.map((t: any) => t.id === tempId ? task : t) || []
-      )
+      updateAllOptimistically(current => [...(current || []), task])
       
       return task
     } catch (error) {
-      // Revert optimistic update on error
-      if (dueDate === dateStr) {
-        updateDailyOptimistically(current => 
-          current?.filter((t: any) => t.id !== tempId) || []
-        )
-      }
-      updateAllOptimistically(current => 
-        current?.filter((t: any) => t.id !== tempId) || []
-      )
+      console.error('Failed to create task:', error)
       throw error
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
@@ -189,11 +170,10 @@ export function useTasks(selectedDate?: Date) {
   }, [allTasks, dailyTasks, updateDailyOptimistically, updateAllOptimistically])
   
   // Batch update for drag and drop
-  const batchUpdateTasks = useCallback(async (updates: TaskUpdate[]) => {
-    // Apply optimistic updates
+  const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task> }[]) => {
+    // Update optimistically by applying updates to matching tasks
     const updater = (tasks: Task[] | null) => {
       if (!tasks) return []
-      
       return tasks.map(task => {
         const update = updates.find(u => u.taskId === task.id)
         return update ? { ...task, ...update.updates } : task
@@ -224,7 +204,7 @@ export function useTasks(selectedDate?: Date) {
   const deleteTask = useCallback(async (taskId: string) => {
     // Update optimistically by removing the task
     const updater = (tasks: Task[] | null) => 
-      tasks?.filter(t => t.id !== taskId) || []
+      tasks?.filter(t => t.id.toString() !== taskId) || []
     
     updateDailyOptimistically(updater)
     updateAllOptimistically(updater)
@@ -237,6 +217,11 @@ export function useTasks(selectedDate?: Date) {
       })
       
       if (!res.ok) throw new Error('Failed to delete task')
+      
+      // Add a small delay to ensure Todoist processes the deletion
+      // before any potential cache refresh
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
     } catch (error) {
       // On error, refetch to get correct state
       refetchDaily()
@@ -251,16 +236,54 @@ export function useTasks(selectedDate?: Date) {
     [dailyTasks]
   );
 
-  const scheduledTasks = useMemo(() => 
-    (dailyTasks || []).filter(t => !t.completed && t.hourSlot),
-    [dailyTasks]
-  );
+  const scheduledTasks = useMemo(() => {
+    // Only include scheduled tasks that are due today or have no due date
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // Get scheduled tasks from daily tasks (already filtered by date)
+    const dailyScheduled = (dailyTasks || []).filter(t => !t.completed && t.hourSlot);
+    
+    // Get scheduled tasks from all tasks, but only if they're due today or have no due date
+    const allScheduled = (allTasks || []).filter(t => {
+      if (t.completed || !t.hourSlot) return false;
+      // Include if no due date or due today
+      return !t.due?.date || t.due.date === todayStr;
+    });
+    
+    // Combine and deduplicate by id
+    const combined = [...dailyScheduled];
+    allScheduled.forEach(task => {
+      if (!combined.find(t => t.id === task.id)) {
+        combined.push(task);
+      }
+    });
+    
+    
+    return combined;
+  }, [dailyTasks, allTasks]);
+
+  // Upcoming tasks: all open tasks with future due dates
+  const upcomingTasks = useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    return (allTasks || []).filter(t => {
+      if (t.completed) return false;
+      if (!t.due?.date) return false;
+      return t.due.date > todayStr;
+    }).sort((a, b) => {
+      // Sort by due date ascending
+      if (!a.due?.date || !b.due?.date) return 0;
+      return a.due.date.localeCompare(b.due.date);
+    });
+  }, [allTasks]);
 
   return {
     dailyTasks: dailyTasks || [],
     allTasks: allTasks || [],
     dailyVisibleTasks, // Tasks that should appear in daily list (no hourSlot)
     scheduledTasks,    // Tasks that should appear in hourly planner (has hourSlot)
+    upcomingTasks,     // Tasks with future due dates
     loading: dailyLoading || allLoading,
     error: dailyError || allError,
     createTask,

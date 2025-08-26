@@ -97,7 +97,7 @@ import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import TrendsPanel from "./trends-panel";
 import WidgetSelector from "./widget-selector";
-import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
+import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import HourlyPlanner from "./hourly-planner";
 import { NutritionMealTracker } from "./nutrition-meal-tracker";
 import { NutritionSummaryWidget } from "./nutrition-summary-widget";
@@ -319,9 +319,9 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
 }
 
 // Inner component that uses TasksContext
-function TaskBoardDashboardInner() {
-  // Access tasks context for scheduled tasks
-  const { scheduledTasks, refetch, batchUpdateTasks } = useTasksContext();
+function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
+  // Access tasks context for all task operations
+  const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask } = useTasksContext();
   
   const [buckets, setBuckets] = useState<string[]>([]);
   const [activeBucket, setActiveBucket] = useState<string>("");
@@ -333,8 +333,6 @@ function TaskBoardDashboardInner() {
   // Ensures we only backfill yesterday's Fitbit totals once per session
   const fetchedYesterdayRef = useRef(false);
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
-  const [date, setDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -363,7 +361,7 @@ function TaskBoardDashboardInner() {
     // Do nothing until a bucket is selected
     if (!activeBucket) return;
 
-    // 1) LocalStorage
+    // Save active bucket to localStorage only
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('active_bucket', activeBucket);
@@ -371,18 +369,6 @@ function TaskBoardDashboardInner() {
         console.error('Failed to save active bucket to localStorage', e);
       }
     }
-
-    // 2) Supabase (fire & forget)
-    (async () => {
-      try {
-        const prefs = await getUserPreferencesClient();
-        if (prefs && prefs.active_bucket !== activeBucket) {
-          await saveUserPreferences({ ...prefs, active_bucket: activeBucket });
-        }
-      } catch (err) {
-        console.error('Failed to save active bucket to Supabase', err);
-      }
-    })();
   }, [activeBucket]);
   
   // Add a ref for progress too
@@ -1157,6 +1143,7 @@ function TaskBoardDashboardInner() {
       let newDueDate: string | null = null;
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const prevWeek = new Date(selectedDate.getTime() - 7 * 24 * 60 * 60 * 1000);
       const nextWeek = new Date(today);
       nextWeek.setDate(nextWeek.getDate() + 8);
       const nextMonth = new Date(today);
@@ -1705,11 +1692,8 @@ function TaskBoardDashboardInner() {
       const prefs = await getUserPreferencesClient();
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
         setBuckets(prefs.life_buckets);
-        const prefSaved = prefs.active_bucket as string | undefined;
         const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-        const initialActive = prefSaved && prefs.life_buckets.includes(prefSaved)
-          ? prefSaved
-          : (localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0]);
+        const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
         setActiveBucket(initialActive);
       } else {
         // If no buckets found, set default buckets
@@ -1770,11 +1754,11 @@ function TaskBoardDashboardInner() {
   }
 
   const daysInMonth = () => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    return new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
   };
 
   const firstDayOfMonth = () => {
-    return new Date(date.getFullYear(), date.getMonth(), 1);
+    return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
   };
 
   const getDayOfWeek = (date: Date) => {
@@ -1784,7 +1768,7 @@ function TaskBoardDashboardInner() {
   const getDaysArray = () => {
     const days = [];
     for (let i = 1; i <= daysInMonth(); i++) {
-      days.push(new Date(date.getFullYear(), date.getMonth(), i));
+      days.push(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), i));
     }
     return days;
   };
@@ -1807,7 +1791,6 @@ function TaskBoardDashboardInner() {
 
   const handleDateChange = (newDate: Date) => {
     const normalized = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
-    setDate(normalized);
     setSelectedDate(normalized);
   };
 
@@ -1897,111 +1880,29 @@ function TaskBoardDashboardInner() {
     }
   };
 
-  /**
-   * Create a new Todoist task (optionally for the selected date)
-   */
-  const createTask = async (content: string, dueDate: string | null) => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
+  // Legacy createTask function removed - now using TasksContext
 
-    // --------------------------------------------------
-    // 1. Optimistic UI update
-    // --------------------------------------------------
-    const tempId = `temp-${Date.now()}`;
-    const optimisticTask: any = {
-      id: tempId,
-      content: trimmed,
-      completed: false,
-      due: dueDate ? { date: dueDate } : null,
-    };
-
-    setAllTodoistTasks((prev) => [optimisticTask, ...prev]);
-    if (dueDate) {
-      const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-      if (dueDate === selectedDateStr) {
-        setTodoistTasks((prev) => [optimisticTask, ...prev]);
-      }
-    }
-
-    try {
-      // --------------------------------------------------
-      // 2. Call API to actually create task in Todoist
-      // --------------------------------------------------
-      const res = await fetch('/api/integrations/todoist/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed, dueDate }),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Failed to create task:', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorText,
-          requestBody: { content: trimmed, dueDate }
-        });
-        throw new Error(`Todoist create failed: ${res.status} ${errorText}`);
-      }
-
-      const { task } = await res.json();
-      if (!task) throw new Error('No task returned');
-
-      console.log('✅ Task created successfully:', {
-        id: task.id,
-        content: task.content,
-        due: task.due,
-        dueDate
-      });
-
-      task.completed = false;
-
-      // --------------------------------------------------
-      // 3. Replace optimistic task with the real one
-      // --------------------------------------------------
-      setAllTodoistTasks((prev) => {
-        const without = prev.filter((t) => t.id !== tempId);
-        return [task, ...without];
-      });
-
-      if (dueDate) {
-        const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-        if (dueDate === selectedDateStr) {
-          setTodoistTasks((prev) => {
-            const without = prev.filter((t) => t.id !== tempId);
-            return [task, ...without];
-          });
-        }
-      }
-
-      // --------------------------------------------------
-      // 4. Invalidate task caches so calendar updates
-      // --------------------------------------------------
-      invalidateTaskCaches();
-    } catch (err) {
-      // --------------------------------------------------
-      // 4. Roll back optimistic update on failure
-      // --------------------------------------------------
-      console.error('Error creating task', err);
-      setAllTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
-      if (dueDate) {
-        const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-        if (dueDate === selectedDateStr) {
-          setTodoistTasks((prev) => prev.filter((t) => t.id !== tempId));
-        }
-      }
-    }
-  };
-
-  const handleAddDailyTask = () => {
+  const handleAddDailyTask = async () => {
     const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-    createTask(newDailyTask, selectedDateStr);
-    setNewDailyTask('');
+    console.log('🔄 Creating daily task:', newDailyTask, 'for date:', selectedDateStr);
+    try {
+      await contextCreateTask(newDailyTask, selectedDateStr);
+      console.log('✅ Daily task created successfully');
+      setNewDailyTask('');
+    } catch (error) {
+      console.error('❌ Failed to create daily task:', error);
+    }
   };
 
-  const handleAddOpenTask = () => {
-    createTask(newOpenTask, null);
-    setNewOpenTask('');
+  const handleAddOpenTask = async () => {
+    console.log('🔄 Creating open task:', newOpenTask);
+    try {
+      await contextCreateTask(newOpenTask, null);
+      console.log('✅ Open task created successfully');
+      setNewOpenTask('');
+    } catch (error) {
+      console.error('❌ Failed to create open task:', error);
+    }
   };
 
   // Fetch current weather using browser geolocation and open-meteo API (no key required)
@@ -2292,9 +2193,8 @@ function TaskBoardDashboardInner() {
       scheduledTasks.map((t) => t.id.toString())
     );
   }, [scheduledTasks]);
-  const dailyVisibleTasks = todoistTasks.filter(
-    (t) => !assignedTaskIds.has(t.id.toString())
-  );
+  // Use tasks from context instead of local state
+  const dailyVisibleTasks = contextDailyTasks;
 
   // Helpers for droppable id parsing
   const isHour = (id: string) => id.startsWith('hour-');
@@ -2306,7 +2206,7 @@ function TaskBoardDashboardInner() {
     const taskContent = `${widget.name}: ${widget.target} ${widget.unit}`;
     
     // Create a task for today
-    await createTask(taskContent, selectedDateStr);
+    await contextCreateTask(taskContent, selectedDateStr);
   };
 
   // -----------------------------------------------------------------------------
@@ -2466,8 +2366,8 @@ function TaskBoardDashboardInner() {
                   }}
                   className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[13px] font-medium capitalize transition-colors ${
                     b === activeBucket
-                      ? 'bg-indigo-600 text-white shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
-                      : 'bg-white text-indigo-600 hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
+                      ? 'bg-theme-primary-600 text-theme-text-inverse shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
+                      : 'bg-theme-surface-base text-theme-primary-600 hover:bg-theme-neutral-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
                   }`}
                 >
                   {b}
@@ -2480,9 +2380,9 @@ function TaskBoardDashboardInner() {
                   zIndex: 0,
                   marginRight: '-10px'
                 }}
-                className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-white px-8 text-[21px] font-bold transition-colors hover:bg-gray-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
+                className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-theme-surface-base px-8 text-[21px] font-bold transition-colors hover:bg-theme-neutral-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
               >
-                <span className="text-indigo-600">
+                <span className="text-theme-primary-600">
                   +
                 </span>
               </button>
@@ -2522,8 +2422,8 @@ function TaskBoardDashboardInner() {
                     onClick={() => setActiveSubTab(item)}
                     className={`pb-3 border-b-2 transition-colors ${
                       item === activeSubTab
-                        ? 'border-indigo-500 text-indigo-500'
-                        : 'border-transparent text-gray-400 hover:text-gray-600'
+                        ? 'border-theme-primary-500 text-theme-primary-600'
+                        : 'border-transparent text-theme-text-quaternary hover:text-theme-text-secondary'
                     }`}
                   >
                     {item}
@@ -2541,7 +2441,7 @@ function TaskBoardDashboardInner() {
                     className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-indigo-500/90 shadow-sm">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
                         {isRefreshing ? (
                           <Loader2 className="h-5 w-5 animate-spin text-white" />
                         ) : (
@@ -2627,11 +2527,11 @@ function TaskBoardDashboardInner() {
                               e.stopPropagation();
                               convertWidgetToTask(w);
                             }}
-                            className="rounded-full bg-indigo-100 hover:bg-indigo-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 transition"
+                            className="rounded-full bg-theme-primary-100 hover:bg-theme-primary-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition"
                             aria-label="Convert to task"
                             title="Convert to task"
                           >
-                            <ListChecks className="h-3 w-3 text-indigo-600" />
+                            <ListChecks className="h-3 w-3 text-theme-primary-600" />
                           </button>
                           <button
                             onClick={(e) => {
@@ -3142,7 +3042,7 @@ function TaskBoardDashboardInner() {
                                 )}
                               </div>
                               <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
-                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-theme-primary-500'}`} style={{ width: `${pct}%` }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
@@ -3315,7 +3215,7 @@ function TaskBoardDashboardInner() {
                                     setEditingWidget(widget);
                                     setIsWidgetSheetOpen(true);
                                   }}
-                                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mr-2"
+                                  className="px-4 py-2 bg-theme-primary-600 text-theme-text-inverse rounded-md hover:bg-theme-primary-700 focus:outline-none focus:ring-2 focus:ring-theme-primary-500 mr-2"
                                 >
                                   Edit Widget
                                 </button>
@@ -3346,15 +3246,21 @@ function TaskBoardDashboardInner() {
           </div>
 
           {/* Right section: Calendar and To-do */}
-          <aside className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out ${
-            isSidebarCollapsed ? 'w-12' : 'w-[400px]'
-          }`}>
-            <div className={`rounded-lg border border-gray-100 bg-white shadow-sm flex flex-col ${
-              taskView === 'Today' ? 'min-h-full' : 'h-full'
-            } ${isSidebarCollapsed ? 'p-2 overflow-hidden' : 'p-4'}`}>
+          <aside 
+            className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out relative ${
+              isSidebarCollapsed ? 'w-12' : 'w-[400px]'
+            }`}
+            style={{ zIndex: 9999 }}
+          >
+            <div 
+              className={`rounded-lg border border-gray-100 bg-white shadow-sm flex flex-col relative ${
+                taskView === 'Today' ? 'min-h-full' : 'h-full'
+              } ${isSidebarCollapsed ? 'p-2 overflow-hidden' : 'p-4'}`}
+              style={{ zIndex: 9999 }}
+            >
               <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isSidebarCollapsed && (
-                  <h3 className="text-sm font-medium text-gray-900">{format(date, 'MMMM yyyy')}</h3>
+                  <h3 className="text-sm font-medium text-gray-900">{format(selectedDate, 'MMMM yyyy')}</h3>
                 )}
                 <div className="flex gap-1 text-gray-500">
                   <button 
@@ -3366,8 +3272,8 @@ function TaskBoardDashboardInner() {
                   </button>
                   {!isSidebarCollapsed && (
                     <>
-                      <button onClick={() => handleDateChange(addDays(date, -7))} aria-label="Previous week">&lt;</button>
-                      <button onClick={() => handleDateChange(addDays(date, 7))} aria-label="Next week">&gt;</button>
+                      <button onClick={() => handleDateChange(addDays(selectedDate, -7))} aria-label="Previous week">&lt;</button>
+                      <button onClick={() => handleDateChange(addDays(selectedDate, 7))} aria-label="Next week">&gt;</button>
                     </>
                   )}
                 </div>
@@ -3375,14 +3281,14 @@ function TaskBoardDashboardInner() {
 
               {/* Week view */}
               <div className="flex justify-between gap-2 overflow-x-auto pb-1">
-                {getWeekDays().map((day, idx) => (
+                {getDaysArray().map((day: Date, index: number) => (
                   <button
-                    key={idx}
+                    key={index}
                     onClick={() => handleDateChange(day)}
                     className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
                       isSameDay(day, selectedDate)
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                        ? 'bg-theme-primary-500 text-theme-text-inverse'
+                        : 'bg-theme-neutral-100 text-theme-text-secondary hover:bg-theme-neutral-200'
                     }`}
                   >
                     <span className="text-lg font-semibold leading-none">{format(day, 'd')}</span>
@@ -3393,15 +3299,15 @@ function TaskBoardDashboardInner() {
 
               {/* Task view toggle */}
               <div className="mt-4">
-                <div className="flex rounded-full border border-[#E2E6F6] bg-white p-1 w-full shadow-sm">
+                <div className="flex rounded-full border border-theme-neutral-200 bg-theme-surface-raised p-1 w-full shadow-sm">
                   {(['Today','Upcoming','Master List'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setTaskView(tab)}
                       className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                         taskView === tab
-                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-theme-primary-500 text-theme-text-inverse shadow'
+                          : 'text-theme-text-secondary hover:bg-theme-hover hover:text-theme-primary-600'
                       }`}
                     >
                       {tab}
@@ -3411,7 +3317,7 @@ function TaskBoardDashboardInner() {
               </div>
 
               {/* To-do lists with drag & drop */}
-              <div className="mt-6 flex-1 overflow-hidden flex flex-col">
+              <div className="mt-6 flex-1 flex flex-col">
                 <DragDropContext onDragEnd={handleDragEnd}>
                   {taskView === 'Today' && (<>
                   {/* Daily tasks (header + list share same droppable so header accepts drops) */}
@@ -3420,7 +3326,8 @@ function TaskBoardDashboardInner() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="flex flex-col"
+                        className="flex flex-col relative"
+                        style={{ zIndex: isDailyCollapsed ? 'auto' : 10000 }}
                       >
                         <div
                           className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
@@ -3430,72 +3337,88 @@ function TaskBoardDashboardInner() {
                           {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                         </div>
 
-                        <ul
-                          className="space-y-3 pr-1 transition-[max-height] duration-200"
-                          style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
-                        >
-                          {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                            <li className="text-gray-500 text-sm">Loading…</li>
-                          ) : null}
+                        {!isDailyCollapsed && (
+                          <ul className="space-y-3 pr-1 overflow-visible">
+                            {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
+                              <li className="text-gray-500 text-sm">Loading…</li>
+                            ) : null}
 
-                          {!isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                            <li className="text-gray-500 text-sm">No tasks</li>
-                          ) : null}
+                            {!isLoadingTasks && dailyVisibleTasks.length === 0 ? (
+                              <li className="text-gray-500 text-sm">No tasks</li>
+                            ) : null}
 
-                          {dailyVisibleTasks.map((t: any, index: number) => (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                              {(provided: any, dragSnapshot: any) => (
-                                <li
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  style={provided.draggableProps.style}
-                                  className={`group flex items-start gap-3 px-4 py-3 
-                                    bg-card border border-border/60 
-                                    shadow-sm hover:shadow-md 
-                                    rounded-xl transition-all duration-200 
-                                    hover:border-primary/40 hover:bg-card/80
-                                    ${dragSnapshot.isDragging ? 'shadow-lg rotate-1 scale-105 border-primary/60' : ''}
-                                    ${t.completed ? 'opacity-60' : ''}
-                                  `}
-                                >
-                                  {/* Enhanced status indicator */}
-                                  <div className="flex-shrink-0 mt-1">
-                                    <div 
-                                      className={`w-2.5 h-2.5 rounded-full ring-2 transition-all duration-200 cursor-pointer
-                                        ${t.completed 
-                                          ? 'bg-green-500 ring-green-500/20' 
-                                          : 'bg-primary ring-primary/20 hover:ring-primary/40'
-                                        }`}
-                                      onClick={() => toggleTaskCompletion(t.id.toString())}
-                                      title={t.completed ? 'Mark as pending' : 'Mark as complete'}
-                                    />
-                                  </div>
-                                  
-                                  <div className="flex flex-col w-full justify-center min-w-0">
-                                    {/* Task content with enhanced typography */}
-                                    <div className={`font-semibold truncate text-sm leading-tight transition-all duration-200
-                                      ${t.completed 
-                                        ? 'line-through text-card-foreground/50' 
-                                        : 'text-card-foreground group-hover:text-primary'
-                                      }`}>
-                                      {t.content}
+                            {dailyVisibleTasks.map((t: any, index: number) => (
+                              <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
+                                {(provided: any, dragSnapshot: any) => (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      zIndex: dragSnapshot.isDragging ? 10000 : 9999
+                                    }}
+                                    className={`group flex items-start gap-3 px-4 py-3 
+                                      bg-card border border-border/60 
+                                      shadow-sm hover:shadow-md 
+                                      rounded-xl transition-all duration-200 
+                                      hover:border-primary/40 hover:bg-card/80
+                                      ${dragSnapshot.isDragging ? 'shadow-lg rotate-1 scale-105 border-primary/60' : ''}
+                                      ${t.completed ? 'opacity-60' : ''}
+                                    `}
+                                  >
+                                    {/* Enhanced status indicator */}
+                                    <div className="flex-shrink-0 mt-1">
+                                      <div 
+                                        className={`w-2.5 h-2.5 rounded-full ring-2 transition-all duration-200 cursor-pointer
+                                          ${t.completed 
+                                            ? 'bg-green-500 ring-green-500/20' 
+                                            : 'bg-primary ring-primary/20 hover:ring-primary/40'
+                                          }`}
+                                        onClick={() => toggleTaskCompletion(t.id.toString())}
+                                        title={t.completed ? 'Mark as pending' : 'Mark as complete'}
+                                      />
                                     </div>
-                                    
-                                    {/* Due date/time indicator */}
-                                    {t.due && (
-                                      <div className="text-xs font-medium text-primary/70 leading-tight mt-1 tracking-wide">
-                                        Due: {new Date(t.due.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                        {t.due.datetime && ` at ${new Date(t.due.datetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+
+                                    {/* Task content with drag handle */}
+                                    <div className="flex-1 min-w-0" {...provided.dragHandleProps}>
+                                      <div className={`font-medium text-sm leading-tight ${t.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                        {t.content}
                                       </div>
-                                    )}
-                                  </div>
-                                </li>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </ul>
+                                      {t.due?.date && (
+                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                          <span>Due: {format(new Date(t.due.date), 'MMM d')}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Delete button - always visible for testing */}
+                                    <button
+                                      onClick={async (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        console.log('🗑️ Delete button clicked for task:', t.id, t.content);
+                                        console.log('🗑️ deleteTask function:', typeof deleteTask);
+                                        try {
+                                          await deleteTask(t.id.toString());
+                                          console.log('✅ Task deleted successfully');
+                                        } catch (error) {
+                                          console.error('❌ Failed to delete task:', error);
+                                        }
+                                      }}
+                                      className="flex-shrink-0 opacity-100 transition-opacity duration-200 p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700 z-10 ml-2"
+                                      title="Delete task"
+                                      type="button"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </ul>
+                        )}
+                        {provided.placeholder}
                       </div>
                     )}
                   </Droppable>
@@ -4103,11 +4026,11 @@ function TaskBoardDashboardInner() {
 
 // Main exported component that wraps with TasksProvider
 export function TaskBoardDashboard() {
-  const [selectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
   
   return (
     <TasksProvider selectedDate={selectedDate}>
-      <TaskBoardDashboardInner />
+      <TaskBoardDashboardInner selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
     </TasksProvider>
   );
 }

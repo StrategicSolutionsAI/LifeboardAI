@@ -18,6 +18,7 @@ import { getUserPreferencesClient } from "@/lib/user-preferences"
 import { DynamicBucketTabs } from "./dynamic-bucket-tabs"
 import { TaskColumn } from "./task-column"
 import { HealthWidgets } from "./health-widgets"
+import { MetricTile } from "./metric-tile"
 import { WidgetLibrary } from "./widget-library"
 
 export function DashboardLayout() {
@@ -212,44 +213,32 @@ export function DashboardLayout() {
                 <div>
                   {/* Health Metric Cards Row */}
                   <div className="grid grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm flex flex-col">
-                      <div className="text-xs text-gray-500 uppercase mb-1">Weight</div>
-                      <div className="flex items-baseline">
-                        <span className="text-xl font-medium text-gray-900">150</span>
-                        <span className="text-xs text-gray-500 ml-1">lbs</span>
-                      </div>
-                      <div className="ml-auto w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center">
-                        <BarChart2 className="w-3 h-3 text-amber-500" />
-                      </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm flex flex-col">
-                      <div className="text-xs text-gray-500 uppercase mb-1">Calories</div>
-                      <div className="flex items-baseline">
-                        <span className="text-xl font-medium text-gray-900">1,230</span>
-                      </div>
-                      <div className="ml-auto w-6 h-6 bg-pink-100 rounded-full flex items-center justify-center">
-                        <BarChart2 className="w-3 h-3 text-pink-500" />
-                      </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm flex flex-col">
-                      <div className="text-xs text-gray-500 uppercase mb-1">Steps</div>
-                      <div className="flex items-baseline">
-                        <span className="text-xl font-medium text-gray-900">15,138</span>
-                      </div>
-                      <div className="ml-auto w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <BarChart2 className="w-3 h-3 text-green-500" />
-                      </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm flex flex-col">
-                      <div className="text-xs text-gray-500 uppercase mb-1">Water</div>
-                      <div className="flex items-baseline">
-                        <span className="text-xl font-medium text-gray-900">40</span>
-                        <span className="text-xs text-gray-500 ml-1">oz</span>
-                      </div>
-                      <div className="ml-auto w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                        <BarChart2 className="w-3 h-3 text-blue-500" />
-                      </div>
-                    </div>
+                    <MetricTile
+                      label="Weight"
+                      value={150}
+                      unit="lbs"
+                      icon={<BarChart2 className="w-3 h-3 text-amber-500" />}
+                      iconBgClassName="bg-amber-100"
+                    />
+                    <MetricTile
+                      label="Calories"
+                      value={"1,230"}
+                      icon={<BarChart2 className="w-3 h-3 text-pink-500" />}
+                      iconBgClassName="bg-pink-100"
+                    />
+                    <MetricTile
+                      label="Steps"
+                      value={"15,138"}
+                      icon={<BarChart2 className="w-3 h-3 text-green-500" />}
+                      iconBgClassName="bg-green-100"
+                    />
+                    <MetricTile
+                      label="Water"
+                      value={40}
+                      unit="oz"
+                      icon={<BarChart2 className="w-3 h-3 text-blue-500" />}
+                      iconBgClassName="bg-blue-100"
+                    />
                   </div>
                   
                   {/* Weight Tabs */}
@@ -303,12 +292,12 @@ export function DashboardLayout() {
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-sm font-medium text-gray-900">{format(today, 'LLLL yyyy')}</h3>
                   <div className="flex space-x-1">
-                    <button className="text-gray-400 hover:text-gray-600">
+                    <button aria-label="Previous month" className="text-gray-400 hover:text-gray-600">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <button className="text-gray-400 hover:text-gray-600">
+                    <button aria-label="Next month" className="text-gray-400 hover:text-gray-600">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                       </svg>

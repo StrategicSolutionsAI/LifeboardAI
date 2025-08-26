@@ -65,17 +65,15 @@ if (prefs) {
   systemContext = `System: The user has the following life buckets (tabs): ${prefs.life_buckets.join(', ')}. Widgets per bucket: ${bucketSummary}.${dynamicString}`
 }
 
-    // Convert messages array into a prompt string expected by Claude
-    const chatPrompt = [systemContext, ...messages.map(({ role, content }) => `${role}: ${content}`), 'assistant:'].filter(Boolean).join('\n');
+    // Convert messages array into a prompt string expected by GPT-5
+    const chatPrompt = [systemContext, ...messages.map(({ role, content }) => `${role}: ${content}`)].filter(Boolean).join('\n');
 
     const output = await replicate.run(
-      "anthropic/claude-4-sonnet",
+      "openai/gpt-5",
       {
         input: {
           prompt: chatPrompt,
-
           max_tokens: 1024,
-
         },
       }
     )

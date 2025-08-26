@@ -60,7 +60,7 @@ export function RefinedWidgetError({
   className 
 }: RefinedWidgetErrorProps) {
   const config = { ...errorConfigs[error.type], ...error }
-  const ErrorIcon = config.icon || AlertTriangle
+  const ErrorIcon = (config.icon as any) || AlertTriangle
 
   return (
     <RefinedWidgetBase
@@ -156,7 +156,7 @@ export function RefinedWidgetEmpty({
   return (
     <RefinedWidgetBase
       title={title}
-      icon={icon}
+      icon={icon as any}
       iconColor={iconColor}
       primaryValue="—"
       statusBadge={{ text: 'Empty', variant: 'neutral' }}

@@ -15,6 +15,18 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
   },
+  webpack: (config, { isServer }) => {
+    // Suppress critical dependency warnings for @supabase/realtime-js
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /node_modules\/@supabase\/realtime-js/,
+        message: /Critical dependency/,
+      },
+    ];
+    
+    return config;
+  },
 }
 
 module.exports = withSentryConfig(nextConfig, {

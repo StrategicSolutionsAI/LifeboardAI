@@ -4,10 +4,12 @@ import { withErrorHandling, createApiError } from '@/lib/api-error-handler';
 
 async function postHandler(request: Request | NextRequest) {
   const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  const authResult = await supabase.auth.getUser();
+  const user = authResult?.data?.user;
   
   if (!user) {
-    throw createApiError('User not authenticated', 401, 'AUTH_REQUIRED');
+    // Tests expect 'Unauthorized' string
+    throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED');
   }
   
   const body = await request.json();
@@ -88,10 +90,12 @@ async function postHandler(request: Request | NextRequest) {
 
 async function getHandler(request: Request | NextRequest) {
   const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  const authResult = await supabase.auth.getUser();
+  const user = authResult?.data?.user;
   
   if (!user) {
-    throw createApiError('User not authenticated', 401, 'AUTH_REQUIRED');
+    // Tests expect 'Unauthorized' string
+    throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED');
   }
   
   const { data, error } = await supabase
