@@ -13,6 +13,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeColor>(() => getUserTheme())
+  const [isThemeLoaded, setIsThemeLoaded] = useState(false)
   const pathname = usePathname()
   
   // Landing pages should not be affected by theme changes
@@ -35,7 +36,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (!isLandingPage) {
       applyTheme(theme)
     }
+    setIsThemeLoaded(true)
   }, [theme, isLandingPage])
+
+  // Don't render children until theme is loaded to prevent flash
+  if (!isThemeLoaded && !isLandingPage) {
+    return null
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

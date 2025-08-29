@@ -12,9 +12,9 @@ export const themeColors: ThemeColor[] = [
   {
     id: "indigo",
     name: "Indigo Wave",
-    primary: "#5271F8",
-    secondary: "#7482FE", 
-    accent: "#909CFF",
+    primary: "#4f46e5",
+    secondary: "#6366f1", 
+    accent: "#818cf8",
     description: "Classic professional blue"
   },
   {

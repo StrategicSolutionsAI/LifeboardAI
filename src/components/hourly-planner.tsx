@@ -5,7 +5,7 @@
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { X, Clock, Plus, Edit3, Copy } from "lucide-react";
+import { X } from "lucide-react";
 import {
   Droppable,
   Draggable,
@@ -27,14 +27,17 @@ interface PlannerItem {
 // Constants – 7 AM → 9 PM
 // -----------------------------------------------------------------------------
 const HOUR_HEIGHT = 64; // px that represents one hour
-const hours = Array.from({ length: 15 }, (_, i) => {
+const HOURS = Array.from({ length: 15 }, (_, i) => {
   const h = 7 + i;
   return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
 });
 
+const RESIZE_INCREMENT = 15; // minutes
+const MIN_DURATION = 15; // minutes
+
 // Helper function to calculate end time
 const calculateEndTime = (startHour: string, durationMinutes: number): string => {
-  const hourIndex = hours.indexOf(startHour);
+  const hourIndex = HOURS.indexOf(startHour);
   if (hourIndex === -1) return startHour;
   
   const startHourNum = 7 + hourIndex;
@@ -76,17 +79,14 @@ export default function HourlyPlanner({
   // Build hourly plan from scheduled tasks
   const hourlyPlan = useMemo(() => {
     const plan: Record<string, PlannerItem[]> = {};
-    hours.forEach((h) => (plan[h] = []));
+    HOURS.forEach((h) => (plan[h] = []));
     
     // Process only tasks that have been scheduled (have hourSlot)
     scheduledTasks.forEach((t) => {
-      let slot = t.hourSlot as string;
-      // Clean up slot format - remove "hour-" prefix if present
-      slot = slot.replace('hour-', '');
+      const slot = t.hourSlot?.replace('hour-', '') || '';
       
       // Validate slot exists in our hours array
-      if (!hours.includes(slot)) {
-        console.warn(`Invalid hourSlot "${slot}" for task "${t.content}", skipping`);
+      if (!HOURS.includes(slot)) {
         return;
       }
       
@@ -98,9 +98,9 @@ export default function HourlyPlanner({
     });
     
     return plan;
-  }, [scheduledTasks, hours]);
+  }, [scheduledTasks]);
 
-  // Resize helpers ------------------------------------------------------------
+  // Resize state and handlers
   const [resizingTask, setResizingTask] = useState<{
     taskId: string;
     hour: string;
@@ -113,61 +113,55 @@ export default function HourlyPlanner({
     hour: string;
   } | null>(null);
 
-  function startResize(e: React.MouseEvent, hour: string, taskId: string) {
+  const startResize = (e: React.MouseEvent, hour: string, taskId: string) => {
     e.stopPropagation();
     e.preventDefault();
 
-    const startY = e.clientY;
     const task = hourlyPlan[hour].find((t) => t.id === taskId);
     const startDuration = task?.duration ?? 60;
-    resizeStartRef.current = { y: startY, duration: startDuration, taskId, hour };
+    
+    resizeStartRef.current = { 
+      y: e.clientY, 
+      duration: startDuration, 
+      taskId, 
+      hour 
+    };
     setResizingTask({ taskId, hour, currentDuration: startDuration });
 
-    function onMove(ev: MouseEvent) {
+    const handleMouseMove = (ev: MouseEvent) => {
       if (!resizeStartRef.current) return;
+      
       const delta = ev.clientY - resizeStartRef.current.y;
-      // Round to nearest 15-min increment, minimum 15
-      const minutes = Math.max(
-        15,
-        Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / 15) * 15,
+      const newDuration = Math.max(
+        MIN_DURATION,
+        Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / RESIZE_INCREMENT) * RESIZE_INCREMENT
       );
       
-      // Only update local state during resize - don't call API until mouse up
-      setResizingTask(prev => prev ? { ...prev, currentDuration: minutes } : null);
-    }
+      setResizingTask(prev => prev ? { ...prev, currentDuration: newDuration } : null);
+    };
 
-    function onUp() {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
       
-      // Only now update the server with final duration using current resizing state
       if (resizingTask?.currentDuration) {
-        // Update server only once at the end
-        batchUpdateTasks([
-          { taskId, updates: { duration: resizingTask.currentDuration } as any },
-        ]);
+        batchUpdateTasks([{ taskId, updates: { duration: resizingTask.currentDuration } }]);
       }
       
       setResizingTask(null);
       resizeStartRef.current = null;
-    }
+    };
 
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
 
-  // Remove task from hourly planner - simplified approach
+  // Remove task from hourly planner
   const removeTaskFromPlanner = async (taskId: string) => {
-    if (!batchUpdateTasks) {
-      console.error('❌ batchUpdateTasks function not available!');
-      return;
-    }
-    
     try {
-      // Use the context method directly - this should handle optimistic updates
       await batchUpdateTasks([{ taskId, updates: { hourSlot: undefined } }]);
     } catch (error) {
-      console.error('❌ Failed to remove task from planner:', taskId, error);
+      // Error handling is done in the context
     }
   };
 
@@ -182,49 +176,38 @@ export default function HourlyPlanner({
     return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
   }, [currentTime]);
 
-  // Auto-scroll to current hour on mount and time changes
+  // Auto-scroll to current hour on mount
   useEffect(() => {
     if (!containerRef.current) return;
     
     const currentHour = currentTime.getHours();
-    // Find the hour block to scroll to (current hour or one before if available)
     let targetHourIndex = -1;
     
     // Find current hour in our hours array (7 AM to 9 PM)
-    for (let i = 0; i < hours.length; i++) {
-      const hourNum = 7 + i; // Convert index to actual hour
+    for (let i = 0; i < HOURS.length; i++) {
+      const hourNum = 7 + i;
       if (hourNum === currentHour) {
-        // Scroll to the hour before current time, or current hour if it's the first
         targetHourIndex = Math.max(0, i - 1);
         break;
       } else if (hourNum > currentHour) {
-        // Current time is before our range, scroll to first hour
         targetHourIndex = 0;
         break;
       }
     }
     
-    // If current time is after our range (after 9 PM), scroll to last hour
-    if (targetHourIndex === -1 && currentHour > 21) {
-      targetHourIndex = hours.length - 1;
-    }
-    
-    // If current time is before our range (before 7 AM), scroll to first hour
-    if (targetHourIndex === -1 && currentHour < 7) {
-      targetHourIndex = 0;
+    // Handle edge cases
+    if (targetHourIndex === -1) {
+      targetHourIndex = currentHour > 21 ? HOURS.length - 1 : 0;
     }
     
     if (targetHourIndex >= 0) {
-      // Calculate scroll position (each hour block is ~68px tall)
       const scrollPosition = targetHourIndex * 68;
-      
-      // Smooth scroll to the target position
       containerRef.current.scrollTo({
         top: scrollPosition,
         behavior: 'smooth'
       });
     }
-  }, [currentTime, hours]); // Re-run when time changes
+  }, [currentTime]);
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -234,7 +217,7 @@ export default function HourlyPlanner({
       ref={containerRef}
       className={`space-y-1 ${className} max-h-[600px] overflow-y-auto`}
     >
-        {hours.map((disp) => (
+        {HOURS.map((disp) => (
           <Droppable key={disp} droppableId={`hour-${disp}`}>
             {(provided, snapshot) => (
               <div
@@ -253,7 +236,7 @@ export default function HourlyPlanner({
                 <ul
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex-1 relative h-[60px] overflow-visible"
+                  className="flex-1 relative min-h-[60px] overflow-visible"
                 >
                   {hourlyPlan[disp].map((t, index) => {
                     const taskCount = hourlyPlan[disp].length;
@@ -312,12 +295,7 @@ export default function HourlyPlanner({
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                try {
-                                  await deleteTask(t.id);
-                                  console.log('✅ Task deleted successfully');
-                                } catch (error) {
-                                  console.error('❌ Failed to delete task:', error);
-                                }
+                                await deleteTask(t.id);
                               }}
                               className="flex-shrink-0 opacity-0 group-hover:opacity-100 
                                 hover:bg-theme-error-100 hover:text-theme-error-600
@@ -352,14 +330,6 @@ export default function HourlyPlanner({
                   })}
                   {provided.placeholder}
                   
-                  {/* Empty state visual cue */}
-                  {hourlyPlan[disp].length === 0 && !snapshot.isDraggingOver && (
-                    <div className="flex-1 min-h-[44px] rounded-lg border-2 border-dashed border-theme-neutral-300 
-                      flex items-center justify-center text-theme-text-quaternary text-xs
-                      transition-colors hover:border-theme-neutral-400">
-                      Drop tasks here
-                    </div>
-                  )}
                 </ul>
 
                 {/* Enhanced current-time indicator */}

@@ -99,4 +99,29 @@ export interface WidgetInstance extends WidgetTemplate {
     totalChange?: number;        // total weight change from starting weight
     goalProgress?: number;       // percentage toward goal (0-100)
   };
+  // Home Projects data
+  homeProjectsData?: {
+    projects?: Array<{
+      id: string
+      title: string
+      description?: string
+      category: 'maintenance' | 'repairs' | 'improvements' | 'seasonal' | 'exterior' | 'interior'
+      priority: 'critical' | 'high' | 'medium' | 'low'
+      status: 'planning' | 'active' | 'waiting' | 'completed' | 'on-hold'
+      room?: string
+      estimatedHours?: number
+      actualHours?: number
+      dueDate?: string // ISO date string
+      createdAt: string // ISO timestamp
+      updatedAt: string // ISO timestamp
+      notes?: string[]
+      photos?: string[]
+      completedAt?: string // ISO timestamp when marked complete
+    }>
+    activeCount?: number        // number of active projects
+    completedThisMonth?: number // completed projects this month
+    totalProjects?: number      // total number of projects
+    completionRate?: number     // percentage of completed projects
+    lastUpdated?: string        // ISO timestamp of last update
+  };
 } 

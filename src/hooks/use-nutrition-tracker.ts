@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useDataCache } from '@/hooks/use-data-cache'
 
 // Types
@@ -151,6 +151,9 @@ export function useNutritionTracker() {
       // Update favorites
       await updateFavoriteFood(foodId, foodName, serving)
       
+      // Emit event to update other nutrition components immediately
+      window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
+      
       return newMeal
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to add food'
@@ -180,6 +183,9 @@ export function useNutritionTracker() {
           [mealType]: meals[mealType].filter((food: MealFood) => food.id !== foodId)
         }
       })
+
+      // Emit event to update other nutrition components immediately
+      window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to remove food'
       setError(message)
@@ -260,6 +266,20 @@ export function useNutritionTracker() {
   }, [dailyMeals])
 
   const clearError = useCallback(() => setError(null), [])
+
+  // Listen for external data updates (e.g., when panel closes)
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      console.log('🔄 Nutrition data updated - refetching caches')
+      // Force refetch instead of just invalidating
+      mealsCache.refetch()
+      goalsCache.refetch()
+      favoritesCache.refetch()
+    }
+
+    window.addEventListener('nutritionDataUpdated', handleDataUpdate)
+    return () => window.removeEventListener('nutritionDataUpdated', handleDataUpdate)
+  }, [mealsCache, goalsCache, favoritesCache])
 
   return {
     // Data

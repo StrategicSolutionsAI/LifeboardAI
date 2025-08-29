@@ -103,6 +103,7 @@ import { NutritionMealTracker } from "./nutrition-meal-tracker";
 import { NutritionSummaryWidget } from "./nutrition-summary-widget";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
 import { ExerciseWidget } from "./exercise-widget-simple";
+import { HomeProjectsWidget } from "./home-projects-widget";
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -347,6 +348,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [nutritionWidgetOpen, setNutritionWidgetOpen] = useState(false);
   const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
   const [exerciseWidgetOpen, setExerciseWidgetOpen] = useState(false);
+  const [homeProjectsWidgetOpen, setHomeProjectsWidgetOpen] = useState(false);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -2434,11 +2436,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               {/* Content area */}
               <div className="flex-1 overflow-y-auto p-6">
                 {/* Overview Tab */}
-                <div className={activeSubTab === 'Overview' ? 'flex flex-wrap gap-4' : 'hidden'}>
+                <div className={activeSubTab === 'Overview' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr' : 'hidden'}>
                   {/* Refresh card */}
                   <div
                     onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                    className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
+                    className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
@@ -2491,7 +2493,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
 
                     return (
-                      <div key={w.instanceId} className={`w-48 rounded-xl border border-gray-100 ${cardBgClass} p-4 shadow-sm relative group cursor-pointer hover:shadow-md hover:border-gray-200 transition-all`} onClick={() => { 
+                      <div key={w.instanceId} className={`rounded-xl border border-gray-100 ${cardBgClass} p-4 shadow-sm relative group cursor-pointer hover:shadow-md hover:border-gray-200 transition-all min-w-0`} onClick={() => { 
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -2501,6 +2503,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         } else if (w.id === 'exercise') {
                           // For exercise widget, show a modal with the enhanced exercise tracker
                           setExerciseWidgetOpen(true);
+                        } else if (w.id === 'home_projects') {
+                          // For home projects widget, show a modal with the comprehensive project manager
+                          setHomeProjectsWidgetOpen(true);
                         } else {
                           setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
                         }
@@ -3020,6 +3025,71 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             );
                           }
 
+                          // Special handling for home projects widget
+                          if (w.id === 'home_projects') {
+                            const projects = w.homeProjectsData?.projects || [];
+                            const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
+                            const urgentProjects = projects.filter(p => 
+                              (p.priority === 'critical' || p.priority === 'high') && 
+                              p.status !== 'completed'
+                            );
+                            const completedProjects = projects.filter(p => p.status === 'completed');
+                            const completionRate = projects.length > 0 ? Math.round((completedProjects.length / projects.length) * 100) : 0;
+
+                            if (projects.length === 0) {
+                              return (
+                                <div className="mt-3 text-center">
+                                  <div className="text-2xl mb-2">🔨</div>
+                                  <div className="text-xs text-gray-600 mb-1">Home Projects</div>
+                                  <div className="text-xs text-gray-500">
+                                    Track household tasks & improvements
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Find next priority project
+                            const sortedActive = activeProjects.sort((a, b) => {
+                              const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+                              return priorityOrder[a.priority] - priorityOrder[b.priority];
+                            });
+                            const nextProject = sortedActive[0];
+
+                            return (
+                              <div className="mt-3 space-y-2">
+                                {/* Stats */}
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                  <div>
+                                    <div className="text-sm font-semibold text-gray-900">{activeProjects.length}</div>
+                                    <div className="text-xs text-gray-500">Active</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-red-600">{urgentProjects.length}</div>
+                                    <div className="text-xs text-gray-500">Urgent</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-green-600">{completionRate}%</div>
+                                    <div className="text-xs text-gray-500">Done</div>
+                                  </div>
+                                </div>
+                                
+                                {/* Next priority project */}
+                                {nextProject && (
+                                  <div className="border-t border-gray-100 pt-2">
+                                    <div className="text-xs text-gray-600 mb-1">Next Priority:</div>
+                                    <div className="flex items-center gap-1">
+                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-blue-500' : 'bg-gray-400'}`}></span>
+                                      <span className="text-xs font-medium text-gray-900 truncate">{nextProject.title}</span>
+                                    </div>
+                                    {nextProject.room && (
+                                      <div className="text-xs text-gray-500 capitalize mt-1">📍 {nextProject.room}</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
                           // Regular progress bar for other widgets
                           const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
                           const prog = progressByWidget[w.instanceId];
@@ -3071,7 +3141,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   })}
 
                   {/* Add Widget card */}
-                  <div className="w-48 rounded-lg border border-gray-100 bg-white p-3 shadow-sm flex flex-col items-center gap-2 cursor-pointer hover:bg-gray-50" onClick={() => setIsWidgetSheetOpen(true)}>
+                  <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm flex flex-col items-center gap-2 cursor-pointer hover:bg-gray-50 min-w-0" onClick={() => setIsWidgetSheetOpen(true)}>
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50">
                       <Plus className="h-6 w-6 text-indigo-500" />
                     </div>
@@ -3250,13 +3320,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out relative ${
               isSidebarCollapsed ? 'w-12' : 'w-[400px]'
             }`}
-            style={{ zIndex: 9999 }}
+            style={{ zIndex: 40 }}
           >
             <div 
               className={`rounded-lg border border-gray-100 bg-white shadow-sm flex flex-col relative ${
                 taskView === 'Today' ? 'min-h-full' : 'h-full'
               } ${isSidebarCollapsed ? 'p-2 overflow-hidden' : 'p-4'}`}
-              style={{ zIndex: 9999 }}
+              style={{ zIndex: 40 }}
             >
               <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                 {!isSidebarCollapsed && (
@@ -3281,7 +3351,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
               {/* Week view */}
               <div className="flex justify-between gap-2 overflow-x-auto pb-1">
-                {getDaysArray().map((day: Date, index: number) => (
+                {getWeekDays().map((day: Date, index: number) => (
                   <button
                     key={index}
                     onClick={() => handleDateChange(day)}
@@ -3333,7 +3403,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
                           onClick={() => setIsDailyCollapsed((c) => !c)}
                         >
-                          <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
+                          <span>Tasks on {format(selectedDate,'MMM d, yyyy')}</span>
                           {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                         </div>
 
@@ -3528,7 +3598,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
                           onClick={() => setIsDailyCollapsed((c) => !c)}
                         >
-                          <span>Todoist tasks on {format(selectedDate,'MMM d, yyyy')}</span>
+                          <span>Tasks on {format(selectedDate,'MMM d, yyyy')}</span>
                           {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                         </div>
 
@@ -3863,7 +3933,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         )}
 
         {/* Nutrition Widget Modal */}
-        <Sheet open={nutritionWidgetOpen} onOpenChange={setNutritionWidgetOpen}>
+        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => {
+          setNutritionWidgetOpen(open)
+          if (!open) {
+            // Force refresh nutrition widgets when panel closes
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
+            }, 100)
+          }
+        }}>
           <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Daily Nutrition Tracker</SheetTitle>
@@ -3894,6 +3972,35 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </SheetHeader>
             <div className="mt-6">
               <ExerciseWidget onClose={() => setExerciseWidgetOpen(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Home Projects Widget Modal */}
+        <Sheet open={homeProjectsWidgetOpen} onOpenChange={setHomeProjectsWidgetOpen}>
+          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6">
+              <HomeProjectsWidget 
+                widget={getDisplayWidgets(activeBucket).find(w => w.id === 'home_projects') || {} as WidgetInstance}
+                onUpdate={(updatedWidget) => {
+                  setWidgetsByBucket(prev => ({
+                    ...prev,
+                    [activeBucket]: prev[activeBucket]?.map(w => 
+                      w.instanceId === updatedWidget.instanceId ? updatedWidget : w
+                    ) || []
+                  }));
+                }}
+                onAddToTasks={async (projectTitle: string, projectDescription?: string, dueDate?: string) => {
+                  try {
+                    await contextCreateTask(projectTitle, dueDate || null);
+                  } catch (error) {
+                    console.error('Failed to add project to tasks:', error);
+                  }
+                }}
+              />
             </div>
           </SheetContent>
         </Sheet>
@@ -4026,7 +4133,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
 // Main exported component that wraps with TasksProvider
 export function TaskBoardDashboard() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  });
   
   return (
     <TasksProvider selectedDate={selectedDate}>

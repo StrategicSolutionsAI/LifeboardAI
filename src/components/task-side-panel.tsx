@@ -3,11 +3,12 @@
 
 import React, { useState, useMemo, useCallback } from "react";
 import { format, addDays, isSameDay } from "date-fns";
-import { ChevronRight, ChevronDown, AlertCircle, RefreshCw } from "lucide-react";
+import { ChevronRight, ChevronDown, AlertCircle, RefreshCw, ListPlus } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import HourlyPlanner from "./hourly-planner";
+import { HomeProject, PROJECT_STATUS } from "@/types/home-projects";
 
 interface Task {
   id: string | number;
@@ -200,6 +201,71 @@ export function TaskSidePanel() {
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
+  const [isHomeProjectsCollapsed, setIsHomeProjectsCollapsed] = useState(false);
+
+  // Mock Home Projects data - in a real implementation, this would come from a context or API
+  const mockHomeProjects: HomeProject[] = [
+    {
+      id: '1',
+      title: 'Kitchen Cabinet Repair',
+      description: 'Fix the loose hinge on the upper cabinet',
+      status: 'active',
+      priority: 'high',
+      category: 'maintenance',
+      room: 'Kitchen',
+      dueDate: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '2',
+      title: 'Living Room Paint Touch-up',
+      description: 'Touch up scuff marks on the living room walls',
+      status: 'planning',
+      priority: 'medium',
+      category: 'improvements',
+      room: 'Living Room',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '3',
+      title: 'Garage Organization',
+      description: 'Organize tools and storage in the garage',
+      status: 'active',
+      priority: 'low',
+      category: 'interior',
+      room: 'Garage',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: '4',
+      title: 'Bathroom Deep Clean',
+      description: 'Deep clean and organize the master bathroom',
+      status: 'planning',
+      priority: 'medium',
+      category: 'maintenance',
+      room: 'Bathroom',
+      dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // Filter active projects (not completed)
+  const activeHomeProjects = mockHomeProjects.filter(p => p.status !== 'completed');
+
+  // Function to add project to tasks
+  const handleAddProjectToTasks = async (project: HomeProject) => {
+    try {
+      const taskTitle = `${project.title}${project.room ? ` (${project.room})` : ''}`;
+      await createTask(taskTitle, project.dueDate || null);
+      // In a real implementation, you might also update the project status
+    } catch (error) {
+      console.error('Failed to add project to tasks:', error);
+    }
+  };
 
   return (
     <aside className="w-[400px] flex-shrink-0 -mt-12">
@@ -513,6 +579,83 @@ export function TaskSidePanel() {
                     <button onClick={handleAddOpenTask} className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline">
                       Add
                     </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Home Projects Section */}
+            {taskView === "Today" && (
+              <>
+                <div
+                  className="flex items-center justify-between text-sm font-medium text-theme-text-primary mt-4 mb-2 cursor-pointer select-none"
+                  onClick={() => setIsHomeProjectsCollapsed((c) => !c)}
+                >
+                  <span>Home Projects ({activeHomeProjects.length})</span>
+                  {isHomeProjectsCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                </div>
+                
+                {!isHomeProjectsCollapsed && (
+                  <div className="space-y-2 mb-4">
+                    {activeHomeProjects.length === 0 ? (
+                      <div className="text-sm text-theme-text-secondary p-2 text-center">
+                        No active projects
+                      </div>
+                    ) : (
+                      activeHomeProjects.map((project) => {
+                        const statusConfig = PROJECT_STATUS[project.status];
+                        const priorityColors = {
+                          low: 'text-blue-600',
+                          medium: 'text-yellow-600', 
+                          high: 'text-orange-600',
+                          critical: 'text-red-600'
+                        };
+                        
+                        return (
+                          <div 
+                            key={project.id} 
+                            className="flex items-center justify-between p-2 rounded-md border border-theme-neutral-200 bg-theme-surface hover:bg-theme-neutral-50 group"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  statusConfig.color === 'green' ? 'bg-green-500' : 
+                                  statusConfig.color === 'blue' ? 'bg-blue-500' : 
+                                  statusConfig.color === 'amber' ? 'bg-amber-500' : 
+                                  statusConfig.color === 'orange' ? 'bg-orange-500' : 
+                                  'bg-gray-500'
+                                }`} />
+                                <p className="text-sm font-medium text-theme-text-primary truncate">
+                                  {project.title}
+                                </p>
+                                <span className={`text-xs font-medium ${priorityColors[project.priority]}`}>
+                                  {project.priority.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {project.room && (
+                                  <span className="text-xs text-theme-text-secondary">
+                                    📍 {project.room}
+                                  </span>
+                                )}
+                                {project.dueDate && (
+                                  <span className="text-xs text-theme-text-secondary">
+                                    📅 {format(new Date(project.dueDate), 'MMM d')}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleAddProjectToTasks(project)}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-theme-neutral-100 transition-all"
+                              title="Add to tasks"
+                            >
+                              <ListPlus size={14} className="text-theme-text-secondary hover:text-theme-primary-600" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </>

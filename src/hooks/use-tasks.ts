@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
@@ -34,18 +34,13 @@ export function useTasks(selectedDate?: Date) {
     try {
       const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
       if (!res.ok) {
-        const errorText = await res.text()
-        console.error(`Daily tasks API error: ${res.status} ${res.statusText}`, errorText)
-        throw new Error(`Failed to fetch daily tasks: ${res.status} ${res.statusText}`)
+        throw new Error(`Failed to fetch daily tasks: ${res.status}`)
       }
       const data = await res.json()
-      const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
-      return tasks
+      return Array.isArray(data) ? data : (data.tasks ?? [])
     } catch (error) {
-      console.error('Network error fetching daily tasks:', error)
-      // Return empty array instead of throwing to prevent UI crashes
+      // Return empty array for network errors to prevent UI crashes
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.warn('Todoist integration may not be configured. Returning empty tasks.')
         return []
       }
       throw error
@@ -57,18 +52,13 @@ export function useTasks(selectedDate?: Date) {
     try {
       const res = await fetch('/api/integrations/todoist/tasks?all=true')
       if (!res.ok) {
-        const errorText = await res.text()
-        console.error(`All tasks API error: ${res.status} ${res.statusText}`, errorText)
-        throw new Error(`Failed to fetch all tasks: ${res.status} ${res.statusText}`)
+        throw new Error(`Failed to fetch all tasks: ${res.status}`)
       }
       const data = await res.json()
-      const tasks = Array.isArray(data) ? data : (data.tasks ?? [])
-      return tasks
+      return Array.isArray(data) ? data : (data.tasks ?? [])
     } catch (error) {
-      console.error('Network error fetching all tasks:', error)
-      // Return empty array instead of throwing to prevent UI crashes
+      // Return empty array for network errors to prevent UI crashes
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.warn('Todoist integration may not be configured. Returning empty tasks.')
         return []
       }
       throw error
@@ -104,7 +94,6 @@ export function useTasks(selectedDate?: Date) {
     if (!trimmed) return
     
     try {
-      // Call API first to get the real task
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,21 +104,14 @@ export function useTasks(selectedDate?: Date) {
       
       const { task } = await res.json()
       
-      console.log('✅ Task created, adding to cache:', task.id)
-      
-      // Add real task to cache immediately
+      // Add task to appropriate caches
       if (dueDate === dateStr) {
-        updateDailyOptimistically(current => {
-          const updated = [...(current || []), task]
-          console.log('📋 Added real task to daily cache, now has:', updated.length, 'tasks')
-          return updated
-        })
+        updateDailyOptimistically(current => [...(current || []), task])
       }
       updateAllOptimistically(current => [...(current || []), task])
       
       return task
     } catch (error) {
-      console.error('Failed to create task:', error)
       throw error
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
@@ -218,9 +200,6 @@ export function useTasks(selectedDate?: Date) {
       
       if (!res.ok) throw new Error('Failed to delete task')
       
-      // Add a small delay to ensure Todoist processes the deletion
-      // before any potential cache refresh
-      await new Promise(resolve => setTimeout(resolve, 500))
       
     } catch (error) {
       // On error, refetch to get correct state
@@ -230,36 +209,31 @@ export function useTasks(selectedDate?: Date) {
     }
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   
-  // Properly filter tasks for different views
+  // Filter tasks for different views
   const dailyVisibleTasks = useMemo(() => 
     (dailyTasks || []).filter(t => !t.completed && !t.hourSlot),
     [dailyTasks]
   );
 
   const scheduledTasks = useMemo(() => {
-    // Only include scheduled tasks that are due today or have no due date
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     
     // Get scheduled tasks from daily tasks (already filtered by date)
     const dailyScheduled = (dailyTasks || []).filter(t => !t.completed && t.hourSlot);
     
-    // Get scheduled tasks from all tasks, but only if they're due today or have no due date
+    // Get scheduled tasks from all tasks for today
     const allScheduled = (allTasks || []).filter(t => {
       if (t.completed || !t.hourSlot) return false;
-      // Include if no due date or due today
       return !t.due?.date || t.due.date === todayStr;
     });
     
     // Combine and deduplicate by id
-    const combined = [...dailyScheduled];
-    allScheduled.forEach(task => {
-      if (!combined.find(t => t.id === task.id)) {
-        combined.push(task);
-      }
+    const taskMap = new Map();
+    [...dailyScheduled, ...allScheduled].forEach(task => {
+      taskMap.set(task.id, task);
     });
     
-    
-    return combined;
+    return Array.from(taskMap.values());
   }, [dailyTasks, allTasks]);
 
   // Upcoming tasks: all open tasks with future due dates

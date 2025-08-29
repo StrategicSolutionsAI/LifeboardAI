@@ -355,6 +355,10 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
       // Update favorites
       await updateFavoriteFood(selectedFood.food.food_id, selectedFood.food.food_name, selectedServing)
 
+      // Emit event to update other nutrition components immediately
+      console.log('🍎 Food added - dispatching nutritionDataUpdated event')
+      window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
+
       // Reset form
       setSelectedFood(null)
       setSelectedServing(null)
@@ -384,6 +388,8 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
           ...prev,
           [mealType]: prev[mealType].filter(food => food.id !== foodId)
         }))
+        // Emit event to update other nutrition components immediately
+        window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
       } else {
         console.error('Failed to remove meal')
       }
@@ -444,6 +450,9 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
           meal.id === optimisticMeal.id ? newMeal : meal
         )
       }))
+
+      // Emit event to update other nutrition components immediately
+      window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
 
       setShowQuickAdd(false)
     } catch (error) {

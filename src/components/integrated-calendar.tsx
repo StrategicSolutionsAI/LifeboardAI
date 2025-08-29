@@ -202,7 +202,11 @@ export default function IntegratedCalendar() {
                 <div
                   key={dayStr}
                   onClick={() => dayEvents.length && setSelectedDate(dayStr)}
-                  className={`aspect-square cursor-pointer flex flex-col items-center justify-start text-sm ${isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"} ${isToday ? "border border-indigo-500" : ""}`}
+                  className={`aspect-square cursor-pointer flex flex-col items-center justify-start text-sm ${
+                    isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
+                  } ${
+                    isToday ? "bg-theme-primary-500 text-white border-2 border-theme-primary-600" : ""
+                  }`}
                 >
                   <span className="mt-1">{format(day, "d")}</span>
                   {dayEvents.length > 0 && (

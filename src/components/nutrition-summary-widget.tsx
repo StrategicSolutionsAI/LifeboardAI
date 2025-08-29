@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Utensils, Coffee, Sun, Moon, Cookie, Apple } from 'lucide-react'
-import { getCurrentLocalDate } from '@/lib/date-utils'
+import { useNutritionTracker } from '@/hooks/use-nutrition-tracker'
 
 interface MealFood {
   id: string
@@ -45,78 +45,13 @@ export function NutritionSummaryWidget({
   showControls = true, 
   compact = false 
 }: NutritionSummaryWidgetProps) {
-  const [dailyMeals, setDailyMeals] = useState<DailyMeals>({
-    breakfast: [],
-    lunch: [],
-    dinner: [],
-    snacks: []
-  })
-  const [nutritionGoals, setNutritionGoals] = useState<NutritionGoals>({
-    calories: 2000,
-    protein: 150,
-    carbs: 250,
-    fat: 65
-  })
-  const [loading, setLoading] = useState(true)
+  const { 
+    dailyMeals, 
+    nutritionGoals, 
+    dailyTotals, 
+    isLoading 
+  } = useNutritionTracker()
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      await Promise.all([loadMeals(), loadNutritionGoals()])
-    } catch (error) {
-      console.error('Error loading nutrition data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadMeals = async () => {
-    try {
-      const today = getCurrentLocalDate()
-      const response = await fetch(`/api/nutrition/meals?date=${today}`)
-      if (response.ok) {
-        const meals = await response.json()
-        setDailyMeals(meals)
-      }
-    } catch (error) {
-      console.error('Failed to load meals:', error)
-    }
-  }
-
-  const loadNutritionGoals = async () => {
-    try {
-      const response = await fetch('/api/nutrition/goals')
-      if (response.ok) {
-        const goals = await response.json()
-        setNutritionGoals(goals)
-      }
-    } catch (error) {
-      console.error('Failed to load nutrition goals:', error)
-    }
-  }
-
-  const calculateMealNutrition = (foods: MealFood[]) => {
-    return foods.reduce((totals, food) => {
-      const calories = parseFloat(food.serving.calories || '0') * food.quantity
-      return {
-        calories: totals.calories + calories
-      }
-    }, { calories: 0 })
-  }
-
-  const calculateDailyTotals = () => {
-    const allFoods = [
-      ...dailyMeals.breakfast,
-      ...dailyMeals.lunch,
-      ...dailyMeals.dinner,
-      ...dailyMeals.snacks
-    ]
-    return calculateMealNutrition(allFoods)
-  }
 
   const getMealIcon = (mealType: string) => {
     switch (mealType) {
@@ -132,7 +67,6 @@ export function NutritionSummaryWidget({
     return mealType.charAt(0).toUpperCase() + mealType.slice(1)
   }
 
-  const dailyTotals = calculateDailyTotals()
   const calorieProgress = (dailyTotals.calories / nutritionGoals.calories) * 100
 
   const mealsWithFood = Object.entries(dailyMeals).filter(([_, foods]) => foods.length > 0)
@@ -193,7 +127,7 @@ export function NutritionSummaryWidget({
     )
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative animate-pulse">
         <div className="flex items-center gap-2 mb-2">

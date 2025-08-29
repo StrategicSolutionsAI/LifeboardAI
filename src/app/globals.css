@@ -2,33 +2,259 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enhanced Landing Page Animations and Micro-interactions */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(132, 145, 255, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(132, 145, 255, 0.5); }
+}
+
+/* Landing Page Specific Styles */
+.landing-fade-in {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.landing-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.landing-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Enhanced Button Hover States */
+.landing-cta-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.landing-cta-button:hover::before {
+  left: 100%;
+}
+
+/* Smooth Scroll Behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Advanced Animations for World-Class Website */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleInCenter {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-15px) rotate(2deg); }
+}
+
+/* World-class interaction effects */
+.world-class-card {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.world-class-card:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+.testimonial-card {
+  animation: slideInFromLeft 0.8s ease-out;
+}
+
+.testimonial-card:nth-child(2) {
+  animation: scaleInCenter 0.8s ease-out 0.2s both;
+}
+
+.testimonial-card:nth-child(3) {
+  animation: slideInFromRight 0.8s ease-out 0.4s both;
+}
+
+/* Premium gradient background */
+.premium-gradient {
+  background: linear-gradient(-45deg, #8491FF, #9c4dcc, #8491FF, #7c3aed);
+  background-size: 400% 400%;
+  animation: gradientShift 8s ease infinite;
+}
+
+/* Advanced text effects */
+.premium-text-glow {
+  text-shadow: 0 0 20px rgba(132, 145, 255, 0.3);
+}
+
+/* Floating elements animation refinement */
+.premium-float {
+  animation: float-reverse 8s ease-in-out infinite;
+}
+
+/* Interactive pricing cards */
+.pricing-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* FAQ hover effects */
+.faq-item {
+  transition: all 0.3s ease;
+}
+
+.faq-item:hover {
+  background: linear-gradient(135deg, rgba(132, 145, 255, 0.05), rgba(132, 145, 255, 0.02));
+  border-color: rgba(132, 145, 255, 0.2);
+}
+
+/* Scrollbar hide for testimonials */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Section transition effects */
+.section-transition {
+  position: relative;
+}
+
+.section-transition::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(to bottom, transparent, rgba(132, 145, 255, 0.03));
+  pointer-events: none;
+}
+
+/* Testimonial scroll animation */
+.testimonial-scroll {
+  animation: scroll-fade 0.6s ease-out forwards;
+}
+
+@keyframes scroll-fade {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Sticky CTA Bar Animation */
+.sticky-cta-show {
+  transform: translateY(0) !important;
+}
+
+/* Enhanced mobile mockup shadows */
+.mobile-mockup {
+  filter: drop-shadow(0 25px 50px rgba(0, 0, 0, 0.15));
+}
+
+/* Integration logo hover effects */
+.integration-logo {
+  transition: all 0.3s ease;
+}
+
+.integration-logo:hover {
+  transform: translateY(-2px);
+  opacity: 1 !important;
+}
+
 /* Enhanced Senior UI/UX Designer Color System */
 :root {
   /* === PRIMARY BRAND PALETTE === */
-  --theme-primary-50: #eef2ff;   /* Ultra light tint */
-  --theme-primary-100: #e0e7ff;  /* Light tint */
-  --theme-primary-200: #c7d2fe;  /* Lighter */
-  --theme-primary-300: #a5b4fc;  /* Light */
-  --theme-primary-400: #818cf8;  /* Medium light */
-  --theme-primary-500: #6366f1;  /* Base primary */
-  --theme-primary-600: #4f46e5;  /* Medium dark */
-  --theme-primary-700: #4338ca;  /* Dark */
-  --theme-primary-800: #3730a3;  /* Darker */
-  --theme-primary-900: #312e81;  /* Darkest */
-  --theme-primary-950: #1e1b4b;  /* Ultra dark */
+  --theme-primary-50: #f8fafc;   /* Ultra light tint */
+  --theme-primary-100: #f1f5f9;  /* Light tint */
+  --theme-primary-200: #e2e8f0;  /* Lighter */
+  --theme-primary-300: #cbd5e1;  /* Light */
+  --theme-primary-400: #94a3b8;  /* Medium light */
+  --theme-primary-500: #64748b;  /* Base primary */
+  --theme-primary-600: #475569;  /* Medium dark */
+  --theme-primary-700: #334155;  /* Dark */
+  --theme-primary-800: #1e293b;  /* Darker */
+  --theme-primary-900: #0f172a;  /* Darkest */
+  --theme-primary-950: #020617;  /* Ultra dark */
   
   /* === SECONDARY ACCENT PALETTE === */
-  --theme-secondary-50: #ecfeff;
-  --theme-secondary-100: #cffafe;
-  --theme-secondary-200: #a5f3fc;
-  --theme-secondary-300: #67e8f9;
-  --theme-secondary-400: #22d3ee;
-  --theme-secondary-500: #06b6d4;  /* Base secondary */
-  --theme-secondary-600: #0891b2;
-  --theme-secondary-700: #0e7490;
-  --theme-secondary-800: #155e75;
-  --theme-secondary-900: #164e63;
-  --theme-secondary-950: #083344;
+  --theme-secondary-50: #f8fafc;
+  --theme-secondary-100: #f1f5f9;
+  --theme-secondary-200: #e2e8f0;
+  --theme-secondary-300: #cbd5e1;
+  --theme-secondary-400: #94a3b8;
+  --theme-secondary-500: #64748b;  /* Base secondary */
+  --theme-secondary-600: #475569;
+  --theme-secondary-700: #334155;
+  --theme-secondary-800: #1e293b;
+  --theme-secondary-900: #0f172a;
+  --theme-secondary-950: #020617;
   
   /* === SEMANTIC COLORS === */
   --theme-success-50: #ecfdf5;
