@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Play, Star, CheckCircle, Users, Calendar, Zap, ArrowRight, Shield, Clock, Heart, ChevronDown, Quote, Smartphone, Globe, Lock } from "lucide-react"
+import WorldClassLandingEffects from "@/components/world-class-landing-effects"
 
 export default function Home() {
   return (
+    <WorldClassLandingEffects>
     <div className="min-h-screen relative overflow-hidden">
       {/* Sticky CTA Bar - Appears on scroll */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#8491FF] text-white p-4 shadow-2xl transform translate-y-full transition-transform duration-300" id="sticky-cta">
@@ -25,41 +27,49 @@ export default function Home() {
         </div>
       </div>
       {/* Background Image Layer */}
-      <div className="absolute inset-0 top-0 h-[1048px] w-full -z-10 pointer-events-none">
-        <img src="/images/background.png" alt="hero background" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent"></div>
+      <div className="absolute inset-0 w-full h-full min-h-screen -z-10 pointer-events-none overflow-hidden">
+        <img 
+          src="/images/background.png" 
+          alt="hero background" 
+          className="w-full h-full object-cover object-center" 
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-white/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-white/20 via-transparent to-transparent"></div>
       </div>
 
       {/* Navigation Header */}
-      <nav className="relative z-10 flex items-center justify-between px-4 md:px-16 py-6 backdrop-blur-sm bg-white/80">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-[#8491FF]/80 to-[#8491FF]/60 rounded-lg flex items-center justify-center shadow-lg">
+      <nav className="relative z-10 flex items-center justify-between px-4 md:px-16 py-4 md:py-6 backdrop-blur-sm bg-white/90 border-b border-white/20">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-[#8491FF] rounded-lg flex items-center justify-center shadow-lg">
             <span className="text-white text-sm font-bold">L</span>
           </div>
-          <span className="text-2xl font-bold text-[#8491FF]">Lifeboard</span>
-          <span className="text-2xl font-bold text-gray-800">AI</span>
+          <div className="flex items-baseline space-x-1">
+            <span className="text-xl md:text-2xl font-bold text-[#8491FF]">Lifeboard</span>
+            <span className="text-xl md:text-2xl font-bold text-gray-800">AI</span>
+          </div>
         </div>
         
-        <div className="hidden md:flex items-center space-x-8">
-          <Link href="#features" className="text-gray-600 hover:text-gray-800 transition-colors">Features</Link>
-          <Link href="#pricing" className="text-gray-600 hover:text-gray-800 transition-colors">Pricing</Link>
-          <Link href="#testimonials" className="text-gray-600 hover:text-gray-800 transition-colors">Reviews</Link>
-          <Link href="#support" className="text-gray-600 hover:text-gray-800 transition-colors">Support</Link>
+        <div className="hidden lg:flex items-center space-x-8">
+          <Link href="#features" className="text-gray-600 hover:text-gray-800 transition-colors font-medium">Features</Link>
+          <Link href="#pricing" className="text-gray-600 hover:text-gray-800 transition-colors font-medium">Pricing</Link>
+          <Link href="#testimonials" className="text-gray-600 hover:text-gray-800 transition-colors font-medium">Reviews</Link>
+          <Link href="#support" className="text-gray-600 hover:text-gray-800 transition-colors font-medium">Support</Link>
           
-          <div className="flex items-center space-x-4 ml-8">
+          <div className="flex items-center space-x-4 ml-8 border-l border-gray-200 pl-8">
             <Link href="/login" className="text-gray-600 hover:text-gray-800 font-medium transition-colors">Sign In</Link>
             <Link href="/signup">
-              <Button className="text-white px-6 py-2 rounded-lg bg-gradient-to-r from-[#8491FF]/90 to-[#8491FF]/70 hover:from-[#8491FF] hover:to-[#8491FF]/80 transition-all duration-200 transform hover:scale-105 shadow-lg">
+              <Button className="text-white px-6 py-2.5 rounded-lg bg-[#8491FF] hover:bg-[#8491FF]/90 transition-all duration-200 transform hover:scale-105 shadow-lg font-medium">
                 Get Started
               </Button>
             </Link>
           </div>
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden">
+        {/* Mobile Navigation */}
+        <div className="lg:hidden flex items-center space-x-3">
+          <Link href="/login" className="text-gray-600 hover:text-gray-800 font-medium text-sm">Sign In</Link>
           <Link href="/signup">
-            <Button className="text-white px-4 py-2 rounded-lg bg-[#8491FF] hover:bg-[#7482FE]">
+            <Button className="text-white px-4 py-2 rounded-lg bg-[#8491FF] hover:bg-[#8491FF]/90 text-sm font-medium shadow-lg">
               Get Started
             </Button>
           </Link>
@@ -67,100 +77,103 @@ export default function Home() {
       </nav>
 
       {/* Social Proof Bar */}
-      <div className="relative z-10 px-4 md:px-16 py-4">
-        <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
-          <div className="flex items-center space-x-1">
-            <Users className="w-4 h-4" />
-            <span>Join 10,000+ families</span>
+      <div className="relative z-10 px-4 md:px-16 py-3 md:py-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-8 text-sm text-gray-600">
+          <div className="flex items-center space-x-2">
+            <Users className="w-4 h-4 text-[#8491FF]" />
+            <span className="font-medium">Join 10,000+ families</span>
           </div>
-          <div className="flex items-center space-x-1">
-            {[1,2,3,4,5].map((star) => (
-              <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            ))}
-            <span className="ml-2">4.9/5 rating</span>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center">
+              {[1,2,3,4,5].map((star) => (
+                <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              ))}
+            </div>
+            <span className="font-medium">4.9/5 rating</span>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 px-4 md:px-16 py-16 md:py-28 flex flex-col md:flex-row items-center justify-between gap-12 md:gap-20">
-        <div className="max-w-2xl text-center md:text-left landing-fade-in">
+      <div className="relative z-10 px-4 md:px-16 py-12 md:py-24 lg:py-32 flex flex-col lg:flex-row items-center justify-between gap-8 md:gap-12 lg:gap-20 max-w-7xl mx-auto">
+        <div className="flex-1 max-w-2xl text-center lg:text-left hero-grand-entrance">
           {/* Trust Badge */}
-          <div className="inline-flex items-center space-x-2 bg-[#8491FF]/8 text-[#8491FF] px-5 py-3 rounded-full text-sm font-medium mb-8 border border-[#8491FF]/20 backdrop-blur-sm">
+          <div className="inline-flex items-center space-x-2 bg-[#8491FF]/10 text-[#8491FF] px-4 py-2.5 rounded-full text-sm font-medium mb-6 md:mb-8 border border-[#8491FF]/20 backdrop-blur-sm">
             <CheckCircle className="w-4 h-4" />
             <span>Free for 30 days - No credit card required</span>
           </div>
 
-          <h1 className="text-4xl md:text-7xl font-bold text-gray-900 leading-[1.1] mb-8 tracking-tight">
-            Organize Your Life,<br />
-            <span className="bg-gradient-to-r from-[#8491FF] to-[#8491FF]/70 bg-clip-text text-transparent">Effortlessly</span> With AI
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-gray-900 leading-[1.1] mb-6 md:mb-8 tracking-tight text-reveal">
+            <span className="block stagger-1">Organize Your Life,</span>
+            <span className="block stagger-2 text-[#8491FF] font-extrabold">Effortlessly</span>
+            <span className="block stagger-3">With AI</span>
           </h1>
           
-          <p className="text-xl md:text-2xl text-gray-600 mb-12 leading-relaxed max-w-2xl font-light">
+          <p className="text-lg md:text-xl lg:text-2xl text-gray-600 mb-8 md:mb-12 leading-relaxed max-w-2xl font-light text-reveal stagger-4 mx-auto lg:mx-0">
             Stop juggling family schedules, tasks, and to-dos across multiple apps. LifeboardAI brings everything together in one intelligent dashboard that learns your family's unique needs.
           </p>
 
           {/* Key Benefits */}
-          <div className="flex flex-wrap gap-4 mb-12 justify-center md:justify-start">
-            <div className="flex items-center space-x-3 text-gray-800 bg-white/50 backdrop-blur-sm px-5 py-3 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
-              <Calendar className="w-5 h-5 text-[#8491FF]" />
-              <span className="font-semibold text-sm">Unified calendar</span>
+          <div className="flex flex-wrap gap-3 mb-8 md:mb-12 justify-center lg:justify-start">
+            <div className="flex items-center space-x-2 text-gray-800 bg-white/60 backdrop-blur-sm px-4 py-2.5 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
+              <Calendar className="w-4 h-4 text-[#8491FF]" />
+              <span className="font-medium text-sm">Unified calendar</span>
             </div>
-            <div className="flex items-center space-x-3 text-gray-800 bg-white/50 backdrop-blur-sm px-5 py-3 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
-              <Zap className="w-5 h-5 text-[#8491FF]" />
-              <span className="font-semibold text-sm">AI-powered insights</span>
+            <div className="flex items-center space-x-2 text-gray-800 bg-white/60 backdrop-blur-sm px-4 py-2.5 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
+              <Zap className="w-4 h-4 text-[#8491FF]" />
+              <span className="font-medium text-sm">AI-powered insights</span>
             </div>
-            <div className="flex items-center space-x-3 text-gray-800 bg-white/50 backdrop-blur-sm px-5 py-3 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
-              <Users className="w-5 h-5 text-[#8491FF]" />
-              <span className="font-semibold text-sm">Family collaboration</span>
+            <div className="flex items-center space-x-2 text-gray-800 bg-white/60 backdrop-blur-sm px-4 py-2.5 rounded-full border border-[#8491FF]/20 hover:border-[#8491FF]/40 transition-all duration-200">
+              <Users className="w-4 h-4 text-[#8491FF]" />
+              <span className="font-medium text-sm">Family collaboration</span>
             </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-8 mb-12">
+          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-8 md:mb-12 justify-center lg:justify-start">
             <Link href="/signup">
-              <Button className="w-full sm:w-auto text-white px-10 py-5 rounded-full text-xl font-bold bg-gradient-to-r from-[#8491FF]/90 to-[#8491FF]/70 hover:from-[#8491FF] hover:to-[#8491FF]/80 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl shadow-lg landing-cta-button">
+              <Button className="w-full sm:w-auto text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-lg md:text-xl font-bold bg-gradient-to-r from-[#8491FF] to-[#8491FF]/80 hover:from-[#8491FF]/90 hover:to-[#8491FF]/70 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
                 Start Free Trial
               </Button>
             </Link>
             
-            <Button variant="ghost" className="w-full sm:w-auto flex items-center justify-center space-x-4 text-gray-700 hover:text-gray-900 group transition-all duration-200 px-6">
-              <div className="w-14 h-14 bg-gray-800 rounded-full flex items-center justify-center group-hover:bg-gray-700 transition-colors shadow-lg">
-                <Play className="w-6 h-6 text-white ml-1" />
+            <Button variant="ghost" className="w-full sm:w-auto flex items-center justify-center space-x-3 text-gray-700 hover:text-gray-900 group px-4">
+              <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center group-hover:bg-gray-700 transition-colors shadow-lg">
+                <Play className="w-5 h-5 text-white ml-0.5" />
               </div>
-              <span className="text-xl font-semibold">See How It Works</span>
+              <span className="text-lg font-semibold">See How It Works</span>
             </Button>
           </div>
 
           {/* Additional Social Proof */}
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 md:gap-8 text-gray-500">
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 md:gap-6 text-gray-500 text-sm">
             <span className="flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-emerald-500" />
-              <span className="text-base font-medium">Setup in under 5 minutes</span>
+              <span className="font-medium">Setup in under 5 minutes</span>
             </span>
             <span className="flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-emerald-500" />
-              <span className="text-base font-medium">Cancel anytime</span>
+              <span className="font-medium">Cancel anytime</span>
             </span>
             <span className="flex items-center space-x-2">
               <CheckCircle className="w-4 h-4 text-emerald-500" />
-              <span className="text-base font-medium">24/7 support</span>
+              <span className="font-medium">24/7 support</span>
             </span>
           </div>
         </div>
 
         {/* Hero Image */}
-        <div className="relative w-full max-w-lg md:max-w-xl lg:max-w-2xl">
+        <div className="relative w-full max-w-lg md:max-w-xl lg:max-w-2xl dashboard-preview-interactive">
           {/* Background glow effects */}
-          <div className="absolute -inset-4 bg-gradient-to-br from-[#8491FF]/10 via-[#8491FF]/5 to-transparent rounded-3xl blur-3xl"></div>
-          <div className="absolute -inset-8 bg-gradient-to-tr from-[#8491FF]/8 to-transparent rounded-3xl blur-2xl transform rotate-12"></div>
+          <div className="absolute -inset-4 bg-[#8491FF]/10 rounded-3xl blur-3xl"></div>
+          <div className="absolute -inset-8 bg-[#8491FF]/5 rounded-3xl blur-2xl transform rotate-12"></div>
           
           {/* Hero image container - AI Dashboard Mockup */}
-          <div className="relative bg-white/20 backdrop-blur-sm rounded-3xl p-3 shadow-2xl border border-white/30">
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 shadow-xl">
+          <div className="relative ultra-glass rounded-3xl p-3 shadow-2xl">
+            <div className="bg-gray-50 rounded-2xl p-6 shadow-xl widget-demo">
               {/* Dashboard Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#8491FF] to-[#8491FF]/70 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[#8491FF] rounded-lg flex items-center justify-center">
                     <span className="text-white text-sm font-bold">L</span>
                   </div>
                   <span className="text-lg font-bold text-gray-800">Family Dashboard</span>
@@ -179,7 +192,7 @@ export default function Home() {
               </div>
 
               {/* AI Insight Card */}
-              <div className="bg-gradient-to-r from-[#8491FF]/10 to-[#8491FF]/5 rounded-xl p-4 mb-4 border border-[#8491FF]/20">
+              <div className="bg-[#8491FF]/8 rounded-xl p-4 mb-4 border border-[#8491FF]/20 magnetic-hover">
                 <div className="flex items-center space-x-2 mb-2">
                   <Zap className="w-4 h-4 text-[#8491FF]" />
                   <span className="text-sm font-semibold text-[#8491FF]">AI Insight</span>
@@ -235,14 +248,17 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Floating elements for visual interest */}
-          <div className="absolute -top-4 -right-4 w-8 h-8 bg-[#8491FF]/20 rounded-full blur-sm animate-pulse"></div>
-          <div className="absolute -bottom-6 -left-4 w-12 h-12 bg-[#8491FF]/15 rounded-full blur-md animate-pulse delay-1000"></div>
+          {/* Advanced floating particles */}
+          <div className="absolute -top-4 -right-4 w-8 h-8 bg-[#8491FF]/30 rounded-full floating-particle floating-particle-delay-1"></div>
+          <div className="absolute -bottom-6 -left-4 w-12 h-12 bg-[#8491FF]/25 rounded-full floating-particle floating-particle-delay-2"></div>
+          <div className="absolute -top-8 left-1/4 w-6 h-6 bg-[#a855f7]/20 rounded-full floating-particle floating-particle-delay-3"></div>
+          <div className="absolute bottom-1/4 -right-8 w-10 h-10 bg-[#8491FF]/15 rounded-full floating-particle floating-particle-delay-4"></div>
+          <div className="absolute top-1/3 -left-6 w-4 h-4 bg-[#a855f7]/30 rounded-full floating-particle floating-particle-delay-5"></div>
         </div>
       </div>
 
       {/* Feature Preview Cards */}
-      <div className="relative z-10 px-4 md:px-16 py-24 md:py-32 bg-gradient-to-b from-white/50 to-white/20">
+      <div className="relative z-10 px-4 md:px-16 py-24 md:py-32 bg-white/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 tracking-tight">
@@ -254,10 +270,9 @@ export default function Home() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-xl hover:shadow-2xl transition-all duration-700 transform hover:-translate-y-4 border border-white/30 group relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8491FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="feature-card-interactive rounded-3xl p-10 shadow-xl border border-white/30 group relative hardware-accelerate">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#8491FF]/15 to-[#8491FF]/10 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-20 h-20 bg-[#8491FF]/15 rounded-3xl flex items-center justify-center mb-8 magnetic-hover">
                   <Calendar className="w-10 h-10 text-[#8491FF]" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#8491FF] transition-colors duration-300">Smart Scheduling</h3>
@@ -265,10 +280,9 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-xl hover:shadow-2xl transition-all duration-700 transform hover:-translate-y-4 border border-white/30 group relative overflow-hidden md:mt-12 lg:mt-16">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8491FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="feature-card-interactive rounded-3xl p-10 shadow-xl border border-white/30 group relative hardware-accelerate md:mt-12 lg:mt-16">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#8491FF]/15 to-[#8491FF]/10 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-20 h-20 bg-[#8491FF]/15 rounded-3xl flex items-center justify-center mb-8 magnetic-hover">
                   <CheckCircle className="w-10 h-10 text-[#8491FF]" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#8491FF] transition-colors duration-300">Task Management</h3>
@@ -276,10 +290,9 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-xl hover:shadow-2xl transition-all duration-700 transform hover:-translate-y-4 border border-white/30 group relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#8491FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="feature-card-interactive rounded-3xl p-10 shadow-xl border border-white/30 group relative hardware-accelerate">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#8491FF]/15 to-[#8491FF]/10 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-20 h-20 bg-[#8491FF]/15 rounded-3xl flex items-center justify-center mb-8 magnetic-hover">
                   <Zap className="w-10 h-10 text-[#8491FF]" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-[#8491FF] transition-colors duration-300">AI Insights</h3>
@@ -332,7 +345,7 @@ export default function Home() {
       </div>
 
       {/* Social Proof & Testimonials Section - Redesigned Layout */}
-      <div className="relative z-10 py-24 md:py-32 bg-gradient-to-b from-[#8491FF]/5 to-white overflow-hidden">
+      <div className="relative z-10 py-24 md:py-32 bg-white overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-20 left-10 w-32 h-32 bg-[#8491FF] rounded-full blur-3xl"></div>
@@ -355,7 +368,7 @@ export default function Home() {
               </blockquote>
               
               <div className="flex items-center justify-center space-x-4 mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 bg-pink-500 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-xl">SM</span>
                 </div>
                 <div className="text-left">
@@ -376,7 +389,7 @@ export default function Home() {
           <div className="mb-20">
             <h3 className="text-2xl font-bold text-center text-gray-900 mb-12">What families are saying</h3>
             <div className="flex space-x-6 overflow-x-auto pb-6 scrollbar-hide">
-              <div className="flex-shrink-0 w-80 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50">
+              <div className="flex-shrink-0 w-80 testimonial-premium rounded-2xl p-6 shadow-lg border border-gray-200/50 testimonial-card">
                 <div className="flex mb-4">
                   {[1,2,3,4,5].map((star) => (
                     <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -386,7 +399,7 @@ export default function Home() {
                   "Finally, ONE app that handles everything! My husband and I are finally synced on family schedules."
                 </p>
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">JC</span>
                   </div>
                   <div>
@@ -396,7 +409,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 w-80 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50">
+              <div className="flex-shrink-0 w-80 testimonial-premium rounded-2xl p-6 shadow-lg border border-gray-200/50 testimonial-card">
                 <div className="flex mb-4">
                   {[1,2,3,4,5].map((star) => (
                     <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -406,7 +419,7 @@ export default function Home() {
                   "My kids love seeing their tasks and activities in one place. It's become our family command center!"
                 </p>
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">MR</span>
                   </div>
                   <div>
@@ -416,7 +429,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 w-80 bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-gray-200/50">
+              <div className="flex-shrink-0 w-80 testimonial-premium rounded-2xl p-6 shadow-lg border border-gray-200/50 testimonial-card">
                 <div className="flex mb-4">
                   {[1,2,3,4,5].map((star) => (
                     <Star key={star} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -426,7 +439,7 @@ export default function Home() {
                   "The AI insights are genuinely helpful, not gimmicky. Setup was actually under 5 minutes!"
                 </p>
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">LC</span>
                   </div>
                   <div>
@@ -609,7 +622,7 @@ export default function Home() {
       </div>
 
       {/* Mobile App Preview Section */}
-      <div className="relative z-10 py-24 md:py-32 bg-gradient-to-br from-white to-[#8491FF]/5">
+      <div className="relative z-10 py-24 md:py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 md:px-16">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left: Content */}
@@ -666,7 +679,7 @@ export default function Home() {
             <div className="relative">
               <div className="flex items-center justify-center space-x-6">
                 {/* iPhone Mockup */}
-                <div className="relative mobile-mockup">
+                <div className="relative mobile-mockup hardware-accelerate">
                   <div className="w-64 h-[520px] bg-gray-900 rounded-[3rem] p-2 shadow-2xl">
                     <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative">
                       {/* Status Bar */}
@@ -716,7 +729,7 @@ export default function Home() {
                 </div>
 
                 {/* iPad Mockup (partially visible) */}
-                <div className="relative -ml-8 opacity-75 transform rotate-12">
+                <div className="relative -ml-8 opacity-75 transform rotate-12 parallax-float">
                   <div className="w-48 h-64 bg-gray-900 rounded-2xl p-2 shadow-xl">
                     <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center">
                       <div className="text-center text-gray-500">
@@ -733,10 +746,10 @@ export default function Home() {
       </div>
 
       {/* Bottom Dark Section with Desktop Interface */}
-      <div className="relative bg-gradient-to-r from-gray-800 to-gray-900 h-96 w-full flex items-start justify-center overflow-visible">
+      <div className="relative bg-gray-800 h-96 w-full flex items-start justify-center overflow-visible">
         {/* Desktop interface mockup */}
         <div className="absolute -top-8 md:-top-12 w-[90%] max-w-5xl">
-          <div className="absolute inset-0 bg-gradient-to-t from-[#8491FF]/15 to-transparent rounded-xl blur-2xl"></div>
+          <div className="absolute inset-0 bg-[#8491FF]/15 rounded-xl blur-2xl"></div>
           
           {/* Desktop Browser Frame */}
           <div className="relative bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-200">
@@ -755,12 +768,12 @@ export default function Home() {
             </div>
 
             {/* Dashboard Interface */}
-            <div className="bg-gradient-to-br from-gray-50 to-white p-6">
+            <div className="bg-gray-50 p-6">
               {/* Top Navigation */}
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-6">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-[#8491FF] to-[#8491FF]/70 rounded-lg flex items-center justify-center">
+                    <div className="w-10 h-10 bg-[#8491FF] rounded-lg flex items-center justify-center">
                       <span className="text-white font-bold">L</span>
                     </div>
                     <span className="text-2xl font-bold text-gray-800">LifeboardAI</span>
@@ -785,7 +798,7 @@ export default function Home() {
                 {/* AI Insights Panel */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Featured AI Insight */}
-                  <div className="bg-gradient-to-r from-[#8491FF]/10 to-[#8491FF]/5 rounded-xl p-6 border border-[#8491FF]/20">
+                  <div className="bg-[#8491FF]/8 rounded-xl p-6 border border-[#8491FF]/20">
                     <div className="flex items-center space-x-3 mb-4">
                       <Zap className="w-6 h-6 text-[#8491FF]" />
                       <h3 className="text-lg font-bold text-[#8491FF]">Smart Schedule Optimization</h3>
@@ -970,11 +983,11 @@ export default function Home() {
           </div>
 
           {/* CTA in FAQ */}
-          <div className="text-center mt-16 p-8 bg-gradient-to-br from-[#8491FF]/5 to-[#8491FF]/10 rounded-3xl border border-[#8491FF]/20">
+          <div className="text-center mt-16 p-8 bg-[#8491FF]/8 rounded-3xl border border-[#8491FF]/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Ready to organize your family life?</h3>
             <p className="text-gray-600 mb-6">Join thousands of families already loving LifeboardAI</p>
             <Link href="/signup">
-              <Button className="px-8 py-4 text-lg font-semibold bg-gradient-to-r from-[#8491FF]/90 to-[#8491FF]/70 hover:from-[#8491FF] hover:to-[#8491FF]/80 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <Button className="px-8 py-4 text-lg font-semibold bg-[#8491FF] hover:bg-[#8491FF]/90 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                 Start Your Free Trial
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
@@ -990,7 +1003,7 @@ export default function Home() {
             {/* Brand Column */}
             <div className="md:col-span-1">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#8491FF] to-[#8491FF]/70 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-[#8491FF] rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold">L</span>
                 </div>
                 <span className="text-2xl font-bold">LifeboardAI</span>
@@ -1066,5 +1079,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
+    </WorldClassLandingEffects>
   )
 }

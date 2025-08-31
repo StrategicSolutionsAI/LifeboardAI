@@ -98,7 +98,6 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import TrendsPanel from "./trends-panel";
 import WidgetSelector from "./widget-selector";
 import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
-import HourlyPlanner from "./hourly-planner";
 import { NutritionMealTracker } from "./nutrition-meal-tracker";
 import { NutritionSummaryWidget } from "./nutrition-summary-widget";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
@@ -324,8 +323,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Access tasks context for all task operations
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask } = useTasksContext();
   
-  const [buckets, setBuckets] = useState<string[]>([]);
-  const [activeBucket, setActiveBucket] = useState<string>("");
+  const [buckets, setBuckets] = useState<string[]>(['Health', 'Work', 'Personal', 'Finance']);
+  const [activeBucket, setActiveBucket] = useState<string>("Health");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
@@ -336,6 +335,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Debug logging for bucket state
+  useEffect(() => {
+    console.log('🔍 DEBUG - Current buckets state:', buckets);
+    console.log('🔍 DEBUG - Active bucket:', activeBucket);
+    console.log('🔍 DEBUG - User:', user?.id);
+    console.log('🔍 DEBUG - Is loading:', isLoading);
+  }, [buckets, activeBucket, user, isLoading]);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const widgetsByBucketRef = useRef(widgetsByBucket);
@@ -465,7 +474,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Collapse state for task lists
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
-  // Collapse state for the new hourly planner
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
   // Collapse state for upcoming task sections
   const [isNext7DaysCollapsed, setIsNext7DaysCollapsed] = useState(false);
@@ -1576,11 +1584,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Auth state change listener
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      console.log('Client auth check:', { user: user?.id, error });
       setUser(user);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event, { user: session?.user?.id });
       setUser(session?.user ?? null);
     });
 
@@ -1964,6 +1974,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Tab row scroll fade state
   // ----------------------------------------------------------------------
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
+  const plannerRef = useRef<HTMLDivElement | null>(null);
   const [showLeftTabFade, setShowLeftTabFade] = useState(false);
   const [showRightTabFade, setShowRightTabFade] = useState(false);
 
@@ -2019,8 +2030,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Height (px) representing one-hour slot in the planner – used for sizing + resizing
   const HOUR_HEIGHT = 48; // keep in sync with tailwind padding/line-height
 
-  // Ref for the scrollable hourly planner container
-  const plannerRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll the planner so the current hour sits at the top
   useEffect(() => {
@@ -3713,20 +3722,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               <Clock size={14} className="text-indigo-500" />
               <span suppressHydrationWarning>{format(currentTime, 'h:mm a')}</span>
             </div>
-            {/* Hourly Planner */}
-                      <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mt-4 mb-2 cursor-pointer select-none"
-                        onClick={() => setIsPlannerCollapsed((c) => !c)}
-                      >
-                        <span>Hourly Planner</span>
-                        {isPlannerCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                      <div
-                        ref={plannerRef} className="space-y-2 pr-1 transition-[max-height] duration-200"
-                        style={{ maxHeight: isPlannerCollapsed ? 0 : 'none' }}
-                      >
-                        {!isPlannerCollapsed && <HourlyPlanner className="" />}
-                      </div>
                     </>
                   )}
 

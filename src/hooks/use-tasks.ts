@@ -32,7 +32,9 @@ export function useTasks(selectedDate?: Date) {
   // Fetch daily tasks
   const dailyTasksFetcher = useCallback(async () => {
     try {
-      const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`)
+      const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`, {
+        credentials: 'same-origin'
+      })
       if (!res.ok) {
         throw new Error(`Failed to fetch daily tasks: ${res.status}`)
       }
@@ -50,7 +52,9 @@ export function useTasks(selectedDate?: Date) {
   // Fetch all open tasks
   const allTasksFetcher = useCallback(async () => {
     try {
-      const res = await fetch('/api/integrations/todoist/tasks?all=true')
+      const res = await fetch('/api/integrations/todoist/tasks?all=true', {
+        credentials: 'same-origin'
+      })
       if (!res.ok) {
         throw new Error(`Failed to fetch all tasks: ${res.status}`)
       }
@@ -96,6 +100,7 @@ export function useTasks(selectedDate?: Date) {
     try {
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot }),
       })
@@ -138,7 +143,10 @@ export function useTasks(selectedDate?: Date) {
         ? `/api/integrations/todoist/tasks/${taskId}/close`
         : `/api/integrations/todoist/tasks/${taskId}/reopen`
       
-      const res = await fetch(endpoint, { method: 'POST' })
+      const res = await fetch(endpoint, { 
+        method: 'POST',
+        credentials: 'same-origin'
+      })
       if (!res.ok) throw new Error('Failed to toggle task')
     } catch (error) {
       // Revert on error
@@ -169,6 +177,7 @@ export function useTasks(selectedDate?: Date) {
     try {
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates })
       })
@@ -194,6 +203,7 @@ export function useTasks(selectedDate?: Date) {
     try {
       const res = await fetch('/api/integrations/todoist/tasks/delete', {
         method: 'DELETE',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId })
       })

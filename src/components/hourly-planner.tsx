@@ -5,7 +5,7 @@
 
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import {
   Droppable,
   Draggable,
@@ -70,13 +70,95 @@ export default function HourlyPlanner({
     scheduledTasks,
     batchUpdateTasks,
     deleteTask,
+    createTask,
   } = useTasksContext();
   
   // Ref for the scrollable container
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // State for inline task creation
+  const [creatingTaskAt, setCreatingTaskAt] = useState<string | null>(null);
+  const [newTaskContent, setNewTaskContent] = useState("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   
-  // Build hourly plan from scheduled tasks
+  // Local state for newly created tasks to show immediately
+  const [pendingTasks, setPendingTasks] = useState<PlannerItem[]>([]);
+  
+  // Handle creating a new task at a specific time slot
+  const handleCreateTaskAtTime = async (timeSlot: string) => {
+    if (!newTaskContent.trim() || isCreatingTask) return;
+    
+    setIsCreatingTask(true);
+    
+    // Create a temporary task to show immediately
+    const tempTask: PlannerItem = {
+      id: `temp-${timeSlot}-${Date.now()}`,
+      content: newTaskContent.trim(),
+      duration: 60
+    };
+    
+    try {
+      // Get today's date for the task
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      
+      console.log('Creating task:', { content: newTaskContent.trim(), date: dateStr, timeSlot });
+      
+      // Add to pending tasks for immediate display
+      setPendingTasks(prev => [...prev, tempTask]);
+      
+      // Create the task via API
+      const newTask = await createTask(newTaskContent.trim(), dateStr);
+      
+      console.log('Task created:', newTask);
+      
+      // Update with the hourSlot immediately
+      if (newTask) {
+        console.log('Updating hourSlot for task:', newTask.id);
+        
+        await batchUpdateTasks([{ 
+          taskId: newTask.id, 
+          updates: { 
+            hourSlot: `hour-${timeSlot}`,
+            duration: 60
+          } 
+        }]);
+        console.log('Task updated with hourSlot');
+        
+        // Remove the temporary task once the real one is updated
+        setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
+      }
+      
+      // Reset state
+      setNewTaskContent("");
+      setCreatingTaskAt(null);
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      // Remove the pending task on error
+      setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
+      // Don't reset state on error so user can retry
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
+
+  // Handle clicking on a time slot to start creating a task
+  const handleTimeSlotClick = (timeSlot: string) => {
+    // Don't interfere with existing tasks
+    if (hourlyPlan[timeSlot].length > 0) return;
+    
+    setCreatingTaskAt(timeSlot);
+    setNewTaskContent("");
+  };
+
+  // Handle canceling task creation
+  const handleCancelCreation = () => {
+    setCreatingTaskAt(null);
+    setNewTaskContent("");
+    setIsCreatingTask(false);
+  };
+  
+  // Build hourly plan from scheduled tasks plus pending tasks
   const hourlyPlan = useMemo(() => {
     const plan: Record<string, PlannerItem[]> = {};
     HOURS.forEach((h) => (plan[h] = []));
@@ -97,8 +179,16 @@ export default function HourlyPlanner({
       });
     });
     
+    // Add pending tasks to show immediate feedback
+    pendingTasks.forEach((task) => {
+      const slot = task.id.split('-')[1]; // Extract time slot from temp ID like "temp-7AM-123456"
+      if (HOURS.includes(slot) && plan[slot]) {
+        plan[slot].push(task);
+      }
+    });
+    
     return plan;
-  }, [scheduledTasks]);
+  }, [scheduledTasks, pendingTasks]);
 
   // Resize state and handlers
   const [resizingTask, setResizingTask] = useState<{
@@ -237,7 +327,62 @@ export default function HourlyPlanner({
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className="flex-1 relative min-h-[60px] overflow-visible"
+                  onClick={() => handleTimeSlotClick(disp)}
                 >
+                  {/* Empty time slot indicator */}
+                  {hourlyPlan[disp].length === 0 && creatingTaskAt !== disp && (
+                    <li className="absolute inset-0 flex items-center justify-center group cursor-pointer hover:bg-theme-surface-hover/50 rounded-lg transition-colors">
+                      <div className="flex items-center gap-2 text-theme-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Plus size={14} />
+                        <span className="text-xs font-medium">Add task</span>
+                      </div>
+                    </li>
+                  )}
+                  
+                  {/* Task creation form */}
+                  {creatingTaskAt === disp && (
+                    <li className="absolute inset-0 flex items-center p-2">
+                      <div className="flex-1 flex items-center gap-2 bg-theme-widget-bg border border-theme-primary-200 rounded-lg p-3 shadow-sm">
+                        <input
+                          type="text"
+                          value={newTaskContent}
+                          onChange={(e) => setNewTaskContent(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleCreateTaskAtTime(disp);
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              handleCancelCreation();
+                            }
+                          }}
+                          placeholder="What needs to be done?"
+                          className="flex-1 text-sm bg-transparent border-none outline-none placeholder-theme-text-tertiary"
+                          autoFocus
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateTaskAtTime(disp);
+                          }}
+                          disabled={isCreatingTask}
+                          className="px-2 py-1 text-xs font-medium text-theme-primary-600 hover:text-theme-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isCreatingTask ? 'Adding...' : 'Add'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelCreation();
+                          }}
+                          className="px-2 py-1 text-xs font-medium text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </li>
+                  )}
+                  
                   {hourlyPlan[disp].map((t, index) => {
                     const taskCount = hourlyPlan[disp].length;
                     const taskWidth = taskCount > 1 ? `${(100 / taskCount) - 1}%` : '100%'; // Small gap between tasks
@@ -265,6 +410,7 @@ export default function HourlyPlanner({
                             transform: isResizing ? "none" : undefined,
                             transition: isResizing ? "none" : undefined,
                           }}
+                          onClick={(e) => e.stopPropagation()}
                           className={`group relative flex items-start gap-3 px-4 py-3 
                             bg-theme-widget-bg border border-theme-widget-border 
                             shadow-sm hover:shadow-md 

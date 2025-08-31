@@ -14,8 +14,15 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = supabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Authentication error', details: authError.message }, { status: 401 });
+    }
+    
     if (!user) {
+      console.error('No user found in session');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 

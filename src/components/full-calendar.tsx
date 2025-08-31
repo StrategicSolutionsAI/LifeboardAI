@@ -69,7 +69,7 @@ interface FullCalendarProps {
 
 export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange }: FullCalendarProps = {}) {
   const [currentDate, setCurrentDate] = useState(propSelectedDate || new Date());
-  const [view, setView] = useState<CalendarView>('month');
+  const [view, setView] = useState<CalendarView>('day');
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const today = new Date();
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
@@ -321,17 +321,22 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             {getHeaderTitle()}
           </h2>
           
-          {/* View Selector Dropdown */}
-          <select 
-            value={view} 
-            onChange={(e) => setView(e.target.value as CalendarView)}
-            title="Calendar view selector"
-            className="px-3 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            <option value="month">Month</option>
-            <option value="week">Week</option>
-            <option value="day">Day</option>
-          </select>
+          {/* View Toggle Buttons */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
+              <button
+                key={viewOption}
+                onClick={() => setView(viewOption)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  view === viewOption
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
         
         <button
