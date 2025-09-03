@@ -657,17 +657,17 @@ html {
 /* Enhanced Senior UI/UX Designer Color System */
 :root {
   /* === PRIMARY BRAND PALETTE === */
-  --theme-primary-50: #f8fafc;   /* Ultra light tint */
-  --theme-primary-100: #f1f5f9;  /* Light tint */
-  --theme-primary-200: #e2e8f0;  /* Lighter */
-  --theme-primary-300: #cbd5e1;  /* Light */
-  --theme-primary-400: #94a3b8;  /* Medium light */
-  --theme-primary-500: #64748b;  /* Base primary */
-  --theme-primary-600: #475569;  /* Medium dark */
-  --theme-primary-700: #334155;  /* Dark */
-  --theme-primary-800: #1e293b;  /* Darker */
-  --theme-primary-900: #0f172a;  /* Darkest */
-  --theme-primary-950: #020617;  /* Ultra dark */
+  --theme-primary-50: #f4f6ff;   /* Ultra light LifeboardAI purple tint */
+  --theme-primary-100: #ebeeff;  /* Light tint */
+  --theme-primary-200: #d9deff;  /* Lighter */
+  --theme-primary-300: #c2ccff;  /* Light */
+  --theme-primary-400: #a4b4ff;  /* Medium light */
+  --theme-primary-500: #8491ff;  /* Base LifeboardAI brand purple */
+  --theme-primary-600: #6b7bdd;  /* Medium dark */
+  --theme-primary-700: #5866bb;  /* Dark */
+  --theme-primary-800: #475199;  /* Darker */
+  --theme-primary-900: #3c4477;  /* Darkest */
+  --theme-primary-950: #252a55;  /* Ultra dark */
   
   /* === SECONDARY ACCENT PALETTE === */
   --theme-secondary-50: #f8fafc;

@@ -98,6 +98,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import TrendsPanel from "./trends-panel";
 import WidgetSelector from "./widget-selector";
 import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
+import HourlyPlanner from './hourly-planner';
 import { NutritionMealTracker } from "./nutrition-meal-tracker";
 import { NutritionSummaryWidget } from "./nutrition-summary-widget";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
@@ -323,6 +324,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Access tasks context for all task operations
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask } = useTasksContext();
   
+  // State for task management
+  const [taskView, setTaskView] = useState('Today');
+  const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
+  const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
+  const [newOpenTask, setNewOpenTask] = useState('');
+  const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
   const [buckets, setBuckets] = useState<string[]>(['Health', 'Work', 'Personal', 'Finance']);
   const [activeBucket, setActiveBucket] = useState<string>("Health");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -330,9 +337,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
-  // Ensures we only backfill yesterday's Fitbit totals once per session
   const fetchedYesterdayRef = useRef(false);
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
+
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -463,17 +470,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   
   // Master list of all open tasks
   const [allTodoistTasks, setAllTodoistTasks] = useState<any[]>([]);
-  const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
   
   const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
   
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState('');
-  const [newOpenTask, setNewOpenTask] = useState('');
-  
-  // Collapse state for task lists
-  const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
-  const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
   // Collapse state for upcoming task sections
   const [isNext7DaysCollapsed, setIsNext7DaysCollapsed] = useState(false);
@@ -1996,7 +1997,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, []);
 
   // Toggle for task views (right panel)
-  const [taskView, setTaskView] = useState<'Today'|'Upcoming'|'Master List'>('Today');
 
   // ------------------------------------------------------------------
   // Live "Now" time indicator
@@ -2333,19 +2333,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, [checkAndResetWidgets]);
 
   return (
-      <div className="flex-1">
-      <div className="flex flex-col">
+    <div className="flex-1 relative min-h-screen overflow-hidden">
+        {/* Background Image Layer */}
+        <div className="absolute inset-0 w-full h-full -z-10 pointer-events-none">
+          <img 
+            src="/images/background.png" 
+            alt="dashboard background" 
+            className="w-full h-full object-cover object-center" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-white/50 via-white/25 to-white/10"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
+        </div>
+        
+        <div className="relative z-10 flex flex-col backdrop-blur-md bg-white/25 p-6 border border-white/20 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06)]">
 
-        {/* Greeting */}
-        <section className="w-full">
-          <h2 className="text-base font-medium text-gray-800">
-            Hello Dalit <span className="ml-2 text-sm font-normal text-gray-500">You've got this!</span>
-          </h2>
+          {/* Greeting */}
+          <section className="w-full mb-4">
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">
+              Hello <span className="text-theme-primary-600">Dalit</span>
+            </h1>
+            <p className="text-sm text-gray-600">You've got this! Let's make today productive.</p>
+          </section>
           
           {/* Bucket tabs row (scrollable) */}
           <div
-            className="relative z-10 mt-10 transition-all duration-300 ease-in-out"
-            style={{ width: isSidebarCollapsed ? 'calc(100% - 88px)' : 'calc(100% - 440px)' }}
+            className="relative z-10 mt-6 transition-all duration-300 ease-in-out"
+            style={{ width: '100%' }}
           >
             <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
               {buckets.length > 0 && buckets.map((b, idx) => (
@@ -2375,10 +2389,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     zIndex: b === activeBucket ? 50 : 9 - idx,
                     marginRight: '-10px'
                   }}
-                  className={`relative flex h-[44px] items-center justify-center whitespace-nowrap rounded-t-[20px] px-6 text-[13px] font-medium capitalize transition-colors ${
+                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-6 text-[14px] font-semibold capitalize transition-all duration-300 ${
                     b === activeBucket
-                      ? 'bg-theme-primary-600 text-theme-text-inverse shadow-[0_2px_6px_rgba(0,0,0,0.12)]'
-                      : 'bg-theme-surface-base text-theme-primary-600 hover:bg-theme-neutral-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]'
+                      ? 'bg-theme-primary-500 text-white border border-theme-primary-500/30 hover:bg-theme-primary-600 scale-[1.02] shadow-[4px_0_6px_rgba(0,0,0,0.08),-4px_0_6px_rgba(0,0,0,0.08)]'
+                      : 'bg-white/70 backdrop-blur-md text-theme-primary-600 border border-white/40 hover:bg-white/90 hover:border-theme-primary-500/30 shadow-[3px_0_4px_rgba(0,0,0,0.05),-3px_0_4px_rgba(0,0,0,0.05)]'
                   }`}
                 >
                   {b}
@@ -2391,7 +2405,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   zIndex: 0,
                   marginRight: '-10px'
                 }}
-                className="relative flex h-[44px] items-center justify-center rounded-t-[20px] bg-theme-surface-base px-8 text-[21px] font-bold transition-colors hover:bg-theme-neutral-50 shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
+                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white/70 backdrop-blur-md px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white/90 hover:border-theme-primary-500/30 border border-white/40 shadow-[3px_0_4px_rgba(0,0,0,0.05),-3px_0_4px_rgba(0,0,0,0.05)]"
               >
                 <span className="text-theme-primary-600">
                   +
@@ -2399,11 +2413,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </button>
             </div>
             {/* scroll container ends */}
-            {/* bottom gray divider under all tabs (fixed) */}
-            <div
-              className="pointer-events-none absolute bottom-0 left-0 h-px bg-gray-200"
-              style={{ zIndex: 60, width: 'calc(100% - 440px)' }}
-            />
             {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
             {showLeftTabFade && (
               <div
@@ -2418,23 +2427,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               />
             )}
             </div>
-        </section>
-
         {/* Main content container */}
-        <div className="w-full flex-1 pb-24 flex gap-10">
+        <div className="w-full flex-1 pb-24">
           {/* Left section: tabs and widgets */}
-          <div className="flex-1" style={{ width: 'calc(100% - 440px)' }}>
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-lg border-t border-gray-200 bg-white shadow-sm">
+          <div className="flex-1 w-full">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-white/30 bg-white/70 backdrop-blur-md">
               {/* Inner nav */}
-              <nav className="flex items-center gap-8 border-b border-gray-100 px-6 pt-4 text-sm font-medium">
+              <nav className="flex items-center gap-8 border-b border-white/20 px-6 pt-4 text-sm font-semibold">
                 {(['Overview','Trends','Logs','Settings'] as const).map((item) => (
                   <button
                     key={item}
                     onClick={() => setActiveSubTab(item)}
-                    className={`pb-3 border-b-2 transition-colors ${
+                    className={`pb-3 border-b-2 transition-all duration-300 ${
                       item === activeSubTab
-                        ? 'border-theme-primary-500 text-theme-primary-600'
-                        : 'border-transparent text-theme-text-quaternary hover:text-theme-text-secondary'
+                        ? 'border-theme-primary-500 text-theme-primary-600 font-bold'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-theme-primary-300/50'
                     }`}
                   >
                     {item}
@@ -2449,7 +2456,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   {/* Refresh card */}
                   <div
                     onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                    className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
+                    className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02]"
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
@@ -2499,10 +2506,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       blue:'bg-blue-500/5', green:'bg-green-500/5', red:'bg-red-500/5', orange:'bg-orange-500/5', purple:'bg-purple-500/5', indigo:'bg-indigo-500/5', amber:'bg-amber-500/5', teal:'bg-teal-500/5', rose:'bg-rose-500/5', cyan:'bg-cyan-500/5', yellow:'bg-yellow-500/5', sky:'bg-sky-500/5', emerald:'bg-emerald-500/5', violet:'bg-violet-500/5', lime:'bg-lime-500/5', fuchsia:'bg-fuchsia-500/5', gray:'bg-gray-500/5', slate:'bg-slate-500/5', stone:'bg-stone-500/5'
                     };
                     const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
-                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100') : 'bg-white';
+                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100/60') : 'bg-white/80';
 
                     return (
-                      <div key={w.instanceId} className={`rounded-xl border border-gray-100 ${cardBgClass} p-4 shadow-sm relative group cursor-pointer hover:shadow-md hover:border-gray-200 transition-all min-w-0`} onClick={() => { 
+                      <div key={w.instanceId} className={`rounded-2xl border border-white/40 ${cardBgClass} backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative group cursor-pointer hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0`} onClick={() => { 
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -3140,7 +3147,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               incrementProgress(w);
                             }}
-                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-indigo-600'} hover:scale-110 transition-transform`}
+                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-theme-primary-600'} hover:scale-110 transition-transform`}
                           >
                             +
                           </button>
@@ -3150,9 +3157,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   })}
 
                   {/* Add Widget card */}
-                  <div className="rounded-lg border border-gray-100 bg-white p-3 shadow-sm flex flex-col items-center gap-2 cursor-pointer hover:bg-gray-50 min-w-0" onClick={() => setIsWidgetSheetOpen(true)}>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50">
-                      <Plus className="h-6 w-6 text-indigo-500" />
+                  <div className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-4 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] flex flex-col items-center gap-3 cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0" onClick={() => setIsWidgetSheetOpen(true)}>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-theme-primary-500/10">
+                      <Plus className="h-6 w-6 text-theme-primary-600" />
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-semibold text-gray-800">Add Widget</p>
@@ -3294,7 +3301,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     setEditingWidget(widget);
                                     setIsWidgetSheetOpen(true);
                                   }}
-                                  className="px-4 py-2 bg-theme-primary-600 text-theme-text-inverse rounded-md hover:bg-theme-primary-700 focus:outline-none focus:ring-2 focus:ring-theme-primary-500 mr-2"
+                                  className="px-4 py-2 bg-theme-primary-500 text-white rounded-md hover:bg-theme-primary-500/90 focus:outline-none focus:ring-2 focus:ring-theme-primary-500 mr-2"
                                 >
                                   Edit Widget
                                 </button>
@@ -3324,599 +3331,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </div>
           </div>
 
-          {/* Right section: Calendar and To-do */}
-          <aside 
-            className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out relative ${
-              isSidebarCollapsed ? 'w-12' : 'w-[400px]'
-            }`}
-            style={{ zIndex: 40 }}
-          >
-            <div 
-              className={`rounded-lg border border-gray-100 bg-white shadow-sm flex flex-col relative ${
-                taskView === 'Today' ? 'min-h-full' : 'h-full'
-              } ${isSidebarCollapsed ? 'p-2 overflow-hidden' : 'p-4'}`}
-              style={{ zIndex: 40 }}
-            >
-              <div className={`mb-4 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-                {!isSidebarCollapsed && (
-                  <h3 className="text-sm font-medium text-gray-900">{format(selectedDate, 'MMMM yyyy')}</h3>
-                )}
-                <div className="flex gap-1 text-gray-500">
-                  <button 
-                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                  >
-                    {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                  </button>
-                  {!isSidebarCollapsed && (
-                    <>
-                      <button onClick={() => handleDateChange(addDays(selectedDate, -7))} aria-label="Previous week">&lt;</button>
-                      <button onClick={() => handleDateChange(addDays(selectedDate, 7))} aria-label="Next week">&gt;</button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Week view */}
-              <div className="flex justify-between gap-2 overflow-x-auto pb-1">
-                {getWeekDays().map((day: Date, index: number) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDateChange(day)}
-                    className={`flex flex-col items-center rounded-xl px-3 py-2 w-14 transition-colors ${
-                      isSameDay(day, selectedDate)
-                        ? 'bg-theme-primary-500 text-theme-text-inverse'
-                        : 'bg-theme-neutral-100 text-theme-text-secondary hover:bg-theme-neutral-200'
-                    }`}
-                  >
-                    <span className="text-lg font-semibold leading-none">{format(day, 'd')}</span>
-                    <span className="text-xs leading-none mt-1">{format(day, 'EEE')}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Task view toggle */}
-              <div className="mt-4">
-                <div className="flex rounded-full border border-theme-neutral-200 bg-theme-surface-raised p-1 w-full shadow-sm">
-                  {(['Today','Upcoming','Master List'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setTaskView(tab)}
-                      className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
-                        taskView === tab
-                          ? 'bg-theme-primary-500 text-theme-text-inverse shadow'
-                          : 'text-theme-text-secondary hover:bg-theme-hover hover:text-theme-primary-600'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* To-do lists with drag & drop */}
-              <div className="mt-6 flex-1 flex flex-col">
-                <DragDropContext onDragEnd={handleDragEnd}>
-                  {taskView === 'Today' && (<>
-                  {/* Daily tasks (header + list share same droppable so header accepts drops) */}
-                  <Droppable droppableId="dailyTasks">
-                    {(provided: any) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="flex flex-col relative"
-                        style={{ zIndex: isDailyCollapsed ? 'auto' : 10000 }}
-                      >
-                        <div
-                          className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                          onClick={() => setIsDailyCollapsed((c) => !c)}
-                        >
-                          <span>Tasks on {format(selectedDate,'MMM d, yyyy')}</span>
-                          {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                        </div>
-
-                        {!isDailyCollapsed && (
-                          <ul className="space-y-3 pr-1 overflow-visible">
-                            {isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                              <li className="text-gray-500 text-sm">Loading…</li>
-                            ) : null}
-
-                            {!isLoadingTasks && dailyVisibleTasks.length === 0 ? (
-                              <li className="text-gray-500 text-sm">No tasks</li>
-                            ) : null}
-
-                            {dailyVisibleTasks.map((t: any, index: number) => (
-                              <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                                {(provided: any, dragSnapshot: any) => (
-                                  <li
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    style={{
-                                      ...provided.draggableProps.style,
-                                      zIndex: dragSnapshot.isDragging ? 10000 : 9999
-                                    }}
-                                    className={`group flex items-start gap-3 px-4 py-3 
-                                      bg-card border border-border/60 
-                                      shadow-sm hover:shadow-md 
-                                      rounded-xl transition-all duration-200 
-                                      hover:border-primary/40 hover:bg-card/80
-                                      ${dragSnapshot.isDragging ? 'shadow-lg rotate-1 scale-105 border-primary/60' : ''}
-                                      ${t.completed ? 'opacity-60' : ''}
-                                    `}
-                                  >
-                                    {/* Enhanced status indicator */}
-                                    <div className="flex-shrink-0 mt-1">
-                                      <div 
-                                        className={`w-2.5 h-2.5 rounded-full ring-2 transition-all duration-200 cursor-pointer
-                                          ${t.completed 
-                                            ? 'bg-green-500 ring-green-500/20' 
-                                            : 'bg-primary ring-primary/20 hover:ring-primary/40'
-                                          }`}
-                                        onClick={() => toggleTaskCompletion(t.id.toString())}
-                                        title={t.completed ? 'Mark as pending' : 'Mark as complete'}
-                                      />
-                                    </div>
-
-                                    {/* Task content with drag handle */}
-                                    <div className="flex-1 min-w-0" {...provided.dragHandleProps}>
-                                      <div className={`font-medium text-sm leading-tight ${t.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                                        {t.content}
-                                      </div>
-                                      {t.due?.date && (
-                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                          <span>Due: {format(new Date(t.due.date), 'MMM d')}</span>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Delete button - always visible for testing */}
-                                    <button
-                                      onClick={async (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        console.log('🗑️ Delete button clicked for task:', t.id, t.content);
-                                        console.log('🗑️ deleteTask function:', typeof deleteTask);
-                                        try {
-                                          await deleteTask(t.id.toString());
-                                          console.log('✅ Task deleted successfully');
-                                        } catch (error) {
-                                          console.error('❌ Failed to delete task:', error);
-                                        }
-                                      }}
-                                      className="flex-shrink-0 opacity-100 transition-opacity duration-200 p-1 hover:bg-red-100 rounded text-red-500 hover:text-red-700 z-10 ml-2"
-                                      title="Delete task"
-                                      type="button"
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-                        )}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-
-                  {/* Add task to daily list */}
-                  {!isDailyCollapsed && (
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add task…"
-                        value={newDailyTask}
-                        onChange={(e) => setNewDailyTask(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
-                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                      />
-                      <button
-                        onClick={handleAddDailyTask}
-                        className="text-sm text-indigo-600 hover:underline"
-                      >Add</button>
-                    </div>
-                  )}
-                   
-                  {/* Divider removed */}
-
-                  {/* Master tasks */}
-                  <div
-                    className={`flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none ${(taskView as any)==='Today' ? 'hidden' : ''}`}
-                    onClick={() => setIsOpenCollapsed((c) => !c)}
-                  >
-                    <span>All open tasks</span>
-                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  <Droppable droppableId="openTasks">
-                    {(provided: any) => (
-                      <ul
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto ${(taskView as any)==='Today' ? 'hidden' : ''}`}
-                        style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
-                      >
-                        {isLoadingAllTasks && openTasksToShow.length === 0 ? (
-                          <li className="text-gray-500">Loading…</li>
-                        ) : null}
-
-                        {!isLoadingAllTasks && openTasksToShow.length === 0 ? (
-                          <li className="text-gray-500">No tasks</li>
-                        ) : null}
-
-                        {openTasksToShow.map((t: any, index: number) => (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                            {(provided: any) => (
-                              <li
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                style={provided.draggableProps.style}
-                                className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t.content}
-                                  checked={t.completed ?? false}
-                                  onChange={() => toggleTaskCompletion(t.id.toString())}
-                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                                />
-                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </ul>
-                    )}
-                  </Droppable>
-
-                  {/* Add open task (hidden in Today view) */}
-                  {false && (
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add task…"
-                        value={newOpenTask}
-                        onChange={(e) => setNewOpenTask(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
-                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                      />
-                      <button
-                        onClick={handleAddOpenTask}
-                        className="text-sm text-indigo-600 hover:underline"
-                      >Add</button>
-                    </div>
-                  )}
-                  </>)}
-
-                  {taskView === 'Master List' && (<>
-                  {/* Divider removed */}
-
-                  {/* Today tasks header (droppable) */}
-                  <Droppable droppableId="dailyTasks">
-                    {(provided: any) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="flex flex-col mb-4"
-                      >
-                        <div
-                          className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                          onClick={() => setIsDailyCollapsed((c) => !c)}
-                        >
-                          <span>Tasks on {format(selectedDate,'MMM d, yyyy')}</span>
-                          {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                        </div>
-
-                        <ul
-                          className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
-                          style={{ maxHeight: isDailyCollapsed ? 0 : '10rem' }}
-                        >
-                          {dailyVisibleTasks.map((t: any, index: number) => (
-                            <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                              {(provided: any) => (
-                                <li
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  style={provided.draggableProps.style}
-                                  className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    aria-label={t.content}
-                                    checked={t.completed ?? false}
-                                    onChange={() => toggleTaskCompletion(t.id.toString())}
-                                    className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                                  />
-                                  <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                                </li>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </ul>
-                      </div>
-                    )}
-                  </Droppable>
-
-                  {/* Divider removed */}
-
-                  {/* Master tasks */}
-                  <div
-                    className={`flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none ${(taskView as any)==='Today' ? 'hidden' : ''}`}
-                    onClick={() => setIsOpenCollapsed((c) => !c)}
-                  >
-                    <span>All open tasks</span>
-                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  <Droppable droppableId="openTasks">
-                    {(provided: any) => (
-                      <ul
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                        style={{ maxHeight: isOpenCollapsed ? 0 : '12rem' }}
-                      >
-                        {isLoadingAllTasks && openTasksToShow.length === 0 ? (
-                          <li className="text-gray-500">Loading…</li>
-                        ) : null}
-
-                        {!isLoadingAllTasks && openTasksToShow.length === 0 ? (
-                          <li className="text-gray-500">No tasks</li>
-                        ) : null}
-
-                        {openTasksToShow.map((t: any, index: number) => (
-                          <Draggable draggableId={t.id.toString()} index={index} key={t.id} isDragDisabled={!!resizingTask}>
-                            {(provided: any) => (
-                              <li
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                style={provided.draggableProps.style}
-                                className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg"
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t.content}
-                                  checked={t.completed ?? false}
-                                  onChange={() => toggleTaskCompletion(t.id.toString())}
-                                  className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                                />
-                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </ul>
-                    )}
-                  </Droppable>
-
-                  {/* Add open task */}
-                  {!isOpenCollapsed && (
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add task…"
-                        value={newOpenTask}
-                        onChange={(e) => setNewOpenTask(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
-                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                      />
-                      <button
-                        onClick={handleAddOpenTask}
-                        className="text-sm text-indigo-600 hover:underline"
-                      >Add</button>
-                    </div>
-                  )}
-                  </>)}
-
-                  {taskView === 'Today' && (
-                    <>
-                      {/* Current Time Indicator */}
-            <div className="flex items-center gap-1 text-sm text-gray-600 mt-4">
-              <Clock size={14} className="text-indigo-500" />
-              <span suppressHydrationWarning>{format(currentTime, 'h:mm a')}</span>
-            </div>
-                    </>
-                  )}
-
-                  {/* Upcoming Tasks View */}
-                  {taskView === 'Upcoming' && (
-                    <>
-                      {/* Next 7 Days */}
-                      <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                        onClick={() => setIsNext7DaysCollapsed((c) => !c)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>⚡</span>
-                          <span>Next 7 Days</span>
-                          <span className="text-xs text-gray-500">({upcomingTaskGroups.next7Days.length})</span>
-                        </span>
-                        {isNext7DaysCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                      <Droppable droppableId="next7Days">
-                        {(provided: any) => (
-                          <ul
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                            style={{ maxHeight: isNext7DaysCollapsed ? 0 : '12rem' }}
-                          >
-                            {upcomingTaskGroups.next7Days.length === 0 ? (
-                              <li className="text-gray-500">No tasks</li>
-                            ) : null}
-                            {upcomingTaskGroups.next7Days.map((t: any, index: number) => (
-                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                                {(provided: any) => (
-                                  <li
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
-                                  >
-                                    <span className="flex-1">{t.content}</span>
-                                    <span className="text-xs text-gray-500 ml-2">
-                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
-                                    </span>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-                        )}
-                      </Droppable>
-
-                      {/* Next 2 Weeks */}
-                      <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
-                        onClick={() => setIsNext2WeeksCollapsed((c) => !c)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>📅</span>
-                          <span>Next 2 Weeks</span>
-                          <span className="text-xs text-gray-500">({upcomingTaskGroups.next2Weeks.length})</span>
-                        </span>
-                        {isNext2WeeksCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                      <Droppable droppableId="next2Weeks">
-                        {(provided: any) => (
-                          <ul
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                            style={{ maxHeight: isNext2WeeksCollapsed ? 0 : '12rem' }}
-                          >
-                            {upcomingTaskGroups.next2Weeks.length === 0 ? (
-                              <li className="text-gray-500">No tasks</li>
-                            ) : null}
-                            {upcomingTaskGroups.next2Weeks.map((t: any, index: number) => (
-                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                                {(provided: any) => (
-                                  <li
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
-                                  >
-                                    <span className="flex-1">{t.content}</span>
-                                    <span className="text-xs text-gray-500 ml-2">
-                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
-                                    </span>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-                        )}
-                      </Droppable>
-
-                      {/* Later */}
-                      <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
-                        onClick={() => setIsLaterCollapsed((c) => !c)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>🗓️</span>
-                          <span>Later</span>
-                          <span className="text-xs text-gray-500">({upcomingTaskGroups.later.length})</span>
-                        </span>
-                        {isLaterCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                      <Droppable droppableId="later">
-                        {(provided: any) => (
-                          <ul
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                            style={{ maxHeight: isLaterCollapsed ? 0 : '12rem' }}
-                          >
-                            {upcomingTaskGroups.later.length === 0 ? (
-                              <li className="text-gray-500">No tasks</li>
-                            ) : null}
-                            {upcomingTaskGroups.later.map((t: any, index: number) => (
-                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                                {(provided: any) => (
-                                  <li
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
-                                  >
-                                    <span className="flex-1">{t.content}</span>
-                                    <span className="text-xs text-gray-500 ml-2">
-                                      {formatTimeUntilDue(getTimeUntilDue(t.due?.date))}
-                                    </span>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-                        )}
-                      </Droppable>
-
-                      {/* No Due Date */}
-                      <div
-                        className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 mt-4 cursor-pointer select-none"
-                        onClick={() => setIsNoDueDateCollapsed((c) => !c)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>📋</span>
-                          <span>No Due Date</span>
-                          <span className="text-xs text-gray-500">({upcomingTaskGroups.noDueDate.length})</span>
-                        </span>
-                        {isNoDueDateCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                      </div>
-                      <Droppable droppableId="noDueDate">
-                        {(provided: any) => (
-                          <ul
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                            style={{ maxHeight: isNoDueDateCollapsed ? 0 : '12rem' }}
-                          >
-                            {upcomingTaskGroups.noDueDate.length === 0 ? (
-                              <li className="text-gray-500">No tasks</li>
-                            ) : null}
-                            {upcomingTaskGroups.noDueDate.map((t: any, index: number) => (
-                              <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                                {(provided: any) => (
-                                  <li
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2 hover:bg-gray-100"
-                                  >
-                                    <span className="flex-1">{t.content}</span>
-                                    <span className="text-xs text-gray-500 ml-2">No due date</span>
-                                  </li>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </ul>
-                        )}
-                      </Droppable>
-                    </>
-                  )}
-                </DragDropContext>
-              </div>
-            </div>
-          </aside>
         </div>
+
 
         {/* Widget editor sheet */}
         {typeof window !== 'undefined' && (
-          <WidgetEditorSheet 
-            widget={editingWidget}
+          <WidgetEditorSheet
+            widget={editingWidget} 
             open={editingWidget !== null}
             onClose={() => {
               setEditingWidget(null)
@@ -3928,7 +3349,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         )}
 
         {/* Nutrition Widget Modal */}
-        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => {
+        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => { 
           setNutritionWidgetOpen(open)
           if (!open) {
             // Force refresh nutrition widgets when panel closes
@@ -3939,7 +3360,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-indigo-950">Daily Nutrition Tracker</SheetTitle>
+              <SheetTitle className="text-gray-900">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               <NutritionMealTracker />
@@ -3951,7 +3372,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <Sheet open={medicationWidgetOpen} onOpenChange={setMedicationWidgetOpen}>
           <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-indigo-950">Medication Tracker</SheetTitle>
+              <SheetTitle className="text-gray-900">Medication Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               <MedicationTrackerWidget />
@@ -3978,153 +3399,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <HomeProjectsWidget 
-                widget={getDisplayWidgets(activeBucket).find(w => w.id === 'home_projects') || {} as WidgetInstance}
-                onUpdate={(updatedWidget) => {
-                  setWidgetsByBucket(prev => ({
-                    ...prev,
-                    [activeBucket]: prev[activeBucket]?.map(w => 
-                      w.instanceId === updatedWidget.instanceId ? updatedWidget : w
-                    ) || []
-                  }));
-                }}
-                onAddToTasks={async (projectTitle: string, projectDescription?: string, dueDate?: string) => {
-                  try {
-                    await contextCreateTask(projectTitle, dueDate || null);
-                  } catch (error) {
-                    console.error('Failed to add project to tasks:', error);
-                  }
-                }}
-              />
+              <HomeProjectsWidget onClose={() => setHomeProjectsWidgetOpen(false)} />
             </div>
           </SheetContent>
         </Sheet>
-
-        {/* Add Bucket Sheet */}
-        <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-            <SheetContent side="right" className="w-[420px] sm:w-[500px] overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle className="text-indigo-950">Add a new bucket</SheetTitle>
-              </SheetHeader>
-              <div className="space-y-6 mt-6">
-                {/* Add new bucket input */}
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="New bucket name (e.g. Fitness)"
-                    value={newBucket}
-                    onChange={(e) => setNewBucket(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-                  />
-                  <div className="flex justify-end gap-3">
-                    <Button variant="secondary" onClick={() => setIsEditorOpen(false)}>Close</Button>
-                    <Button onClick={() => {
-                      handleAddBucket();
-                      setNewBucket('');
-                    }}>Add Bucket</Button>
-                  </div>
-                </div>
-
-                {/* Suggested buckets */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Suggestions</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {SUGGESTED_BUCKETS.filter(b=>!buckets.includes(b)).map((b)=>(
-                      <button
-                        key={b}
-                        onClick={() => {
-                          if (buckets.includes(b)) return;
-                          setBuckets(prev=>[...prev,b]);
-                          if (typeof window!== 'undefined') {
-                            localStorage.setItem('life_buckets', JSON.stringify([...buckets,b]));
-                          }
-                          // Save to Supabase
-                          (async ()=>{
-                            try{
-                              const prefs = await getUserPreferencesClient();
-                              if (prefs){ await saveUserPreferences({ ...prefs, life_buckets:[...buckets,b] }); }
-                            }catch(err){ console.error('Failed to save bucket suggestion',err);} })();
-                        }}
-                        className="px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs"
-                      >{b}</button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Existing buckets list */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Existing buckets</h4>
-                  <ul className="space-y-2">
-                    {buckets.map((b) => (
-                      <li key={b} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
-                        <span>{b}</span>
-                        {buckets.length > 1 ? (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleRemoveBucket(b)}
-                            aria-label={`Delete ${b}`}
-                          >
-                            <X className="h-4 w-4 text-red-500" />
-                          </Button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-
-        {/* Widget library sheet */}
-        <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-          <SheetContent side="right" className="w-[800px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Add a Widget</SheetTitle>
-            </SheetHeader>
-            <WidgetLibrary
-              bucket={activeBucket}
-              onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
-                const isInstance = 'instanceId' in widgetOrTemplate;
-                const newInstance: WidgetInstance = isInstance
-                  ? widgetOrTemplate
-                  : {
-                      ...widgetOrTemplate,
-                      instanceId: `${widgetOrTemplate.id}-${Date.now()}`,
-                      target: widgetOrTemplate.defaultTarget || 100,
-                      color: widgetOrTemplate.color || 'gray',
-                      dataSource: 'manual',
-                      createdAt: new Date().toISOString(),
-                      schedule: [true, true, true, true, true, true, true],
-                      // Initialize specialized data for specific widget types
-                      ...(widgetOrTemplate.id === 'birthdays' && { birthdayData: { friendName: '', birthDate: '' } }),
-                      ...(widgetOrTemplate.id === 'social_events' && { eventData: { eventName: '', eventDate: '', description: '' } }),
-                      ...(widgetOrTemplate.id === 'holidays' && { holidayData: { holidayName: '', holidayDate: '' } }),
-                      ...(widgetOrTemplate.id === 'mood' && { moodData: { currentMood: undefined, moodNote: '', lastUpdated: '' } }),
-                      ...(widgetOrTemplate.id === 'journal' && { journalData: { todaysEntry: '', lastEntryDate: '', entryCount: 0 } }),
-                      ...(widgetOrTemplate.id === 'gratitude' && { gratitudeData: { gratitudeItems: [''], lastEntryDate: '', entryCount: 0 } }),
-                    };
-                const updated = { ...widgetsByBucket };
-                updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
-                setWidgetsByBucket(updated);
-                widgetsByBucketRef.current = updated; // Update the ref immediately
-                setIsWidgetSheetOpen(false);
-                // Automatically open editor for new widgets
-                setNewlyCreatedWidgetId(newInstance.instanceId);
-                setEditingWidget(newInstance);
-                setEditingBucket(activeBucket);
-                // Save immediately
-                debouncedSaveToSupabase();
-              }}
-            />
-          </SheetContent>
-        </Sheet>
-
+        </div>
+        <ChatBar />
       </div>
-      <ChatBar />
-      </div>
-  );
-}
+    );
+  }
 
 // Main exported component that wraps with TasksProvider
 export function TaskBoardDashboard() {
@@ -4135,7 +3418,10 @@ export function TaskBoardDashboard() {
   
   return (
     <TasksProvider selectedDate={selectedDate}>
-      <TaskBoardDashboardInner selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+      <TaskBoardDashboardInner 
+        selectedDate={selectedDate} 
+        setSelectedDate={setSelectedDate}
+      />
     </TasksProvider>
   );
 }

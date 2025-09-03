@@ -19,9 +19,9 @@ export default function SettingsPage() {
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
   const [editingTheme, setEditingTheme] = useState<ThemeColor | null>(null)
   const [customThemeName, setCustomThemeName] = useState('')
-  const [customPrimary, setCustomPrimary] = useState('#5271F8')
-  const [customSecondary, setCustomSecondary] = useState('#7482FE')
-  const [customAccent, setCustomAccent] = useState('#909CFF')
+  const [customPrimary, setCustomPrimary] = useState('#8491FF')
+  const [customSecondary, setCustomSecondary] = useState('#9CA3FF')
+  const [customAccent, setCustomAccent] = useState('#B4BAFF')
   const [allThemes, setAllThemes] = useState<ThemeColor[]>(getAllThemes())
 
   const handleCreateCustomTheme = () => {
@@ -79,9 +79,9 @@ export default function SettingsPage() {
 
   const resetForm = () => {
     setCustomThemeName('')
-    setCustomPrimary('#5271F8')
-    setCustomSecondary('#7482FE')
-    setCustomAccent('#909CFF')
+    setCustomPrimary('#8491FF')
+    setCustomSecondary('#9CA3FF')
+    setCustomAccent('#B4BAFF')
     setShowCustomColorForm(false)
     setEditingTheme(null)
   }
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                           />
                           <input
                             type="text"
-                            placeholder="#5271F8"
+                            placeholder="#8491FF"
                             value={customPrimary}
                             onChange={(e) => setCustomPrimary(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
@@ -306,7 +306,7 @@ export default function SettingsPage() {
                           />
                           <input
                             type="text"
-                            placeholder="#7482FE"
+                            placeholder="#9CA3FF"
                             value={customSecondary}
                             onChange={(e) => setCustomSecondary(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
@@ -328,7 +328,7 @@ export default function SettingsPage() {
                           />
                           <input
                             type="text"
-                            placeholder="#909CFF"
+                            placeholder="#B4BAFF"
                             value={customAccent}
                             onChange={(e) => setCustomAccent(e.target.value)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"

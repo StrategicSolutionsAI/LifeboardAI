@@ -91,9 +91,14 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       {/* Header */}
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-10 -ml-[120px] w-[calc(100%+120px)]">
         <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-1 text-2xl font-semibold">
-            <span className="text-theme-primary">Lifeboard</span>
-            <span>AI</span>
+          <div className="flex items-center gap-3 text-2xl font-semibold">
+            <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-lg">
+              <span className="text-white text-sm font-bold">L</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-theme-primary">Lifeboard</span>
+              <span className="text-gray-800">AI</span>
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <button className="p-2 rounded-full hover:bg-gray-100">

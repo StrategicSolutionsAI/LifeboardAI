@@ -10,6 +10,14 @@ export interface ThemeColor {
 
 export const themeColors: ThemeColor[] = [
   {
+    id: "lifeboard",
+    name: "LifeboardAI",
+    primary: "#8491FF",
+    secondary: "#9CA3FF", 
+    accent: "#B4BAFF",
+    description: "Official LifeboardAI brand theme"
+  },
+  {
     id: "indigo",
     name: "Indigo Wave",
     primary: "#4f46e5",
@@ -75,7 +83,7 @@ export const themeColors: ThemeColor[] = [
   }
 ]
 
-export function getThemeColors(themeId: string = "indigo"): ThemeColor {
+export function getThemeColors(themeId: string = "lifeboard"): ThemeColor {
   return themeColors.find(theme => theme.id === themeId) || themeColors[0]
 }
 
@@ -269,5 +277,5 @@ export function getUserTheme(): ThemeColor {
     console.error('Error loading user theme:', error)
   }
   
-  return themeColors[0] // Default to indigo
+  return themeColors[0] // Default to LifeboardAI theme
 }

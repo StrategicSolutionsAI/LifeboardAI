@@ -158,15 +158,15 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
 
       {/* Task view toggle */}
       <div className="mb-4">
-        <div className="flex rounded-full border border-[#E2E6F6] bg-white p-1 w-full shadow-sm">
+        <div className="flex rounded-full border border-theme-neutral-200 bg-theme-surface-raised p-1 w-full shadow-sm">
           {(['Today','Upcoming','Master List'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setTaskView(tab)}
               className={`flex-1 rounded-full px-4 py-1 text-sm font-semibold transition-colors ${
                 taskView === tab
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow'
-                  : 'text-gray-500 hover:bg-gray-50'
+                  ? 'bg-theme-primary-500 text-white shadow'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-theme-primary-600'
               }`}
             >
               {tab}
@@ -216,7 +216,7 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                               style={provided.draggableProps.style}
-                              className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+                              className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
                             >
                               <input
                                 type="checkbox"
@@ -292,7 +292,7 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           style={provided.draggableProps.style}
-                          className="flex items-start gap-2 px-3 py-3 bg-white border border-black/10 shadow-sm rounded-lg hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+                          className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
                         >
                           <input
                             type="checkbox"
