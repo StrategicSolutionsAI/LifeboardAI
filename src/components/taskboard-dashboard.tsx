@@ -3408,14 +3408,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     <li key={b} className="flex items-center justify-between px-3 py-2 bg-white">
                       <span className={`text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
                       <div className="flex items-center gap-2">
-                        {b !== activeBucket && (
-                          <button
-                            onClick={() => setActiveBucket(b)}
-                            className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
-                          >
-                            Make Active
-                          </button>
-                        )}
                         <button
                           onClick={() => handleRemoveBucket(b)}
                           className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
