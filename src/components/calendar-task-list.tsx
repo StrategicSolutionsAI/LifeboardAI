@@ -59,28 +59,27 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
   // Open tasks (only shown in Master List tab)
   const openTasksBase = useMemo(() => allTasks.filter(t => !t.completed && !t.hourSlot), [allTasks]);
 
-  // Maintain a local, immediately responsive order for open tasks
-  const [openOrderIds, setOpenOrderIds] = useState<string[]>([]);
+  // Maintain a local, immediately responsive list for open tasks
+  const [openTasksLocal, setOpenTasksLocal] = useState<any[]>([]);
 
-  // Sync local order with tasks and their stored positions
+  // Sync local list when membership changes (add/remove), but don't override order on mere metadata updates
   React.useEffect(() => {
-    const byId = new Map(openTasksBase.map(t => [t.id.toString(), t]));
-    // Sort by position first (if any), then keep stable order for the rest
-    const withPos = openTasksBase.filter((t: any) => t.position != null).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-    const withoutPos = openTasksBase.filter((t: any) => t.position == null);
-    const ordered = [...withPos, ...withoutPos].map(t => t.id.toString());
-    setOpenOrderIds(ordered);
+    const baseMap = new Map(openTasksBase.map(t => [t.id.toString(), t]));
+    const localIds = new Set(openTasksLocal.map(t => t.id.toString()));
+    let changed = false;
+    // Remove items no longer in base
+    let next = openTasksLocal.filter(t => baseMap.has(t.id.toString()));
+    if (next.length !== openTasksLocal.length) changed = true;
+    // Append new items at the end preserving current local order
+    openTasksBase.forEach(t => {
+      const id = t.id.toString();
+      if (!localIds.has(id)) { next.push(t); changed = true; }
+    });
+    if (changed || openTasksLocal.length === 0) setOpenTasksLocal(next);
   }, [openTasksBase]);
 
-  // Derive ordered list for rendering
-  const openTasksToShow = useMemo(() => {
-    if (!openOrderIds.length) return openTasksBase;
-    const map = new Map(openTasksBase.map(t => [t.id.toString(), t]));
-    const ordered: any[] = [];
-    openOrderIds.forEach(id => { if (map.has(id)) { ordered.push(map.get(id)!); map.delete(id); } });
-    ordered.push(...Array.from(map.values()));
-    return ordered;
-  }, [openTasksBase, openOrderIds]);
+  // Render from local list
+  const openTasksToShow = openTasksLocal.length ? openTasksLocal : openTasksBase;
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -131,14 +130,12 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
       }
       // Reorder for open tasks: update local order immediately and persist positions
       if (destination.droppableId === 'openTasks') {
-        const ids = [...openOrderIds];
-        const [movedId] = ids.splice(source.index, 1);
-        ids.splice(destination.index, 0, movedId);
-        setOpenOrderIds(ids);
-        // Build updates from the newly ordered ids that exist in the base list
-        const idSet = new Set(openTasksBase.map(t => t.id.toString()));
-        const visibleIds = ids.filter(id => idSet.has(id));
-        const updates = visibleIds.map((id, idx) => ({ taskId: id, updates: { position: idx } }));
+        const list = [...openTasksToShow];
+        const [moved] = list.splice(source.index, 1);
+        list.splice(destination.index, 0, moved);
+        setOpenTasksLocal(list);
+        // Persist as positions for all visible tasks
+        const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
         batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
         return;
       }
