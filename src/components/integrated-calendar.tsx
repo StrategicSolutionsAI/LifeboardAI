@@ -17,6 +17,8 @@ import {
 } from "date-fns";
 import { Plus } from "lucide-react";
 import HourlyPlanner from "@/components/hourly-planner";
+import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import { useTasksContext } from "@/contexts/tasks-context";
 
 interface DayEvent {
   source: "google" | "todoist";
@@ -52,6 +54,8 @@ function getWeekDays(anchor: Date) {
 }
 
 export default function IntegratedCalendar() {
+  const { batchUpdateTasks } = useTasksContext();
+  const [isDragging, setIsDragging] = useState(false);
   const [view, setView] = useState<ViewMode>("month");
   const [anchorDate, setAnchorDate] = useState<Date>(startOfDay(new Date()));
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
@@ -260,7 +264,29 @@ export default function IntegratedCalendar() {
             {format(anchorDate, "EEEE, MMMM d, yyyy")}
           </h3>
           {/* Hourly planner */}
-          <HourlyPlanner className="max-h-[70vh] overflow-y-auto" />
+          <DragDropContext
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={(result: DropResult) => {
+              // Ignore drops if a resize operation is active
+              if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+                setIsDragging(false);
+                return;
+              }
+              setIsDragging(false);
+              if (!result.destination) return;
+              const { source, destination, draggableId } = result;
+              const isHour = (id: string) => id.startsWith('hour-');
+
+              // Only handle hour → hour moves in this simple integrated view
+              if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+                const dstHour = destination.droppableId; // keep full 'hour-7AM'
+                batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }])
+                  .catch(err => console.error('Failed to update task hourSlot:', err));
+              }
+            }}
+          >
+            <HourlyPlanner className="max-h-[70vh] overflow-y-auto" isDragging={isDragging} />
+          </DragDropContext>
         </div>
       )}
 

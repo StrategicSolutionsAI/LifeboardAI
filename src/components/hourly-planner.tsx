@@ -3,7 +3,7 @@
 // Enhanced hourly planner component with improved UX
 // Features: better visual hierarchy, time ranges, quick actions, and intuitive interactions
 
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { X, Plus } from "lucide-react";
 import {
@@ -59,12 +59,18 @@ interface HourlyPlannerProps {
   className?: string;
   showTimeIndicator?: boolean;
   allowResize?: boolean;
+  availableBuckets?: string[];
+  selectedBucket?: string;
+  isDragging?: boolean;
 }
 
 export default function HourlyPlanner({ 
   className = "", 
   showTimeIndicator = true,
-  allowResize = true 
+  allowResize = true,
+  availableBuckets = [],
+  selectedBucket,
+  isDragging = false
 }: HourlyPlannerProps) {
   const {
     scheduledTasks,
@@ -80,6 +86,7 @@ export default function HourlyPlanner({
   const [creatingTaskAt, setCreatingTaskAt] = useState<string | null>(null);
   const [newTaskContent, setNewTaskContent] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [taskBucket, setTaskBucket] = useState(selectedBucket || (availableBuckets.length > 0 ? availableBuckets[0] : ''));
   
   // Local state for newly created tasks to show immediately
   const [pendingTasks, setPendingTasks] = useState<PlannerItem[]>([]);
@@ -108,7 +115,7 @@ export default function HourlyPlanner({
       setPendingTasks(prev => [...prev, tempTask]);
       
       // Create the task via API
-      const newTask = await createTask(newTaskContent.trim(), dateStr);
+      const newTask = await createTask(newTaskContent.trim(), dateStr, undefined, taskBucket);
       
       console.log('Task created:', newTask);
       
@@ -203,12 +210,13 @@ export default function HourlyPlanner({
     hour: string;
   } | null>(null);
 
-  const startResize = (e: React.MouseEvent, hour: string, taskId: string) => {
+  const startResize = useCallback((e: React.MouseEvent, hour: string, taskId: string) => {
     e.stopPropagation();
     e.preventDefault();
 
     const task = hourlyPlan[hour].find((t) => t.id === taskId);
     const startDuration = task?.duration ?? 60;
+    let currentDuration = startDuration;
     
     resizeStartRef.current = { 
       y: e.clientY, 
@@ -217,6 +225,29 @@ export default function HourlyPlanner({
       hour 
     };
     setResizingTask({ taskId, hour, currentDuration: startDuration });
+    // Mark global resizing flag to prevent DnD handlers from acting
+    try { document.body.classList.add('lb-resizing'); } catch {}
+
+    // Guard against multiple finalizations
+    let ended = false;
+    const endResize = () => {
+      if (ended) return;
+      ended = true;
+      // Only update if duration actually changed
+      if (currentDuration !== startDuration) {
+        // Persist duration and re-assert current hourSlot to avoid accidental moves
+        batchUpdateTasks([{ taskId, updates: { duration: currentDuration, hourSlot: `hour-${hour}` } }]);
+      }
+      setResizingTask(null);
+      resizeStartRef.current = null;
+      try { document.body.classList.remove('lb-resizing'); } catch {}
+      // Remove listeners
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", endResize);
+      window.removeEventListener("pointerup", endResize);
+      window.removeEventListener("blur", endResize);
+      window.removeEventListener("mouseleave", endResize);
+    };
 
     const handleMouseMove = (ev: MouseEvent) => {
       if (!resizeStartRef.current) return;
@@ -227,24 +258,16 @@ export default function HourlyPlanner({
         Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / RESIZE_INCREMENT) * RESIZE_INCREMENT
       );
       
+      currentDuration = newDuration;
       setResizingTask(prev => prev ? { ...prev, currentDuration: newDuration } : null);
     };
 
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      
-      if (resizingTask?.currentDuration) {
-        batchUpdateTasks([{ taskId, updates: { duration: resizingTask.currentDuration } }]);
-      }
-      
-      setResizingTask(null);
-      resizeStartRef.current = null;
-    };
-
     window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
+    window.addEventListener("mouseup", endResize);
+    window.addEventListener("pointerup", endResize);
+    window.addEventListener("blur", endResize);
+    window.addEventListener("mouseleave", endResize);
+  }, [hourlyPlan, batchUpdateTasks]);
 
   // Remove task from hourly planner
   const removeTaskFromPlanner = async (taskId: string) => {
@@ -327,11 +350,15 @@ export default function HourlyPlanner({
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className="flex-1 relative min-h-[60px] overflow-visible"
-                  onClick={() => handleTimeSlotClick(disp)}
+                  onClick={(e) => {
+                    // Prevent click-to-create during drag or resize to avoid interference
+                    if (isDragging || resizingTask) return;
+                    handleTimeSlotClick(disp);
+                  }}
                 >
                   {/* Empty time slot indicator */}
                   {hourlyPlan[disp].length === 0 && creatingTaskAt !== disp && (
-                    <li className="absolute inset-0 flex items-center justify-center group cursor-pointer hover:bg-theme-surface-hover/50 rounded-lg transition-colors">
+                    <li className={`absolute inset-0 flex items-center justify-center group ${(isDragging || resizingTask) ? 'pointer-events-none' : 'cursor-pointer'} hover:bg-theme-surface-hover/50 rounded-lg transition-colors`}>
                       <div className="flex items-center gap-2 text-theme-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
                         <Plus size={14} />
                         <span className="text-xs font-medium">Add task</span>
@@ -341,74 +368,98 @@ export default function HourlyPlanner({
                   
                   {/* Task creation form */}
                   {creatingTaskAt === disp && (
-                    <li className="absolute inset-0 flex items-center p-2">
-                      <div className="flex-1 flex items-center gap-2 bg-theme-widget-bg border border-theme-primary-200 rounded-lg p-3 shadow-sm">
-                        <input
-                          type="text"
-                          value={newTaskContent}
-                          onChange={(e) => setNewTaskContent(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
+                    <li className="absolute inset-0 flex items-center p-1">
+                      <div className="flex-1 bg-theme-widget-bg border border-theme-primary-200 rounded-lg p-2 shadow-sm">
+                        {availableBuckets.length > 0 && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-xs text-gray-600 font-medium min-w-0">Bucket:</span>
+                            <select
+                              value={taskBucket}
+                              onChange={(e) => setTaskBucket(e.target.value)}
+                              className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-500 focus:outline-none bg-white"
+                            >
+                              {availableBuckets.map(bucket => (
+                                <option key={bucket} value={bucket}>{bucket}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={newTaskContent}
+                            onChange={(e) => setNewTaskContent(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleCreateTaskAtTime(disp);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelCreation();
+                              }
+                            }}
+                            placeholder="What needs to be done?"
+                            className="flex-1 text-xs bg-transparent border-none outline-none placeholder-theme-text-tertiary"
+                            autoFocus
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleCreateTaskAtTime(disp);
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
+                            }}
+                            disabled={isCreatingTask}
+                            className="px-2 py-0.5 text-xs font-medium text-theme-primary-600 hover:text-theme-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {isCreatingTask ? 'Adding...' : 'Add'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleCancelCreation();
-                            }
-                          }}
-                          placeholder="What needs to be done?"
-                          className="flex-1 text-sm bg-transparent border-none outline-none placeholder-theme-text-tertiary"
-                          autoFocus
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCreateTaskAtTime(disp);
-                          }}
-                          disabled={isCreatingTask}
-                          className="px-2 py-1 text-xs font-medium text-theme-primary-600 hover:text-theme-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isCreatingTask ? 'Adding...' : 'Add'}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCancelCreation();
-                          }}
-                          className="px-2 py-1 text-xs font-medium text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
-                        >
-                          Cancel
-                        </button>
+                            }}
+                            className="px-1 py-0.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     </li>
                   )}
                   
                   {hourlyPlan[disp].map((t, index) => {
                     const taskCount = hourlyPlan[disp].length;
-                    const taskWidth = taskCount > 1 ? `${(100 / taskCount) - 1}%` : '100%'; // Small gap between tasks
-                    const leftOffset = taskCount > 1 ? `${(index * 100) / taskCount}%` : '0%';
+                    // Better spacing calculation for multiple tasks
+                    const taskWidth = taskCount > 1 ? `${Math.floor(100 / taskCount) - 2}%` : '100%';
+                    const leftOffset = taskCount > 1 ? `${(index * Math.floor(100 / taskCount)) + 1}%` : '0%';
                     
                     return (
-                    <Draggable key={t.id} draggableId={t.id} index={index} isDragDisabled={resizingTask?.taskId === t.id}>
+                    <Draggable 
+                      key={t.id} 
+                      draggableId={t.id} 
+                      index={index} 
+                      isDragDisabled={!!resizingTask || (resizingTask?.taskId === t.id)}
+                    >
                       {(prov, dragSnapshot) => {
                         const isResizing = resizingTask?.taskId === t.id;
                         const taskDuration = isResizing ? resizingTask.currentDuration : t.duration ?? 60;
+                        const isDraggingNow = dragSnapshot.isDragging;
                         
                         return (
                         <li
                           ref={prov.innerRef}
                           {...prov.draggableProps}
-                          {...prov.dragHandleProps}
                           style={{
-                            ...(isResizing ? {} : prov.draggableProps.style),
-                            height: `${Math.max(20, (taskDuration / 60) * HOUR_HEIGHT)}px`,
-                            position: 'absolute',
-                            top: '0px',
-                            left: leftOffset,
-                            width: taskWidth,
-                            zIndex: isResizing ? 1000 : (dragSnapshot.isDragging ? 1000 : index + 1),
-                            transform: isResizing ? "none" : undefined,
-                            transition: isResizing ? "none" : undefined,
+                            // Let DnD control transform entirely during drag; avoid conflicting absolute positioning
+                            ...(prov.draggableProps.style || {}),
+                            height: `${Math.max(24, (taskDuration / 60) * HOUR_HEIGHT)}px`,
+                            ...(isDraggingNow ? {} : {
+                              position: 'absolute',
+                              top: taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px',
+                              left: leftOffset,
+                              width: taskWidth,
+                            }),
+                            zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : index + 1),
+                            ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
                           }}
                           onClick={(e) => e.stopPropagation()}
                           className={`group relative flex items-start gap-3 px-4 py-3 
@@ -416,11 +467,11 @@ export default function HourlyPlanner({
                             shadow-sm hover:shadow-md 
                             rounded-xl transition-all duration-200 
                             hover:border-theme-primary-400 hover:bg-theme-surface-hover
-                            ${dragSnapshot.isDragging ? 'shadow-lg rotate-1 scale-105 border-theme-primary-500' : ''}
+                            ${isDraggingNow ? 'shadow-lg rotate-1 scale-105 border-theme-primary-500' : ''}
                             ${resizingTask?.taskId === t.id ? 'ring-2 ring-theme-primary-200' : ''}
                           `}
                         >
-                          <div className="flex items-start gap-3 w-full h-full min-h-[32px]">
+                          <div className="flex items-start gap-3 w-full h-full min-h-[32px]" {...prov.dragHandleProps}>
                             {/* Enhanced status indicator with brand colors */}
                             <div className="flex-shrink-0 mt-1">
                               <div className="w-2.5 h-2.5 bg-theme-primary-500 rounded-full ring-2 ring-theme-primary-200" />

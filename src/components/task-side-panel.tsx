@@ -125,8 +125,17 @@ export function TaskSidePanel() {
     }
   };
 
+  // Drag state and handler
+  const [isDragging, setIsDragging] = useState(false);
+
   // Unified drag and drop handler
   function handleDragEnd(result: DropResult) {
+    // Ignore drops if a resize operation is active
+    if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(false);
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
@@ -144,7 +153,7 @@ export function TaskSidePanel() {
     // Handle moves to/from hourly planner
     if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
       // Daily task → Hour slot: Set the hourSlot to schedule the task
-      const dstHour = hourKey(destination.droppableId);
+      const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
       ]).catch(error => {
@@ -155,7 +164,7 @@ export function TaskSidePanel() {
 
     if ((source.droppableId === 'openTasks' || source.droppableId === 'upcomingTasks') && isHour(destination.droppableId)) {
       // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
-      const dstHour = hourKey(destination.droppableId);
+      const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
       ]).catch(error => {
@@ -186,7 +195,7 @@ export function TaskSidePanel() {
 
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       // Hour slot → Different hour slot: Update the hourSlot
-      const dstHour = hourKey(destination.droppableId);
+      const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
       ]).catch(error => {
@@ -318,7 +327,10 @@ export function TaskSidePanel() {
 
         {/* Lists */}
         <div className="mt-6 flex-1 overflow-y-auto flex flex-col" style={{ transform: 'none' }}>
-          <DragDropContext onDragEnd={handleDragEnd}>
+          <DragDropContext 
+            onDragStart={() => setIsDragging(true)}
+            onDragEnd={handleDragEnd}
+          >
             {/* Today view */}
             {taskView === "Today" && (
               <>
@@ -675,7 +687,7 @@ export function TaskSidePanel() {
                   className="overflow-y-auto pr-1 transition-[max-height] duration-200"
                   style={{ maxHeight: isPlannerCollapsed ? 0 : "16rem" }}
                 >
-                  <HourlyPlanner showTimeIndicator={true} allowResize={true} />
+                  <HourlyPlanner showTimeIndicator={true} allowResize={true} isDragging={isDragging} />
                 </div>
               </>
             )}

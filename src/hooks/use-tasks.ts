@@ -9,6 +9,7 @@ interface Task {
   due?: { date: string }
   duration?: number
   hourSlot?: string
+  bucket?: string
   created_at?: string
   updated_at?: string
 }
@@ -93,7 +94,7 @@ export function useTasks(selectedDate?: Date) {
   })
   
   // Optimistic task creation
-  const createTask = useCallback(async (content: string, dueDate: string | null, hourSlot?: number) => {
+  const createTask = useCallback(async (content: string, dueDate: string | null, hourSlot?: number, bucket?: string) => {
     const trimmed = content.trim()
     if (!trimmed) return
     
@@ -102,7 +103,7 @@ export function useTasks(selectedDate?: Date) {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot }),
+        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket }),
       })
       
       if (!res.ok) throw new Error('Failed to create task')
@@ -226,25 +227,26 @@ export function useTasks(selectedDate?: Date) {
   );
 
   const scheduledTasks = useMemo(() => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    
-    // Get scheduled tasks from daily tasks (already filtered by date)
+    // Use the selected date for context instead of always "today"
+    const targetDateStr = dateStr;
+
+    // From daily tasks (already scoped to selected date)
     const dailyScheduled = (dailyTasks || []).filter(t => !t.completed && t.hourSlot);
-    
-    // Get scheduled tasks from all tasks for today
+
+    // From all tasks: include tasks with hourSlot that are undated or dated to the selected date
     const allScheduled = (allTasks || []).filter(t => {
       if (t.completed || !t.hourSlot) return false;
-      return !t.due?.date || t.due.date === todayStr;
+      return !t.due?.date || t.due.date === targetDateStr;
     });
-    
+
     // Combine and deduplicate by id
-    const taskMap = new Map();
+    const taskMap = new Map<string, Task>();
     [...dailyScheduled, ...allScheduled].forEach(task => {
       taskMap.set(task.id, task);
     });
-    
+
     return Array.from(taskMap.values());
-  }, [dailyTasks, allTasks]);
+  }, [dailyTasks, allTasks, dateStr]);
 
   // Upcoming tasks: all open tasks with future due dates
   const upcomingTasks = useMemo(() => {

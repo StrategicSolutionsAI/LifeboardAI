@@ -65,9 +65,11 @@ interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; 
 interface FullCalendarProps {
   selectedDate?: Date;
   onDateChange?: (date: Date) => void;
+  availableBuckets?: string[];
+  selectedBucket?: string;
 }
 
-export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange }: FullCalendarProps = {}) {
+export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket }: FullCalendarProps = {}) {
   const [currentDate, setCurrentDate] = useState(propSelectedDate || new Date());
   const [view, setView] = useState<CalendarView>('day');
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
@@ -173,8 +175,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const rows = getMatrix();
 
+  // Drag state to improve UX (disable click-to-create while dragging)
+  const [isDragging, setIsDragging] = useState(false);
+
   // Unified drag and drop handler for calendar day view
   const handleDragEnd = (result: DropResult) => {
+    // Ignore drops if a resize operation is active
+    if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(false);
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
@@ -185,10 +196,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
     // Handle moves between hour slots in day view
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-      // Hour slot → Different hour slot: Update the hourSlot
-      const dstHour = hourKey(destination.droppableId);
+      // Hour slot → Different hour slot: Update the hourSlot (keep full 'hour-<time>' format for consistency)
+      const dstHour = destination.droppableId; // e.g., 'hour-7AM'
       console.log('⏰ Moving task between hour slots in calendar day view:', { draggableId, dstHour });
-      
+
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour } }
       ]).catch(error => {
@@ -371,11 +382,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </p>
           </div>
           
-          <DragDropContext onDragEnd={handleDragEnd}>
+          <DragDropContext 
+            onDragStart={() => setIsDragging(true)} 
+            onDragEnd={handleDragEnd}
+          >
             <HourlyPlanner 
               className="max-h-[70vh] overflow-y-auto" 
               showTimeIndicator={true}
               allowResize={true}
+              availableBuckets={availableBuckets}
+              selectedBucket={selectedBucket}
+              isDragging={isDragging}
             />
           </DragDropContext>
         </div>

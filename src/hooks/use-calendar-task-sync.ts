@@ -62,7 +62,8 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
       .map(task => ({
         source: 'lifeboard' as const,
         title: task.content,
-        time: hourSlotToTime(task.hourSlot || '9AM'),
+        // Normalize hourSlot which may be stored as 'hour-7AM' or '7AM'
+        time: hourSlotToTime((task.hourSlot || '9AM').replace(/^hour-/, '')),
         allDay: false,
         taskId: task.id,
         duration: task.duration || 60
@@ -76,7 +77,7 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
       .map(task => ({
         source: 'lifeboard' as const,
         title: task.content,
-        time: hourSlotToTime(task.hourSlot || '9AM'),
+        time: hourSlotToTime((task.hourSlot || '9AM').replace(/^hour-/, '')),
         allDay: false,
         taskId: task.id,
         duration: task.duration || 60

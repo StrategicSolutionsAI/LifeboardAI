@@ -9,9 +9,11 @@ import { useTasksContext } from "@/contexts/tasks-context";
 interface CalendarTaskListProps {
   selectedDate: Date;
   onDateChange?: (date: Date) => void;
+  availableBuckets?: string[];
+  selectedBucket?: string;
 }
 
-export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets = [], selectedBucket }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -36,26 +38,31 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
   const [newOpenTask, setNewOpenTask] = useState("");
+  const [taskBucket, setTaskBucket] = useState(selectedBucket || (availableBuckets.length > 0 ? availableBuckets[0] : ''));
 
   const handleAddDailyTask = async () => {
     if (newDailyTask.trim()) {
       const dateStr = `${selectedDate.getFullYear()}-${String(
         selectedDate.getMonth() + 1
       ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
-      await createTask(newDailyTask, dateStr);
+      await createTask(newDailyTask, dateStr, undefined, taskBucket);
       setNewDailyTask("");
     }
   };
 
   const handleAddOpenTask = async () => {
     if (newOpenTask.trim()) {
-      await createTask(newOpenTask, null);
+      await createTask(newOpenTask, null, undefined, taskBucket);
       setNewOpenTask("");
     }
   };
 
   // Unified drag and drop handler
   function handleDragEnd(result: DropResult) {
+    // Ignore drops if a resize operation is active in the planner
+    if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+      return;
+    }
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
@@ -225,7 +232,14 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
                                 onChange={() => toggleTaskCompletion(t.id.toString())}
                                 className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
                               />
-                              <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              <div className="flex-1">
+                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                                {t.bucket && (
+                                  <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                                    {t.bucket}
+                                  </span>
+                                )}
+                              </div>
                             </li>
                           )}
                         </Draggable>
@@ -238,21 +252,37 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
 
               {/* Add task to daily list */}
               {!isDailyCollapsed && (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Add task for today…"
-                    value={newDailyTask}
-                    onChange={(e) => setNewDailyTask(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
-                    className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAddDailyTask}
-                    className="text-sm text-indigo-600 hover:underline"
-                  >
-                    Add
-                  </button>
+                <div className="mt-2 space-y-2">
+                  {availableBuckets.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-600 font-medium">Bucket:</label>
+                      <select
+                        value={taskBucket}
+                        onChange={(e) => setTaskBucket(e.target.value)}
+                        className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white"
+                      >
+                        {availableBuckets.map(bucket => (
+                          <option key={bucket} value={bucket}>{bucket}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add task for today…"
+                      value={newDailyTask}
+                      onChange={(e) => setNewDailyTask(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
+                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleAddDailyTask}
+                      className="text-sm text-indigo-600 hover:underline"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               )}
             </>
@@ -301,7 +331,14 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
                             onChange={() => toggleTaskCompletion(t.id.toString())}
                             className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
                           />
-                          <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                          <div className="flex-1">
+                            <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                            {t.bucket && (
+                              <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                                {t.bucket}
+                              </span>
+                            )}
+                          </div>
                         </li>
                       )}
                     </Draggable>
@@ -313,21 +350,37 @@ export function CalendarTaskList({ selectedDate, onDateChange }: CalendarTaskLis
 
             {/* Add open task */}
             {!isOpenCollapsed && (
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Add open task…"
-                  value={newOpenTask}
-                  onChange={(e) => setNewOpenTask(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                />
-                <button
-                  onClick={handleAddOpenTask}
-                  className="text-sm text-indigo-600 hover:underline"
-                >
-                  Add
-                </button>
+              <div className="mt-2 space-y-2">
+                {availableBuckets.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600 font-medium">Bucket:</label>
+                    <select
+                      value={taskBucket}
+                      onChange={(e) => setTaskBucket(e.target.value)}
+                      className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white"
+                    >
+                      {availableBuckets.map(bucket => (
+                        <option key={bucket} value={bucket}>{bucket}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Add open task…"
+                    value={newOpenTask}
+                    onChange={(e) => setNewOpenTask(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                    className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleAddOpenTask}
+                    className="text-sm text-indigo-600 hover:underline"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             )}
           </div>
