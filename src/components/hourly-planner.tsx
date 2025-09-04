@@ -10,6 +10,7 @@ import {
   Droppable,
   Draggable,
 } from "@hello-pangea/dnd";
+import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -62,6 +63,7 @@ interface HourlyPlannerProps {
   availableBuckets?: string[];
   selectedBucket?: string;
   isDragging?: boolean;
+  wrapWithContext?: boolean;
 }
 
 export default function HourlyPlanner({ 
@@ -70,7 +72,8 @@ export default function HourlyPlanner({
   allowResize = true,
   availableBuckets = [],
   selectedBucket,
-  isDragging = false
+  isDragging = false,
+  wrapWithContext = true
 }: HourlyPlannerProps) {
   const {
     scheduledTasks,
@@ -79,6 +82,21 @@ export default function HourlyPlanner({
     createTask,
   } = useTasksContext();
   
+  // Local drag state so the component can work standalone
+  const [dragging, setDragging] = useState(false);
+  const effectiveDragging = isDragging || dragging;
+
+  const handleDragEnd = useCallback((result: DropResult) => {
+    setDragging(false);
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+    const isHour = (id: string) => id.startsWith('hour-');
+    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+      const dstHour = destination.droppableId; // keep full hour-<slot>
+      batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }]).catch(() => {});
+    }
+  }, [batchUpdateTasks]);
+
   // Ref for the scrollable container
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -211,10 +229,16 @@ export default function HourlyPlanner({
   } | null>(null);
 
   const startResize = useCallback((e: React.MouseEvent, hour: string, taskId: string) => {
+    console.log('🎛️ Starting resize:', { hour, taskId });
     e.stopPropagation();
     e.preventDefault();
 
     const task = hourlyPlan[hour].find((t) => t.id === taskId);
+    if (!task) {
+      console.log('❌ Task not found for resize:', { hour, taskId, availableTasks: hourlyPlan[hour] });
+      return;
+    }
+    console.log('✅ Task found, starting resize:', { taskId, task });
     const startDuration = task?.duration ?? 60;
     let currentDuration = startDuration;
     
@@ -325,7 +349,7 @@ export default function HourlyPlanner({
   // ---------------------------------------------------------------------------
   // RENDER
   // ---------------------------------------------------------------------------
-  return (
+  const content = (
     <div 
       ref={containerRef}
       className={`space-y-1 ${className} max-h-[600px] overflow-y-auto`}
@@ -334,14 +358,14 @@ export default function HourlyPlanner({
           <Droppable key={disp} droppableId={`hour-${disp}`}>
             {(provided, snapshot) => (
               <div
-                className={`relative flex items-start gap-4 py-2 h-[68px] border-t border-theme-neutral-200 first:border-t-0 transition-colors ${
-                  snapshot.isDraggingOver ? 'bg-theme-primary-50 border-theme-primary-200' : ''
+                className={`relative flex items-start gap-4 py-2 h-[68px] border-t border-gray-200 first:border-t-0 transition-colors ${
+                  snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : ''
                 }`}
               >
                 {/* Enhanced time label with better typography */}
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
-                  <span className="text-sm font-medium text-theme-text-primary leading-none">{disp}</span>
-                  <span className="text-xs text-theme-text-tertiary mt-0.5">
+                  <span className="text-sm font-medium text-gray-900 leading-none">{disp}</span>
+                  <span className="text-xs text-gray-500 mt-0.5">
                     {disp === currentHourDisplay ? 'Now' : ''}
                   </span>
                 </div>
@@ -352,13 +376,13 @@ export default function HourlyPlanner({
                   className="flex-1 relative min-h-[60px] overflow-visible"
                   onClick={(e) => {
                     // Prevent click-to-create during drag or resize to avoid interference
-                    if (isDragging || resizingTask) return;
+                    if (effectiveDragging || resizingTask) return;
                     handleTimeSlotClick(disp);
                   }}
                 >
                   {/* Empty time slot indicator */}
                   {hourlyPlan[disp].length === 0 && creatingTaskAt !== disp && (
-                    <li className={`absolute inset-0 flex items-center justify-center group ${(isDragging || resizingTask) ? 'pointer-events-none' : 'cursor-pointer'} hover:bg-theme-surface-hover/50 rounded-lg transition-colors`}>
+                    <li className={`absolute inset-0 flex items-center justify-center group ${(effectiveDragging || resizingTask) ? 'pointer-events-none' : 'cursor-pointer'} hover:bg-theme-surface-hover/50 rounded-lg transition-colors`}>
                       <div className="flex items-center gap-2 text-theme-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
                         <Plus size={14} />
                         <span className="text-xs font-medium">Add task</span>
@@ -435,7 +459,7 @@ export default function HourlyPlanner({
                     return (
                     <Draggable 
                       key={t.id} 
-                      draggableId={t.id} 
+                      draggableId={t.id.toString()} 
                       index={index} 
                       isDragDisabled={!!resizingTask || (resizingTask?.taskId === t.id)}
                     >
@@ -449,41 +473,42 @@ export default function HourlyPlanner({
                           ref={prov.innerRef}
                           {...prov.draggableProps}
                           style={{
-                            // Let DnD control transform entirely during drag; avoid conflicting absolute positioning
+                            // Let DnD control transform entirely during drag
                             ...(prov.draggableProps.style || {}),
-                            height: `${Math.max(24, (taskDuration / 60) * HOUR_HEIGHT)}px`,
-                            ...(isDraggingNow ? {} : {
-                              position: 'absolute',
-                              top: taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px',
-                              left: leftOffset,
-                              width: taskWidth,
-                            }),
+                            height: `${Math.max(32, (taskDuration / 60) * HOUR_HEIGHT)}px`,
+                            // Simplified positioning for better drag compatibility
+                            position: isDraggingNow ? 'relative' : 'absolute',
+                            top: isDraggingNow ? 'auto' : (taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px'),
+                            left: isDraggingNow ? 'auto' : leftOffset,
+                            width: isDraggingNow ? 'auto' : taskWidth,
                             zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : index + 1),
                             ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
                           }}
                           onClick={(e) => e.stopPropagation()}
                           className={`group relative flex items-start gap-3 px-4 py-3 
-                            bg-theme-widget-bg border border-theme-widget-border 
+                            bg-white border border-gray-200 
                             shadow-sm hover:shadow-md 
                             rounded-xl transition-all duration-200 
-                            hover:border-theme-primary-400 hover:bg-theme-surface-hover
-                            ${isDraggingNow ? 'shadow-lg rotate-1 scale-105 border-theme-primary-500' : ''}
-                            ${resizingTask?.taskId === t.id ? 'ring-2 ring-theme-primary-200' : ''}
+                            cursor-grab active:cursor-grabbing
+                            hover:border-indigo-400 hover:bg-gray-50
+                            ${isDraggingNow ? 'shadow-lg rotate-1 scale-105 border-indigo-500 cursor-grabbing' : ''}
+                            ${resizingTask?.taskId === t.id ? 'ring-2 ring-indigo-200' : ''}
                           `}
+                          {...prov.dragHandleProps}
                         >
-                          <div className="flex items-start gap-3 w-full h-full min-h-[32px]" {...prov.dragHandleProps}>
+                          <div className="flex items-start gap-3 w-full h-full min-h-[32px]">
                             {/* Enhanced status indicator with brand colors */}
                             <div className="flex-shrink-0 mt-1">
-                              <div className="w-2.5 h-2.5 bg-theme-primary-500 rounded-full ring-2 ring-theme-primary-200" />
+                              <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full ring-2 ring-indigo-200" />
                             </div>
                             
                             <div className="flex flex-col w-full justify-center min-w-0">
                               {/* Improved time range typography */}
-                              <div className="text-xs font-medium text-theme-primary-600 leading-tight mb-1 tracking-wide">
+                              <div className="text-xs font-medium text-indigo-600 leading-tight mb-1 tracking-wide">
                                 {disp} – {calculateEndTime(disp, resizingTask?.taskId === t.id ? resizingTask.currentDuration : t.duration ?? 60)}
                               </div>
                               {/* Enhanced task title */}
-                              <div className="font-semibold text-theme-text-primary truncate text-sm leading-tight">
+                              <div className="font-semibold text-gray-900 truncate text-sm leading-tight">
                                 {t.content}
                               </div>
                             </div>
@@ -509,13 +534,13 @@ export default function HourlyPlanner({
                             <div className="absolute -bottom-1 left-2 right-2 flex justify-center">
                               <div
                                 onMouseDown={(e) => startResize(e, disp, t.id)}
-                                className="h-2 w-8 cursor-ns-resize 
-                                  bg-theme-primary-200 hover:bg-theme-primary-300 
+                                className="h-3 w-10 cursor-ns-resize 
+                                  bg-indigo-200 hover:bg-indigo-400 
                                   rounded-full transition-all duration-200
-                                  opacity-0 group-hover:opacity-100
-                                  flex items-center justify-center"
+                                  opacity-60 group-hover:opacity-100 hover:scale-110
+                                  flex items-center justify-center shadow-sm"
                               >
-                                <div className="w-3 h-0.5 bg-theme-primary-600 rounded-full" />
+                                <div className="w-3 h-0.5 bg-indigo-600 rounded-full" />
                               </div>
                             </div>
                           )}
@@ -537,10 +562,10 @@ export default function HourlyPlanner({
                   >
                     <div className="w-16 shrink-0" />
                     <div className="flex items-center flex-1">
-                      <div className="w-3 h-3 bg-theme-error-500 rounded-full shadow-lg 
-                        ring-2 ring-theme-error-200 animate-pulse" />
-                      <div className="flex-1 h-0.5 bg-theme-error-500 shadow-sm" />
-                      <div className="px-2 py-1 bg-theme-error-500 text-theme-text-inverse 
+                      <div className="w-3 h-3 bg-theme-primary rounded-full shadow-lg 
+                        ring-2 ring-blue-200 animate-pulse" />
+                      <div className="flex-1 h-0.5 bg-theme-primary shadow-sm" />
+                      <div className="px-2 py-1 bg-theme-primary text-white 
                         text-xs font-medium rounded-md shadow-sm ml-2">
                         {currentTime.toLocaleTimeString('en-US', { 
                           hour: 'numeric', 
@@ -557,4 +582,12 @@ export default function HourlyPlanner({
         ))}
     </div>
   );
+  if (wrapWithContext) {
+    return (
+      <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={handleDragEnd}>
+        {content}
+      </DragDropContext>
+    );
+  }
+  return content;
 }

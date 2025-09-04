@@ -67,9 +67,11 @@ interface FullCalendarProps {
   onDateChange?: (date: Date) => void;
   availableBuckets?: string[];
   selectedBucket?: string;
+  isDragging?: boolean;
+  disableInternalDragDrop?: boolean;
 }
 
-export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket }: FullCalendarProps = {}) {
+export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: FullCalendarProps = {}) {
   const [currentDate, setCurrentDate] = useState(propSelectedDate || new Date());
   const [view, setView] = useState<CalendarView>('day');
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
@@ -175,17 +177,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const rows = getMatrix();
 
-  // Drag state to improve UX (disable click-to-create while dragging)
-  const [isDragging, setIsDragging] = useState(false);
+  // Use drag state from props or local state
+  const [localDragging, setLocalDragging] = useState(false);
+  const dragState = isDragging || localDragging;
 
   // Unified drag and drop handler for calendar day view
   const handleDragEnd = (result: DropResult) => {
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
-      setIsDragging(false);
+      setLocalDragging(false);
       return;
     }
-    setIsDragging(false);
+    setLocalDragging(false);
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
@@ -317,7 +320,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm">
+    <div className="max-w-4xl mx-auto bg-white/95 backdrop-blur-sm border border-gray-200/60 p-6 rounded-xl shadow-sm">
       {/* Header with View Selector */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -382,19 +385,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </p>
           </div>
           
-          <DragDropContext 
-            onDragStart={() => setIsDragging(true)} 
-            onDragEnd={handleDragEnd}
-          >
-            <HourlyPlanner 
-              className="max-h-[70vh] overflow-y-auto" 
-              showTimeIndicator={true}
-              allowResize={true}
-              availableBuckets={availableBuckets}
-              selectedBucket={selectedBucket}
-              isDragging={isDragging}
-            />
-          </DragDropContext>
+          
+          <HourlyPlanner 
+            className="max-h-[70vh] overflow-y-auto" 
+            showTimeIndicator={true}
+            allowResize={true}
+            availableBuckets={availableBuckets}
+            selectedBucket={selectedBucket}
+            wrapWithContext={true}
+          />
         </div>
       ) : (
         // Month and Week views: Use calendar grid
