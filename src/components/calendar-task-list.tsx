@@ -320,8 +320,8 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
               <ul
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                style={{ maxHeight: isOpenCollapsed ? 0 : '16rem' }}
+               className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+               style={{ maxHeight: isOpenCollapsed ? 0 : '60vh' }}
               >
                 {loading && openTasksToShow.length === 0 ? (
                   <li className="text-gray-500">Loading…</li>
