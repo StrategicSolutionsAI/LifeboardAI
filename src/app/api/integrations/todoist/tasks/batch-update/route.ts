@@ -10,7 +10,6 @@ interface TaskUpdate {
     duration?: number;
     hourSlot?: string;
     bucket?: string | null;
-    position?: number;
     due?: { date: string };
     [key: string]: any;
   };
@@ -86,7 +85,6 @@ export async function POST(request: NextRequest) {
           ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
           ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
           ...(update.updates.bucket !== undefined && { bucket: update.updates.bucket }),
-          ...(update.updates.position !== undefined && { position: update.updates.position }),
         };
 
         // Handle null values by removing them from metadata  

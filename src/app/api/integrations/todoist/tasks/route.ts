@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     // Parse metadata from task descriptions and enhance tasks
     const enhancedTasks = tasks.map((task: any) => {
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number } = {};
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string } = {};
       let cleanContent = task.content;
       
       if (task.description) {
@@ -103,7 +103,6 @@ export async function GET(request: NextRequest) {
         duration: metadata.duration, // Only include if exists
         hourSlot: metadata.hourSlot, // Only include if exists - no default
         bucket: metadata.bucket, // Only include if exists
-        position: metadata.position, // For custom ordering in Master List
       };
     });
 

@@ -9,7 +9,6 @@ interface Task {
   due?: { date: string }
   duration?: number
   hourSlot?: string
-  position?: number
   bucket?: string
   created_at?: string
   updated_at?: string

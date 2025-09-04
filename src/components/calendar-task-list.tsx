@@ -38,17 +38,29 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
     [allTasks, todayStr]
   );
 
+  // Local order for today's tasks, persisted per-day in localStorage
+  const todayOrderKey = `daily-order-${todayStr}`;
+  const todayTasksOrdered = useMemo(() => {
+    try {
+      if (typeof window === 'undefined') return todayTasks;
+      const raw = window.localStorage.getItem(todayOrderKey);
+      const idOrder: string[] = raw ? JSON.parse(raw) : [];
+      const map = new Map(todayTasks.map(t => [t.id.toString(), t]));
+      const ordered: any[] = [];
+      idOrder.forEach(id => { if (map.has(id)) { ordered.push(map.get(id)!); map.delete(id); } });
+      // Append any new tasks not yet in the stored order
+      ordered.push(...Array.from(map.values()));
+      return ordered;
+    } catch {
+      return todayTasks;
+    }
+  }, [todayTasks, todayOrderKey]);
+
   // Open tasks (only shown in Master List tab)
-  const openTasksToShow = useMemo(() => {
-    const list = allTasks.filter(t => !t.completed && !t.hourSlot);
-    return list.sort((a: any, b: any) => {
-      const pa = (a as any).position; const pb = (b as any).position;
-      if (pa == null && pb == null) return 0;
-      if (pa == null) return 1;
-      if (pb == null) return -1;
-      return pa - pb;
-    });
-  }, [allTasks]);
+  const openTasksToShow = useMemo(() => 
+    allTasks.filter(t => !t.completed && !t.hourSlot), 
+    [allTasks]
+  );
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -84,16 +96,20 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
     const isHour = (id: string) => id.startsWith('hour-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
-    // Same list reorder - persist custom position metadata for openTasks
+    // Same list reorder - persist for specific lists
     if (source.droppableId === destination.droppableId && source.index !== destination.index) {
-      if (destination.droppableId === 'openTasks') {
-        const reordered = [...openTasksToShow];
-        const [moved] = reordered.splice(source.index, 1);
-        reordered.splice(destination.index, 0, moved);
-        const updates = reordered.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
-        batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
+      // Reorder for today's list (persist to localStorage, no API call)
+      if (destination.droppableId === 'dailyTasks') {
+        const list = [...todayTasksOrdered];
+        const [moved] = list.splice(source.index, 1);
+        list.splice(destination.index, 0, moved);
+        if (typeof window !== 'undefined') {
+          const newOrder = list.map(t => t.id.toString());
+          try { window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); } catch {}
+        }
+        return;
       }
-      return;
+      // Reorder for open tasks is handled below
     }
 
     // Handle moves to/from hourly planner (if calendar has hourly view)
@@ -244,7 +260,7 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
                       <li className="text-gray-500">No tasks for today</li>
                     ) : null}
 
-                    {todayTasks.map((t: any, index: number) => (
+                      {todayTasksOrdered.map((t: any, index: number) => (
                       <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
                         {(provided: any) => (
                           <li
