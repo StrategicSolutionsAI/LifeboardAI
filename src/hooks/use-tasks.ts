@@ -109,12 +109,47 @@ export function useTasks(selectedDate?: Date) {
       if (!res.ok) throw new Error('Failed to create task')
       
       const { task } = await res.json()
-      
+
+      // Parse and normalize metadata so UI shows bucket/duration immediately
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string } = {}
+      let cleanContent: string = task.content
+
+      try {
+        if (task.description) {
+          const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
+          if (metaMatch) {
+            metadata = JSON.parse(metaMatch[1])
+          }
+        }
+        if (typeof task.content === 'string') {
+          const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/)
+          if (contentMetaMatch) {
+            cleanContent = contentMetaMatch[1].trim()
+            if (Object.keys(metadata).length === 0) {
+              const metaMatch = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
+              if (metaMatch) {
+                metadata = JSON.parse(metaMatch[1])
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore parse errors; fall back to raw task fields
+      }
+
+      const enhancedTask = {
+        ...task,
+        content: cleanContent,
+        ...(metadata.duration !== undefined ? { duration: metadata.duration } : {}),
+        ...(metadata.hourSlot !== undefined ? { hourSlot: metadata.hourSlot } : {}),
+        ...(metadata.bucket !== undefined ? { bucket: metadata.bucket } : {}),
+      }
+
       // Add task to appropriate caches
       if (dueDate === dateStr) {
-        updateDailyOptimistically(current => [...(current || []), task])
+        updateDailyOptimistically(current => [...(current || []), enhancedTask as any])
       }
-      updateAllOptimistically(current => [...(current || []), task])
+      updateAllOptimistically(current => [...(current || []), enhancedTask as any])
       
       return task
     } catch (error) {
