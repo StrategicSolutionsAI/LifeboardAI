@@ -10,6 +10,7 @@ interface Task {
   duration?: number
   hourSlot?: string
   bucket?: string
+  position?: number
   created_at?: string
   updated_at?: string
 }
@@ -176,12 +177,14 @@ export function useTasks(selectedDate?: Date) {
     
     try {
       const endpoint = newCompleted 
-        ? `/api/integrations/todoist/tasks/${taskId}/close`
-        : `/api/integrations/todoist/tasks/${taskId}/reopen`
+        ? `/api/integrations/todoist/tasks/complete`
+        : `/api/integrations/todoist/tasks/reopen`
       
       const res = await fetch(endpoint, { 
         method: 'POST',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
       })
       if (!res.ok) throw new Error('Failed to toggle task')
     } catch (error) {
@@ -197,6 +200,8 @@ export function useTasks(selectedDate?: Date) {
   
   // Batch update for drag and drop
   const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task> }[]) => {
+    console.log('🚀 batchUpdateTasks called with:', updates);
+    
     // Update optimistically by applying updates to matching tasks
     const updater = (tasks: Task[] | null) => {
       if (!tasks) return []
@@ -211,6 +216,7 @@ export function useTasks(selectedDate?: Date) {
     
     // Send batch update to server
     try {
+      console.log('📡 Sending batch update to API...');
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
         credentials: 'same-origin',
@@ -218,8 +224,16 @@ export function useTasks(selectedDate?: Date) {
         body: JSON.stringify({ updates })
       })
       
-      if (!res.ok) throw new Error('Failed to batch update tasks')
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('❌ Batch update failed:', res.status, errorText);
+        throw new Error(`Failed to batch update tasks: ${res.status}`);
+      }
+      
+      const result = await res.json();
+      console.log('✅ Batch update successful:', result);
     } catch (error) {
+      console.error('💥 Batch update error:', error);
       // On error, refetch to get correct state
       refetchDaily()
       refetchAll()
