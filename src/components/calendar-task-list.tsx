@@ -56,11 +56,17 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
     }
   }, [todayTasks, todayOrderKey]);
 
-  // Open tasks (only shown in Master List tab)
-  const openTasksToShow = useMemo(() => 
-    allTasks.filter(t => !t.completed && !t.hourSlot), 
-    [allTasks]
-  );
+  // Open tasks (only shown in Master List tab), sorted by custom position if present
+  const openTasksToShow = useMemo(() => {
+    const list = allTasks.filter(t => !t.completed && !t.hourSlot);
+    return list.sort((a: any, b: any) => {
+      const pa = (a as any).position; const pb = (b as any).position;
+      if (pa == null && pb == null) return 0;
+      if (pa == null) return 1;
+      if (pb == null) return -1;
+      return pa - pb;
+    });
+  }, [allTasks]);
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -109,7 +115,15 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
         }
         return;
       }
-      // Reorder for open tasks is handled below
+      // Reorder for open tasks: persist order via position in metadata
+      if (destination.droppableId === 'openTasks') {
+        const list = [...openTasksToShow];
+        const [moved] = list.splice(source.index, 1);
+        list.splice(destination.index, 0, moved);
+        const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
+        batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
+        return;
+      }
     }
 
     // Handle moves to/from hourly planner (if calendar has hourly view)
