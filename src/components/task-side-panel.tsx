@@ -529,7 +529,7 @@ export function TaskSidePanel() {
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
-                      style={{ maxHeight: isOpenCollapsed ? 0 : "24rem" }}
+                      style={{ maxHeight: isOpenCollapsed ? 0 : "40rem" }}
                     >
                       {error ? (
                         <TaskError error={error} onRetry={refetch} />
