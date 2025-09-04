@@ -2434,7 +2434,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
             {/* Content container: white widget box with subtle shadow */}
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-gray-100 bg-white shadow-md">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-gray-100 bg-white shadow-sm">
               {/* Inner nav */}
               <nav className="flex items-center gap-8 border-b border-white/20 px-6 pt-4 text-sm font-semibold">
                 {(['Overview','Trends','Logs','Tasks','Settings'] as const).map((item) => (
