@@ -64,6 +64,7 @@ interface HourlyPlannerProps {
   selectedBucket?: string;
   isDragging?: boolean;
   wrapWithContext?: boolean;
+  plannerDate?: string; // yyyy-MM-dd for creating tasks on selected day
 }
 
 export default function HourlyPlanner({ 
@@ -73,7 +74,8 @@ export default function HourlyPlanner({
   availableBuckets = [],
   selectedBucket,
   isDragging = false,
-  wrapWithContext = true
+  wrapWithContext = true,
+  plannerDate
 }: HourlyPlannerProps) {
   const {
     scheduledTasks,
@@ -88,6 +90,12 @@ export default function HourlyPlanner({
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setDragging(false);
+    // If a resize gesture is in progress or just ended, ignore drag end
+    try {
+      if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+        return;
+      }
+    } catch {}
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
     const isHour = (id: string) => id.startsWith('hour-');
@@ -123,9 +131,8 @@ export default function HourlyPlanner({
     };
     
     try {
-      // Get today's date for the task
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
+      // Use provided planner date (calendar selected day) or fallback to today
+      const dateStr = plannerDate || new Date().toISOString().split('T')[0];
       
       console.log('Creating task:', { content: newTaskContent.trim(), date: dateStr, timeSlot });
       

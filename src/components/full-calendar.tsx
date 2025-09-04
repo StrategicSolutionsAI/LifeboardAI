@@ -393,6 +393,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             availableBuckets={availableBuckets}
             selectedBucket={selectedBucket}
             wrapWithContext={true}
+            plannerDate={format(currentDate, 'yyyy-MM-dd')}
           />
         </div>
       ) : (
