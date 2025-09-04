@@ -39,10 +39,16 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
   );
 
   // Open tasks (only shown in Master List tab)
-  const openTasksToShow = useMemo(() => 
-    allTasks.filter(t => !t.completed && !t.hourSlot), 
-    [allTasks]
-  );
+  const openTasksToShow = useMemo(() => {
+    const list = allTasks.filter(t => !t.completed && !t.hourSlot);
+    return list.sort((a: any, b: any) => {
+      const pa = (a as any).position; const pb = (b as any).position;
+      if (pa == null && pb == null) return 0;
+      if (pa == null) return 1;
+      if (pb == null) return -1;
+      return pa - pb;
+    });
+  }, [allTasks]);
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -78,8 +84,15 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
     const isHour = (id: string) => id.startsWith('hour-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
-    // Same list reorder - no API call needed for now
+    // Same list reorder - persist custom position metadata for openTasks
     if (source.droppableId === destination.droppableId && source.index !== destination.index) {
+      if (destination.droppableId === 'openTasks') {
+        const reordered = [...openTasksToShow];
+        const [moved] = reordered.splice(source.index, 1);
+        reordered.splice(destination.index, 0, moved);
+        const updates = reordered.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
+        batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
+      }
       return;
     }
 

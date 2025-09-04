@@ -148,6 +148,18 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
     const isHour = (id: string) => id.startsWith('hour-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
+    // Same-list reorder for Master List (openTasks)
+    if (source.droppableId === destination.droppableId && source.index !== destination.index) {
+      if (destination.droppableId === 'openTasks') {
+        const list = [...openTasksToShow];
+        const [moved] = list.splice(source.index, 1);
+        list.splice(destination.index, 0, moved);
+        const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
+        batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
+        return;
+      }
+    }
+
     // Handle moves to/from hourly planner
     if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
       // Daily task → Hour slot: Set the hourSlot to schedule the task
@@ -204,7 +216,14 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
   };
 
   const openTasksToShow = useMemo(() => {
-    return allTodoistTasks.filter(t => !t.completed);
+    const list = allTodoistTasks.filter(t => !t.completed);
+    return list.sort((a: any, b: any) => {
+      const pa = (a as any).position; const pb = (b as any).position;
+      if (pa == null && pb == null) return 0;
+      if (pa == null) return 1;
+      if (pb == null) return -1;
+      return pa - pb;
+    });
   }, [allTodoistTasks]);
 
   return (

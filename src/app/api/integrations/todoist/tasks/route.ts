@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
 
     // Parse metadata from task descriptions and enhance tasks
     const enhancedTasks = tasks.map((task: any) => {
-      let metadata: { duration?: number; hourSlot?: string } = {};
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number } = {};
+      let cleanContent = task.content;
       
       if (task.description) {
         try {
@@ -75,10 +76,34 @@ export async function GET(request: NextRequest) {
         }
       }
       
+      // Also check content for metadata (in case it was stored there)
+      if (task.content) {
+        try {
+          const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/);
+          if (contentMetaMatch) {
+            // Extract clean content before metadata
+            cleanContent = contentMetaMatch[1].trim();
+            
+            // Also parse metadata from content if not found in description
+            if (Object.keys(metadata).length === 0) {
+              const metaMatch = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
+              if (metaMatch) {
+                metadata = JSON.parse(metaMatch[1]);
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors, keep original content
+        }
+      }
+      
       return {
         ...task,
+        content: cleanContent, // Use cleaned content
         duration: metadata.duration, // Only include if exists
         hourSlot: metadata.hourSlot, // Only include if exists - no default
+        bucket: metadata.bucket, // Only include if exists
+        position: metadata.position, // For custom ordering in Master List
       };
     });
 
@@ -102,7 +127,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, dueDate, due_date, hour_slot } = await request.json();
+    const { content, dueDate, due_date, hour_slot, bucket } = await request.json();
     const actualDueDate = dueDate || due_date; // Support both formats
 
     if (!content || typeof content !== 'string') {
@@ -129,14 +154,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    let taskContent = content;
-    if (hour_slot) {
-      taskContent = `${content} [LIFEBOARD_META]{\"hourSlot\":\"${hour_slot}\"}[/LIFEBOARD_META]`;
-    }
-
-    const body: Record<string, string> = { content: taskContent };
+    const metadata: { hourSlot?: string; bucket?: string } = {};
+    if (hour_slot) metadata.hourSlot = hour_slot;
+    if (bucket) metadata.bucket = bucket;
+    
+    const body: Record<string, string> = { content };
     if (actualDueDate) {
       body['due_date'] = actualDueDate; // YYYY-MM-DD
+    }
+    
+    // Store metadata in description field instead of content
+    if (Object.keys(metadata).length > 0) {
+      body['description'] = `[LIFEBOARD_META]${JSON.stringify(metadata)}[/LIFEBOARD_META]`;
     }
 
     const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {
