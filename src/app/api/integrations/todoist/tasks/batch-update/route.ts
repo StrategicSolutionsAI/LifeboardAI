@@ -9,6 +9,7 @@ interface TaskUpdate {
     content?: string;
     duration?: number;
     hourSlot?: string;
+    bucket?: string | null;
     due?: { date: string };
     [key: string]: any;
   };
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
           ...existingMeta,
           ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
           ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
+          ...(update.updates.bucket !== undefined && { bucket: update.updates.bucket }),
         };
 
         // Handle null values by removing them from metadata  
@@ -93,6 +95,10 @@ export async function POST(request: NextRequest) {
         if (update.updates.duration === null) {
           delete newMeta.duration;
           console.log(`Removing duration from task ${update.taskId}`);
+        }
+        if (update.updates.bucket === null) {
+          delete newMeta.bucket;
+          console.log(`Removing bucket from task ${update.taskId}`);
         }
 
         // Build new description with metadata
