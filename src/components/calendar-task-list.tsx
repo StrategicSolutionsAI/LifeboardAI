@@ -339,7 +339,7 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             style={provided.draggableProps.style}
-                            className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200"
+                            className="group relative flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200"
                           >
                             <input
                               type="checkbox"
@@ -357,25 +357,25 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
                                   </span>
                                 )}
                               </div>
+                              {/* Hover bucket selector: appears on hover without changing layout height */}
                               {availableBuckets?.length > 0 && (
-                                <div className="mt-2">
-                                  <label className="text-xs text-gray-500 mr-2">Bucket:</label>
-                                  <select
-                                    value={t.bucket || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      batchUpdateTasks([
-                                        { taskId: t.id.toString(), updates: { bucket: val ? val : null } }
-                                      ]).catch(err => console.error('Failed to update bucket', err));
-                                    }}
-                                    className="text-xs rounded-md border border-gray-300 px-2 py-1 bg-white focus:border-indigo-500 focus:outline-none"
-                                  >
-                                    <option value="">No bucket</option>
-                                    {availableBuckets.map((b) => (
-                                      <option key={b} value={b}>{b}</option>
-                                    ))}
-                                  </select>
-                                </div>
+                                <select
+                                  aria-label="Change bucket"
+                                  title="Change bucket"
+                                  value={t.bucket || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    batchUpdateTasks([
+                                      { taskId: t.id.toString(), updates: { bucket: val ? val : null } }
+                                    ]).catch(err => console.error('Failed to update bucket', err));
+                                  }}
+                                  className="absolute right-3 top-2 text-xs rounded-md border border-gray-300 px-2 py-0.5 bg-white focus:border-indigo-500 focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                >
+                                  <option value="">No bucket</option>
+                                  {availableBuckets.map((b) => (
+                                    <option key={b} value={b}>{b}</option>
+                                  ))}
+                                </select>
                               )}
                             </div>
                           </li>
