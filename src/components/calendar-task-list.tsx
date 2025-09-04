@@ -304,9 +304,9 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
           </>
         )}
 
-        {/* Master List tab: show open tasks only in this tab */}
+        {/* Master List tab: fills remaining height; list scrolls within */}
         {taskView === 'Master List' && (
-        <div className={`mt-4`}>
+        <div className="mt-4 flex-1 min-h-0 flex flex-col">
           <div
             className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
             onClick={() => setIsOpenCollapsed((c) => !c)}
@@ -314,60 +314,63 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
             <span>All Open Tasks</span>
             {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
           </div>
-          
-          <Droppable droppableId="openTasks">
-            {(provided: any) => (
-              <ul
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-               className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-               style={{ maxHeight: isOpenCollapsed ? 0 : '60vh' }}
-              >
-                {loading && openTasksToShow.length === 0 ? (
-                  <li className="text-gray-500">Loading…</li>
-                ) : null}
+          {/* Scroll container takes remaining space when expanded */}
+          <div className={`transition-[max-height] duration-200 ${isOpenCollapsed ? 'max-h-0' : 'flex-1 min-h-0'}`}>
+            {!isOpenCollapsed && (
+              <Droppable droppableId="openTasks">
+                {(provided: any) => (
+                  <ul
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="space-y-2 text-sm text-gray-700 pr-1 h-full overflow-y-auto"
+                  >
+                    {loading && openTasksToShow.length === 0 ? (
+                      <li className="text-gray-500">Loading…</li>
+                    ) : null}
 
-                {!loading && openTasksToShow.length === 0 ? (
-                  <li className="text-gray-500">No open tasks</li>
-                ) : null}
+                    {!loading && openTasksToShow.length === 0 ? (
+                      <li className="text-gray-500">No open tasks</li>
+                    ) : null}
 
-                {openTasksToShow.map((t: any, index: number) => (
-                  <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                    {(provided: any) => (
-                      <li
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        style={provided.draggableProps.style}
-                        className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={t.content}
-                          checked={t.completed ?? false}
-                          onChange={() => toggleTaskCompletion(t.id.toString())}
-                          className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                        />
-                        <div className="flex-1">
-                          <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                          {t.bucket && (
-                            <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                              {t.bucket}
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </ul>
+                    {openTasksToShow.map((t: any, index: number) => (
+                      <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                        {(provided: any) => (
+                          <li
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={provided.draggableProps.style}
+                            className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
+                          >
+                            <input
+                              type="checkbox"
+                              aria-label={t.content}
+                              checked={t.completed ?? false}
+                              onChange={() => toggleTaskCompletion(t.id.toString())}
+                              className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                            />
+                            <div className="flex-1">
+                              <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              {t.bucket && (
+                                <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                                  {t.bucket}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </ul>
+                )}
+              </Droppable>
             )}
-          </Droppable>
+          </div>
 
           {/* Add open task */}
-          {!isOpenCollapsed && (
-            <div className="mt-2 space-y-2">
+           {!isOpenCollapsed && (
+             <div className="mt-2 space-y-2">
               {availableBuckets.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-gray-600 font-medium">Bucket:</label>
