@@ -101,6 +101,7 @@ import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-c
 import HourlyPlanner from './hourly-planner';
 import { NutritionMealTracker } from "./nutrition-meal-tracker";
 import { NutritionSummaryWidget } from "./nutrition-summary-widget";
+import { CalendarTaskList } from "./calendar-task-list";
 import { MedicationTrackerWidget } from "./medication-tracker-simple";
 import { ExerciseWidget } from "./exercise-widget-simple";
 import { HomeProjectsWidget } from "./home-projects-widget";
@@ -483,7 +484,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isNoDueDateCollapsed, setIsNoDueDateCollapsed] = useState(true);
   
   // Dashboard inner subtabs (left panel)
-  const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Settings'>('Overview');
+  const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Tasks'|'Settings'>('Overview');
   
   // Widget selection for filtering
   const [selectedLogsWidget, setSelectedLogsWidget] = useState<string | 'all'>('all');
@@ -2346,7 +2347,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
         </div>
         
-        <div className="relative z-10 flex flex-col backdrop-blur-md bg-white/25 p-6 border border-white/20 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.06)]">
+        {/* Main wrapper: simplify background and remove heavy drop shadow */}
+        <div className="relative z-10 flex flex-col bg-white p-6 border border-gray-100 rounded-2xl">
 
           {/* Greeting */}
           <section className="w-full mb-4">
@@ -2391,8 +2393,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   }}
                   className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-6 text-[14px] font-semibold capitalize transition-all duration-300 ${
                     b === activeBucket
-                      ? 'bg-theme-primary-500 text-white border border-theme-primary-500/30 hover:bg-theme-primary-600 scale-[1.02] shadow-[4px_0_6px_rgba(0,0,0,0.08),-4px_0_6px_rgba(0,0,0,0.08)]'
-                      : 'bg-white/70 backdrop-blur-md text-theme-primary-600 border border-white/40 hover:bg-white/90 hover:border-theme-primary-500/30 shadow-[3px_0_4px_rgba(0,0,0,0.05),-3px_0_4px_rgba(0,0,0,0.05)]'
+                      ? 'bg-theme-primary-500 text-white border border-theme-primary-500/30 hover:bg-theme-primary-600 scale-[1.02] shadow-none'
+                      : 'bg-white text-theme-primary-600 border border-gray-100 hover:bg-white hover:border-theme-primary-500/30 shadow-none'
                   }`}
                 >
                   {b}
@@ -2405,7 +2407,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   zIndex: 0,
                   marginRight: '-10px'
                 }}
-                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white/70 backdrop-blur-md px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white/90 hover:border-theme-primary-500/30 border border-white/40 shadow-[3px_0_4px_rgba(0,0,0,0.05),-3px_0_4px_rgba(0,0,0,0.05)]"
+                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-gray-100 shadow-none"
               >
                 <span className="text-theme-primary-600">
                   +
@@ -2431,10 +2433,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <div className="w-full flex-1 pb-24">
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-white/30 bg-white/70 backdrop-blur-md">
+            {/* Content container: remove blur and translucent bg to avoid halo/shadow */}
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-gray-100 bg-white">
               {/* Inner nav */}
               <nav className="flex items-center gap-8 border-b border-white/20 px-6 pt-4 text-sm font-semibold">
-                {(['Overview','Trends','Logs','Settings'] as const).map((item) => (
+                {(['Overview','Trends','Logs','Tasks','Settings'] as const).map((item) => (
                   <button
                     key={item}
                     onClick={() => setActiveSubTab(item)}
@@ -3173,6 +3176,28 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     widgets={getDisplayWidgets(activeBucket)} 
                     bucketName={activeBucket}
                   />
+                )}
+
+                {activeSubTab === 'Tasks' && (
+                  <div>
+                    {/* Tasks Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-semibold">Tasks for {activeBucket}</h2>
+                    </div>
+                    
+                    {/* Tasks Content */}
+                    <TasksProvider selectedDate={new Date()}>
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <div className="space-y-6">
+                          <CalendarTaskList 
+                            selectedDate={new Date()}
+                            availableBuckets={buckets}
+                            selectedBucket={activeBucket}
+                          />
+                        </div>
+                      </div>
+                    </TasksProvider>
+                  </div>
                 )}
 
                 {activeSubTab === 'Logs' && (
