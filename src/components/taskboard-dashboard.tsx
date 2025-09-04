@@ -3373,6 +3373,67 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           />
         )}
 
+        {/* Bucket editor: add/remove tabs */}
+        <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+          <SheetContent side="right" className="w-[520px] sm:w-[560px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-gray-900">Manage Tabs</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Add a new tab</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tab name (e.g., Side Projects)"
+                    value={newBucket}
+                    onChange={(e) => setNewBucket(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddBucket()}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleAddBucket}
+                    disabled={!newBucket.trim() || buckets.includes(newBucket.trim())}
+                    className="px-3 py-2 text-sm rounded-md bg-theme-primary-500 text-white hover:bg-theme-primary-600 disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-2">Existing tabs</div>
+                <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 overflow-hidden">
+                  {buckets.map((b) => (
+                    <li key={b} className="flex items-center justify-between px-3 py-2 bg-white">
+                      <span className={`text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
+                      <div className="flex items-center gap-2">
+                        {b !== activeBucket && (
+                          <button
+                            onClick={() => setActiveBucket(b)}
+                            className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
+                          >
+                            Make Active
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemoveBucket(b)}
+                          className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                  {buckets.length === 0 && (
+                    <li className="px-3 py-6 text-sm text-gray-500 text-center">No tabs yet</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
         {/* Nutrition Widget Modal */}
         <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => { 
           setNutritionWidgetOpen(open)
