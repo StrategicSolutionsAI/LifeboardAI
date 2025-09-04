@@ -2347,8 +2347,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
         </div>
         
-        {/* Main wrapper: simplify background and remove heavy drop shadow */}
-        <div className="relative z-10 flex flex-col bg-white p-6 border border-gray-100 rounded-2xl">
+        {/* Main wrapper: no styling, acts purely as a container */}
+        <div className="relative z-10 flex flex-col">
 
           {/* Greeting */}
           <section className="w-full mb-4">
