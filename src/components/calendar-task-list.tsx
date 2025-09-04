@@ -11,9 +11,11 @@ interface CalendarTaskListProps {
   onDateChange?: (date: Date) => void;
   availableBuckets?: string[];
   selectedBucket?: string;
+  isDragging?: boolean;
+  disableInternalDragDrop?: boolean;
 }
 
-export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets = [], selectedBucket }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -29,7 +31,14 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
     batchUpdateTasks,
   } = useTasksContext();
 
-  // Filter tasks for display
+  // Today-only list (always use real today, independent of selectedDate)
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const todayTasks = useMemo(() =>
+    allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr),
+    [allTasks, todayStr]
+  );
+
+  // Open tasks (only shown in Master List tab)
   const openTasksToShow = useMemo(() => 
     allTasks.filter(t => !t.completed && !t.hourSlot), 
     [allTasks]
@@ -42,10 +51,8 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
 
   const handleAddDailyTask = async () => {
     if (newDailyTask.trim()) {
-      const dateStr = `${selectedDate.getFullYear()}-${String(
-        selectedDate.getMonth() + 1
-      ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
-      await createTask(newDailyTask, dateStr, undefined, taskBucket);
+      // Always add to today in this sidebar's Today section
+      await createTask(newDailyTask, todayStr, undefined, taskBucket);
       setNewDailyTask("");
     }
   };
@@ -111,13 +118,9 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
 
     // Handle moves between daily and open tasks
     if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
-      // Open task → Daily: Set due date
-      const dateStr = `${selectedDate.getFullYear()}-${String(
-        selectedDate.getMonth() + 1
-      ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
-      
+      // Open task → Today list: Set due date to real today
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: { date: dateStr } } }
+        { taskId: draggableId, updates: { due: { date: todayStr } } }
       ]).catch(error => {
         console.error('Failed to update task due date:', error);
       });
@@ -184,172 +187,87 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
 
       {/* Task lists with drag & drop */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        <DragDropContext onDragEnd={handleDragEnd}>
-          {taskView === 'Today' && (
-            <>
-              {/* Daily tasks */}
-              <Droppable droppableId="dailyTasks">
-                {(provided: any) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="flex flex-col"
-                  >
-                    <div
-                      className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-                      onClick={() => setIsDailyCollapsed((c) => !c)}
-                    >
-                      <span>Tasks for {format(selectedDate, 'MMM d, yyyy')}</span>
-                      {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                    </div>
+        {!disableInternalDragDrop ? (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            {renderTaskContent()}
+          </DragDropContext>
+        ) : (
+          renderTaskContent()
+        )}
+      </div>
+    </div>
+  );
 
-                    <ul
-                      className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                      style={{ maxHeight: isDailyCollapsed ? 0 : '12rem' }}
-                    >
-                      {loading && dailyVisibleTasks.length === 0 ? (
-                        <li className="text-gray-500">Loading…</li>
-                      ) : null}
-
-                      {!loading && dailyVisibleTasks.length === 0 ? (
-                        <li className="text-gray-500">No tasks for today</li>
-                      ) : null}
-
-                      {dailyVisibleTasks.map((t: any, index: number) => (
-                        <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                          {(provided: any) => (
-                            <li
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={provided.draggableProps.style}
-                              className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
-                            >
-                              <input
-                                type="checkbox"
-                                aria-label={t.content}
-                                checked={t.completed ?? false}
-                                onChange={() => toggleTaskCompletion(t.id.toString())}
-                                className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                              />
-                              <div className="flex-1">
-                                <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                                {t.bucket && (
-                                  <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                                    {t.bucket}
-                                  </span>
-                                )}
-                              </div>
-                            </li>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </ul>
-                  </div>
-                )}
-              </Droppable>
-
-              {/* Add task to daily list */}
-              {!isDailyCollapsed && (
-                <div className="mt-2 space-y-2">
-                  {availableBuckets.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-600 font-medium">Bucket:</label>
-                      <select
-                        value={taskBucket}
-                        onChange={(e) => setTaskBucket(e.target.value)}
-                        className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white"
-                      >
-                        {availableBuckets.map(bucket => (
-                          <option key={bucket} value={bucket}>{bucket}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add task for today…"
-                      value={newDailyTask}
-                      onChange={(e) => setNewDailyTask(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
-                      className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleAddDailyTask}
-                      className="text-sm text-indigo-600 hover:underline"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Master tasks (all open tasks) */}
-          <div className={`mt-4 ${taskView === 'Today' ? '' : 'mt-0'}`}>
-            <div
-              className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-              onClick={() => setIsOpenCollapsed((c) => !c)}
-            >
-              <span>All Open Tasks</span>
-              {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-            </div>
-            
-            <Droppable droppableId="openTasks">
+  function renderTaskContent() {
+    return (
+      <>
+        {taskView === 'Today' && (
+          <>
+            {/* Daily tasks */}
+            <Droppable droppableId="dailyTasks">
               {(provided: any) => (
-                <ul
+                <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-                  style={{ maxHeight: isOpenCollapsed ? 0 : '16rem' }}
+                  className="flex flex-col"
                 >
-                  {loading && openTasksToShow.length === 0 ? (
-                    <li className="text-gray-500">Loading…</li>
-                  ) : null}
+                  <div
+                    className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+                    onClick={() => setIsDailyCollapsed((c) => !c)}
+                  >
+                    <span>Tasks for Today</span>
+                    {isDailyCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  </div>
 
-                  {!loading && openTasksToShow.length === 0 ? (
-                    <li className="text-gray-500">No open tasks</li>
-                  ) : null}
+                  <ul
+                    className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                    style={{ maxHeight: isDailyCollapsed ? 0 : '12rem' }}
+                  >
+                    {loading && todayTasks.length === 0 ? (
+                      <li className="text-gray-500">Loading…</li>
+                    ) : null}
 
-                  {openTasksToShow.map((t: any, index: number) => (
-                    <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
-                      {(provided: any) => (
-                        <li
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          style={provided.draggableProps.style}
-                          className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
-                        >
-                          <input
-                            type="checkbox"
-                            aria-label={t.content}
-                            checked={t.completed ?? false}
-                            onChange={() => toggleTaskCompletion(t.id.toString())}
-                            className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                          />
-                          <div className="flex-1">
-                            <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
-                            {t.bucket && (
-                              <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                                {t.bucket}
-                              </span>
-                            )}
-                          </div>
-                        </li>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </ul>
+                    {!loading && todayTasks.length === 0 ? (
+                      <li className="text-gray-500">No tasks for today</li>
+                    ) : null}
+
+                    {todayTasks.map((t: any, index: number) => (
+                      <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                        {(provided: any) => (
+                          <li
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={provided.draggableProps.style}
+                            className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
+                          >
+                            <input
+                              type="checkbox"
+                              aria-label={t.content}
+                              checked={t.completed ?? false}
+                              onChange={() => toggleTaskCompletion(t.id.toString())}
+                              className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                            />
+                            <div className="flex-1">
+                              <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                              {t.bucket && (
+                                <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                                  {t.bucket}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </ul>
+                </div>
               )}
             </Droppable>
 
-            {/* Add open task */}
-            {!isOpenCollapsed && (
+            {/* Add task to daily list */}
+            {!isDailyCollapsed && (
               <div className="mt-2 space-y-2">
                 {availableBuckets.length > 0 && (
                   <div className="flex items-center gap-2">
@@ -368,14 +286,14 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Add open task…"
-                    value={newOpenTask}
-                    onChange={(e) => setNewOpenTask(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                    placeholder="Add task for today…"
+                    value={newDailyTask}
+                    onChange={(e) => setNewDailyTask(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddDailyTask(); }}
                     className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
                   />
                   <button
-                    onClick={handleAddOpenTask}
+                    onClick={handleAddDailyTask}
                     className="text-sm text-indigo-600 hover:underline"
                   >
                     Add
@@ -383,9 +301,108 @@ export function CalendarTaskList({ selectedDate, onDateChange, availableBuckets 
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {/* Master List tab: show open tasks only in this tab */}
+        {taskView === 'Master List' && (
+        <div className={`mt-4`}>
+          <div
+            className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+            onClick={() => setIsOpenCollapsed((c) => !c)}
+          >
+            <span>All Open Tasks</span>
+            {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
           </div>
-        </DragDropContext>
-      </div>
-    </div>
-  );
+          
+          <Droppable droppableId="openTasks">
+            {(provided: any) => (
+              <ul
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
+                style={{ maxHeight: isOpenCollapsed ? 0 : '16rem' }}
+              >
+                {loading && openTasksToShow.length === 0 ? (
+                  <li className="text-gray-500">Loading…</li>
+                ) : null}
+
+                {!loading && openTasksToShow.length === 0 ? (
+                  <li className="text-gray-500">No open tasks</li>
+                ) : null}
+
+                {openTasksToShow.map((t: any, index: number) => (
+                  <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                    {(provided: any) => (
+                      <li
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        style={provided.draggableProps.style}
+                        className="flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing"
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={t.content}
+                          checked={t.completed ?? false}
+                          onChange={() => toggleTaskCompletion(t.id.toString())}
+                          className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
+                        />
+                        <div className="flex-1">
+                          <span className={t.completed ? 'line-through text-gray-400' : ''}>{t.content}</span>
+                          {t.bucket && (
+                            <span className="ml-2 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                              {t.bucket}
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </ul>
+            )}
+          </Droppable>
+
+          {/* Add open task */}
+          {!isOpenCollapsed && (
+            <div className="mt-2 space-y-2">
+              {availableBuckets.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600 font-medium">Bucket:</label>
+                  <select
+                    value={taskBucket}
+                    onChange={(e) => setTaskBucket(e.target.value)}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none bg-white"
+                  >
+                    {availableBuckets.map(bucket => (
+                      <option key={bucket} value={bucket}>{bucket}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add open task…"
+                  value={newOpenTask}
+                  onChange={(e) => setNewOpenTask(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
+                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleAddOpenTask}
+                  className="text-sm text-indigo-600 hover:underline"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        )}
+      </>
+    );
+  }
 }
