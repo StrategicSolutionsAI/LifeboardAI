@@ -214,7 +214,7 @@ export function useTasks(selectedDate?: Date) {
     updateDailyOptimistically(updater)
     updateAllOptimistically(updater)
     
-    // Send batch update to server
+    // Send batch update to server (soft-fail if API unreachable)
     try {
       console.log('📡 Sending batch update to API...');
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
@@ -223,21 +223,22 @@ export function useTasks(selectedDate?: Date) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates })
       })
-      
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('❌ Batch update failed:', res.status, errorText);
-        throw new Error(`Failed to batch update tasks: ${res.status}`);
+        const errorText = await res.text().catch(() => '');
+        console.warn('❌ Batch update non-OK:', res.status, errorText);
+        // Soft recover: resync caches but do not throw (keep optimistic UI)
+        refetchDaily();
+        refetchAll();
+        return;
       }
-      
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
       console.log('✅ Batch update successful:', result);
     } catch (error) {
-      console.error('💥 Batch update error:', error);
-      // On error, refetch to get correct state
-      refetchDaily()
-      refetchAll()
-      throw error
+      console.warn('💥 Batch update network error (continuing with optimistic state):', error);
+      refetchDaily();
+      refetchAll();
+      // Do not throw to avoid UI crash overlays
+      return;
     }
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   

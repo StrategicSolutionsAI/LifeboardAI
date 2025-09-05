@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         provider: 'withings',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
+        provider_user_id: tokenData.userid ? String(tokenData.userid) : null,
         token_data: tokenData,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

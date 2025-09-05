@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     // Parse metadata from task descriptions and enhance tasks
     const enhancedTasks = tasks.map((task: any) => {
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string } = {};
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number } = {};
       let cleanContent = task.content;
       
       if (task.description) {
@@ -103,6 +103,7 @@ export async function GET(request: NextRequest) {
         duration: metadata.duration, // Only include if exists
         hourSlot: metadata.hourSlot, // Only include if exists - no default
         bucket: metadata.bucket, // Only include if exists
+        position: metadata.position, // Only include if exists
       };
     });
 
@@ -116,7 +117,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For all=true we return all open tasks (no filtering)
+    // For all=true we return all open tasks (no filtering), sorted by position
+    if (allParam) {
+      // Sort tasks by position (ascending), with tasks without position at the end
+      responseTasks.sort((a: any, b: any) => {
+        const posA = a.position ?? Number.MAX_SAFE_INTEGER;
+        const posB = b.position ?? Number.MAX_SAFE_INTEGER;
+        return posA - posB;
+      });
+    }
+    
     return NextResponse.json({ tasks: responseTasks });
   } catch (err) {
     console.error('Todoist tasks endpoint error', err);

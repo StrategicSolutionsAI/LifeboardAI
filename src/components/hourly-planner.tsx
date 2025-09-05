@@ -87,6 +87,7 @@ export default function HourlyPlanner({
   // Local drag state so the component can work standalone
   const [dragging, setDragging] = useState(false);
   const effectiveDragging = isDragging || dragging;
+  const suppressDragUntilRef = useRef<number>(0);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setDragging(false);
@@ -96,6 +97,7 @@ export default function HourlyPlanner({
         return;
       }
     } catch {}
+    if (Date.now() < suppressDragUntilRef.current) return;
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
     const isHour = (id: string) => id.startsWith('hour-');
@@ -258,6 +260,7 @@ export default function HourlyPlanner({
     setResizingTask({ taskId, hour, currentDuration: startDuration });
     // Mark global resizing flag to prevent DnD handlers from acting
     try { document.body.classList.add('lb-resizing'); } catch {}
+    suppressDragUntilRef.current = Date.now() + 300;
 
     // Guard against multiple finalizations
     let ended = false;
@@ -272,6 +275,7 @@ export default function HourlyPlanner({
       setResizingTask(null);
       resizeStartRef.current = null;
       try { document.body.classList.remove('lb-resizing'); } catch {}
+      suppressDragUntilRef.current = Date.now() + 250;
       // Remove listeners
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", endResize);
