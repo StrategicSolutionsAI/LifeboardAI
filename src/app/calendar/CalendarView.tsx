@@ -101,7 +101,12 @@ function CalendarContent() {
 
     // Handle moves from hourly slots back to sidebar task lists
     if (isHour(source.droppableId) && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
-      console.log('⏰➡️📋 Calendar hour → Sidebar:', { draggableId, from: source.droppableId, to: destination.droppableId });
+      console.log('⏰➡️📋 Calendar hour → Sidebar:', { 
+        draggableId, 
+        from: source.droppableId, 
+        to: destination.droppableId, 
+        targetIndex: destination.index 
+      });
       
       // Determine what updates to make based on destination
       let updates: any = { hourSlot: undefined }; // Always remove hour slot
