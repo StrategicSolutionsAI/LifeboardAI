@@ -22,8 +22,8 @@ interface SidebarLayoutProps {
 }
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
