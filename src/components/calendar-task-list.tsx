@@ -323,8 +323,16 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     later: true
   });
 
+  // Filter upcoming tasks by selected bucket if provided
+  const filteredUpcomingTasks = useMemo(() => {
+    if (selectedBucket) {
+      return upcomingTasks.filter(t => t.bucket === selectedBucket);
+    }
+    return upcomingTasks;
+  }, [upcomingTasks, selectedBucket]);
+
   // Group upcoming tasks intelligently
-  const taskGroups = useTaskGrouping(upcomingTasks);
+  const taskGroups = useTaskGrouping(filteredUpcomingTasks);
 
   // Handle task expansion
   const handleTaskExpand = useCallback((taskId: string) => {
@@ -355,10 +363,16 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Today-only list (always use real today, independent of selectedDate)
   const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-  const todayTasks = useMemo(() =>
-    allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr),
-    [allTasks, todayStr]
-  );
+  const todayTasks = useMemo(() => {
+    let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr);
+    
+    // Filter by selectedBucket if provided
+    if (selectedBucket) {
+      filtered = filtered.filter(t => t.bucket === selectedBucket);
+    }
+    
+    return filtered;
+  }, [allTasks, todayStr, selectedBucket]);
 
   // Local order for today's tasks, persisted per-day in localStorage
   const todayOrderKey = `daily-order-${todayStr}`;
@@ -383,7 +397,16 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   }, [todayTasks, todayOrderKey, todayTasksRenderKey]);
 
   // Open tasks (only shown in Master List tab)
-  const openTasksBase = useMemo(() => allTasks.filter(t => !t.completed && !t.hourSlot), [allTasks]);
+  const openTasksBase = useMemo(() => {
+    let filtered = allTasks.filter(t => !t.completed && !t.hourSlot);
+    
+    // Filter by selectedBucket if provided
+    if (selectedBucket) {
+      filtered = filtered.filter(t => t.bucket === selectedBucket);
+    }
+    
+    return filtered;
+  }, [allTasks, selectedBucket]);
 
   // Maintain a local, immediately responsive list for open tasks
   const [openTasksLocal, setOpenTasksLocal] = useState<any[]>([]);
