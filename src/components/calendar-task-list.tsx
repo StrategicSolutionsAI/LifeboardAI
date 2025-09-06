@@ -327,7 +327,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   // Filter upcoming tasks by selected bucket if provided
   const filteredUpcomingTasks = useMemo(() => {
     if (selectedBucket) {
-      return upcomingTasks.filter(t => t.bucket === selectedBucket);
+      return upcomingTasks.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     return upcomingTasks;
   }, [upcomingTasks, selectedBucket]);
@@ -339,7 +339,19 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const dashboardTasks = useMemo(() => {
     if (!dashboardView) return [];
     
-    let allBucketTasks = allTasks.filter(t => !t.completed && (!selectedBucket || t.bucket === selectedBucket));
+    let allBucketTasks = allTasks.filter(t => !t.completed);
+    
+    // Filter by selectedBucket if provided, but be more lenient
+    // Include tasks that either:
+    // 1. Have no bucket property (likely Todoist tasks)
+    // 2. Have a bucket that matches the selectedBucket
+    // 3. If no selectedBucket, show all tasks
+    if (selectedBucket) {
+      allBucketTasks = allBucketTasks.filter(t => 
+        !t.bucket || // Include tasks without bucket (Todoist tasks)
+        t.bucket === selectedBucket
+      );
+    }
     
     // Sort tasks: those with due dates first (by date), then tasks without due dates
     return allBucketTasks.sort((a, b) => {
@@ -389,9 +401,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const todayTasks = useMemo(() => {
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr);
     
-    // Filter by selectedBucket if provided
+    // Filter by selectedBucket if provided, but include tasks without bucket (Todoist tasks)
     if (selectedBucket) {
-      filtered = filtered.filter(t => t.bucket === selectedBucket);
+      filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     
     return filtered;
@@ -423,9 +435,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const openTasksBase = useMemo(() => {
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot);
     
-    // Filter by selectedBucket if provided
+    // Filter by selectedBucket if provided, but include tasks without bucket (Todoist tasks)
     if (selectedBucket) {
-      filtered = filtered.filter(t => t.bucket === selectedBucket);
+      filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     
     return filtered;
