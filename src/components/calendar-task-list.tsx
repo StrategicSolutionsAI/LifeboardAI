@@ -341,16 +341,10 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     
     let allBucketTasks = allTasks.filter(t => !t.completed);
     
-    // Filter by selectedBucket if provided, but be more lenient
-    // Include tasks that either:
-    // 1. Have no bucket property (likely Todoist tasks)
-    // 2. Have a bucket that matches the selectedBucket
-    // 3. If no selectedBucket, show all tasks
+    // For dashboard view, be more strict about bucket filtering
+    // Only show tasks that specifically belong to the selected bucket
     if (selectedBucket) {
-      allBucketTasks = allBucketTasks.filter(t => 
-        !t.bucket || // Include tasks without bucket (Todoist tasks)
-        t.bucket === selectedBucket
-      );
+      allBucketTasks = allBucketTasks.filter(t => t.bucket === selectedBucket);
     }
     
     // Sort tasks: those with due dates first (by date), then tasks without due dates
@@ -770,6 +764,12 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Dashboard view: Simple task list without groupings
   if (dashboardView) {
+    console.log('🎯 Dashboard view activated', { 
+      dashboardView, 
+      selectedBucket, 
+      dashboardTasksCount: dashboardTasks.length,
+      allTasksCount: allTasks.length 
+    });
     return (
       <div className="space-y-3">
         {loading && dashboardTasks.length === 0 ? (
@@ -866,6 +866,8 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       </div>
     );
   }
+
+  console.log('🎯 Regular view rendering', { dashboardView, selectedBucket });
 
   return (
     <div className="w-[420px] bg-white/95 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
