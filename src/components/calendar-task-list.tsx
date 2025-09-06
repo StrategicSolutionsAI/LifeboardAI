@@ -15,6 +15,7 @@ interface CalendarTaskListProps {
   selectedBucket?: string;
   isDragging?: boolean;
   disableInternalDragDrop?: boolean;
+  dashboardView?: boolean; // Simplified view for dashboard usage
 }
 
 // Enhanced task card component with priority-based styling and progressive disclosure
@@ -296,7 +297,7 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ availableBuckets = [], selectedBucket, disableInternalDragDrop = false }: CalendarTaskListProps) {
+export function CalendarTaskList({ availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -333,6 +334,28 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Group upcoming tasks intelligently
   const taskGroups = useTaskGrouping(filteredUpcomingTasks);
+
+  // Combined tasks for dashboard view (all incomplete tasks from the bucket, sorted by due date)
+  const dashboardTasks = useMemo(() => {
+    if (!dashboardView) return [];
+    
+    let allBucketTasks = allTasks.filter(t => !t.completed && (!selectedBucket || t.bucket === selectedBucket));
+    
+    // Sort tasks: those with due dates first (by date), then tasks without due dates
+    return allBucketTasks.sort((a, b) => {
+      // Tasks with due dates come first
+      if (a.due?.date && !b.due?.date) return -1;
+      if (!a.due?.date && b.due?.date) return 1;
+      
+      // Both have due dates - sort by date
+      if (a.due?.date && b.due?.date) {
+        return new Date(a.due.date).getTime() - new Date(b.due.date).getTime();
+      }
+      
+      // Both don't have due dates - maintain current order
+      return 0;
+    });
+  }, [dashboardView, allTasks, selectedBucket]);
 
   // Handle task expansion
   const handleTaskExpand = useCallback((taskId: string) => {
@@ -729,6 +752,105 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
         >
           <ChevronLeft size={18} className="text-gray-500 group-hover:text-gray-700 transition-colors" />
         </button>
+      </div>
+    );
+  }
+
+  // Dashboard view: Simple task list without groupings
+  if (dashboardView) {
+    return (
+      <div className="space-y-3">
+        {loading && dashboardTasks.length === 0 ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-gray-100 h-16 rounded-xl"></div>
+              </div>
+            ))}
+          </div>
+        ) : !loading && dashboardTasks.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center mx-auto mb-3">
+              <Clock size={20} className="text-indigo-600" />
+            </div>
+            <h5 className="text-sm font-medium text-gray-900 mb-1">No tasks</h5>
+            <p className="text-xs text-gray-500">Add a task to get started</p>
+          </div>
+        ) : (
+          dashboardTasks.map((task: any, index: number) => (
+            <div
+              key={task.id}
+              className="group relative bg-white border border-gray-200/60 hover:border-gray-300/80 rounded-xl p-4 transition-all duration-200 hover:shadow-md"
+            >
+              <div className="flex items-start gap-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={task.completed ?? false}
+                    onChange={() => toggleTaskCompletion(task.id.toString())}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                    task.completed 
+                      ? 'bg-indigo-600 border-indigo-600' 
+                      : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
+                  }`}>
+                    {task.completed && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </label>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
+                    task.completed ? 'line-through text-gray-400' : 'text-gray-900'
+                  }`}>
+                    {task.content}
+                  </p>
+                  {/* Display due date if available */}
+                  {task.due?.date && (
+                    <div className="mt-2">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                        {format(new Date(task.due.date), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        
+        {/* Add task form for dashboard view */}
+        <div className="p-4 bg-gradient-to-r from-gray-50/80 to-gray-50/40 rounded-xl border border-gray-200/60 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h5 className="text-sm font-medium text-gray-900">Add task</h5>
+          </div>
+          
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="What needs to be done?"
+              value={newOpenTask}
+              onChange={(e) => setNewOpenTask(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newOpenTask.trim()) handleAddOpenTask(); }}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all duration-200 placeholder-gray-400"
+            />
+            <button
+              onClick={handleAddOpenTask}
+              disabled={!newOpenTask.trim()}
+              className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:from-gray-300 disabled:to-gray-400 text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+            >
+              Add
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

@@ -3193,6 +3193,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             selectedDate={new Date()}
                             availableBuckets={buckets}
                             selectedBucket={activeBucket}
+                            dashboardView={true}
                           />
                         </div>
                       </div>
