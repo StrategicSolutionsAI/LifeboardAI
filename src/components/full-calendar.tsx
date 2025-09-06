@@ -23,7 +23,7 @@ import {
 import HourlyPlanner from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
-import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import { DragDropContext, DropResult, Droppable } from "@hello-pangea/dnd";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -392,7 +392,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             allowResize={true}
             availableBuckets={availableBuckets}
             selectedBucket={selectedBucket}
-            wrapWithContext={true}
+            wrapWithContext={false}
             plannerDate={format(currentDate, 'yyyy-MM-dd')}
           />
         </div>
@@ -406,13 +406,23 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             const isToday = isSameDay(day, today);
             
             return (
-              <div
-                key={idx}
-                onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
-                className={`${getCellSize()} cursor-pointer flex flex-col items-start justify-start text-sm p-2 ${
-                  isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
-                } ${isToday ? "border-2 border-indigo-500" : ""}`}
-              >
+              <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
+                {(provided, snapshot) => {
+                  return (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
+                      className={`${getCellSize()} cursor-pointer flex flex-col items-start justify-start text-sm p-2 transition-colors duration-200 ${
+                        isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
+                      } ${isToday ? "border-2 border-indigo-500" : ""} ${
+                        snapshot.isDraggingOver ? "bg-indigo-50 border-indigo-300 border-2" : ""
+                      }`}
+                      style={{
+                        ...provided.droppableProps.style,
+                        minHeight: view === 'month' ? '120px' : '140px'
+                      }}
+                    >
                 {/* Date Header */}
                 <div className="flex items-center justify-between w-full mb-1">
                   <span className="font-medium">
@@ -469,7 +479,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     )}
                   </div>
                 )}
-              </div>
+                      {provided.placeholder}
+                    </div>
+                  );
+                }}
+              </Droppable>
             );
           })}
         </div>

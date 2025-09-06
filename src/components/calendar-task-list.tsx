@@ -484,6 +484,37 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       }
     };
 
+    const handleReorderMasterTodayTasks = (event: CustomEvent) => {
+      const { source, destination } = event.detail;
+      console.log('📨 Received reorder event for masterTodayTasks:', { source: source.index, destination: destination.index });
+      
+      const list = [...todayTasksOrdered];
+      const [moved] = list.splice(source.index, 1);
+      list.splice(destination.index, 0, moved);
+      console.log('📝 New master today task order:', list.map((t, idx) => `${idx}: ${t.content}`));
+      
+      // Force immediate re-render by updating the localStorage and triggering a state change
+      if (typeof window !== 'undefined') {
+        const newOrder = list.map(t => t.id.toString());
+        try { 
+          window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); 
+          console.log('💾 Saved master today task order to localStorage');
+          
+          // Trigger a custom event to force re-render of today tasks
+          window.dispatchEvent(new CustomEvent('todayTasksReordered'));
+        } catch {}
+      }
+    };
+
+    const handleReorderUpcomingTasks = (event: CustomEvent) => {
+      const { source, destination, draggableId } = event.detail;
+      console.log('📨 Received reorder event for upcomingTasks:', { source: source.droppableId, destination: destination.droppableId, draggableId });
+      
+      // For now, we'll just log this - the upcoming tasks don't have persistent ordering like today tasks
+      // The UI should handle this automatically through the task groups reorganization
+      console.log('📝 Upcoming task reorder - handled by automatic regrouping');
+    };
+
     const handleTodayTasksReordered = () => {
       console.log('🔄 Forcing today tasks re-render');
       setTodayTasksRenderKey(prev => prev + 1);
@@ -491,11 +522,15 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
     window.addEventListener('reorderOpenTasks', handleReorderOpenTasks as EventListener);
     window.addEventListener('reorderDailyTasks', handleReorderDailyTasks as EventListener);
+    window.addEventListener('reorderMasterTodayTasks', handleReorderMasterTodayTasks as EventListener);
+    window.addEventListener('reorderUpcomingTasks', handleReorderUpcomingTasks as EventListener);
     window.addEventListener('todayTasksReordered', handleTodayTasksReordered);
 
     return () => {
       window.removeEventListener('reorderOpenTasks', handleReorderOpenTasks as EventListener);
       window.removeEventListener('reorderDailyTasks', handleReorderDailyTasks as EventListener);
+      window.removeEventListener('reorderMasterTodayTasks', handleReorderMasterTodayTasks as EventListener);
+      window.removeEventListener('reorderUpcomingTasks', handleReorderUpcomingTasks as EventListener);
       window.removeEventListener('todayTasksReordered', handleTodayTasksReordered);
     };
   }, [openTasksToShow, todayTasksOrdered, todayOrderKey, batchUpdateTasks]);
@@ -624,6 +659,39 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });
+      return;
+    }
+
+    // Handle moves between Master List today section and open tasks
+    if (source.droppableId === 'openTasks' && destination.droppableId === 'masterTodayTasks') {
+      // Open task → Master List Today: Set due date to real today
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { due: { date: todayStr } } }
+      ]).catch(error => {
+        console.error('Failed to update task due date:', error);
+      });
+      return;
+    }
+
+    if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
+      // Master List Today → Open: Remove due date
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { due: undefined } }
+      ]).catch(error => {
+        console.error('Failed to remove task due date:', error);
+      });
+      return;
+    }
+
+    // Handle reordering within Master List today section
+    if (source.droppableId === destination.droppableId && destination.droppableId === 'masterTodayTasks') {
+      const list = [...todayTasksOrdered];
+      const [moved] = list.splice(source.index, 1);
+      list.splice(destination.index, 0, moved);
+      if (typeof window !== 'undefined') {
+        const newOrder = list.map(t => t.id.toString());
+        try { window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); } catch {}
+      }
       return;
     }
   }
@@ -850,7 +918,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                   <button
                     onClick={handleAddDailyTask}
                     disabled={!newDailyTask.trim()}
-                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:from-gray-300 disabled:to-gray-400 text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                    className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:from-gray-300 disabled:to-gray-400 text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
                     Add
                   </button>
@@ -1034,16 +1102,121 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
           </div>
         )}
 
-        {/* Master List tab: show open tasks only in this tab */}
+        {/* Master List tab: show today tasks first, then open tasks */}
         {taskView === 'Master List' && (
-        <div className={`mt-4`}>
-          <div
-            className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-            onClick={() => setIsOpenCollapsed((c) => !c)}
-          >
-            <span>All Open Tasks</span>
-            {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-          </div>
+        <div className="space-y-6">
+          {/* Today's Tasks Section in Master List */}
+          <Droppable droppableId="masterTodayTasks">
+            {(provided: any) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="space-y-4"
+              >
+                <div
+                  className="flex items-center justify-between group cursor-pointer select-none py-2"
+                  onClick={() => setIsDailyCollapsed((c) => !c)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center transition-transform duration-200 ${isDailyCollapsed ? 'rotate-0' : 'rotate-90'}`}>
+                      <ChevronRight size={14} className="text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900 tracking-tight">Today's Tasks</h4>
+                      <p className="text-sm text-gray-500">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`transition-all duration-300 ease-out overflow-hidden ${
+                    isDailyCollapsed ? 'max-h-0 opacity-0' : 'max-h-[400px] opacity-100'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    {loading && todayTasks.length === 0 ? (
+                      <div className="space-y-3">
+                        {[1,2,3].map(i => (
+                          <div key={i} className="animate-pulse">
+                            <div className="bg-gray-100 h-16 rounded-xl"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : !loading && todayTasks.length === 0 ? (
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center mx-auto mb-3">
+                          <Clock size={20} className="text-indigo-600" />
+                        </div>
+                        <h5 className="text-sm font-medium text-gray-900 mb-1">No tasks for today</h5>
+                        <p className="text-xs text-gray-500">Drag a task from "All Open Tasks" below to add it to today</p>
+                      </div>
+                    ) : (
+                      todayTasksOrdered.map((t: any, index: number) => (
+                        <Draggable draggableId={t.id.toString()} index={index} key={t.id}>
+                          {(provided: any) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={provided.draggableProps.style}
+                              className="group relative bg-white border border-gray-200/60 hover:border-gray-300/80 rounded-xl p-4 transition-all duration-200 hover:shadow-md cursor-grab active:cursor-grabbing"
+                            >
+                              <div className="flex items-start gap-3">
+                                <label className="flex items-center cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={t.completed ?? false}
+                                    onChange={() => toggleTaskCompletion(t.id.toString())}
+                                    className="sr-only"
+                                  />
+                                  <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                                    t.completed 
+                                      ? 'bg-indigo-600 border-indigo-600' 
+                                      : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
+                                  }`}>
+                                    {t.completed && (
+                                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                </label>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
+                                    t.completed ? 'line-through text-gray-400' : 'text-gray-900'
+                                  }`}>
+                                    {t.content}
+                                  </p>
+                                  {t.bucket && (
+                                    <div className="mt-2">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                        {t.bucket}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))
+                    )}
+                    {provided.placeholder}
+                  </div>
+                </div>
+              </div>
+            )}
+          </Droppable>
+
+          {/* All Open Tasks Section */}
+          <div className="space-y-4">
+            <div
+              className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
+              onClick={() => setIsOpenCollapsed((c) => !c)}
+            >
+              <span>All Open Tasks</span>
+              {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+            </div>
           
           <Droppable droppableId="openTasks">
             {(provided: any) => (
@@ -1069,25 +1242,47 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             style={provided.draggableProps.style}
-                            className="group relative flex items-start gap-2 px-3 py-3 bg-card border border-border/60 shadow-sm hover:shadow-md rounded-xl transition-all duration-200"
+                            className="group relative bg-white border border-gray-200/60 hover:border-gray-300/80 rounded-xl p-4 transition-all duration-200 hover:shadow-md cursor-grab active:cursor-grabbing"
                           >
-                            <input
-                              type="checkbox"
-                              aria-label={t.content}
-                              checked={t.completed ?? false}
-                              onChange={() => toggleTaskCompletion(t.id.toString())}
-                              className={`${t.completed ? 'accent-purple-600' : 'accent-indigo-500'} mt-0.5`}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className={`truncate ${t.completed ? 'line-through text-gray-400' : ''}`}>{t.content}</span>
-                                {t.bucket && (
-                                  <span className="shrink-0 inline-block px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                                    {t.bucket}
-                                  </span>
-                                )}
+                            <div className="flex items-start gap-3">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={t.completed ?? false}
+                                  onChange={() => toggleTaskCompletion(t.id.toString())}
+                                  className="sr-only"
+                                />
+                                <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                                  t.completed 
+                                    ? 'bg-indigo-600 border-indigo-600' 
+                                    : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
+                                }`}>
+                                  {t.completed && (
+                                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </label>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
+                                      t.completed ? 'line-through text-gray-400' : 'text-gray-900'
+                                    }`}>
+                                      {t.content}
+                                    </p>
+                                    {t.bucket && (
+                                      <div className="mt-2">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                          {t.bucket}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              {/* Hover bucket selector: appears on hover without changing layout height */}
+                              {/* Hover bucket selector */}
                               {availableBuckets?.length > 0 && (
                                 <select
                                   aria-label="Change bucket"
@@ -1099,7 +1294,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                       { taskId: t.id.toString(), updates: { bucket: val || undefined } }
                                     ]).catch(err => console.error('Failed to update bucket', err));
                                   }}
-                                  className="absolute right-3 top-2 text-xs rounded-md border border-gray-300 px-2 py-0.5 bg-white focus:border-indigo-500 focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                  className="absolute right-3 top-3 text-xs rounded-md border border-gray-300 px-2 py-1 bg-white focus:border-indigo-500 focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                                 >
                                   <option value="">No bucket</option>
                                   {availableBuckets.map((b) => (
@@ -1145,13 +1340,15 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                 />
                 <button
                   onClick={handleAddOpenTask}
-                  className="text-sm text-indigo-600 hover:underline"
+                  disabled={!newOpenTask.trim()}
+                  className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:from-gray-300 disabled:to-gray-400 text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
                   Add
                 </button>
               </div>
             </div>
           )}
+          </div>
         </div>
         )}
       </>

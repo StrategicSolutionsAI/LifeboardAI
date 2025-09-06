@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { format, addDays } from "date-fns";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { CalendarTaskList } from "@/components/calendar-task-list";
@@ -25,6 +26,7 @@ function CalendarContent() {
   // Unified drag and drop handler for sidebar to calendar
   const handleDragEnd = (result: DropResult) => {
     console.log('🎯 CalendarView handleDragEnd called:', result);
+    
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       console.log('❌ Drag ignored - resize operation active');
@@ -46,8 +48,16 @@ function CalendarContent() {
 
     console.log('🎯 Unified drag operation:', { source: source.droppableId, destination: destination.droppableId, draggableId });
 
+    // Helper to check if source is from sidebar
+    const isFromSidebar = (sourceId: string) => {
+      return sourceId === 'dailyTasks' || 
+             sourceId === 'openTasks' || 
+             sourceId === 'masterTodayTasks' || 
+             sourceId.startsWith('upcoming-');
+    };
+
     // Handle drag from sidebar to calendar hour slots
-    if ((source.droppableId === 'dailyTasks' || source.droppableId === 'openTasks') && isHour(destination.droppableId)) {
+    if (isFromSidebar(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId; // Keep full 'hour-<time>' format
       console.log('📅➡️⏰ Sidebar task → Calendar hour slot:', { draggableId, dstHour });
       
@@ -71,7 +81,7 @@ function CalendarContent() {
     }
 
     // Handle drag from sidebar to calendar day (non-hour areas)
-    if ((source.droppableId === 'dailyTasks' || source.droppableId === 'openTasks') && isCalendarDay(destination.droppableId)) {
+    if (isFromSidebar(source.droppableId) && isCalendarDay(destination.droppableId)) {
       const targetDateStr = destination.droppableId.replace('calendar-day-', '');
       console.log('📅➡️📅 Sidebar task → Calendar day:', { draggableId, targetDateStr });
       
@@ -125,6 +135,24 @@ function CalendarContent() {
         window.dispatchEvent(reorderEvent);
         return;
       }
+
+      // For masterTodayTasks, similar approach
+      if (source.droppableId === 'masterTodayTasks') {
+        const reorderEvent = new CustomEvent('reorderMasterTodayTasks', {
+          detail: { source, destination, draggableId }
+        });
+        window.dispatchEvent(reorderEvent);
+        return;
+      }
+
+      // For upcoming task sections, dispatch reorder event
+      if (source.droppableId.startsWith('upcoming-')) {
+        const reorderEvent = new CustomEvent('reorderUpcomingTasks', {
+          detail: { source, destination, draggableId }
+        });
+        window.dispatchEvent(reorderEvent);
+        return;
+      }
     }
 
     // Handle moves between sidebar lists (existing functionality)
@@ -148,6 +176,127 @@ function CalendarContent() {
         console.error('Failed to remove task due date:', error);
       });
       return;
+    }
+
+    // Handle moves between openTasks and masterTodayTasks (Master List today section)
+    if (source.droppableId === 'openTasks' && destination.droppableId === 'masterTodayTasks') {
+      // Get today's date string for setting due date
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(
+        today.getMonth() + 1
+      ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      
+      console.log('📋➡️📅 Open task → Master List Today:', { draggableId, todayStr });
+      
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { due: { date: todayStr } } }
+      ]).catch(error => {
+        console.error('Failed to update task due date:', error);
+      });
+      return;
+    }
+
+    if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
+      console.log('📅➡️📋 Master List Today → Open task:', { draggableId });
+      
+      batchUpdateTasks([
+        { taskId: draggableId, updates: { due: undefined } }
+      ]).catch(error => {
+        console.error('Failed to remove task due date:', error);
+      });
+      return;
+    }
+
+    // Handle moves from upcoming task sections to other lists
+    if (source.droppableId.startsWith('upcoming-')) {
+      if (destination.droppableId === 'openTasks') {
+        console.log('📋➡️📋 Upcoming task → Open tasks:', { draggableId });
+        
+        batchUpdateTasks([
+          { taskId: draggableId, updates: { due: undefined } }
+        ]).catch(error => {
+          console.error('Failed to remove task due date:', error);
+        });
+        return;
+      }
+
+      if (destination.droppableId === 'dailyTasks') {
+        const dateStr = `${selectedDate.getFullYear()}-${String(
+          selectedDate.getMonth() + 1
+        ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+        
+        console.log('📋➡️📅 Upcoming task → Daily tasks:', { draggableId, dateStr });
+        
+        batchUpdateTasks([
+          { taskId: draggableId, updates: { due: { date: dateStr } } }
+        ]).catch(error => {
+          console.error('Failed to update task due date:', error);
+        });
+        return;
+      }
+
+      if (destination.droppableId === 'masterTodayTasks') {
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(
+          today.getMonth() + 1
+        ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        
+        console.log('📋➡️📅 Upcoming task → Master List Today:', { draggableId, todayStr });
+        
+        batchUpdateTasks([
+          { taskId: draggableId, updates: { due: { date: todayStr } } }
+        ]).catch(error => {
+          console.error('Failed to update task due date:', error);
+        });
+        return;
+      }
+    }
+
+    // Handle moves from other lists to upcoming sections (these would change due dates)
+    if (destination.droppableId.startsWith('upcoming-')) {
+      const groupKey = destination.droppableId.replace('upcoming-', '');
+      let targetDate: string | undefined = undefined;
+
+      // Calculate target date based on upcoming group
+      const today = new Date();
+      switch (groupKey) {
+        case 'today':
+          targetDate = format(today, 'yyyy-MM-dd');
+          break;
+        case 'tomorrow':
+          targetDate = format(addDays(today, 1), 'yyyy-MM-dd');
+          break;
+        case 'thisWeek':
+          // Set to end of this week as a default
+          targetDate = format(addDays(today, 3), 'yyyy-MM-dd');
+          break;
+        case 'nextWeek':
+          // Set to start of next week
+          targetDate = format(addDays(today, 7), 'yyyy-MM-dd');
+          break;
+        case 'later':
+          // Set to a week from now
+          targetDate = format(addDays(today, 14), 'yyyy-MM-dd');
+          break;
+        case 'overdue':
+          // Don't allow moving to overdue - this doesn't make sense
+          console.warn('Cannot move task to overdue section');
+          return;
+        default:
+          console.warn('Unknown upcoming group:', groupKey);
+          return;
+      }
+
+      if (targetDate) {
+        console.log(`📋➡️📋 Task → Upcoming ${groupKey}:`, { draggableId, targetDate });
+        
+        batchUpdateTasks([
+          { taskId: draggableId, updates: { due: { date: targetDate } } }
+        ]).catch(error => {
+          console.error('Failed to update task due date:', error);
+        });
+        return;
+      }
     }
 
     console.log('Unhandled drag operation:', result);
