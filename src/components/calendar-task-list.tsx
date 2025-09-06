@@ -1026,6 +1026,27 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     )}
                                   </div>
                                 </div>
+                                {/* Hover bucket selector for Today tasks */}
+                                {availableBuckets?.length > 0 && (
+                                  <select
+                                    aria-label="Change bucket"
+                                    title="Change bucket"
+                                    value={t.bucket || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      batchUpdateTasks([
+                                        { taskId: t.id.toString(), updates: { bucket: val || undefined } }
+                                      ]).catch(err => console.error('Failed to update bucket', err));
+                                    }}
+                                    className="absolute right-3 top-3 text-xs rounded-md border border-gray-300 px-2 py-1 bg-white focus:border-indigo-500 focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <option value="">No bucket</option>
+                                    {availableBuckets.map((b) => (
+                                      <option key={b} value={b}>{b}</option>
+                                    ))}
+                                  </select>
+                                )}
                               </div>
                             )}
                           </Draggable>
@@ -1355,6 +1376,27 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                   )}
                                 </div>
                               </div>
+                              {/* Hover bucket selector for Master List Today tasks */}
+                              {availableBuckets?.length > 0 && (
+                                <select
+                                  aria-label="Change bucket"
+                                  title="Change bucket"
+                                  value={t.bucket || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    batchUpdateTasks([
+                                      { taskId: t.id.toString(), updates: { bucket: val || undefined } }
+                                    ]).catch(err => console.error('Failed to update bucket', err));
+                                  }}
+                                  className="absolute right-3 top-3 text-xs rounded-md border border-gray-300 px-2 py-1 bg-white focus:border-indigo-500 focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <option value="">No bucket</option>
+                                  {availableBuckets.map((b) => (
+                                    <option key={b} value={b}>{b}</option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                           )}
                         </Draggable>
