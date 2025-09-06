@@ -99,6 +99,81 @@ function CalendarContent() {
       return;
     }
 
+    // Handle moves from hourly slots back to sidebar task lists
+    if (isHour(source.droppableId) && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
+      console.log('⏰➡️📋 Calendar hour → Sidebar:', { draggableId, from: source.droppableId, to: destination.droppableId });
+      
+      // Determine what updates to make based on destination
+      let updates: any = { hourSlot: undefined }; // Always remove hour slot
+      
+      if (destination.droppableId === 'dailyTasks') {
+        // Moving to daily tasks - set due date to selected date
+        const dateStr = `${selectedDate.getFullYear()}-${String(
+          selectedDate.getMonth() + 1
+        ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+        updates.due = { date: dateStr };
+      } else if (destination.droppableId === 'masterTodayTasks') {
+        // Moving to master today tasks - set due date to today
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(
+          today.getMonth() + 1
+        ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        updates.due = { date: todayStr };
+      } else if (destination.droppableId === 'openTasks') {
+        // Moving to open tasks - remove due date
+        updates.due = undefined;
+      }
+      
+      batchUpdateTasks([
+        { taskId: draggableId, updates }
+      ]).catch(error => {
+        console.error('Failed to move task from hourly slot to sidebar:', error);
+      });
+      return;
+    }
+
+    // Handle moves from hourly slots to upcoming task sections
+    if (isHour(source.droppableId) && destination.droppableId.startsWith('upcoming-')) {
+      const groupKey = destination.droppableId.replace('upcoming-', '');
+      console.log('⏰➡️📋 Calendar hour → Upcoming section:', { draggableId, groupKey });
+      
+      let targetDate: string | undefined = undefined;
+      const today = new Date();
+      
+      switch (groupKey) {
+        case 'today':
+          targetDate = format(today, 'yyyy-MM-dd');
+          break;
+        case 'tomorrow':
+          targetDate = format(addDays(today, 1), 'yyyy-MM-dd');
+          break;
+        case 'thisWeek':
+          targetDate = format(addDays(today, 3), 'yyyy-MM-dd');
+          break;
+        case 'nextWeek':
+          targetDate = format(addDays(today, 7), 'yyyy-MM-dd');
+          break;
+        case 'later':
+          targetDate = format(addDays(today, 14), 'yyyy-MM-dd');
+          break;
+        case 'overdue':
+          console.warn('Cannot move task to overdue section');
+          return;
+        default:
+          console.warn('Unknown upcoming group:', groupKey);
+          return;
+      }
+
+      if (targetDate) {
+        batchUpdateTasks([
+          { taskId: draggableId, updates: { hourSlot: undefined, due: { date: targetDate } } }
+        ]).catch(error => {
+          console.error('Failed to move task from hourly slot to upcoming:', error);
+        });
+      }
+      return;
+    }
+
     // Handle moves between hour slots in calendar
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId;
