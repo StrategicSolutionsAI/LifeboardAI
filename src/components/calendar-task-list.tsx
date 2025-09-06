@@ -326,11 +326,12 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Filter upcoming tasks by selected bucket if provided
   const filteredUpcomingTasks = useMemo(() => {
-    if (selectedBucket) {
+    // Only filter by selectedBucket in dashboard view, not in Calendar view
+    if (selectedBucket && dashboardView) {
       return upcomingTasks.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     return upcomingTasks;
-  }, [upcomingTasks, selectedBucket]);
+  }, [upcomingTasks, selectedBucket, dashboardView]);
 
   // Group upcoming tasks intelligently
   const taskGroups = useTaskGrouping(filteredUpcomingTasks);
@@ -395,13 +396,13 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const todayTasks = useMemo(() => {
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr);
     
-    // Filter by selectedBucket if provided, but include tasks without bucket (Todoist tasks)
-    if (selectedBucket) {
+    // Only filter by selectedBucket in dashboard view, not in Calendar view
+    if (selectedBucket && dashboardView) {
       filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     
     return filtered;
-  }, [allTasks, todayStr, selectedBucket]);
+  }, [allTasks, todayStr, selectedBucket, dashboardView]);
 
   // Local order for today's tasks, persisted per-day in localStorage
   const todayOrderKey = `daily-order-${todayStr}`;
@@ -429,13 +430,13 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const openTasksBase = useMemo(() => {
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot);
     
-    // Filter by selectedBucket if provided, but include tasks without bucket (Todoist tasks)
-    if (selectedBucket) {
+    // Only filter by selectedBucket in dashboard view, not in Calendar view
+    if (selectedBucket && dashboardView) {
       filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
     
     return filtered;
-  }, [allTasks, selectedBucket]);
+  }, [allTasks, selectedBucket, dashboardView]);
 
   // Maintain a local, immediately responsive list for open tasks
   const [openTasksLocal, setOpenTasksLocal] = useState<any[]>([]);
