@@ -25,9 +25,22 @@ interface PlannerItem {
 }
 
 // -----------------------------------------------------------------------------
-// Constants – 7 AM → 9 PM
+// Constants – 7 AM → 9 PM with 15-minute intervals
 // -----------------------------------------------------------------------------
 const HOUR_HEIGHT = 64; // px that represents one hour
+const TIME_SLOTS = Array.from({ length: 15 * 4 }, (_, i) => {
+  const totalMinutes = (7 * 60) + (i * 15); // Start at 7 AM (420 minutes), increment by 15
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  const displayHour = hours % 12 || 12;
+  const period = hours < 12 ? "AM" : "PM";
+  const minuteString = minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : '';
+  
+  return `${displayHour}${minuteString}${period}`;
+});
+
+// Keep HOURS for backward compatibility and major hour markers
 const HOURS = Array.from({ length: 15 }, (_, i) => {
   const h = 7 + i;
   return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
@@ -36,21 +49,38 @@ const HOURS = Array.from({ length: 15 }, (_, i) => {
 const RESIZE_INCREMENT = 15; // minutes
 const MIN_DURATION = 15; // minutes
 
-// Helper function to calculate end time
-const calculateEndTime = (startHour: string, durationMinutes: number): string => {
-  const hourIndex = HOURS.indexOf(startHour);
-  if (hourIndex === -1) return startHour;
+// Helper function to parse time slot into minutes from midnight
+const parseTimeSlot = (timeSlot: string): number => {
+  const match = timeSlot.match(/^(\d{1,2})(?::(\d{2}))?([AP]M)$/);
+  if (!match) return 0;
   
-  const startHourNum = 7 + hourIndex;
-  const endTimeMinutes = (startHourNum * 60) + durationMinutes;
-  const endHour = Math.floor(endTimeMinutes / 60) % 24;
-  const endMin = endTimeMinutes % 60;
+  const [, hourStr, minuteStr = '0', period] = match;
+  let hours = parseInt(hourStr);
+  const minutes = parseInt(minuteStr);
   
-  const displayHour = endHour % 12 || 12;
-  const period = endHour < 12 ? "AM" : "PM";
-  const minString = endMin > 0 ? `:${endMin.toString().padStart(2, '0')}` : "";
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+};
+
+// Helper function to format minutes from midnight into time string
+const formatTimeSlot = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  
+  const displayHour = hours % 12 || 12;
+  const period = hours < 12 ? "AM" : "PM";
+  const minString = minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : '';
   
   return `${displayHour}${minString}${period}`;
+};
+
+// Helper function to calculate end time
+const calculateEndTime = (startTimeSlot: string, durationMinutes: number): string => {
+  const startMinutes = parseTimeSlot(startTimeSlot);
+  const endMinutes = startMinutes + durationMinutes;
+  return formatTimeSlot(endMinutes);
 };
 
 // -----------------------------------------------------------------------------
@@ -195,14 +225,14 @@ export default function HourlyPlanner({
   // Build hourly plan from scheduled tasks plus pending tasks
   const hourlyPlan = useMemo(() => {
     const plan: Record<string, PlannerItem[]> = {};
-    HOURS.forEach((h) => (plan[h] = []));
+    TIME_SLOTS.forEach((slot) => (plan[slot] = []));
     
     // Process only tasks that have been scheduled (have hourSlot)
     scheduledTasks.forEach((t) => {
       const slot = t.hourSlot?.replace('hour-', '') || '';
       
-      // Validate slot exists in our hours array
-      if (!HOURS.includes(slot)) {
+      // Validate slot exists in our time slots array
+      if (!TIME_SLOTS.includes(slot)) {
         return;
       }
       
@@ -216,7 +246,7 @@ export default function HourlyPlanner({
     // Add pending tasks to show immediate feedback
     pendingTasks.forEach((task) => {
       const slot = task.id.split('-')[1]; // Extract time slot from temp ID like "temp-7AM-123456"
-      if (HOURS.includes(slot) && plan[slot]) {
+      if (TIME_SLOTS.includes(slot) && plan[slot]) {
         plan[slot].push(task);
       }
     });
@@ -324,32 +354,40 @@ export default function HourlyPlanner({
     return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
   }, [currentTime]);
 
-  // Auto-scroll to current hour on mount
+  // Auto-scroll to current time slot on mount
   useEffect(() => {
     if (!containerRef.current) return;
     
     const currentHour = currentTime.getHours();
-    let targetHourIndex = -1;
+    const currentMinutes = currentTime.getMinutes();
+    let targetSlotIndex = -1;
     
-    // Find current hour in our hours array (7 AM to 9 PM)
-    for (let i = 0; i < HOURS.length; i++) {
-      const hourNum = 7 + i;
-      if (hourNum === currentHour) {
-        targetHourIndex = Math.max(0, i - 1);
-        break;
-      } else if (hourNum > currentHour) {
-        targetHourIndex = 0;
+    // Find current time slot in our TIME_SLOTS array
+    for (let i = 0; i < TIME_SLOTS.length; i++) {
+      const slotMinutes = parseTimeSlot(TIME_SLOTS[i]);
+      const totalCurrentMinutes = currentHour * 60 + currentMinutes;
+      
+      if (slotMinutes <= totalCurrentMinutes && (i === TIME_SLOTS.length - 1 || parseTimeSlot(TIME_SLOTS[i + 1]) > totalCurrentMinutes)) {
+        targetSlotIndex = Math.max(0, i - 4); // Show a few slots above current time
         break;
       }
     }
     
     // Handle edge cases
-    if (targetHourIndex === -1) {
-      targetHourIndex = currentHour > 21 ? HOURS.length - 1 : 0;
+    if (targetSlotIndex === -1) {
+      const totalCurrentMinutes = currentHour * 60 + currentMinutes;
+      const startMinutes = 7 * 60; // 7 AM
+      const endMinutes = 21 * 60; // 9 PM
+      
+      if (totalCurrentMinutes < startMinutes) {
+        targetSlotIndex = 0;
+      } else if (totalCurrentMinutes > endMinutes) {
+        targetSlotIndex = TIME_SLOTS.length - 1;
+      }
     }
     
-    if (targetHourIndex >= 0) {
-      const scrollPosition = targetHourIndex * 68;
+    if (targetSlotIndex >= 0) {
+      const scrollPosition = Math.floor(targetSlotIndex / 4) * 68; // Each hour (4 slots) = 68px
       containerRef.current.scrollTo({
         top: scrollPosition,
         behavior: 'smooth'
@@ -363,36 +401,52 @@ export default function HourlyPlanner({
   const content = (
     <div 
       ref={containerRef}
-      className={`space-y-1 ${className} max-h-[600px] overflow-y-auto`}
+      className={`space-y-0 ${className} max-h-[600px] overflow-y-auto`}
     >
-        {HOURS.map((disp) => (
-          <Droppable key={disp} droppableId={`hour-${disp}`}>
+        {TIME_SLOTS.map((timeSlot, index) => {
+          // Check if this is a major hour (on the hour)
+          const isMainHour = timeSlot.indexOf(':') === -1;
+          
+          return (
+          <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
             {(provided, snapshot) => (
               <div
-                className={`relative flex items-start gap-4 py-2 h-[68px] border-t border-gray-200 first:border-t-0 transition-colors ${
+                className={`relative flex items-start gap-4 border-gray-200 transition-colors h-[17px] ${
+                  isMainHour 
+                    ? 'border-t' 
+                    : 'border-t border-dashed border-gray-100'
+                } ${index === 0 ? 'border-t-0' : ''} ${
                   snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : ''
                 }`}
               >
-                {/* Enhanced time label with better typography */}
+                {/* Enhanced time label with better typography - only show for main hours */}
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
-                  <span className="text-sm font-medium text-gray-900 leading-none">{disp}</span>
-                  <span className="text-xs text-gray-500 mt-0.5">
-                    {disp === currentHourDisplay ? 'Now' : ''}
-                  </span>
+                  {isMainHour ? (
+                    <>
+                      <span className="text-sm font-medium text-gray-900 leading-none">
+                        {timeSlot}
+                      </span>
+                      <span className="text-xs text-gray-500 mt-0.5">
+                        {timeSlot === currentHourDisplay ? 'Now' : ''}
+                      </span>
+                    </>
+                  ) : (
+                    <div className="h-4"></div>
+                  )}
                 </div>
                 
                 <ul
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex-1 relative min-h-[60px] overflow-visible"
+                  className="flex-1 relative overflow-visible min-h-[15px]"
                   onClick={(e) => {
                     // Prevent click-to-create during drag or resize to avoid interference
                     if (effectiveDragging || resizingTask) return;
-                    handleTimeSlotClick(disp);
+                    handleTimeSlotClick(timeSlot);
                   }}
                 >
                   {/* Empty time slot indicator */}
-                  {hourlyPlan[disp].length === 0 && creatingTaskAt !== disp && (
+                  {hourlyPlan[timeSlot].length === 0 && creatingTaskAt !== timeSlot && (
                     <li className={`absolute inset-0 flex items-center justify-center group ${(effectiveDragging || resizingTask) ? 'pointer-events-none' : 'cursor-pointer'} hover:bg-theme-surface-hover/50 rounded-lg transition-colors`}>
                       <div className="flex items-center gap-2 text-theme-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
                         <Plus size={14} />
@@ -402,7 +456,7 @@ export default function HourlyPlanner({
                   )}
                   
                   {/* Task creation form */}
-                  {creatingTaskAt === disp && (
+                  {creatingTaskAt === timeSlot && (
                     <li className="absolute inset-0 flex items-center p-1">
                       <div className="flex-1 bg-theme-widget-bg border border-theme-primary-200 rounded-lg p-2 shadow-sm">
                         {availableBuckets.length > 0 && (
@@ -427,7 +481,7 @@ export default function HourlyPlanner({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleCreateTaskAtTime(disp);
+                                handleCreateTaskAtTime(timeSlot);
                               } else if (e.key === 'Escape') {
                                 e.preventDefault();
                                 handleCancelCreation();
@@ -440,7 +494,7 @@ export default function HourlyPlanner({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCreateTaskAtTime(disp);
+                              handleCreateTaskAtTime(timeSlot);
                             }}
                             disabled={isCreatingTask}
                             className="px-2 py-0.5 text-xs font-medium text-theme-primary-600 hover:text-theme-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
@@ -461,8 +515,8 @@ export default function HourlyPlanner({
                     </li>
                   )}
                   
-                  {hourlyPlan[disp].map((t, index) => {
-                    const taskCount = hourlyPlan[disp].length;
+                  {hourlyPlan[timeSlot].map((t, index) => {
+                    const taskCount = hourlyPlan[timeSlot].length;
                     // Better spacing calculation for multiple tasks
                     const taskWidth = taskCount > 1 ? `${Math.floor(100 / taskCount) - 2}%` : '100%';
                     const leftOffset = taskCount > 1 ? `${(index * Math.floor(100 / taskCount)) + 1}%` : '0%';
@@ -514,14 +568,28 @@ export default function HourlyPlanner({
                             </div>
                             
                             <div className="flex flex-col w-full justify-center min-w-0">
-                              {/* Improved time range typography */}
-                              <div className="text-xs font-medium text-indigo-600 leading-tight mb-1 tracking-wide">
-                                {disp} – {calculateEndTime(disp, resizingTask?.taskId === t.id ? resizingTask.currentDuration : t.duration ?? 60)}
-                              </div>
-                              {/* Enhanced task title */}
-                              <div className="font-semibold text-gray-900 truncate text-sm leading-tight">
-                                {t.content}
-                              </div>
+                              {/* Conditional layout based on task height */}
+                              {taskDuration >= 45 ? (
+                                // Tall tasks: time on top, title below
+                                <>
+                                  <div className="text-xs font-medium text-indigo-600 leading-tight mb-1 tracking-wide">
+                                    {timeSlot} – {calculateEndTime(timeSlot, resizingTask?.taskId === t.id ? resizingTask.currentDuration : t.duration ?? 60)}
+                                  </div>
+                                  <div className="font-semibold text-gray-900 truncate text-sm leading-tight">
+                                    {t.content}
+                                  </div>
+                                </>
+                              ) : (
+                                // Short tasks: time and title on same row
+                                <div className="flex items-center gap-2 w-full">
+                                  <div className="text-xs font-medium text-indigo-600 leading-tight tracking-wide flex-shrink-0">
+                                    {timeSlot}
+                                  </div>
+                                  <div className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1">
+                                    {t.content}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             
                             {/* Improved delete button */}
@@ -544,7 +612,7 @@ export default function HourlyPlanner({
                           {allowResize && (
                             <div className="absolute -bottom-1 left-2 right-2 flex justify-center">
                               <div
-                                onMouseDown={(e) => startResize(e, disp, t.id)}
+                                onMouseDown={(e) => startResize(e, timeSlot, t.id)}
                                 className="h-3 w-10 cursor-ns-resize 
                                   bg-indigo-200 hover:bg-indigo-400 
                                   rounded-full transition-all duration-200
@@ -566,7 +634,7 @@ export default function HourlyPlanner({
                 </ul>
 
                 {/* Enhanced current-time indicator */}
-                {showTimeIndicator && disp === currentHourDisplay && (
+                {showTimeIndicator && timeSlot === currentHourDisplay && (
                   <div
                     className="absolute left-0 right-0 pointer-events-none flex items-center z-10"
                     style={{ top: `${20 + (currentTime.getMinutes() / 60) * 80}%` }}
@@ -590,7 +658,8 @@ export default function HourlyPlanner({
               </div>
             )}
           </Droppable>
-        ))}
+          );
+        })}
     </div>
   );
   if (wrapWithContext) {
