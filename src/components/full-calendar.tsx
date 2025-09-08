@@ -72,8 +72,49 @@ interface FullCalendarProps {
 }
 
 export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: FullCalendarProps = {}) {
-  const [currentDate, setCurrentDate] = useState(propSelectedDate || new Date());
-  const [view, setView] = useState<CalendarView>('day');
+  // Initialize current date from localStorage or prop or default to today
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (propSelectedDate) return propSelectedDate;
+    
+    if (typeof window !== 'undefined') {
+      const savedDate = localStorage.getItem('calendar-selected-date');
+      if (savedDate) {
+        try {
+          return parseISO(savedDate);
+        } catch {
+          // If invalid date, fall back to today
+        }
+      }
+    }
+    return new Date();
+  });
+
+  // Persist date changes to localStorage and notify parent
+  const handleDateChange = (newDate: Date) => {
+    setCurrentDate(newDate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('calendar-selected-date', format(newDate, 'yyyy-MM-dd'));
+    }
+    onDateChange?.(newDate);
+  };
+  // Initialize view from localStorage or default to 'day'
+  const [view, setView] = useState<CalendarView>(() => {
+    if (typeof window !== 'undefined') {
+      const savedView = localStorage.getItem('calendar-view');
+      if (savedView && ['month', 'week', 'day'].includes(savedView)) {
+        return savedView as CalendarView;
+      }
+    }
+    return 'day';
+  });
+
+  // Persist view changes to localStorage
+  const handleViewChange = (newView: CalendarView) => {
+    setView(newView);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('calendar-view', newView);
+    }
+  };
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const today = new Date();
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
@@ -85,41 +126,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
 
   const nextPeriod = () => {
-    setCurrentDate((date) => {
-      const newDate = (() => {
-        switch (view) {
-          case 'month':
-            return addMonths(date, 1);
-          case 'week':
-            return addWeeks(date, 1);
-          case 'day':
-            return addDays(date, 1);
-          default:
-            return date;
-        }
-      })();
-      onDateChange?.(newDate);
-      return newDate;
-    });
+    const newDate = (() => {
+      switch (view) {
+        case 'month':
+          return addMonths(currentDate, 1);
+        case 'week':
+          return addWeeks(currentDate, 1);
+        case 'day':
+          return addDays(currentDate, 1);
+        default:
+          return currentDate;
+      }
+    })();
+    handleDateChange(newDate);
   };
 
   const prevPeriod = () => {
-    setCurrentDate((date) => {
-      const newDate = (() => {
-        switch (view) {
-          case 'month':
-            return subMonths(date, 1);
-          case 'week':
-            return addWeeks(date, -1);
-          case 'day':
-            return addDays(date, -1);
-          default:
-            return date;
-        }
-      })();
-      onDateChange?.(newDate);
-      return newDate;
-    });
+    const newDate = (() => {
+      switch (view) {
+        case 'month':
+          return subMonths(currentDate, 1);
+        case 'week':
+          return addWeeks(currentDate, -1);
+        case 'day':
+          return addDays(currentDate, -1);
+        default:
+          return currentDate;
+      }
+    })();
+    handleDateChange(newDate);
   };
 
   const getDateRange = () => {
@@ -320,31 +355,55 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white/95 backdrop-blur-sm border border-gray-200/60 p-6 rounded-xl shadow-sm">
-      {/* Header with View Selector */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={prevPeriod}
-          className="px-3 py-1 rounded hover:bg-gray-100 text-gray-600"
-        >
-          &lt;
-        </button>
+    <div className="w-full max-w-none mx-4 bg-white/98 backdrop-blur-md border border-gray-200/70 rounded-2xl shadow-lg overflow-hidden">
+      {/* Enhanced Header with Modern Navigation */}
+      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={prevPeriod}
+            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Previous period"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          
+          <button
+            onClick={() => {
+              handleDateChange(new Date());
+            }}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
+            Today
+          </button>
+          
+          <button
+            onClick={nextPeriod}
+            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Next period"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
         
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-800">
+        <div className="flex items-center space-x-6">
+          <h2 className="font-bold tracking-tight text-3xl text-gray-900">
             {getHeaderTitle()}
           </h2>
           
-          {/* View Toggle Buttons */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          {/* Enhanced View Selector */}
+          <div className="flex items-center bg-gray-100/80 rounded-xl p-1 border border-gray-200/60">
             {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
               <button
                 key={viewOption}
-                onClick={() => setView(viewOption)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                onClick={() => handleViewChange(viewOption)}
+                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   view === viewOption
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white shadow-md text-blue-700 border border-blue-200/50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
                 }`}
               >
                 {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
@@ -352,13 +411,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             ))}
           </div>
         </div>
-        
-        <button
-          onClick={nextPeriod}
-          className="px-3 py-1 rounded hover:bg-gray-100 text-gray-600"
-        >
-          &gt;
-        </button>
       </div>
 
       {/* Week Days Header - only show for month and week views */}
@@ -374,118 +426,299 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Calendar Grid */}
       {view === 'day' ? (
-        // Day view: Use HourlyPlanner
-        <div className="bg-white rounded-md border border-gray-200 p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {format(currentDate, "EEEE, MMMM d, yyyy")}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Plan your day with hourly scheduling
-            </p>
+        // Enhanced Day view: Modern HourlyPlanner
+        <div className="w-full">
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                {format(currentDate, "EEEE, MMMM d, yyyy")}
+              </h2>
+              <p className="text-sm text-gray-600 mt-2 font-medium">
+                Plan your day with precision scheduling
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <HourlyPlanner 
+                className="max-h-[75vh] overflow-y-auto rounded-xl" 
+                showTimeIndicator={true}
+                allowResize={true}
+                availableBuckets={availableBuckets}
+                selectedBucket={selectedBucket}
+                wrapWithContext={false}
+                plannerDate={format(currentDate, 'yyyy-MM-dd')}
+              />
+            </div>
           </div>
-          
-          
-          <HourlyPlanner 
-            className="max-h-[70vh] overflow-y-auto" 
-            showTimeIndicator={true}
-            allowResize={true}
-            availableBuckets={availableBuckets}
-            selectedBucket={selectedBucket}
-            wrapWithContext={false}
-            plannerDate={format(currentDate, 'yyyy-MM-dd')}
-          />
         </div>
       ) : (
-        // Month and Week views: Use calendar grid
-        <div className={`grid grid-cols-7 gap-px bg-gray-200 rounded-md overflow-hidden`}>
-          {rows.flat().map((day: Date, idx: number) => {
-            const dayStr = day.toISOString().slice(0,10);
-            const dayEvents = eventsByDate[dayStr] ?? [];
-            const isCurrentMonth = view === 'month' ? isSameMonth(day, currentDate) : true;
-            const isToday = isSameDay(day, today);
-            
-            return (
-              <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
-                {(provided, snapshot) => {
-                  return (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
-                      className={`${getCellSize()} cursor-pointer flex flex-col items-start justify-start text-sm p-2 transition-colors duration-200 ${
-                        isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
-                      } ${isToday ? "border-2 border-indigo-500" : ""} ${
-                        snapshot.isDraggingOver ? "bg-indigo-50 border-indigo-300 border-2" : ""
-                      }`}
-                      style={{
-                        ...provided.droppableProps.style,
-                        minHeight: view === 'month' ? '120px' : '140px'
-                      }}
-                    >
-                {/* Date Header */}
-                <div className="flex items-center justify-between w-full mb-1">
-                  <span className="font-medium">
-                    {format(day, "d")}
-                  </span>
-                </div>
+        // Enhanced Month and Week views with optimized layouts
+        <div className="p-6">
+          {view === 'week' ? (
+            // Week view: Tall vertical columns to show all events
+            <div className="grid grid-cols-7 gap-3 h-[600px]">
+              {rows.flat().map((day: Date, idx: number) => {
+                const dayStr = day.toISOString().slice(0,10);
+                const dayEvents = eventsByDate[dayStr] ?? [];
+                const isCurrentMonth = view === 'month' ? isSameMonth(day, currentDate) : true;
+                const isToday = isSameDay(day, today);
                 
-                {/* Events */}
-                {dayEvents.length > 0 && (
-                  <div className={`w-full ${view === 'week' ? 'space-y-1' : 'flex flex-wrap gap-0.5'}`}>
-                    {view === 'week' ? (
-                      // Week view: show first few event titles with time
-                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
-                        const getEventStyle = (source: string) => {
-                          switch (source) {
-                            case 'google':
-                              return { backgroundColor: '#dbeafe', color: '#1e40af' };
-                            case 'lifeboard':
-                              return { backgroundColor: '#dcfce7', color: '#166534' };
-                            default:
-                              return { backgroundColor: '#e0e7ff', color: '#3730a3' };
-                          }
-                        };
-                        
-                        const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
-                        
-                        return (
-                          <div key={i} className="text-xs p-0.5 rounded truncate w-full" style={getEventStyle(ev.source)}>
-                            {timeDisplay && <span className="font-medium">{timeDisplay}</span>} {ev.title}
+                return (
+                  <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
+                    {(provided, snapshot) => {
+                      return (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
+                          className={`
+                            h-full cursor-pointer flex flex-col text-sm p-4
+                            transition-all duration-200 hover:shadow-lg
+                            ${
+                              isCurrentMonth 
+                                ? "bg-white shadow-md border border-gray-200/80" 
+                                : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                            } 
+                            ${
+                              isToday 
+                                ? "ring-2 ring-blue-500/60 bg-blue-50/90 border-blue-300" 
+                                : ""
+                            } 
+                            ${
+                              snapshot.isDraggingOver 
+                                ? "bg-blue-100/90 border-blue-400 border-2 shadow-xl ring-2 ring-blue-300/50" 
+                                : ""
+                            }
+                            rounded-xl overflow-hidden
+                          `}
+                        >
+                          {/* Enhanced Week Day Header */}
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200/70">
+                            <div className="flex flex-col">
+                              <span className={`font-bold text-3xl leading-none ${
+                                isToday ? 'text-blue-700' : 
+                                isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                              }`}>
+                                {format(day, "d")}
+                              </span>
+                              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">
+                                {format(day, "EEE")}
+                              </span>
+                            </div>
+                            {dayEvents.length > 0 && (
+                              <div className="flex flex-col items-end">
+                                <span className="text-sm font-bold text-gray-700 bg-gray-100/80 px-3 py-1 rounded-full border border-gray-300/60 shadow-sm">
+                                  {dayEvents.length}
+                                </span>
+                                <span className="text-[10px] text-gray-500 mt-1 font-medium">
+                                  {dayEvents.length === 1 ? 'event' : 'events'}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        );
-                      })
-                    ) : (
-                      // Month view: show dots with different colors
-                      dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
-                        const getDotColor = (source: string) => {
-                          switch (source) {
-                            case 'google':
-                              return 'bg-blue-500';
-                            case 'lifeboard':
-                              return 'bg-green-500';
-                            default:
-                              return 'bg-indigo-500';
-                          }
-                        };
-                        
-                        return (
-                          <span key={i} className={`w-1.5 h-1.5 rounded-full ${getDotColor(ev.source)}`}></span>
-                        );
-                      })
-                    )}
-                    {dayEvents.length > 3 && (
-                      <span className="text-xs text-gray-500">+{dayEvents.length - 3}</span>
-                    )}
-                  </div>
-                )}
-                      {provided.placeholder}
-                    </div>
-                  );
-                }}
-              </Droppable>
-            );
-          })}
+                          
+                          {/* Scrollable Events Container */}
+                          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                            {dayEvents.length > 0 ? (
+                              dayEvents.map((ev: DayEvent, i: number) => {
+                                const getEventStyle = (source: string) => {
+                                  switch (source) {
+                                    case 'google':
+                                      return {
+                                        container: 'bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-300/60 text-blue-900 hover:from-blue-200 hover:to-blue-100',
+                                        time: 'text-blue-700',
+                                        dot: 'bg-blue-500',
+                                        badge: 'bg-blue-200/80 text-blue-800 border-blue-300/60'
+                                      };
+                                    case 'lifeboard':
+                                      return {
+                                        container: 'bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-300/60 text-emerald-900 hover:from-emerald-200 hover:to-emerald-100',
+                                        time: 'text-emerald-700',
+                                        dot: 'bg-emerald-500',
+                                        badge: 'bg-emerald-200/80 text-emerald-800 border-emerald-300/60'
+                                      };
+                                    default:
+                                      return {
+                                        container: 'bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-300/60 text-purple-900 hover:from-purple-200 hover:to-purple-100',
+                                        time: 'text-purple-700',
+                                        dot: 'bg-purple-500',
+                                        badge: 'bg-purple-200/80 text-purple-800 border-purple-300/60'
+                                      };
+                                  }
+                                };
+                                
+                                const styles = getEventStyle(ev.source);
+                                const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                                
+                                return (
+                                  <div 
+                                    key={i} 
+                                    className={`
+                                      p-3 rounded-xl border-l-4 transition-all duration-300 shadow-sm hover:shadow-md 
+                                      transform hover:-translate-y-1 hover:scale-[1.02] cursor-pointer group
+                                      ${styles.container}
+                                    `}
+                                  >
+                                    {/* Event Header */}
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className={`w-2.5 h-2.5 rounded-full mt-0.5 shadow-sm ${styles.dot}`} />
+                                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shadow-sm ${styles.badge}`}>
+                                        {ev.source === 'google' ? 'Google' : ev.source === 'lifeboard' ? 'Scheduled' : 'Task'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Event Time */}
+                                    {timeDisplay && (
+                                      <div className={`font-bold mb-2 text-base ${styles.time}`}>
+                                        {timeDisplay}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Event Title */}
+                                    <div className="font-bold text-sm mb-2 line-clamp-4 leading-snug group-hover:line-clamp-none transition-all">
+                                      {ev.title}
+                                    </div>
+                                    
+                                    {/* Event Meta Info */}
+                                    <div className="flex items-center gap-2 flex-wrap mt-3">
+                                      {ev.duration && ev.source === 'lifeboard' && (
+                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
+                                          ⏱️ {ev.duration}min
+                                        </span>
+                                      )}
+                                      {ev.allDay && (
+                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
+                                          📅 All day
+                                        </span>
+                                      )}
+                                      {ev.taskId && (
+                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
+                                          🎯 Task
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              // Beautiful empty state for days without events
+                              <div className="flex-1 flex items-center justify-center text-gray-400">
+                                <div className="text-center py-8">
+                                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 mx-auto mb-4 flex items-center justify-center shadow-inner">
+                                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                  </div>
+                                  <p className="text-sm font-semibold text-gray-500 mb-1">Free Day</p>
+                                  <p className="text-xs text-gray-400">No events scheduled</p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Scroll padding */}
+                            <div className="h-6"></div>
+                          </div>
+                          {provided.placeholder}
+                        </div>
+                      );
+                    }}
+                  </Droppable>
+                );
+              })}
+            </div>
+          ) : (
+            // Month view: Compact grid layout
+            <div className={`grid grid-cols-7 gap-1 bg-gray-100/50 rounded-xl overflow-hidden`}>
+              {rows.flat().map((day: Date, idx: number) => {
+                const dayStr = day.toISOString().slice(0,10);
+                const dayEvents = eventsByDate[dayStr] ?? [];
+                const isCurrentMonth = view === 'month' ? isSameMonth(day, currentDate) : true;
+                const isToday = isSameDay(day, today);
+                
+                return (
+                  <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
+                    {(provided, snapshot) => {
+                      return (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
+                          className={`
+                            ${getCellSize()} 
+                            cursor-pointer flex flex-col items-start justify-start text-sm p-3
+                            transition-all duration-200 transform hover:scale-[1.02]
+                            ${
+                              isCurrentMonth 
+                                ? "bg-white shadow-sm border border-gray-200/60 hover:shadow-md" 
+                                : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                            } 
+                            ${
+                              isToday 
+                                ? "ring-2 ring-blue-500/50 bg-blue-50/80 border-blue-200" 
+                                : ""
+                            } 
+                            ${
+                              snapshot.isDraggingOver 
+                                ? "bg-blue-100/80 border-blue-300 border-2 shadow-lg scale-105" 
+                                : ""
+                            }
+                            rounded-xl
+                          `}
+                          style={{
+                            minHeight: '130px'
+                          }}
+                        >
+                          {/* Enhanced Date Header */}
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <span className={`font-bold text-lg ${
+                              isToday ? 'text-blue-700' : 
+                              isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                            }`}>
+                              {format(day, "d")}
+                            </span>
+                            {dayEvents.length > 0 && (
+                              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                {dayEvents.length}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Enhanced Event Indicators */}
+                          {dayEvents.length > 0 && (
+                            <div className="w-full space-y-1">
+                              {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
+                                const getEventBarStyle = (source: string) => {
+                                  switch (source) {
+                                    case 'google':
+                                      return 'bg-gradient-to-r from-blue-400 to-blue-500 border-blue-500';
+                                    case 'lifeboard':
+                                      return 'bg-gradient-to-r from-emerald-400 to-emerald-500 border-emerald-500';
+                                    default:
+                                      return 'bg-gradient-to-r from-purple-400 to-purple-500 border-purple-500';
+                                  }
+                                };
+                                
+                                return (
+                                  <div key={i} className={`h-2.5 rounded-full shadow-sm border ${getEventBarStyle(ev.source)}`} 
+                                       title={ev.title} />
+                                );
+                              })}
+                              {dayEvents.length > 3 && (
+                                <div className="text-xs text-gray-700 font-bold bg-gradient-to-r from-gray-200 to-gray-300 px-2 py-1 rounded-full text-center border border-gray-400 shadow-sm">
+                                  +{dayEvents.length - 3} more
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {provided.placeholder}
+                        </div>
+                      );
+                    }}
+                  </Droppable>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

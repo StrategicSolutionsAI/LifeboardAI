@@ -109,7 +109,7 @@ function CalendarContent() {
       });
       
       // Determine what updates to make based on destination
-      let updates: any = { hourSlot: undefined }; // Always remove hour slot
+      let updates: any = { hourSlot: null }; // Always remove hour slot
       
       if (destination.droppableId === 'dailyTasks') {
         // Moving to daily tasks - set due date to selected date
@@ -126,7 +126,7 @@ function CalendarContent() {
         updates.due = { date: todayStr };
       } else if (destination.droppableId === 'openTasks') {
         // Moving to open tasks - remove due date
-        updates.due = undefined;
+        updates.due = null;
       }
       
       batchUpdateTasks([

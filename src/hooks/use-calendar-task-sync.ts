@@ -58,7 +58,11 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
     return tasks
-      .filter(task => task.due?.date === dateStr && !task.completed)
+      .filter(task => 
+        task.due?.date === dateStr && 
+        !task.completed && 
+        task.hourSlot // Only show tasks that have an hourSlot (are scheduled)
+      )
       .map(task => ({
         source: 'lifeboard' as const,
         title: task.content,
@@ -73,7 +77,11 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
   // Get events for a specific date string (YYYY-MM-DD format)
   const getEventsForDate = useCallback((dateStr: string): CalendarEvent[] => {
     return tasks
-      .filter(task => task.due?.date === dateStr && !task.completed)
+      .filter(task => 
+        task.due?.date === dateStr && 
+        !task.completed && 
+        task.hourSlot // Only show tasks that have an hourSlot (are scheduled)
+      )
       .map(task => ({
         source: 'lifeboard' as const,
         title: task.content,
