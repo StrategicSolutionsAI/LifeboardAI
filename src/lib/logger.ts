@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+// Removed NextRequest import as we now use standard Request
 import * as Sentry from '@sentry/nextjs'
 
 export interface LogContext {
@@ -119,9 +119,10 @@ class Logger {
   }
 
   // Create a scoped logger for a specific request
-  forRequest(request: NextRequest, additionalContext?: LogContext): ScopedLogger {
+  forRequest(request: Request, additionalContext?: LogContext): ScopedLogger {
     const requestId = request.headers.get('x-request-id') || this.generateRequestId()
-    const route = request.nextUrl.pathname
+    const url = new URL(request.url)
+    const route = url.pathname
     
     const baseContext: LogContext = {
       requestId,

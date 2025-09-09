@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { withErrorHandling } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic'
 
-async function handler(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
+async function handler(request: Request) {
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
   const provider = searchParams.get('provider');
   const scoped = logger.forRequest(request, { operation: 'integration-status', provider });
 

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler';
 
-async function postHandler(request: Request | NextRequest) {
+async function postHandler(request: Request) {
   const supabase = supabaseServer();
   const authResult = await supabase.auth.getUser();
   const user = authResult?.data?.user;
@@ -88,7 +88,7 @@ async function postHandler(request: Request | NextRequest) {
   return NextResponse.json(data);
 }
 
-async function getHandler(request: Request | NextRequest) {
+async function getHandler(request: Request) {
   const supabase = supabaseServer();
   const authResult = await supabase.auth.getUser();
   const user = authResult?.data?.user;

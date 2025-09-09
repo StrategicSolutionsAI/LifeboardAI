@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Play, Star, CheckCircle, Users, Calendar, Zap, ArrowRight, Shield, Clock, Heart, ChevronDown, Quote, Smartphone, Globe, Lock } from "lucide-react"
@@ -20,7 +22,7 @@ export default function Home() {
                 Start Free Trial
               </Button>
             </Link>
-            <button className="text-white/80 hover:text-white" onClick="document.getElementById('sticky-cta').style.transform='translateY(100%)'">
+            <button className="text-white/80 hover:text-white" onClick={() => document.getElementById('sticky-cta')!.style.transform='translateY(100%)'}>
               ×
             </button>
           </div>

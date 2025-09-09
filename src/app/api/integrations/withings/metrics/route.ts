@@ -1,19 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { fetchWithingsLatestWeight, refreshWithingsToken } from '@/lib/withings/client'
 import { logger } from '@/lib/logger'
 import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
 import { withErrorHandling } from '@/lib/api-error-handler'
 
-async function handler(request: NextRequest | Request) {
-  // Ensure we have a NextRequest
-  const nextRequest = request instanceof Request ? 
-    new NextRequest(request.url, { 
-      method: request.method, 
-      headers: request.headers,
-      body: request.body 
-    }) : 
-    request
+async function handler(request: Request) {
+  // For logger compatibility, we can pass request directly
+  const nextRequest = request
   const requestLogger = logger.forRequest(nextRequest, { operation: 'get-withings-metrics' })
   
   requestLogger.info('Starting Withings metrics request')

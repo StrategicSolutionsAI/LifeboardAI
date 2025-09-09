@@ -1,15 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { getCalendarClient } from '@/lib/google/client';
 import { withErrorHandling } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-async function handler(request: NextRequest) {
+async function handler(request: Request) {
   const scoped = logger.forRequest(request, { operation: 'google-calendar-events' })
   // Get query parameters
-  const searchParams = request.nextUrl.searchParams;
+  const url = new URL(request.url)
+  const searchParams = url.searchParams;
   const timeMin = searchParams.get('timeMin') || new Date().toISOString();
   const timeMax = searchParams.get('timeMax') || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const maxResults = searchParams.get('maxResults') || '10';
