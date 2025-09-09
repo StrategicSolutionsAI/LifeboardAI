@@ -1,6 +1,14 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+ 
+function getBaseUrl() {
+  const h = headers()
+  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000'
+  const proto = h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https')
+  return `${proto}://${host}`
+}
 import { supabaseServer } from '@/utils/supabase/server'
 
 export async function signInWithGoogle() {
@@ -8,7 +16,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/callback?from=login`,
+      redirectTo: `${getBaseUrl()}/auth/callback?from=login`,
       queryParams: { prompt: 'select_account' },
     },
   })
@@ -22,7 +30,7 @@ export async function signUpWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/auth/callback?from=signup`,
+      redirectTo: `${getBaseUrl()}/auth/callback?from=signup`,
       queryParams: { prompt: 'select_account' },
     },
   })
