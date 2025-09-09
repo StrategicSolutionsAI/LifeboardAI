@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Replicate from 'replicate'
+import OpenAI from 'openai'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-function getReplicate() {
-  const token = process.env.REPLICATE_API_TOKEN
-  if (!token) {
-    throw new Error('Missing REPLICATE_API_TOKEN')
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('Missing OPENAI_API_KEY')
   }
-  return new Replicate({ auth: token })
+  return new OpenAI({ apiKey })
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const replicate = getReplicate()
+    const openai = getOpenAI()
     const { messages } = await req.json() as { messages: { role: 'user' | 'assistant'; content: string }[] }
 
     // Ensure at least one user message
@@ -73,20 +73,20 @@ if (prefs) {
   systemContext = `System: The user has the following life buckets (tabs): ${prefs.life_buckets.join(', ')}. Widgets per bucket: ${bucketSummary}.${dynamicString}`
 }
 
-    // Convert messages array into a prompt string expected by GPT-5
-    const chatPrompt = [systemContext, ...messages.map(({ role, content }) => `${role}: ${content}`)].filter(Boolean).join('\n');
+    // Create OpenAI messages format
+    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
+      ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
+    ]
 
-    const output = await replicate.run(
-      "openai/gpt-5",
-      {
-        input: {
-          prompt: chatPrompt,
-          max_tokens: 1024,
-        },
-      }
-    )
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: openaiMessages,
+      max_tokens: 1024,
+      temperature: 0.7,
+    })
 
-    const reply = (Array.isArray(output) ? output.join('') : String(output)).trim()
+    const reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
     return NextResponse.json({ reply })
   } catch (err: any) {
     console.error('Chat route error', err)
