@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { fetchWithingsLatestWeight } from '@/lib/withings/client'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // Withings webhook endpoint for real-time weight updates
 export async function POST(request: NextRequest) {
   try {
