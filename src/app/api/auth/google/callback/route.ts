@@ -3,6 +3,9 @@ import { getOAuth2Client } from '@/lib/google/client';
 import { supabaseServer } from '@/utils/supabase/server';
 import { PostgrestError } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   // Get the authorization code from the URL
   const searchParams = request.nextUrl.searchParams;

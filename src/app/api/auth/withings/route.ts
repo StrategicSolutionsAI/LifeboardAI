@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getWithingsAuthUrl } from '@/lib/withings/client'
 import { supabaseServer } from '@/utils/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const redirectUrl = searchParams.get('redirectUrl') || '/onboarding/3'
