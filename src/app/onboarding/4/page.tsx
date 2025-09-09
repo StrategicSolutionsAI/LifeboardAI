@@ -23,25 +23,10 @@ const integrations: Integration[] = [
     icon: "🗓️" 
   },
   { 
-    id: "apple-calendar", 
-    name: "Apple Calendar", 
-    description: "Sync your tasks and events with Apple Calendar", 
-    icon: "📅",
-    comingSoon: true
-  },
-  { 
-    id: "notion", 
-    name: "Notion", 
-    description: "Link your Notion workspace and documents", 
-    icon: "📘",
-    comingSoon: true
-  },
-  { 
-    id: "slack", 
-    name: "Slack", 
-    description: "Get notifications directly in your Slack workspace", 
-    icon: "💬",
-    comingSoon: true
+    id: "todoist", 
+    name: "Todoist", 
+    description: "Sync tasks from your Todoist account", 
+    icon: "✅" 
   },
   { 
     id: "fitbit", 
@@ -62,10 +47,46 @@ const integrations: Integration[] = [
     icon: "⚖️" 
   },
   { 
-    id: "todoist", 
-    name: "Todoist", 
-    description: "Sync tasks from your Todoist account", 
-    icon: "✅" 
+    id: "apple-health", 
+    name: "Apple Health", 
+    description: "Sync health and fitness data from iOS Health app", 
+    icon: "🍎",
+    comingSoon: true
+  },
+  { 
+    id: "strava", 
+    name: "Strava", 
+    description: "Track workouts and activities", 
+    icon: "🏃",
+    comingSoon: true
+  },
+  { 
+    id: "myfitnesspal", 
+    name: "MyFitnessPal", 
+    description: "Sync nutrition data", 
+    icon: "🥗",
+    comingSoon: true
+  },
+  { 
+    id: "apple-calendar", 
+    name: "Apple Calendar", 
+    description: "Sync your tasks and events with Apple Calendar", 
+    icon: "📅",
+    comingSoon: true
+  },
+  { 
+    id: "notion", 
+    name: "Notion", 
+    description: "Link your Notion workspace and documents", 
+    icon: "📘",
+    comingSoon: true
+  },
+  { 
+    id: "slack", 
+    name: "Slack", 
+    description: "Get notifications directly in your Slack workspace", 
+    icon: "💬",
+    comingSoon: true
   },
 ]
 
@@ -172,8 +193,8 @@ export default function OnboardingStep4() {
   }
 
   const handleNext = () => {
-    // Store selected integrations if needed, then navigate to next step
-    router.push("/onboarding/5")
+    // Skip step 5 since we've consolidated all integrations here
+    router.push("/onboarding/6")
   }
 
   const handleBack = () => {
@@ -182,18 +203,18 @@ export default function OnboardingStep4() {
 
   return (
     <OnboardingLayout
-      step={4}
-      title="Connect Your Tools"
-      subtitle="Integrate with your favorite services"
-      description=""
+      step={5}
+      title="Connect Your Apps"
+      subtitle="Sync your favorite tools and services"
+      description="Connect apps you already use to automatically import your data and get better insights. You can always add more later."
       buttonText="CONTINUE"
       onNext={handleNext}
       onBack={handleBack}
     >
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h2 className="text-[18px] font-medium text-[#171A1F]">Select integrations</h2>
-          <p className="text-[14px] text-[#565E6C]">Connect Lifeboard AI with your favorite tools</p>
+          <h2 className="text-[18px] font-medium text-[#171A1F]">Popular integrations</h2>
+          <p className="text-[14px] text-[#565E6C]">Click any service below to connect instantly</p>
         </div>
         
         <div className="grid grid-cols-1 gap-3">
@@ -266,41 +287,11 @@ export default function OnboardingStep4() {
         </div>
 
         {/* Info text */}
-        <div className="flex flex-col gap-2 mt-2">
-          <p className="text-[12px] text-[#6B7280]">
-            Note: You can always manage your integrations later from settings
-          </p>
-          
-          <div className="flex justify-end mt-2">
-            <Button 
-              onClick={connectGoogleCalendar}
-              disabled={connectingGoogle}
-              className="bg-theme-primary hover:bg-theme-secondary text-white text-sm px-4"
-            >
-              {connectingGoogle ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>Connect Google Calendar</>
-              )}
-            </Button>
-            <Button
-              onClick={connectTodoist}
-              disabled={connectingTodoist}
-              variant="secondary"
-              className="text-sm ml-2"
-            >
-              {connectingTodoist ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>Connect Todoist</>
-              )}
-            </Button>
+        <div className="flex flex-col gap-2 mt-4">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-[12px] text-[#6B7280]">
+              💡 Don't see your app? More integrations are coming soon! You can always manage connections later from settings.
+            </p>
           </div>
         </div>
       </div>

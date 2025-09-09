@@ -88,23 +88,47 @@ import {
   Settings as SettingsIcon,
   ListChecks,
 } from "lucide-react";
-import { WidgetLibrary, widgetTemplates } from "./widget-library";
+import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
-import WidgetEditorSheet from "@/components/widget-editor";
+import dynamic from 'next/dynamic';
+const WidgetEditorSheet = dynamic(() => import("@/components/widget-editor"), { ssr: false });
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import TrendsPanel from "./trends-panel";
 import WidgetSelector from "./widget-selector";
 import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
-import HourlyPlanner from './hourly-planner';
-import { NutritionMealTracker } from "./nutrition-meal-tracker";
-import { NutritionSummaryWidget } from "./nutrition-summary-widget";
-import { CalendarTaskList } from "./calendar-task-list";
-import { MedicationTrackerWidget } from "./medication-tracker-simple";
-import { ExerciseWidget } from "./exercise-widget-simple";
-import { HomeProjectsWidget } from "./home-projects-widget";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Dynamic, on-demand heavy widgets and panels
+const NutritionMealTracker = dynamic(
+  () => import("./nutrition-meal-tracker").then(m => m.NutritionMealTracker),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+const NutritionSummaryWidget = dynamic(
+  () => import("./nutrition-summary-widget").then(m => m.NutritionSummaryWidget),
+  { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+const CalendarTaskList = dynamic(
+  () => import("./calendar-task-list").then(m => m.CalendarTaskList),
+  { loading: () => <Skeleton className="h-40 w-full" /> }
+);
+const MedicationTrackerWidget = dynamic(
+  () => import("./medication-tracker-simple").then(m => m.MedicationTrackerWidget),
+  { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+const ExerciseWidget = dynamic(
+  () => import("./exercise-widget-simple").then(m => m.ExerciseWidget),
+  { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+const HomeProjectsWidget = dynamic(
+  () => import("./home-projects-widget").then(m => m.HomeProjectsWidget),
+  { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+const TrendsPanel = dynamic(
+  () => import("./trends-panel"),
+  { loading: () => <Skeleton className="h-48 w-full" /> }
+);
 
 // Icon mapping for serialization
 const iconMap: Record<string, LucideIcon> = {
@@ -1401,7 +1425,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ widgetsByBucket: widgetsByBucketRef.current, progressByWidget }),
       });
 
       if (!response.ok) {

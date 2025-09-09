@@ -17,6 +17,7 @@ import {
   Activity
 } from 'lucide-react'
 import { invalidateIntegrationCaches } from '@/hooks/use-data-cache'
+import SectionLoadTimer from '@/components/section-load-timer'
 
 interface IntegrationStatus {
   connected: boolean
@@ -363,6 +364,7 @@ export default function IntegrationsPage() {
   if (loading) {
     return (
       <SidebarLayout>
+        <SectionLoadTimer name="/integrations" />
         <div className="container mx-auto p-6 max-w-4xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Integrations</h1>
@@ -399,6 +401,7 @@ export default function IntegrationsPage() {
 
   return (
     <SidebarLayout>
+      <SectionLoadTimer name="/integrations" />
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">

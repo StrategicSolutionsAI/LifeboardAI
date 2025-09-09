@@ -176,7 +176,7 @@ export function TaskSidePanel() {
     if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
       // Hour slot → Daily list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: undefined } }
+        { taskId: draggableId, updates: { hourSlot: null as any } }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -186,7 +186,7 @@ export function TaskSidePanel() {
     if (isHour(source.droppableId) && (destination.droppableId === 'openTasks' || destination.droppableId === 'upcomingTasks')) {
       // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: undefined } }
+        { taskId: draggableId, updates: { hourSlot: null as any } }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });

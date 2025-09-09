@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
+import SectionLoadTimer from '@/components/section-load-timer';
 import { SidebarLayout } from "@/components/sidebar-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,7 @@ export default function TrendsPage({ params }: { params: { instanceId: string } 
   if (loading) {
     return (
       <SidebarLayout>
+        <SectionLoadTimer name="/trends/[instanceId]" />
         <div className="p-6 max-w-6xl mx-auto space-y-6">
           <div className="space-y-2">
             <Skeleton className="h-8 w-64" />
@@ -167,6 +169,7 @@ export default function TrendsPage({ params }: { params: { instanceId: string } 
   if (error) {
     return (
       <SidebarLayout>
+        <SectionLoadTimer name="/trends/[instanceId]" />
         <div className="p-6 max-w-6xl mx-auto">
           <Card className="border-red-200 bg-red-50">
             <CardHeader>
@@ -220,6 +223,7 @@ export default function TrendsPage({ params }: { params: { instanceId: string } 
 
   return (
     <SidebarLayout>
+      <SectionLoadTimer name="/trends/[instanceId]" />
       <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

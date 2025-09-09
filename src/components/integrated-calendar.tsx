@@ -148,180 +148,382 @@ export default function IntegratedCalendar() {
   const weekDays = getWeekDays(anchorDate);
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-        <div className="flex items-center gap-2">
-          <button onClick={gotoPrev} className="px-3 py-1 rounded hover:bg-gray-100 text-gray-600">
-            &lt;
+    <div className={`w-full max-w-none mx-4 bg-white/98 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/70 overflow-hidden`}>
+      {/* Enhanced Header */}
+      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80 flex-wrap gap-4">
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={gotoPrev} 
+            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Previous period"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
-          <button onClick={gotoToday} className="px-3 py-1 rounded hover:bg-gray-100 text-gray-600">
+          
+          <button 
+            onClick={gotoToday} 
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          >
             Today
           </button>
-          <button onClick={gotoNext} className="px-3 py-1 rounded hover:bg-gray-100 text-gray-600">
-            &gt;
+          
+          <button 
+            onClick={gotoNext} 
+            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Next period"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
-          <h2 className="ml-4 text-lg font-semibold text-gray-800 whitespace-nowrap">
+          
+          <h2 className="ml-4 text-2xl font-bold text-gray-900 tracking-tight whitespace-nowrap">
             {view === "month" && format(anchorDate, "MMMM yyyy")}
             {view === "week" && `${format(weekDays[0], "MMM d")} – ${format(weekDays[6], "MMM d, yyyy")}`}
             {view === "day" && format(anchorDate, "MMMM d, yyyy")}
           </h2>
         </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <select
-            value={view}
-            onChange={(e) => setView(e.target.value as ViewMode)}
-            className="border rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="month">Month view</option>
-            <option value="week">Week view</option>
-            <option value="day">Day view</option>
-          </select>
+        
+        <div className="flex items-center space-x-4 ml-auto">
+          <div className="flex items-center bg-gray-100/80 rounded-xl p-1 border border-gray-200/60">
+            {[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }, { value: 'day', label: 'Day' }].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setView(option.value as ViewMode)}
+                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  view === option.value
+                    ? 'bg-white shadow-md text-blue-700 border border-blue-200/50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          
           <button
             onClick={() => alert("Add event coming soon")}
-            className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1.5 rounded"
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
-            <Plus size={16} /> Add event
+            <Plus size={16} />
+            <span>Add event</span>
           </button>
         </div>
       </div>
 
       {/* Calendar body */}
       {view === "month" && (
-        <>
-          <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-1">
-                {d}
+        <div className="p-6">
+          {/* Enhanced Week Days Header */}
+          <div className="grid grid-cols-7 bg-gray-50/80 rounded-t-xl border-b border-gray-200/60">
+            {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
+              <div key={day} className="px-4 py-3 text-center">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {day.slice(0, 3)}
+                </div>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-md overflow-hidden">
+          
+          {/* Enhanced Month Grid */}
+          <div className="grid grid-cols-7 gap-1 bg-gray-100/50 rounded-b-xl overflow-hidden p-1">
             {monthMatrix.flat().map((day) => {
               const dayStr = day.toISOString().slice(0, 10);
               const dayEvents = eventsByDate[dayStr] ?? [];
               const isCurrentMonth = isSameMonth(day, anchorDate);
               const isToday = isSameDay(day, today);
+              
               return (
                 <div
                   key={dayStr}
                   onClick={() => dayEvents.length && setSelectedDate(dayStr)}
-                  className={`aspect-square cursor-pointer flex flex-col items-center justify-start text-sm ${
-                    isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
-                  } ${
-                    isToday ? "bg-theme-primary-500 text-white border-2 border-theme-primary-600" : ""
-                  }`}
+                  className={`
+                    aspect-square cursor-pointer flex flex-col items-start justify-start p-3 
+                    transition-all duration-200 transform hover:scale-[1.02] rounded-xl
+                    ${
+                      isCurrentMonth 
+                        ? "bg-white shadow-sm border border-gray-200/60 hover:shadow-md" 
+                        : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                    } 
+                    ${
+                      isToday 
+                        ? "ring-2 ring-blue-500/50 bg-blue-50/80 border-blue-200" 
+                        : ""
+                    }
+                  `}
                 >
-                  <span className="mt-1">{format(day, "d")}</span>
+                  {/* Enhanced Date Header */}
+                  <div className="flex items-center justify-between w-full mb-2">
+                    <span className={`font-bold text-lg ${
+                      isToday ? 'text-blue-700' : 
+                      isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                    }`}>
+                      {format(day, "d")}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {dayEvents.length}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Enhanced Event Indicators */}
                   {dayEvents.length > 0 && (
-                    <div className="mt-0.5 flex flex-wrap justify-center gap-0.5">
-                      {dayEvents.slice(0, 3).map((_, i) => (
-                        <span key={i} className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                      ))}
+                    <div className="w-full space-y-1">
+                      {dayEvents.slice(0, 2).map((ev, i) => {
+                        const getEventBarStyle = (source: string) => {
+                          switch (source) {
+                            case 'google':
+                              return 'bg-blue-400 border-blue-500';
+                            case 'todoist':
+                              return 'bg-purple-400 border-purple-500';
+                            default:
+                              return 'bg-emerald-400 border-emerald-500';
+                          }
+                        };
+                        
+                        return (
+                          <div key={i} className={`h-2 rounded-full shadow-sm border ${getEventBarStyle(ev.source)}`} />
+                        );
+                      })}
+                      {dayEvents.length > 2 && (
+                        <div className="text-xs text-gray-600 font-semibold bg-gray-200/80 px-2 py-1 rounded-full text-center">
+                          +{dayEvents.length - 2}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-        </>
+        </div>
       )}
 
       {view === "week" && (
-        <div className="border rounded-md overflow-hidden">
-          <div className="grid grid-cols-7 text-center text-xs text-gray-500 bg-gray-50 border-b">
-            {weekDays.map((d) => (
-              <div key={d.toISOString()} className="py-2">
-                <div className="font-medium text-gray-700">{format(d, "EEE")}</div>
-                <div className="text-gray-900">{format(d, "d")}</div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-px bg-gray-200">
-            {weekDays.map((d) => {
-              const dateStr = d.toISOString().slice(0, 10);
-              const dayEvents = eventsByDate[dateStr] ?? [];
-              return (
-                <div key={dateStr} className="min-h-[120px] bg-white p-1 overflow-auto">
-                  {dayEvents.map((ev, i) => (
-                    <div
-                      key={i}
-                      className="mb-1 px-1 py-0.5 rounded text-xs bg-indigo-50 text-indigo-700 truncate"
-                    >
-                      {ev.title}
+        <div className="mx-6 mb-6">
+          <div className="border border-gray-200/60 rounded-2xl overflow-hidden shadow-lg">
+            {/* Enhanced Week Header */}
+            <div className="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+              {weekDays.map((d) => {
+                const isToday = isSameDay(d, today);
+                return (
+                  <div key={d.toISOString()} className={`py-4 text-center border-r border-gray-200/60 last:border-r-0 ${
+                    isToday ? 'bg-blue-50/80 border-blue-200/60' : ''
+                  }`}>
+                    <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                      {format(d, "EEE")}
                     </div>
-                  ))}
-                </div>
-              );
-            })}
+                    <div className={`text-xl font-bold mt-1 ${
+                      isToday ? 'text-blue-700' : 'text-gray-900'
+                    }`}>
+                      {format(d, "d")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Enhanced Week Content */}
+            <div className="grid grid-cols-7 gap-6 p-6 bg-gray-50/30 h-[650px]">
+              {weekDays.map((d) => {
+                const dateStr = d.toISOString().slice(0, 10);
+                const dayEvents = eventsByDate[dateStr] ?? [];
+                const isToday = isSameDay(d, today);
+                
+                return (
+                  <div key={dateStr} className={`h-full bg-white rounded-xl p-4 shadow-sm border border-gray-200/60 flex flex-col ${
+                    isToday ? 'ring-2 ring-blue-500/30 bg-blue-50/20' : ''
+                  }`}>
+                    <div className="space-y-2">
+                      {dayEvents.map((ev, i) => {
+                        const getEventStyle = (source: string) => {
+                          switch (source) {
+                            case 'google':
+                              return {
+                                container: 'bg-blue-100/80 border border-blue-200 text-blue-800',
+                                time: 'text-blue-600'
+                              };
+                            case 'todoist':
+                              return {
+                                container: 'bg-purple-100/80 border border-purple-200 text-purple-800',
+                                time: 'text-purple-600'
+                              };
+                            default:
+                              return {
+                                container: 'bg-emerald-100/80 border border-emerald-200 text-emerald-800',
+                                time: 'text-emerald-600'
+                              };
+                          }
+                        };
+                        
+                        const styles = getEventStyle(ev.source);
+                        const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                        
+                        return (
+                          <div
+                            key={i}
+                            className={`p-2 rounded-lg text-xs border-l-3 hover:shadow-sm transition-all duration-200 ${styles.container}`}
+                          >
+                            {timeDisplay && (
+                              <div className={`font-bold mb-1 ${styles.time}`}>
+                                {timeDisplay}
+                              </div>
+                            )}
+                            <div className="font-medium line-clamp-2">
+                              {ev.title}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
       {view === "day" && (
-        <div className="border rounded-md p-4">
-          <h3 className="text-base font-medium mb-4">
-            {format(anchorDate, "EEEE, MMMM d, yyyy")}
-          </h3>
-          {/* Hourly planner */}
-          <DragDropContext
-            onDragStart={() => setIsDragging(true)}
-            onDragEnd={(result: DropResult) => {
-              // Ignore drops if a resize operation is active
-              if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
-                setIsDragging(false);
-                return;
-              }
-              setIsDragging(false);
-              if (!result.destination) return;
-              const { source, destination, draggableId } = result;
-              const isHour = (id: string) => id.startsWith('hour-');
+        <div className="mx-6 mb-6">
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+              <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
+                {format(anchorDate, "EEEE, MMMM d, yyyy")}
+              </h3>
+              <p className="text-sm text-gray-600 mt-2 font-medium">
+                Plan your day with precision scheduling
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <DragDropContext
+                onDragStart={() => setIsDragging(true)}
+                onDragEnd={(result: DropResult) => {
+                  // Ignore drops if a resize operation is active
+                  if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
+                    setIsDragging(false);
+                    return;
+                  }
+                  setIsDragging(false);
+                  if (!result.destination) return;
+                  const { source, destination, draggableId } = result;
+                  const isHour = (id: string) => id.startsWith('hour-');
 
-              // Only handle hour → hour moves in this simple integrated view
-              if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-                const dstHour = destination.droppableId; // keep full 'hour-7AM'
-                batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }])
-                  .catch(err => console.error('Failed to update task hourSlot:', err));
-              }
-            }}
-          >
-            <HourlyPlanner className="max-h-[70vh] overflow-y-auto" isDragging={isDragging} />
-          </DragDropContext>
+                  // Only handle hour → hour moves in this simple integrated view
+                  if (isHour(source.droppableId) && isHour(destination.droppableId)) {
+                    const dstHour = destination.droppableId; // keep full 'hour-7AM'
+                    batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }])
+                      .catch(err => console.error('Failed to update task hourSlot:', err));
+                  }
+                }}
+              >
+                <HourlyPlanner className="max-h-[75vh] overflow-y-auto rounded-xl" isDragging={isDragging} />
+              </DragDropContext>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Modal for month/day selection */}
+      {/* Enhanced Modal for event details */}
       {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg w-96 max-w-[90%] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">
-                {format(new Date(selectedDate), "MMMM d, yyyy")}
-              </h3>
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="text-gray-400 hover:text-gray-600 rounded-md focus:outline-none"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="space-y-3 max-h-80 overflow-auto">
-              {(eventsByDate[selectedDate] ?? []).map((ev, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className="mt-1 w-2 h-2 rounded-full bg-indigo-500" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{ev.title}</p>
-                    {ev.time && (
-                      <p className="text-xs text-gray-500">
-                        {ev.allDay ? "All day" : format(new Date(ev.time), "h:mm a")}
-                      </p>
-                    )}
-                  </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {format(new Date(selectedDate), "MMMM d, yyyy")}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {format(new Date(selectedDate), "EEEE")}
+                  </p>
                 </div>
-              ))}
-              {(eventsByDate[selectedDate]?.length ?? 0) === 0 && (
-                <p className="text-sm text-gray-500">No events</p>
-              )}
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  aria-label="Close modal"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {(eventsByDate[selectedDate] ?? []).map((ev, idx) => {
+                  const getEventStyle = (source: string) => {
+                    switch (source) {
+                      case 'google':
+                        return {
+                          container: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
+                          dot: 'bg-blue-500',
+                          badge: 'bg-blue-100 text-blue-700 border-blue-200'
+                        };
+                      case 'todoist':
+                        return {
+                          container: 'bg-purple-50 border-purple-200 hover:bg-purple-100',
+                          dot: 'bg-purple-500',
+                          badge: 'bg-purple-100 text-purple-700 border-purple-200'
+                        };
+                      default:
+                        return {
+                          container: 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100',
+                          dot: 'bg-emerald-500',
+                          badge: 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                        };
+                    }
+                  };
+                  
+                  const getSourceLabel = (source: string) => {
+                    switch (source) {
+                      case 'google':
+                        return 'Google Calendar';
+                      case 'todoist':
+                        return 'Todoist';
+                      default:
+                        return source;
+                    }
+                  };
+                  
+                  const styles = getEventStyle(ev.source);
+                  
+                  return (
+                    <div key={idx} className={`p-4 rounded-xl border transition-all duration-200 ${styles.container}`}>
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-3 h-3 rounded-full mt-1 ring-2 ring-white shadow-sm ${styles.dot}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 mb-2">{ev.title}</p>
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${styles.badge}`}>
+                              {getSourceLabel(ev.source)}
+                            </span>
+                            {ev.time && (
+                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
+                                {ev.allDay ? "All day" : format(new Date(ev.time), "h:mm a")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(eventsByDate[selectedDate]?.length ?? 0) === 0 && (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm text-gray-500 font-medium">No events scheduled</p>
+                    <p className="text-xs text-gray-400 mt-1">This day is completely free</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

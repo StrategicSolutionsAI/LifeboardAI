@@ -424,7 +424,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     } catch {
       return todayTasks;
     }
-  }, [todayTasks, todayOrderKey, todayTasksRenderKey]);
+  }, [todayTasks, todayOrderKey]);
 
   // Open tasks (only shown in Master List tab)
   const openTasksBase = useMemo(() => {
@@ -448,7 +448,6 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   React.useEffect(() => {
     // Don't sync if we're in the middle of a reorder operation
     if (isReordering) {
-      console.log('🚫 Skipping sync during reorder operation');
       return;
     }
 
@@ -457,12 +456,15 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     
     // Check if any tasks have position values - if so, use API order
     const hasPositions = openTasksBase.some(t => t.position !== undefined);
-    console.log('🔍 Sync check - hasPositions:', hasPositions, 'openTasksBase length:', openTasksBase.length, 'openTasksLocal length:', openTasksLocal.length);
     
     if (hasPositions) {
       // Use API order when tasks have positions (they're already sorted by API)
-      console.log('✅ Using API order with positions');
-      setOpenTasksLocal(openTasksBase);
+      // Only update if the order is actually different to prevent infinite loops
+      const currentOrder = openTasksLocal.map(t => t.id.toString()).join(',');
+      const baseOrder = openTasksBase.map(t => t.id.toString()).join(',');
+      if (currentOrder !== baseOrder) {
+        setOpenTasksLocal(openTasksBase);
+      }
       return;
     }
     
@@ -475,11 +477,20 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       const id = t.id.toString();
       if (!localIds.has(id)) { next.push(t); changed = true; }
     });
-    if (changed || openTasksLocal.length === 0) setOpenTasksLocal(next);
+    if (changed || openTasksLocal.length === 0) {
+      // Only update if there's an actual change to prevent infinite loops
+      const nextOrder = next.map(t => t.id.toString()).join(',');
+      const currentOrder = openTasksLocal.map(t => t.id.toString()).join(',');
+      if (nextOrder !== currentOrder) {
+        setOpenTasksLocal(next);
+      }
+    }
   }, [openTasksBase, openTasksLocal, isReordering]);
 
   // Render from local list
-  const openTasksToShow = openTasksLocal.length ? openTasksLocal : openTasksBase;
+  const openTasksToShow = useMemo(() => {
+    return openTasksLocal.length ? openTasksLocal : openTasksBase;
+  }, [openTasksLocal, openTasksBase]);
 
   // Listen for reorder events from parent DragDropContext
   React.useEffect(() => {
@@ -639,24 +650,43 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
         const list = [...todayTasksOrdered];
         const [moved] = list.splice(source.index, 1);
         list.splice(destination.index, 0, moved);
+        
+        // Update localStorage immediately for instant UI feedback
         if (typeof window !== 'undefined') {
           const newOrder = list.map(t => t.id.toString());
-          try { window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); } catch {}
+          try { 
+            window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); 
+            // Trigger immediate re-render
+            setTodayTasksRenderKey(prev => prev + 1);
+          } catch {}
         }
         return;
       }
       // Reorder for open tasks: update local order immediately and persist positions
       if (destination.droppableId === 'openTasks') {
-        console.log('🔄 Reordering open tasks:', { source: source.index, destination: destination.index });
+        // Set reordering flag to prevent sync interference
+        setIsReordering(true);
+        
         const list = [...openTasksToShow];
         const [moved] = list.splice(source.index, 1);
         list.splice(destination.index, 0, moved);
-        console.log('📝 New task order:', list.map((t, idx) => `${idx}: ${t.content}`));
+        
+        // Update local state immediately for instant UI feedback
         setOpenTasksLocal(list);
+        
         // Persist as positions for all visible tasks
         const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
-        console.log('💾 Sending position updates:', updates);
-        batchUpdateTasks(updates).catch(err => console.error('Failed to persist order', err));
+        
+        batchUpdateTasks(updates)
+          .then(() => {
+            // Clear reordering flag after successful API call
+            setTimeout(() => setIsReordering(false), 1000);
+          })
+          .catch(err => {
+            console.error('Failed to persist order', err);
+            // Clear reordering flag even on error
+            setIsReordering(false);
+          });
         return;
       }
     }
@@ -676,7 +706,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
       // Hour slot → Daily tasks: Remove hourSlot to unschedule
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: undefined } }
+        { taskId: draggableId, updates: { hourSlot: null as any } }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -741,9 +771,15 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       const list = [...todayTasksOrdered];
       const [moved] = list.splice(source.index, 1);
       list.splice(destination.index, 0, moved);
+      
+      // Update localStorage immediately for instant UI feedback
       if (typeof window !== 'undefined') {
         const newOrder = list.map(t => t.id.toString());
-        try { window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); } catch {}
+        try { 
+          window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); 
+          // Trigger immediate re-render
+          setTodayTasksRenderKey(prev => prev + 1);
+        } catch {}
       }
       return;
     }
@@ -868,7 +904,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     );
   }
 
-  console.log('🎯 Regular view rendering', { dashboardView, selectedBucket });
+  // console.log('🎯 Regular view rendering', { dashboardView, selectedBucket });
 
   return (
     <div className="w-[420px] bg-white/95 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
@@ -918,7 +954,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
       {/* Task lists with drag & drop */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full px-6 py-2">
+        <div className="h-full px-6 py-2 overflow-y-auto">
           {!disableInternalDragDrop ? (
             <DragDropContext onDragEnd={handleDragEnd}>
               {renderTaskContent()}
@@ -1425,8 +1461,11 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
               <ul
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-               className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200 overflow-y-auto"
-               style={{ maxHeight: isOpenCollapsed ? 0 : '60vh' }}
+               className="space-y-2 text-sm text-gray-700 pr-1 transition-[max-height] duration-200"
+               style={{ 
+                 maxHeight: isOpenCollapsed ? 0 : '60vh',
+                 overflowY: isOpenCollapsed ? 'hidden' : 'auto'
+               }}
               >
                 {loading && openTasksToShow.length === 0 ? (
                   <li className="text-gray-500">Loading…</li>

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   // If no code, redirect to Todoist OAuth
   if (!code) {
     const clientId = process.env.TODOIST_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/todoist/auth`
+    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/todoist/auth`
     
     if (!clientId) {
       return NextResponse.json({ error: 'Todoist client ID not configured' }, { status: 500 })
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=unauthorized`)
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=unauthorized`)
     }
 
     // Exchange code for access token
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         client_id: process.env.TODOIST_CLIENT_ID!,
         client_secret: process.env.TODOIST_CLIENT_SECRET!,
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/todoist/auth`,
+        redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/todoist/auth`,
       }),
     })
 
@@ -66,9 +66,6 @@ export async function GET(request: NextRequest) {
         provider: 'todoist',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token || null,
-        token_expires_at: tokenData.expires_in 
-          ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-          : null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,provider'
@@ -76,14 +73,14 @@ export async function GET(request: NextRequest) {
 
     if (upsertError) {
       console.error('Error storing Todoist integration:', upsertError)
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/integrations?error=storage_failed`)
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/integrations?error=storage_failed`)
     }
 
     // Redirect back to integrations page with success
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/integrations?success=todoist_connected`)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/integrations?success=todoist_connected`)
     
   } catch (error) {
     console.error('Todoist OAuth error:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/integrations?error=oauth_failed`)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/integrations?error=oauth_failed`)
   }
 }

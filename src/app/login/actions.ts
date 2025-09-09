@@ -65,5 +65,5 @@ export async function emailSignUp(formData: FormData): Promise<void> {
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`)
   }
-  redirect('/onboarding/1')
+  redirect('/onboarding/0')
 }

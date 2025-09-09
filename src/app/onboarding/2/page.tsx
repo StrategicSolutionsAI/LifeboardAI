@@ -116,10 +116,10 @@ export default function OnboardingStep2() {
 
   return (
     <OnboardingLayout
-      step={2}
-      title="Customize Your Buckets"
-      subtitle="Add your own custom categories"
-      description=""
+      step={3}
+      title="Add Custom Categories"
+      subtitle="Personalize your dashboard further"
+      description="Add any specific areas you want to track that weren't in the previous list."
       buttonText="CONTINUE"
       onNext={handleContinue}
       onBack={handleBack}

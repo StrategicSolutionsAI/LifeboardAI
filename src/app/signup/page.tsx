@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { emailSignUp, emailLogin, signUpWithGoogle } from '@/app/login/actions'
+import SectionLoadTimer from '@/components/section-load-timer'
 
 function SignUpContent() {
   const [isLogin, setIsLogin] = useState(false)
@@ -109,8 +110,11 @@ function SignUpContent() {
 
 export default function SignUp() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <SignUpContent />
-    </Suspense>
+    <>
+      <SectionLoadTimer name="/signup" />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+        <SignUpContent />
+      </Suspense>
+    </>
   )
 }

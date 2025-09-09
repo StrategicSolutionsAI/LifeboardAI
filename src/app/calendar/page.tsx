@@ -8,10 +8,12 @@ export const metadata: Metadata = {
 const CalendarView = dynamic(() => import("./CalendarView"), { ssr: false });
 
 import { SidebarLayout } from "@/components/sidebar-layout";
+import SectionLoadTimer from "@/components/section-load-timer";
 
 export default function CalendarPage() {
   return (
     <SidebarLayout>
+      <SectionLoadTimer name="/calendar" />
       <CalendarView />
     </SidebarLayout>
   );

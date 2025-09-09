@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { TaskBoardDashboard } from "@/components/taskboard-dashboard"
 import { SidebarLayout } from "@/components/sidebar-layout"
 import { Loader2 } from 'lucide-react'
+import SectionLoadTimer from '@/components/section-load-timer'
 
 function DashboardContent() {
   return (
@@ -26,8 +27,11 @@ function LoadingDashboard() {
 
 export default function Dashboard() {
   return (
-    <Suspense fallback={<LoadingDashboard />}>
-      <DashboardContent />
-    </Suspense>
+    <>
+      <SectionLoadTimer name="/dashboard" />
+      <Suspense fallback={<LoadingDashboard />}>
+        <DashboardContent />
+      </Suspense>
+    </>
   )
 }

@@ -40,19 +40,24 @@ export default function OnboardingStep1() {
     router.push("/onboarding/2");
   }
 
+  const handleBack = () => {
+    router.push("/onboarding/0")
+  }
+
   return (
     <OnboardingLayout
-      step={1}
-      title="Welcome to Onboarding!"
-      subtitle="Let's get your account set up"
-      description=""
+      step={2}
+      title="Choose Your Life Areas"
+      subtitle="Select the categories that matter to you"
+      description="These will become your personalized dashboard buckets. Don't worry - you can add more later!"
       buttonText="CONTINUE"
       onNext={handleContinue}
+      onBack={handleBack}
     >
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h2 className="text-[18px] font-medium text-[#171A1F]">Pick your life buckets</h2>
-          <p className="text-[14px] text-[#565E6C]">Select categories for your Lifeboard AI</p>
+          <h2 className="text-[18px] font-medium text-[#171A1F]">Popular life categories</h2>
+          <p className="text-[14px] text-[#565E6C]">Choose as many as you'd like - you can customize these next</p>
         </div>
         
         <div className="flex flex-wrap gap-1.5">

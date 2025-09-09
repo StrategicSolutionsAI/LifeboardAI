@@ -38,6 +38,11 @@ export function useTasks(selectedDate?: Date) {
         credentials: 'same-origin'
       })
       if (!res.ok) {
+        // Handle authentication errors gracefully
+        if (res.status === 401) {
+          console.warn('Authentication error fetching daily tasks - user may not be logged in or Todoist not connected')
+          return []
+        }
         throw new Error(`Failed to fetch daily tasks: ${res.status}`)
       }
       const data = await res.json()
@@ -58,6 +63,11 @@ export function useTasks(selectedDate?: Date) {
         credentials: 'same-origin'
       })
       if (!res.ok) {
+        // Handle authentication errors gracefully
+        if (res.status === 401) {
+          console.warn('Authentication error fetching all tasks - user may not be logged in or Todoist not connected')
+          return []
+        }
         throw new Error(`Failed to fetch all tasks: ${res.status}`)
       }
       const data = await res.json()
@@ -96,10 +106,16 @@ export function useTasks(selectedDate?: Date) {
   
   // Optimistic task creation
   const createTask = useCallback(async (content: string, dueDate: string | null, hourSlot?: number, bucket?: string) => {
+    console.log('🔧 createTask hook called:', { content, dueDate, hourSlot, bucket });
+    
     const trimmed = content.trim()
-    if (!trimmed) return
+    if (!trimmed) {
+      console.log('❌ createTask: Empty content, returning early');
+      return;
+    }
     
     try {
+      console.log('📡 Making API request to create task...');
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         credentials: 'same-origin',
@@ -107,9 +123,17 @@ export function useTasks(selectedDate?: Date) {
         body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket }),
       })
       
-      if (!res.ok) throw new Error('Failed to create task')
+      console.log('📡 API response status:', res.status, res.statusText);
       
-      const { task } = await res.json()
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('❌ API request failed:', { status: res.status, statusText: res.statusText, errorText });
+        throw new Error(`Failed to create task: ${res.status} ${res.statusText}`);
+      }
+      
+      const responseData = await res.json();
+      console.log('📦 API response data:', responseData);
+      const { task } = responseData;
 
       // Parse and normalize metadata so UI shows bucket/duration immediately
       let metadata: { duration?: number; hourSlot?: string; bucket?: string } = {}
@@ -148,12 +172,16 @@ export function useTasks(selectedDate?: Date) {
 
       // Add task to appropriate caches
       if (dueDate === dateStr) {
+        console.log('📅 Adding task to daily cache for date:', dateStr);
         updateDailyOptimistically(current => [...(current || []), enhancedTask as any])
       }
+      console.log('📋 Adding task to all tasks cache');
       updateAllOptimistically(current => [...(current || []), enhancedTask as any])
       
+      console.log('✅ createTask returning task:', task);
       return task
     } catch (error) {
+      console.error('💥 createTask error:', error);
       throw error
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
@@ -161,8 +189,8 @@ export function useTasks(selectedDate?: Date) {
   // Optimistic task toggle
   const toggleTaskCompletion = useCallback(async (taskId: string) => {
     // Find the task
-    const task = allTasks?.find(t => t.id === taskId) || 
-                 dailyTasks?.find(t => t.id === taskId)
+    const task = allTasks?.find(t => t.id?.toString?.() === taskId?.toString?.()) || 
+                 dailyTasks?.find(t => t.id?.toString?.() === taskId?.toString?.())
     
     if (!task) return
     
@@ -206,7 +234,7 @@ export function useTasks(selectedDate?: Date) {
     const updater = (tasks: Task[] | null) => {
       if (!tasks) return []
       return tasks.map(task => {
-        const update = updates.find(u => u.taskId === task.id)
+        const update = updates.find(u => u.taskId?.toString?.() === task.id?.toString?.())
         return update ? { ...task, ...update.updates } : task
       })
     }

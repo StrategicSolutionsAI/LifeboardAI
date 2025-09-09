@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       .upsert({ id: user.id, onboarded: false })
       .throwOnError()
 
-    return redirectTo('/onboarding/1')
+    return redirectTo('/onboarding/0')
   }
 
   // Look up the user profile to determine onboarding status
@@ -54,11 +54,11 @@ export async function GET(request: NextRequest) {
   if (!profile) {
     // First time user – create profile then send to onboarding
     await supabase.from('profiles').insert({ id: user.id }).throwOnError()
-    return redirectTo('/onboarding/1')
+    return redirectTo('/onboarding/0')
   }
 
   if (!profile.onboarded) {
-    return redirectTo('/onboarding/1')
+    return redirectTo('/onboarding/0')
   }
 
   return redirectTo('/dashboard')

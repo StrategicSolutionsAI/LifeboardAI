@@ -1,11 +1,13 @@
 import { signInWithGoogle, emailLogin } from './actions'
 import { Button } from '@/components/ui/button'
+import SectionLoadTimer from '@/components/section-load-timer'
 
 export const dynamic = 'force-dynamic' // avoid static build for auth
 
 export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <SectionLoadTimer name="/login" />
       <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-8 space-y-6">
         <h1 className="text-2xl font-bold text-center">Sign in to Lifeboard</h1>
 

@@ -148,56 +148,12 @@ export default function HourlyPlanner({
   
   // Local state for newly created tasks to show immediately
   const [pendingTasks, setPendingTasks] = useState<PlannerItem[]>([]);
-  // Keep latest scheduledTasks in a ref for interval checks
-  const scheduledTasksRef = useRef(scheduledTasks);
-  useEffect(() => { scheduledTasksRef.current = scheduledTasks; }, [scheduledTasks]);
-  
-  // Track which task should be brought to front when overlapping
-  const [frontTaskId, setFrontTaskId] = useState<string | null>(null);
-  
-  // Track task editing state
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-  
-  // Handle starting task edit
-  const handleStartEdit = (task: PlannerItem) => {
-    setEditingTaskId(task.id.toString());
-    setEditingContent(task.content);
-  };
-  
-  // Handle saving task edit
-  const handleSaveEdit = async () => {
-    if (!editingTaskId || !editingContent.trim()) return;
-    
-    try {
-      await batchUpdateTasks([{ 
-        taskId: editingTaskId, 
-        updates: { content: editingContent.trim() } 
-      }]);
-      setEditingTaskId(null);
-      setEditingContent('');
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
-  };
-  
-  // Handle canceling task edit
-  const handleCancelEdit = () => {
-    setEditingTaskId(null);
-    setEditingContent('');
-  };
   
   // Handle creating a new task at a specific time slot
   const handleCreateTaskAtTime = async (timeSlot: string) => {
-    console.log('🚀 handleCreateTaskAtTime called:', { timeSlot, content: newTaskContent.trim(), isCreatingTask });
-    
-    if (!newTaskContent.trim() || isCreatingTask) {
-      console.log('❌ Early return:', { hasContent: !!newTaskContent.trim(), isCreatingTask });
-      return;
-    }
+    if (!newTaskContent.trim() || isCreatingTask) return;
     
     setIsCreatingTask(true);
-    console.log('✅ Starting task creation process');
     
     // Create a temporary task to show immediately
     const tempTask: PlannerItem = {
@@ -210,27 +166,20 @@ export default function HourlyPlanner({
       // Use provided planner date (calendar selected day) or fallback to today
       const dateStr = plannerDate || new Date().toISOString().split('T')[0];
       
-      console.log('📅 Creating task with params:', { 
-        content: newTaskContent.trim(), 
-        date: dateStr, 
-        timeSlot, 
-        bucket: taskBucket 
-      });
+      console.log('Creating task:', { content: newTaskContent.trim(), date: dateStr, timeSlot });
       
       // Add to pending tasks for immediate display
-      setPendingTasks(prev => {
-        console.log('➕ Adding temp task to pending:', tempTask);
-        return [...prev, tempTask];
-      });
+      setPendingTasks(prev => [...prev, tempTask]);
       
       // Create the task via API
-      console.log('🔄 Calling createTask API...');
       const newTask = await createTask(newTaskContent.trim(), dateStr, undefined, taskBucket);
-      console.log('📝 CreateTask response:', newTask);
       
-      // Update with the hourSlot and duration if task was created successfully
+      console.log('Task created:', newTask);
+      
+      // Update with the hourSlot immediately
       if (newTask) {
-        console.log('🎯 Updating task with hourSlot:', `hour-${timeSlot}`);
+        console.log('Updating hourSlot for task:', newTask.id);
+        
         await batchUpdateTasks([{ 
           taskId: newTask.id, 
           updates: { 
@@ -238,47 +187,22 @@ export default function HourlyPlanner({
             duration: 60
           } 
         }]);
-        console.log('✅ Task updated successfully');
+        console.log('Task updated with hourSlot');
         
-        // Keep the temp task visible until the real task shows up in scheduledTasks
-        // This avoids a flash/disappearance caused by async refetch timing
-        const expectedHour = `hour-${timeSlot}`;
-        const realId = newTask.id?.toString?.() || String(newTask.id);
-        let checks = 0;
-        const maxChecks = 40; // ~12s at 300ms intervals
-        const intervalId = setInterval(() => {
-          const found = (scheduledTasksRef.current || []).some(
-            (t: any) => t.id?.toString?.() === realId && t.hourSlot === expectedHour
-          );
-          checks += 1;
-          if (found || checks >= maxChecks) {
-            clearInterval(intervalId);
-            if (found) {
-              console.log('🧹 Removing temp task after confirming real task is present:', tempTask.id);
-              setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
-            } else {
-              console.warn('⏱️ Temp task timeout reached before confirmation; leaving UI as-is');
-            }
-          }
-        }, 300);
-      } else {
-        console.log('❌ Task creation returned null/undefined');
-        // If task creation failed, remove temp task immediately
+        // Remove the temporary task once the real one is updated
         setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
       }
       
       // Reset state
       setNewTaskContent("");
       setCreatingTaskAt(null);
-      console.log('🔄 Reset form state');
     } catch (error) {
-      console.error('💥 Failed to create task:', error);
+      console.error('Failed to create task:', error);
       // Remove the pending task on error
       setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
       // Don't reset state on error so user can retry
     } finally {
       setIsCreatingTask(false);
-      console.log('🏁 Task creation process finished');
     }
   };
 
@@ -413,7 +337,6 @@ export default function HourlyPlanner({
   // Remove task from hourly planner
   const removeTaskFromPlanner = async (taskId: string) => {
     try {
-      // Use null (not undefined) so server clears metadata
       await batchUpdateTasks([{ taskId, updates: { hourSlot: null as any } }]);
     } catch (error) {
       // Error handling is done in the context
@@ -483,40 +406,34 @@ export default function HourlyPlanner({
         {TIME_SLOTS.map((timeSlot, index) => {
           // Check if this is a major hour (on the hour)
           const isMainHour = timeSlot.indexOf(':') === -1;
-          const hasTask = hourlyPlan[timeSlot].length > 0;
+          const slotHeight = isMainHour ? 68 : 17; // 68px for full hours, 17px for 15-min slots
           
           return (
           <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
             {(provided, snapshot) => (
               <div
-                className={`relative flex items-start gap-4 border-gray-200 transition-colors h-[17px] group ${
-                  isMainHour 
-                    ? 'border-t' 
-                    : hasTask ? 'group-hover:border-t group-hover:border-dashed group-hover:border-gray-300' : ''
+                className={`relative flex items-start gap-4 py-1 border-gray-200 transition-colors ${
+                  isMainHour ? 'h-[68px] border-t py-2' : 'h-[17px] border-t-0'
                 } ${index === 0 ? 'border-t-0' : ''} ${
                   snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : ''
                 }`}
               >
-                {/* Enhanced time label with better typography - only show for main hours */}
+                {/* Enhanced time label with better typography */}
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
-                  {isMainHour ? (
-                    <>
-                      <span className="text-sm font-medium text-gray-900 leading-none">
-                        {timeSlot}
-                      </span>
-                      <span className="text-xs text-gray-500 mt-0.5">
-                        {timeSlot === currentHourDisplay ? 'Now' : ''}
-                      </span>
-                    </>
-                  ) : (
-                    <div className="h-4"></div>
+                  <span className={`${isMainHour ? 'text-sm font-medium text-gray-900' : 'text-xs font-normal text-gray-600'} leading-none`}>
+                    {timeSlot}
+                  </span>
+                  {isMainHour && (
+                    <span className="text-xs text-gray-500 mt-0.5">
+                      {timeSlot === currentHourDisplay ? 'Now' : ''}
+                    </span>
                   )}
                 </div>
                 
                 <ul
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="flex-1 relative overflow-visible min-h-[15px]"
+                  className={`flex-1 relative overflow-visible ${isMainHour ? 'min-h-[60px]' : 'min-h-[15px]'}`}
                   onClick={(e) => {
                     // Prevent click-to-create during drag or resize to avoid interference
                     if (effectiveDragging || resizingTask) return;
@@ -624,16 +541,10 @@ export default function HourlyPlanner({
                             top: isDraggingNow ? 'auto' : (taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px'),
                             left: isDraggingNow ? 'auto' : leftOffset,
                             width: isDraggingNow ? 'auto' : taskWidth,
-                            zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : (frontTaskId === t.id.toString() ? 999 : index + 1)),
+                            zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : index + 1),
                             ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const taskId = t.id.toString();
-                            setFrontTaskId(taskId);
-                            // Reset after 3 seconds to avoid permanent z-index changes
-                            setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
-                          }}
+                          onClick={(e) => e.stopPropagation()}
                           className={`group relative flex items-start gap-3 px-4 py-3 
                             bg-white border border-gray-200 
                             shadow-sm hover:shadow-md 
@@ -659,35 +570,9 @@ export default function HourlyPlanner({
                                   <div className="text-xs font-medium text-indigo-600 leading-tight mb-1 tracking-wide">
                                     {timeSlot} – {calculateEndTime(timeSlot, resizingTask?.taskId === t.id ? resizingTask.currentDuration : t.duration ?? 60)}
                                   </div>
-                                  {editingTaskId === t.id.toString() ? (
-                                    <input
-                                      type="text"
-                                      value={editingContent}
-                                      onChange={(e) => setEditingContent(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSaveEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          handleCancelEdit();
-                                        }
-                                      }}
-                                      onBlur={handleSaveEdit}
-                                      autoFocus
-                                      className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 w-full focus:outline-none focus:border-indigo-500"
-                                    />
-                                  ) : (
-                                    <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight cursor-text hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartEdit(t);
-                                      }}
-                                    >
-                                      {t.content}
-                                    </div>
-                                  )}
+                                  <div className="font-semibold text-gray-900 truncate text-sm leading-tight">
+                                    {t.content}
+                                  </div>
                                 </>
                               ) : (
                                 // Short tasks: time and title on same row
@@ -695,35 +580,9 @@ export default function HourlyPlanner({
                                   <div className="text-xs font-medium text-indigo-600 leading-tight tracking-wide flex-shrink-0">
                                     {timeSlot}
                                   </div>
-                                  {editingTaskId === t.id.toString() ? (
-                                    <input
-                                      type="text"
-                                      value={editingContent}
-                                      onChange={(e) => setEditingContent(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSaveEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          handleCancelEdit();
-                                        }
-                                      }}
-                                      onBlur={handleSaveEdit}
-                                      autoFocus
-                                      className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-indigo-500"
-                                    />
-                                  ) : (
-                                    <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1 cursor-text hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartEdit(t);
-                                      }}
-                                    >
-                                      {t.content}
-                                    </div>
-                                  )}
+                                  <div className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1">
+                                    {t.content}
+                                  </div>
                                 </div>
                               )}
                             </div>

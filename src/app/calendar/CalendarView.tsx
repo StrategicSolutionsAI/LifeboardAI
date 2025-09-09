@@ -90,7 +90,7 @@ function CalendarContent() {
           taskId: draggableId, 
           updates: { 
             due: { date: targetDateStr },
-            hourSlot: undefined // Remove hour slot when dropping on day area
+            hourSlot: null as any // Remove hour slot when dropping on day area
           } 
         }
       ]).catch(error => {
@@ -171,7 +171,7 @@ function CalendarContent() {
 
       if (targetDate) {
         batchUpdateTasks([
-          { taskId: draggableId, updates: { hourSlot: undefined, due: { date: targetDate } } }
+          { taskId: draggableId, updates: { hourSlot: null as any, due: { date: targetDate } } }
         ]).catch(error => {
           console.error('Failed to move task from hourly slot to upcoming:', error);
         });

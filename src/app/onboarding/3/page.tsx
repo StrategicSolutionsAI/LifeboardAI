@@ -59,10 +59,10 @@ export default function OnboardingStep3() {
 
   return (
     <OnboardingLayout
-      step={3}
+      step={4}
       title="Choose Your Theme"
       subtitle="Personalize your experience"
-      description=""
+      description="Select a color scheme that matches your style. You can change this anytime in settings."
       buttonText="CONTINUE"
       onNext={handleContinue}
       onBack={handleBack}

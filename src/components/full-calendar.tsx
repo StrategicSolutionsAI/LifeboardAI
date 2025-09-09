@@ -355,13 +355,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   return (
-    <div className="w-full max-w-none mx-4 bg-white/98 backdrop-blur-md border border-gray-200/70 rounded-2xl shadow-lg overflow-hidden">
-      {/* Enhanced Header with Modern Navigation */}
-      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+    <div className="w-full max-w-none mx-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Clean Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 border-b border-gray-100">
         <div className="flex items-center space-x-3">
           <button
             onClick={prevPeriod}
-            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             aria-label="Previous period"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -373,14 +373,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             onClick={() => {
               handleDateChange(new Date());
             }}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             Today
           </button>
           
           <button
             onClick={nextPeriod}
-            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             aria-label="Next period"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,21 +389,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </button>
         </div>
         
-        <div className="flex items-center space-x-6">
-          <h2 className="font-bold tracking-tight text-3xl text-gray-900">
+        <div className="flex items-center space-x-3">
+          <h2 className="font-semibold text-lg text-gray-900">
             {getHeaderTitle()}
           </h2>
           
-          {/* Enhanced View Selector */}
-          <div className="flex items-center bg-gray-100/80 rounded-xl p-1 border border-gray-200/60">
+          {/* Clean View Selector */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
             {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
               <button
                 key={viewOption}
                 onClick={() => handleViewChange(viewOption)}
-                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${
                   view === viewOption
-                    ? 'bg-white shadow-md text-blue-700 border border-blue-200/50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                    ? 'bg-white shadow-sm text-blue-600 font-semibold'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
@@ -415,9 +415,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Week Days Header - only show for month and week views */}
       {(view === 'month' || view === 'week') && (
-        <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d} className="py-1">
+        <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2 px-3">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => (
+            <div key={i} className="py-2 font-medium">
               {d}
             </div>
           ))}
@@ -452,15 +452,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </div>
         </div>
       ) : (
-        // Enhanced Month and Week views with optimized layouts
-        <div className="p-6">
+        // Enhanced Month and Week views with optimized layouts for maximum density
+        <div className="p-2">
           {view === 'week' ? (
-            // Week view: Tall vertical columns to show all events
-            <div className="grid grid-cols-7 gap-3 h-[600px]">
+            // Week view: Clean, professional layout
+            <div className="grid grid-cols-7 gap-1 h-[70vh] min-h-[500px] bg-gray-50 rounded-lg overflow-hidden p-1">
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
-                const isCurrentMonth = view === 'month' ? isSameMonth(day, currentDate) : true;
+                const isCurrentMonth = true; // Always show as current month in week view
                 const isToday = isSameDay(day, today);
                 
                 return (
@@ -472,77 +472,67 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {...provided.droppableProps}
                           onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
                           className={`
-                            h-full cursor-pointer flex flex-col text-sm p-4
-                            transition-all duration-200 hover:shadow-lg
+                            h-full cursor-pointer flex flex-col text-sm p-3
+                            transition-all duration-200 hover:shadow-md
                             ${
                               isCurrentMonth 
-                                ? "bg-white shadow-md border border-gray-200/80" 
-                                : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                                ? "bg-white shadow-sm border border-gray-200/60" 
+                                : "bg-gray-50 text-gray-400 border border-gray-100"
                             } 
                             ${
                               isToday 
-                                ? "ring-2 ring-blue-500/60 bg-blue-50/90 border-blue-300" 
+                                ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
                                 : ""
                             } 
                             ${
                               snapshot.isDraggingOver 
-                                ? "bg-blue-100/90 border-blue-400 border-2 shadow-xl ring-2 ring-blue-300/50" 
+                                ? "bg-blue-100 ring-2 ring-blue-400 shadow-lg" 
                                 : ""
                             }
-                            rounded-xl overflow-hidden
+                            rounded-lg overflow-hidden
                           `}
                         >
-                          {/* Enhanced Week Day Header */}
-                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200/70">
-                            <div className="flex flex-col">
-                              <span className={`font-bold text-3xl leading-none ${
-                                isToday ? 'text-blue-700' : 
-                                isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                              }`}>
-                                {format(day, "d")}
-                              </span>
-                              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">
-                                {format(day, "EEE")}
-                              </span>
-                            </div>
+                          {/* Clean Day Header */}
+                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                            <span className={`font-semibold text-lg ${
+                              isToday ? 'text-blue-600' : 
+                              isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                            }`}>
+                              {format(day, "d")}
+                            </span>
                             {dayEvents.length > 0 && (
-                              <div className="flex flex-col items-end">
-                                <span className="text-sm font-bold text-gray-700 bg-gray-100/80 px-3 py-1 rounded-full border border-gray-300/60 shadow-sm">
-                                  {dayEvents.length}
-                                </span>
-                                <span className="text-[10px] text-gray-500 mt-1 font-medium">
-                                  {dayEvents.length === 1 ? 'event' : 'events'}
-                                </span>
-                              </div>
+                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                                {dayEvents.length}
+                              </span>
                             )}
                           </div>
                           
-                          {/* Scrollable Events Container */}
-                          <div className="flex-1 overflow-y-auto pr-1 space-y-3">
+                          {/* Events Container */}
+                          <div className="flex-1 overflow-y-auto space-y-2">
                             {dayEvents.length > 0 ? (
                               dayEvents.map((ev: DayEvent, i: number) => {
                                 const getEventStyle = (source: string) => {
                                   switch (source) {
                                     case 'google':
                                       return {
-                                        container: 'bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-300/60 text-blue-900 hover:from-blue-200 hover:to-blue-100',
-                                        time: 'text-blue-700',
-                                        dot: 'bg-blue-500',
-                                        badge: 'bg-blue-200/80 text-blue-800 border-blue-300/60'
+                                        container: 'bg-blue-50 border-l-4 border-blue-400 text-blue-900 hover:bg-blue-100',
+                                        time: 'text-blue-600',
+                                        dot: 'bg-blue-400',
+                                        badge: 'text-blue-600'
                                       };
                                     case 'lifeboard':
                                       return {
-                                        container: 'bg-gradient-to-br from-emerald-100 to-emerald-50 border border-emerald-300/60 text-emerald-900 hover:from-emerald-200 hover:to-emerald-100',
-                                        time: 'text-emerald-700',
-                                        dot: 'bg-emerald-500',
-                                        badge: 'bg-emerald-200/80 text-emerald-800 border-emerald-300/60'
+                                        container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
+                                        time: 'text-emerald-600',
+                                        dot: 'bg-emerald-400',
+                                        badge: 'text-emerald-600'
                                       };
                                     default:
                                       return {
-                                        container: 'bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-300/60 text-purple-900 hover:from-purple-200 hover:to-purple-100',
-                                        time: 'text-purple-700',
-                                        dot: 'bg-purple-500',
-                                        badge: 'bg-purple-200/80 text-purple-800 border-purple-300/60'
+                                        container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
+                                        time: 'text-purple-600',
+                                        dot: 'bg-purple-400',
+                                        badge: 'text-purple-600'
                                       };
                                   }
                                 };
@@ -553,49 +543,22 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 return (
                                   <div 
                                     key={i} 
-                                    className={`
-                                      p-3 rounded-xl border-l-4 transition-all duration-300 shadow-sm hover:shadow-md 
-                                      transform hover:-translate-y-1 hover:scale-[1.02] cursor-pointer group
-                                      ${styles.container}
-                                    `}
+                                    className={`p-2 rounded transition-colors duration-200 cursor-pointer ${styles.container}`}
+                                    title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                   >
-                                    {/* Event Header */}
-                                    <div className="flex items-start justify-between mb-2">
-                                      <div className={`w-2.5 h-2.5 rounded-full mt-0.5 shadow-sm ${styles.dot}`} />
-                                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shadow-sm ${styles.badge}`}>
-                                        {ev.source === 'google' ? 'Google' : ev.source === 'lifeboard' ? 'Scheduled' : 'Task'}
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0`} />
+                                      {timeDisplay && (
+                                        <span className={`text-xs font-medium ${styles.time} flex-shrink-0`}>
+                                          {timeDisplay}
+                                        </span>
+                                      )}
+                                      <span className="text-sm font-medium truncate flex-1 min-w-0">
+                                        {ev.title}
                                       </span>
-                                    </div>
-                                    
-                                    {/* Event Time */}
-                                    {timeDisplay && (
-                                      <div className={`font-bold mb-2 text-base ${styles.time}`}>
-                                        {timeDisplay}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Event Title */}
-                                    <div className="font-bold text-sm mb-2 line-clamp-4 leading-snug group-hover:line-clamp-none transition-all">
-                                      {ev.title}
-                                    </div>
-                                    
-                                    {/* Event Meta Info */}
-                                    <div className="flex items-center gap-2 flex-wrap mt-3">
-                                      {ev.duration && ev.source === 'lifeboard' && (
-                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
-                                          ⏱️ {ev.duration}min
-                                        </span>
-                                      )}
-                                      {ev.allDay && (
-                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
-                                          📅 All day
-                                        </span>
-                                      )}
-                                      {ev.taskId && (
-                                        <span className="text-xs font-semibold bg-white/70 text-gray-700 px-2 py-1 rounded-full border border-gray-300/60 shadow-sm">
-                                          🎯 Task
-                                        </span>
-                                      )}
+                                      <span className={`text-xs ${styles.badge} flex-shrink-0`}>
+                                        {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                      </span>
                                     </div>
                                   </div>
                                 );
@@ -616,7 +579,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             )}
                             
                             {/* Scroll padding */}
-                            <div className="h-6"></div>
+                            <div className="h-4"></div>
                           </div>
                           {provided.placeholder}
                         </div>
@@ -627,8 +590,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               })}
             </div>
           ) : (
-            // Month view: Compact grid layout
-            <div className={`grid grid-cols-7 gap-1 bg-gray-100/50 rounded-xl overflow-hidden`}>
+            // Month view: Clean grid layout
+            <div className={`grid grid-cols-7 gap-2 bg-gray-50 rounded-lg overflow-hidden p-3`}>
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
@@ -646,66 +609,66 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           className={`
                             ${getCellSize()} 
                             cursor-pointer flex flex-col items-start justify-start text-sm p-3
-                            transition-all duration-200 transform hover:scale-[1.02]
+                            transition-all duration-200 hover:shadow-md
                             ${
                               isCurrentMonth 
-                                ? "bg-white shadow-sm border border-gray-200/60 hover:shadow-md" 
-                                : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                                ? "bg-white shadow-sm border border-gray-200 hover:shadow-md" 
+                                : "bg-gray-100 text-gray-400 border border-gray-200"
                             } 
                             ${
                               isToday 
-                                ? "ring-2 ring-blue-500/50 bg-blue-50/80 border-blue-200" 
+                                ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
                                 : ""
                             } 
                             ${
                               snapshot.isDraggingOver 
-                                ? "bg-blue-100/80 border-blue-300 border-2 shadow-lg scale-105" 
+                                ? "bg-blue-100 ring-2 ring-blue-400 shadow-lg" 
                                 : ""
                             }
-                            rounded-xl
+                            rounded-lg
                           `}
                           style={{
-                            minHeight: '130px'
+                            minHeight: '120px'
                           }}
                         >
-                          {/* Enhanced Date Header */}
+                          {/* Clean Date Header */}
                           <div className="flex items-center justify-between w-full mb-2">
-                            <span className={`font-bold text-lg ${
-                              isToday ? 'text-blue-700' : 
+                            <span className={`font-semibold text-lg ${
+                              isToday ? 'text-blue-600' : 
                               isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
                             }`}>
                               {format(day, "d")}
                             </span>
                             {dayEvents.length > 0 && (
-                              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
                                 {dayEvents.length}
                               </span>
                             )}
                           </div>
                           
-                          {/* Enhanced Event Indicators */}
+                          {/* Clean Event Indicators */}
                           {dayEvents.length > 0 && (
                             <div className="w-full space-y-1">
-                              {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
+                              {dayEvents.slice(0, 4).map((ev: DayEvent, i: number) => {
                                 const getEventBarStyle = (source: string) => {
                                   switch (source) {
                                     case 'google':
-                                      return 'bg-gradient-to-r from-blue-400 to-blue-500 border-blue-500';
+                                      return 'bg-blue-400';
                                     case 'lifeboard':
-                                      return 'bg-gradient-to-r from-emerald-400 to-emerald-500 border-emerald-500';
+                                      return 'bg-emerald-400';
                                     default:
-                                      return 'bg-gradient-to-r from-purple-400 to-purple-500 border-purple-500';
+                                      return 'bg-purple-400';
                                   }
                                 };
                                 
                                 return (
-                                  <div key={i} className={`h-2.5 rounded-full shadow-sm border ${getEventBarStyle(ev.source)}`} 
+                                  <div key={i} className={`h-2 rounded ${getEventBarStyle(ev.source)}`} 
                                        title={ev.title} />
                                 );
                               })}
-                              {dayEvents.length > 3 && (
-                                <div className="text-xs text-gray-700 font-bold bg-gradient-to-r from-gray-200 to-gray-300 px-2 py-1 rounded-full text-center border border-gray-400 shadow-sm">
-                                  +{dayEvents.length - 3} more
+                              {dayEvents.length > 4 && (
+                                <div className="text-xs text-gray-600 font-medium bg-gray-200 px-2 py-1 rounded text-center">
+                                  +{dayEvents.length - 4} more
                                 </div>
                               )}
                             </div>
@@ -727,7 +690,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg w-96 max-w-[90%] p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">{format(parseISO(selectedModalDate), 'MMMM d, yyyy')}</h3>
+              <h3 className="text-lg font-medium">{selectedModalDate ? format(parseISO(selectedModalDate), 'MMMM d, yyyy') : 'Event Details'}</h3>
               <button
                 onClick={() => setSelectedModalDate(null)}
                 className="text-gray-400 hover:text-gray-600 rounded-md focus:outline-none"
@@ -736,7 +699,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </button>
             </div>
             <div className="space-y-3 max-h-80 overflow-auto">
-              {(eventsByDate[selectedModalDate] ?? []).map((ev: DayEvent, idx: number) => {
+              {(eventsByDate[selectedModalDate || ''] ?? []).map((ev: DayEvent, idx: number) => {
                 const getDotColor = (source: string) => {
                   switch (source) {
                     case 'google':
@@ -783,7 +746,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   </div>
                 );
               })}
-              {(eventsByDate[selectedModalDate]?.length ?? 0) === 0 && (
+              {(eventsByDate[selectedModalDate || '']?.length ?? 0) === 0 && (
                 <p className="text-sm text-gray-500">No events</p>
               )}
             </div>

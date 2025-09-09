@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { ThemeProvider } from '@/components/theme-provider'
 
 import './globals.css'
+import PerfObserver from '@/components/perf-observer'
 
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         <ThemeProvider>
+          <PerfObserver />
           {children}
         </ThemeProvider>
       </body>

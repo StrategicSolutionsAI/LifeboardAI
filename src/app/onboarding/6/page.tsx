@@ -23,7 +23,7 @@ export default function OnboardingStep6() {
   }
 
   const handleBack = () => {
-    router.push("/onboarding/5")
+    router.push("/onboarding/4")
   }
 
   return (
