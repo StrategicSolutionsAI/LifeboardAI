@@ -646,29 +646,65 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             )}
                           </div>
                           
-                          {/* Clean Event Indicators */}
+                          {/* Clean Event Cards (same as week view) */}
                           {dayEvents.length > 0 && (
                             <div className="w-full space-y-1">
-                              {dayEvents.slice(0, 4).map((ev: DayEvent, i: number) => {
-                                const getEventBarStyle = (source: string) => {
+                              {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
+                                const getEventStyle = (source: string) => {
                                   switch (source) {
                                     case 'google':
-                                      return 'bg-blue-400';
+                                      return {
+                                        container: 'bg-blue-50 border-l-4 border-blue-400 text-blue-900 hover:bg-blue-100',
+                                        time: 'text-blue-600',
+                                        dot: 'bg-blue-400',
+                                        badge: 'text-blue-600'
+                                      };
                                     case 'lifeboard':
-                                      return 'bg-emerald-400';
+                                      return {
+                                        container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
+                                        time: 'text-emerald-600',
+                                        dot: 'bg-emerald-400',
+                                        badge: 'text-emerald-600'
+                                      };
                                     default:
-                                      return 'bg-purple-400';
+                                      return {
+                                        container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
+                                        time: 'text-purple-600',
+                                        dot: 'bg-purple-400',
+                                        badge: 'text-purple-600'
+                                      };
                                   }
                                 };
                                 
+                                const styles = getEventStyle(ev.source);
+                                const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                                
                                 return (
-                                  <div key={i} className={`h-2 rounded ${getEventBarStyle(ev.source)}`} 
-                                       title={ev.title} />
+                                  <div 
+                                    key={i} 
+                                    className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer ${styles.container}`}
+                                    title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                  >
+                                    <div className="flex items-center gap-1.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0`} />
+                                      {timeDisplay && (
+                                        <span className={`text-[10px] font-medium ${styles.time} flex-shrink-0`}>
+                                          {timeDisplay.replace(' ', '').toLowerCase()}
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-medium truncate flex-1 min-w-0">
+                                        {ev.title.length > 20 ? ev.title.substring(0, 20) + '...' : ev.title}
+                                      </span>
+                                      <span className={`text-[10px] ${styles.badge} flex-shrink-0`}>
+                                        {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                      </span>
+                                    </div>
+                                  </div>
                                 );
                               })}
-                              {dayEvents.length > 4 && (
-                                <div className="text-xs text-gray-600 font-medium bg-gray-200 px-2 py-1 rounded text-center">
-                                  +{dayEvents.length - 4} more
+                              {dayEvents.length > 3 && (
+                                <div className="text-[10px] text-gray-600 font-medium bg-gray-100 px-1.5 py-1 rounded text-center">
+                                  +{dayEvents.length - 3} more
                                 </div>
                               )}
                             </div>
