@@ -521,7 +521,7 @@ export default function HourlyPlanner({
                       key={t.id} 
                       draggableId={t.id.toString()} 
                       index={index} 
-                      isDragDisabled={!!resizingTask || (resizingTask?.taskId === t.id)}
+                      isDragDisabled={Boolean(resizingTask && resizingTask.taskId === t.id)}
                     >
                       {(prov, dragSnapshot) => {
                         const isResizing = resizingTask?.taskId === t.id;
