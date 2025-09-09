@@ -91,7 +91,11 @@ import {
 import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import dynamic from 'next/dynamic';
-const WidgetEditorSheet = dynamic(() => import("@/components/widget-editor"), { ssr: false });
+// Import the widget editor statically to avoid dynamic chunk loading issues
+// seen during login (ChunkLoadError for widget-editor.tsx). This slightly
+// increases the initial bundle size but removes the fragile runtime fetch
+// for this component.
+import WidgetEditorSheet from "@/components/widget-editor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";

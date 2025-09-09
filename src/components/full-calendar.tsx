@@ -546,16 +546,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     className={`p-2 rounded transition-colors duration-200 cursor-pointer ${styles.container}`}
                                     title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0`} />
-                                      {timeDisplay && (
-                                        <span className={`text-xs font-medium ${styles.time} flex-shrink-0`}>
-                                          {timeDisplay}
-                                        </span>
-                                      )}
-                                      <span className="text-sm font-medium truncate flex-1 min-w-0">
-                                        {ev.title}
-                                      </span>
+                                    <div className="flex items-start gap-2">
+                                      <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`} />
+                                      <div className="flex-1 min-w-0">
+                                        {timeDisplay && (
+                                          <div className={`text-xs font-medium ${styles.time} mb-1`}>
+                                            {timeDisplay}
+                                          </div>
+                                        )}
+                                        <div className="text-sm font-medium truncate">
+                                          {ev.title}
+                                        </div>
+                                      </div>
                                       <span className={`text-xs ${styles.badge} flex-shrink-0`}>
                                         {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
                                       </span>
@@ -685,16 +687,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer ${styles.container}`}
                                     title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                   >
-                                    <div className="flex items-center gap-1.5">
-                                      <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0`} />
-                                      {timeDisplay && (
-                                        <span className={`text-[10px] font-medium ${styles.time} flex-shrink-0`}>
-                                          {timeDisplay.replace(' ', '').toLowerCase()}
-                                        </span>
-                                      )}
-                                      <span className="text-xs font-medium truncate flex-1 min-w-0">
-                                        {ev.title.length > 20 ? ev.title.substring(0, 20) + '...' : ev.title}
-                                      </span>
+                                    <div className="flex items-start gap-1.5">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`} />
+                                      <div className="flex-1 min-w-0">
+                                        {timeDisplay && (
+                                          <div className={`text-[10px] font-medium ${styles.time} mb-0.5`}>
+                                            {timeDisplay.replace(' ', '').toLowerCase()}
+                                          </div>
+                                        )}
+                                        <div className="text-xs font-medium truncate">
+                                          {ev.title.length > 25 ? ev.title.substring(0, 25) + '...' : ev.title}
+                                        </div>
+                                      </div>
                                       <span className={`text-[10px] ${styles.badge} flex-shrink-0`}>
                                         {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
                                       </span>
