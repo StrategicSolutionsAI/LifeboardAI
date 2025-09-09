@@ -3505,7 +3505,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <HomeProjectsWidget onClose={() => setHomeProjectsWidgetOpen(false)} />
+              <HomeProjectsWidget 
+                widget={{
+                  id: 'home-projects-modal',
+                  instanceId: 'home-projects-modal',
+                  name: 'Home Projects',
+                  description: 'Track and manage home improvement projects',
+                  icon: 'Hammer',
+                  category: 'productivity',
+                  unit: 'projects',
+                  defaultTarget: 5,
+                  color: 'blue',
+                  target: 0,
+                  schedule: [true, true, true, true, true, true, true],
+                  createdAt: new Date().toISOString()
+                }}
+                onUpdate={() => {}}
+              />
             </div>
           </SheetContent>
         </Sheet>
