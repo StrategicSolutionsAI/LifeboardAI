@@ -14,20 +14,14 @@ export async function GET(request: NextRequest) {
     ? `${forwardedProto}://${forwardedHost}`
     : new URL(request.url).origin
   
-  // Get user from Supabase
+  // Get user from Supabase (optional for Google OAuth login)
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   
-  if (!user) {
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=You must be logged in to connect Google Calendar`
-    );
-  }
-
-  // Create state parameter with redirect URL and user ID
+  // Create state parameter with redirect URL and user ID (if available)
   const state = encodeURIComponent(JSON.stringify({
     redirectUrl,
-    userId: user.id,
+    userId: user?.id || null,
   }));
 
   // Get the authorization URL

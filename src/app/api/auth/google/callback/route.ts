@@ -46,9 +46,16 @@ export async function GET(request: NextRequest) {
     const supabase = supabaseServer();
     const { data: { user } } = await supabase.auth.getUser();
     
-    if (!user) {
+    // If no user is authenticated, this might be a login flow via Google OAuth
+    // In that case, we should handle it differently or redirect to complete authentication
+    if (!user && userId) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=User not authenticated`
+        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=Session expired, please log in again`
+      );
+    } else if (!user) {
+      // This might be initial Google OAuth login - redirect to complete Supabase auth
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/login?message=Please complete authentication`
       );
     }
 
