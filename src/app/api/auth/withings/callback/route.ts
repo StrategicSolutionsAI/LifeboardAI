@@ -28,7 +28,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tokenData = await exchangeWithingsCodeForToken(code)
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const origin = forwardedProto && forwardedHost
+      ? `${forwardedProto}://${forwardedHost}`
+      : new URL(request.url).origin
+    const tokenData = await exchangeWithingsCodeForToken(code, origin)
 
     const supabase = supabaseServer()
     const { data: { user } } = await supabase.auth.getUser()

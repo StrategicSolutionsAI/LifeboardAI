@@ -6,28 +6,34 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
 ];
 
-export function getGoogleAuthUrl() {
+function resolveOrigin(origin?: string) {
+  return origin || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+}
+
+export function getGoogleAuthUrl(origin?: string) {
+  const base = resolveOrigin(origin)
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/auth/google/callback`
-  );
+    `${base}/api/auth/google/callback`
+  )
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    prompt: 'consent', // Forces to approve the consent again
-  });
+    prompt: 'consent',
+  })
 
-  return url;
+  return url
 }
 
-export function getOAuth2Client() {
+export function getOAuth2Client(origin?: string) {
+  const base = resolveOrigin(origin)
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/auth/google/callback`
-  );
+    `${base}/api/auth/google/callback`
+  )
 }
 
 /**

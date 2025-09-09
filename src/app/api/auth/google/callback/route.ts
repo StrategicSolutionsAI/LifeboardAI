@@ -34,7 +34,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Exchange the code for tokens
-    const oauth2Client = getOAuth2Client();
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const origin = forwardedProto && forwardedHost
+      ? `${forwardedProto}://${forwardedHost}`
+      : new URL(request.url).origin
+    const oauth2Client = getOAuth2Client(origin);
     const { tokens } = await oauth2Client.getToken(code);
     
     // Get user details from Supabase

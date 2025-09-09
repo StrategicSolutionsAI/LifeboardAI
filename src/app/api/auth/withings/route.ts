@@ -8,6 +8,11 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const redirectUrl = searchParams.get('redirectUrl') || '/onboarding/3'
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const origin = forwardedProto && forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin
 
   const supabase = supabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,7 +27,7 @@ export async function GET(request: NextRequest) {
   }))
 
   // Replace dummy state placeholder with actual state
-  const baseAuth = getWithingsAuthUrl()
+  const baseAuth = getWithingsAuthUrl(origin)
   const authUrl = `${baseAuth}&state=${state}`
 
   return NextResponse.redirect(authUrl)

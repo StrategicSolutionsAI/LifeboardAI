@@ -6,16 +6,17 @@ const WITHINGS_TOKEN_URL = 'https://wbsapi.withings.net/v2/oauth2'
 // Withings scopes – for weight and body composition data we need "user.metrics"
 export const WITHINGS_SCOPES = ['user.metrics']
 
-function getRedirectUri() {
-  return `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/auth/withings/callback`
+function getRedirectUri(origin?: string) {
+  const base = origin || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  return `${base}/api/auth/withings/callback`
 }
 
-export function getWithingsAuthUrl() {
+export function getWithingsAuthUrl(origin?: string) {
   const params = new URLSearchParams({
     client_id: process.env.WITHINGS_CLIENT_ID || '',
     response_type: 'code',
     scope: WITHINGS_SCOPES.join(','), // Withings expects scopes comma-separated
-    redirect_uri: getRedirectUri(),
+    redirect_uri: getRedirectUri(origin),
     state: 'dummy', // actual state will be appended by caller
   })
 
@@ -23,14 +24,14 @@ export function getWithingsAuthUrl() {
 }
 
 // The token endpoint requires the "action" parameter
-export async function exchangeWithingsCodeForToken(code: string) {
+export async function exchangeWithingsCodeForToken(code: string, origin?: string) {
   const params = new URLSearchParams({
     action: 'requesttoken', // official docs: action=requesttoken was replaced by gettoken; both accepted
     grant_type: 'authorization_code',
     client_id: process.env.WITHINGS_CLIENT_ID || '',
     client_secret: process.env.WITHINGS_CLIENT_SECRET || '',
     code,
-    redirect_uri: getRedirectUri(),
+    redirect_uri: getRedirectUri(origin),
   })
 
   const response = await fetch(WITHINGS_TOKEN_URL, {
