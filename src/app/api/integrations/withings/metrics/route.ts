@@ -5,6 +5,9 @@ import { logger } from '@/lib/logger'
 import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
 import { withErrorHandling } from '@/lib/api-error-handler'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 async function handler(request: Request) {
   // For logger compatibility, we can pass request directly
   const nextRequest = request

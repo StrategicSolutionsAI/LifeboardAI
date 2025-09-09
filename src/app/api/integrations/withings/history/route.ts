@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 interface MeasurementRow {
   id: string
   user_id: string

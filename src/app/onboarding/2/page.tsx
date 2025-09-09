@@ -1,14 +1,14 @@
-"use client"
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
-import { useState, useEffect, FormEvent, KeyboardEvent, ChangeEvent } from "react"
-import { useRouter } from "next/navigation"
-import { OnboardingLayout } from "@/components/onboarding-layout"
-import { PlusCircle, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-import { saveUserPreferences } from "@/lib/user-preferences"
-import { supabase } from "@/utils/supabase/client"
+import OnboardingStep2Client from './page.client'
+
+export default function OnboardingStep2() {
+  return <OnboardingStep2Client />
+}
+
+// Client implementation moved to page.client.tsx
 
 // Some suggested custom buckets to help users get started
 const suggestedBuckets = [

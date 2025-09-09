@@ -1,5 +1,15 @@
-'use client'
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
+import IntegrationsPageClient from './page.client'
+
+export default function IntegrationsPage() {
+  return <IntegrationsPageClient />
+}
+
+// Client implementation moved to page.client.tsx
+/*
 import { useState, useEffect, useCallback } from 'react'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { Button } from '@/components/ui/button'
@@ -586,3 +596,4 @@ export default function IntegrationsPage() {
     </SidebarLayout>
   )
 }
+*/

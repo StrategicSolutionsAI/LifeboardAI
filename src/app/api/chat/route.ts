@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN!,
-})
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+function getReplicate() {
+  const token = process.env.REPLICATE_API_TOKEN
+  if (!token) {
+    throw new Error('Missing REPLICATE_API_TOKEN')
+  }
+  return new Replicate({ auth: token })
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const replicate = getReplicate()
     const { messages } = await req.json() as { messages: { role: 'user' | 'assistant'; content: string }[] }
 
     // Ensure at least one user message
