@@ -7,6 +7,18 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const from = requestUrl.searchParams.get('from') // login | signup
+  const error = requestUrl.searchParams.get('error')
+  
+  console.log('AuthCallback → URL:', requestUrl.toString())
+  console.log('AuthCallback → Code:', code ? 'present' : 'missing')
+  console.log('AuthCallback → From:', from)
+  console.log('AuthCallback → Error param:', error)
+  
+  // Handle OAuth errors from Google
+  if (error) {
+    console.error('AuthCallback → OAuth error from provider:', error)
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error)}`, request.url))
+  }
 
   // Prepare a placeholder response; we will set the final redirect after we know where to go
   let response = NextResponse.next({ request: { headers: request.headers } })
@@ -41,7 +53,8 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       console.error('AuthCallback → exchangeCodeForSession error', error)
-      return NextResponse.redirect(new URL('/login', request.url))
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url))
     }
   }
 
@@ -49,7 +62,8 @@ export async function GET(request: NextRequest) {
   await supabase.auth.getSession()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    console.error('AuthCallback → No user found after code exchange')
+    return NextResponse.redirect(new URL('/login?error=Authentication failed', request.url))
   }
 
   // Decide destination based on onboarding state
