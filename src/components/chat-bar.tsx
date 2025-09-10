@@ -568,6 +568,7 @@ export function ChatBar() {
                     if (triggers.test(transcript)) {
                       const now = new Date()
                       let due_date: string | null = null
+                      let hour_slot: number | undefined
                     if (/\b(today|tonight)\b/i.test(transcript)) {
                       due_date = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
                       // Heuristic: tonight ≈ 8pm local time
@@ -578,7 +579,6 @@ export function ChatBar() {
                       const t2 = new Date(now); t2.setDate(t2.getDate()+1)
                       due_date = new Date(t2.getTime() - t2.getTimezoneOffset()*60000).toISOString().slice(0,10)
                     }
-                    let hour_slot: number | undefined
                     const timeMatch = transcript.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
                     if (timeMatch) {
                       let h = parseInt(timeMatch[1], 10)
@@ -669,6 +669,7 @@ export function ChatBar() {
                   if (triggers.test(candidate) || quotedAny) {
                     const now = new Date()
                     let due_date: string | null = null
+                    let hour_slot: number | undefined
                     if (/\b(today|tonight)\b/i.test(candidate)) {
                       due_date = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
                       if (/\btonight\b/i.test(candidate)) {
@@ -678,7 +679,6 @@ export function ChatBar() {
                       const t2 = new Date(now); t2.setDate(t2.getDate()+1)
                       due_date = new Date(t2.getTime() - t2.getTimezoneOffset()*60000).toISOString().slice(0,10)
                     }
-                    let hour_slot: number | undefined
                     const timeMatch = candidate.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
                     if (timeMatch) {
                       let h = parseInt(timeMatch[1], 10)
