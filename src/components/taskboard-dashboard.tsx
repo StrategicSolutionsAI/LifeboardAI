@@ -91,6 +91,17 @@ import {
 import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import dynamic from 'next/dynamic';
+
+function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
+  return async () => {
+    let lastErr: any
+    for (let i = 0; i <= retries; i++) {
+      try { return await loader() } catch (e) { lastErr = e }
+      await new Promise(r => setTimeout(r, delayMs))
+    }
+    throw lastErr
+  }
+}
 // Import the widget editor statically to avoid dynamic chunk loading issues
 // seen during login (ChunkLoadError for widget-editor.tsx). This slightly
 // increases the initial bundle size but removes the fragile runtime fetch
@@ -110,7 +121,7 @@ const NutritionMealTracker = dynamic(
   { loading: () => <Skeleton className="h-32 w-full" /> }
 );
 const NutritionSummaryWidget = dynamic(
-  () => import("./nutrition-summary-widget").then(m => m.NutritionSummaryWidget),
+  () => withRetry(() => import("./nutrition-summary-widget").then(m => m.NutritionSummaryWidget))(),
   { loading: () => <Skeleton className="h-24 w-full" /> }
 );
 const CalendarTaskList = dynamic(

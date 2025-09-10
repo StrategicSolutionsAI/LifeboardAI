@@ -6,10 +6,13 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const state = searchParams.get('state')
 
+  // Compute origin from env or request (so localhost port mismatches don't break OAuth)
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}`
+
   // If no code, redirect to Todoist OAuth
   if (!code) {
     const clientId = process.env.TODOIST_CLIENT_ID
-    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/todoist/auth`
+    const redirectUri = `${origin}/api/integrations/todoist/auth`
     
     if (!clientId) {
       return NextResponse.json({ error: 'Todoist client ID not configured' }, { status: 500 })
@@ -44,7 +47,7 @@ export async function GET(request: NextRequest) {
         client_id: process.env.TODOIST_CLIENT_ID!,
         client_secret: process.env.TODOIST_CLIENT_SECRET!,
         code,
-        redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/todoist/auth`,
+        redirect_uri: `${origin}/api/integrations/todoist/auth`,
       }),
     })
 
@@ -77,10 +80,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Redirect back to integrations page with success
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/integrations?success=todoist_connected`)
+    return NextResponse.redirect(`${origin}/integrations?success=todoist_connected`)
     
   } catch (error) {
     console.error('Todoist OAuth error:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/integrations?error=oauth_failed`)
+    return NextResponse.redirect(`${origin}/integrations?error=oauth_failed`)
   }
 }

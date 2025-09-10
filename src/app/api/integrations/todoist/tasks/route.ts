@@ -53,15 +53,26 @@ export async function GET(request: NextRequest) {
     });
 
     if (!todoistRes.ok) {
-      const text = await todoistRes.text();
+      const text = await todoistRes.text().catch(() => '');
       console.error('Todoist API error', todoistRes.status, text);
-      return NextResponse.json({ error: 'Todoist API error', status: todoistRes.status }, { status: 502 });
+      // Map common auth errors so the client can prompt reconnection instead of crashing
+      if (todoistRes.status === 401 || todoistRes.status === 403) {
+        return NextResponse.json({ error: 'Todoist auth error', status: todoistRes.status }, { status: 401 });
+      }
+      // Propagate rate limits distinctly
+      if (todoistRes.status === 429) {
+        return NextResponse.json({ error: 'Todoist rate limited', status: 429 }, { status: 429 });
+      }
+      // Attach minimal upstream debug to help client diagnose (no secrets)
+      return NextResponse.json({ error: 'Todoist API error', status: 502, upstreamStatus: todoistRes.status, upstreamBody: (text || '').slice(0, 400) }, { status: 502 });
     }
 
     const tasks = await todoistRes.json();
+    // Defensive: ensure array
+    const list = Array.isArray(tasks) ? tasks : []
 
     // Parse metadata from task descriptions and enhance tasks
-    const enhancedTasks = tasks.map((task: any) => {
+    const enhancedTasks = list.map((task: any) => {
       let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number } = {};
       let cleanContent = task.content;
       
@@ -110,10 +121,19 @@ export async function GET(request: NextRequest) {
     let responseTasks = enhancedTasks;
 
     if (date && !allParam) {
-      // Include tasks that are due today or overdue (tasks with no due date are excluded)
+      // Include tasks due on the specific date. Support both `due.date` and `due.datetime`.
       responseTasks = enhancedTasks.filter((t: any) => {
-        if (!t.due?.date) return false;
-        return t.due.date === date; // strict match for the selected date
+        const due = t.due
+        if (!due) return false
+        if (typeof due.date === 'string') {
+          // Todoist returns YYYY-MM-DD for all-day tasks
+          return due.date.slice(0, 10) === date
+        }
+        if (typeof due.datetime === 'string') {
+          // Timed due date
+          return due.datetime.slice(0, 10) === date
+        }
+        return false
       });
     }
 
@@ -137,7 +157,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { content, dueDate, due_date, hour_slot, bucket } = await request.json();
-    const actualDueDate = dueDate || due_date; // Support both formats
+    let actualDueDate: string | null = (dueDate || due_date) || null; // Support both formats
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content required' }, { status: 400 });
@@ -149,6 +169,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.warn('Todoist create: no user in session')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
@@ -160,13 +181,37 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!integration?.access_token) {
+      console.warn('Todoist create: missing access token')
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
     const metadata: { hourSlot?: string; bucket?: string } = {};
-    if (hour_slot) metadata.hourSlot = hour_slot;
+    if (typeof hour_slot === 'number') {
+      const h = Math.max(0, Math.min(23, hour_slot))
+      const display = (() => {
+        if (h === 0) return '12AM'
+        if (h < 12) return `${h}AM`
+        if (h === 12) return '12PM'
+        return `${h - 12}PM`
+      })()
+      metadata.hourSlot = `hour-${display}`
+    }
     if (bucket) metadata.bucket = bucket;
     
+    // Normalize obviously stale years (e.g., model emitted 2023). If the
+    // provided due date is in a past year, bump to the current year while
+    // preserving month/day. This mirrors safeguards in /api/chat routes and
+    // also covers realtime client-created tasks.
+    if (actualDueDate && /^\d{4}-\d{2}-\d{2}$/.test(actualDueDate)) {
+      try {
+        const yr = Number(actualDueDate.slice(0, 4))
+        const nowYr = new Date().getFullYear()
+        if (yr < nowYr) {
+          actualDueDate = `${nowYr}${actualDueDate.slice(4)}`
+        }
+      } catch {}
+    }
+
     const body: Record<string, string> = { content };
     if (actualDueDate) {
       body['due_date'] = actualDueDate; // YYYY-MM-DD
@@ -188,12 +233,12 @@ export async function POST(request: NextRequest) {
 
     if (!todoistRes.ok) {
       const text = await todoistRes.text();
-      console.error('Todoist create task error', todoistRes.status, text);
+      console.error('Todoist create task error', todoistRes.status, (text || '').slice(0, 200));
       return NextResponse.json({ error: 'Todoist API error', status: todoistRes.status }, { status: 502 });
     }
 
     const task = await todoistRes.json();
-
+    console.log('Todoist create task ok', { id: task?.id, due: task?.due?.date })
     return NextResponse.json({ task });
   } catch (err) {
     console.error('Todoist create task endpoint error', err);

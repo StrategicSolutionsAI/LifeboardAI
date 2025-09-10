@@ -79,7 +79,10 @@ export default function IntegratedCalendar() {
     });
   };
 
-  // Fetch events when anchor month changes
+  // Allow manual refresh
+  const [refreshSeq, setRefreshSeq] = useState(0);
+
+  // Fetch events when anchor month changes or refresh requested
   useEffect(() => {
     async function fetchEvents() {
       const monthStart = startOfMonth(anchorDate);
@@ -141,7 +144,22 @@ export default function IntegratedCalendar() {
     }
 
     fetchEvents();
-  }, [anchorDate]);
+  }, [anchorDate, refreshSeq]);
+
+  // Listen for global tasks updates (from chat/task actions) and refresh
+  useEffect(() => {
+    function onTasksUpdated() {
+      setRefreshSeq((s) => s + 1);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('lifeboard:tasks-updated', onTasksUpdated);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('lifeboard:tasks-updated', onTasksUpdated);
+      }
+    };
+  }, []);
 
   // Display helpers
   const monthMatrix = buildMonthMatrix(anchorDate);
@@ -203,13 +221,23 @@ export default function IntegratedCalendar() {
             ))}
           </div>
           
-          <button
-            onClick={() => alert("Add event coming soon")}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <Plus size={16} />
-            <span>Add event</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setRefreshSeq(s => s + 1)}
+              className="flex items-center space-x-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              title="Refresh"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5"/></svg>
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => alert("Add event coming soon")}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <Plus size={16} />
+              <span>Add event</span>
+            </button>
+          </div>
         </div>
       </div>
 

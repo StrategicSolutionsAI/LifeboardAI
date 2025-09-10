@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
@@ -38,9 +38,13 @@ export function useTasks(selectedDate?: Date) {
         credentials: 'same-origin'
       })
       if (!res.ok) {
-        // Handle authentication errors gracefully
+        // Handle auth and upstream errors gracefully
         if (res.status === 401) {
           console.warn('Authentication error fetching daily tasks - user may not be logged in or Todoist not connected')
+          return []
+        }
+        if (res.status >= 500 || res.status === 429) {
+          console.warn(`Upstream error fetching daily tasks: ${res.status} (treat as empty to avoid UI crash)`) 
           return []
         }
         throw new Error(`Failed to fetch daily tasks: ${res.status}`)
@@ -63,9 +67,13 @@ export function useTasks(selectedDate?: Date) {
         credentials: 'same-origin'
       })
       if (!res.ok) {
-        // Handle authentication errors gracefully
+        // Handle auth and upstream errors gracefully
         if (res.status === 401) {
           console.warn('Authentication error fetching all tasks - user may not be logged in or Todoist not connected')
+          return []
+        }
+        if (res.status >= 500 || res.status === 429) {
+          console.warn(`Upstream error fetching all tasks: ${res.status} (treat as empty to avoid UI crash)`) 
           return []
         }
         throw new Error(`Failed to fetch all tasks: ${res.status}`)
@@ -185,6 +193,22 @@ export function useTasks(selectedDate?: Date) {
       throw error
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
+
+  // React to global refresh events (e.g., chat-created tasks)
+  useEffect(() => {
+    function onTasksUpdated() {
+      try { refetchDaily() } catch {}
+      try { refetchAll() } catch {}
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('lifeboard:tasks-updated', onTasksUpdated)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('lifeboard:tasks-updated', onTasksUpdated)
+      }
+    }
+  }, [refetchDaily, refetchAll])
   
   // Optimistic task toggle
   const toggleTaskCompletion = useCallback(async (taskId: string) => {

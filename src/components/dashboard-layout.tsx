@@ -20,8 +20,11 @@ import { TaskColumn } from "./task-column"
 import { HealthWidgets } from "./health-widgets"
 import { MetricTile } from "./metric-tile"
 import { WidgetLibrary } from "./widget-library"
+import { ChunkErrorReloader } from "./chunk-error-reloader"
 
 export function DashboardLayout() {
+  // Auto-reload on dynamic chunk load failures (helps during dev/HMR)
+  ChunkErrorReloader()
   const router = useRouter()
   const handleSignOut = async () => {
     await supabase.auth.signOut()
