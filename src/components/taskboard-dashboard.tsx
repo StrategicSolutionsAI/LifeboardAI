@@ -107,6 +107,7 @@ function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
 // increases the initial bundle size but removes the fragile runtime fetch
 // for this component.
 import WidgetEditorSheet from "@/components/widget-editor";
+import { WidgetLibrary } from "@/components/widget-library";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
@@ -3411,6 +3412,49 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             onSave={handleSaveWidget}
           />
         )}
+
+        {/* Widget library sheet */}
+        <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
+          <SheetContent side="right" className="w-[800px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Add a Widget</SheetTitle>
+            </SheetHeader>
+            <WidgetLibrary
+              bucket={activeBucket}
+              onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
+                const isInstance = (widgetOrTemplate as any).instanceId !== undefined;
+                const newInstance: WidgetInstance = isInstance
+                  ? (widgetOrTemplate as WidgetInstance)
+                  : {
+                      ...(widgetOrTemplate as WidgetTemplate),
+                      instanceId: `${(widgetOrTemplate as WidgetTemplate).id}-${Date.now()}`,
+                      target: (widgetOrTemplate as WidgetTemplate).defaultTarget || 100,
+                      color: (widgetOrTemplate as WidgetTemplate).color || 'gray',
+                      dataSource: 'manual',
+                      createdAt: new Date().toISOString(),
+                      schedule: [true, true, true, true, true, true, true],
+                    };
+
+                setWidgetsByBucket(prev => {
+                  const updated = { ...prev };
+                  updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
+                  // update ref immediately so debounced save reads latest
+                  widgetsByBucketRef.current = updated;
+                  return updated;
+                });
+
+                // Open editor for the newly added widget for quick tweaks
+                setEditingBucket(activeBucket);
+                setEditingWidget(newInstance);
+                setNewlyCreatedWidgetId(newInstance.instanceId);
+
+                // Persist
+                debouncedSaveToSupabase();
+                setIsWidgetSheetOpen(false);
+              }}
+            />
+          </SheetContent>
+        </Sheet>
 
         {/* Bucket editor: add/remove tabs */}
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>

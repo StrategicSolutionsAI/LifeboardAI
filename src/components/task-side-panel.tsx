@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
-import { format, addDays, isSameDay } from "date-fns";
+import { format, addDays, isSameDay, parse } from "date-fns";
 import { ChevronRight, ChevronDown, AlertCircle, RefreshCw, ListPlus } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
@@ -454,7 +454,7 @@ export function TaskSidePanel() {
                                   <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
                                   {t.due?.date && (
                                     <div className="text-xs text-theme-text-tertiary mt-1">
-                                      Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                      Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
                                     </div>
                                   )}
                                 </div>
@@ -563,7 +563,7 @@ export function TaskSidePanel() {
                                   <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
                                   {t.due?.date && (
                                     <div className="text-xs text-theme-text-tertiary mt-1">
-                                      Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                      Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
                                     </div>
                                   )}
                                 </div>

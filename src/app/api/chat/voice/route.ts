@@ -85,6 +85,36 @@ async function createTodoistTaskViaApi(req: NextRequest, payload: { content: str
   }
 }
 
+// Supabase-backed task creation fallback
+async function createSupabaseTask(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
+  try {
+    const supabase = supabaseServer()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { ok: false as const, reason: 'not_authenticated' as const }
+
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+    const res = await fetch(`${origin}/api/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: req.headers.get('cookie') || ''
+      },
+      body: JSON.stringify({
+        content: payload.content,
+        due_date: payload.due_date ?? null,
+        hour_slot: typeof payload.hour_slot === 'number' ? payload.hour_slot : undefined,
+        bucket: payload.bucket
+      })
+    })
+    if (!res.ok) return { ok: false as const, status: res.status }
+    const json = await res.json()
+    return { ok: true as const, task: json.task }
+  } catch (e) {
+    console.error('Supabase task create exception (voice)', e)
+    return { ok: false as const }
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -276,7 +306,7 @@ export async function POST(req: NextRequest) {
             }
           } catch {}
           console.log('VOICE: create_task command detected', { contentPreview: cmd.content.slice(0,120), due_date: dueDate, hour_slot: cmd.hour_slot, bucket: cmd.bucket })
-          // Try direct first, then internal API
+          // Try Todoist; then internal API; then Supabase fallback
           const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
           if (direct.ok) {
             createdTask = (direct as any).task
@@ -288,7 +318,13 @@ export async function POST(req: NextRequest) {
               createdTask = (viaApi as any).task
               reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
             } else {
-              reply = reply.replace(cmdMatch[0], `\n\n⚠️ Connect Todoist in Integrations to enable task creation.`)
+              const supa = await createSupabaseTask(req, { content: cmd.content, due_date: dueDate || null, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
+              if (supa.ok) {
+                createdTask = (supa as any).task
+                reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
+              } else {
+                reply = reply.replace(cmdMatch[0], `\n\n⚠️ I couldn't create the task right now.`)
+              }
             }
           }
         }
@@ -312,6 +348,12 @@ export async function POST(req: NextRequest) {
             if (viaApi.ok) {
               createdTask = (viaApi as any).task
               reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
+            } else {
+              const supa = await createSupabaseTask(req, { content: parsed.content, due_date: parsed.due_date || null, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
+              if (supa.ok) {
+                createdTask = (supa as any).task
+                reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
+              }
             }
           }
         } catch {}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
-import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays } from "date-fns";
+import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
 import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
@@ -82,7 +82,8 @@ function EnhancedTaskCard({
 
   const formatDueDate = (dueDate?: { date: string }) => {
     if (!dueDate?.date) return null;
-    const date = new Date(dueDate.date);
+    // Parse date-only strings as local dates to avoid timezone shifts
+    const date = parse(dueDate.date, 'yyyy-MM-dd', new Date());
     const today = new Date();
     const diffDays = differenceInDays(date, startOfDay(today));
     
@@ -273,7 +274,8 @@ function useTaskGrouping(tasks: any[]) {
         return;
       }
 
-      const taskDate = startOfDay(new Date(task.due.date));
+      // Parse date-only strings as local dates to avoid timezone issues
+      const taskDate = startOfDay(parse(task.due.date, 'yyyy-MM-dd', new Date()));
       
       if (isBefore(taskDate, today)) {
         groups.overdue.push(task);
@@ -356,7 +358,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       
       // Both have due dates - sort by date
       if (a.due?.date && b.due?.date) {
-        return new Date(a.due.date).getTime() - new Date(b.due.date).getTime();
+        const da = parse(a.due.date, 'yyyy-MM-dd', new Date()).getTime();
+        const db = parse(b.due.date, 'yyyy-MM-dd', new Date()).getTime();
+        return da - db;
       }
       
       // Both don't have due dates - maintain current order
@@ -861,7 +865,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                   {task.due?.date && (
                     <div className="mt-2">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                        {format(new Date(task.due.date), 'MMM d, yyyy')}
+                        {format(parse(task.due.date, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
                       </span>
                     </div>
                   )}
@@ -1162,6 +1166,35 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
               }[groupKey] || { title: groupKey, color: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' };
 
               const isCollapsed = groupCollapsed[groupKey];
+
+              // Add friendly date hints to group headers
+              const now = new Date();
+              const subtitle = (() => {
+                switch (groupKey) {
+                  case 'overdue':
+                    return `Before ${format(now, 'EEE, MMM d')}`;
+                  case 'today':
+                    return `${format(now, 'EEE, MMM d')}`;
+                  case 'tomorrow':
+                    return `${format(addDays(now, 1), 'EEE, MMM d')}`;
+                  case 'thisWeek': {
+                    const s = startOfWeek(now);
+                    const e = endOfWeek(now);
+                    return `${format(s, 'MMM d')} – ${format(e, 'MMM d')}`;
+                  }
+                  case 'nextWeek': {
+                    const s = startOfWeek(addWeeks(now, 1));
+                    const e = endOfWeek(addWeeks(now, 1));
+                    return `${format(s, 'MMM d')} – ${format(e, 'MMM d')}`;
+                  }
+                  case 'later': {
+                    const after = endOfWeek(addWeeks(now, 1));
+                    return `After ${format(after, 'EEE, MMM d')}`;
+                  }
+                  default:
+                    return '';
+                }
+              })();
               
               return (
                 <div key={groupKey} className="rounded-xl border border-gray-200/60 bg-white/80 shadow-sm overflow-hidden">
@@ -1180,6 +1213,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                         </h4>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+                          {subtitle && (
+                            <span className="ml-2 text-gray-400">{subtitle}</span>
+                          )}
                           {groupKey === 'overdue' && tasks.length > 0 && (
                             <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
                               <AlertCircle size={10} />

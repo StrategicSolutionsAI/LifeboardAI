@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
@@ -22,6 +22,9 @@ interface TaskUpdate {
 
 // Custom hook for managing tasks with optimistic updates
 export function useTasks(selectedDate?: Date) {
+  // Track whether Todoist is connected in this session; null = unknown
+  const todoistConnectedRef = useRef<boolean | null>(null)
+
   const dateStr = selectedDate 
     ? format(selectedDate, 'yyyy-MM-dd')
     : format(new Date(), 'yyyy-MM-dd')
@@ -39,8 +42,14 @@ export function useTasks(selectedDate?: Date) {
       })
       if (!res.ok) {
         // Handle auth and upstream errors gracefully
-        if (res.status === 401) {
-          console.warn('Authentication error fetching daily tasks - user may not be logged in or Todoist not connected')
+        if (res.status === 400 || res.status === 401) {
+          // Treat as no Todoist connection – fall back to Supabase tasks
+          todoistConnectedRef.current = false
+          const supa = await fetch(`/api/tasks?date=${dateStr}`, { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            return Array.isArray(json) ? json : (json.tasks ?? [])
+          }
           return []
         }
         if (res.status >= 500 || res.status === 429) {
@@ -50,10 +59,27 @@ export function useTasks(selectedDate?: Date) {
         throw new Error(`Failed to fetch daily tasks: ${res.status}`)
       }
       const data = await res.json()
+      todoistConnectedRef.current = true
       return Array.isArray(data) ? data : (data.tasks ?? [])
     } catch (error) {
-      // Return empty array for network errors to prevent UI crashes
+      // Network error – fall back to local tasks if available
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        // Try Supabase API first
+        try {
+          const supa = await fetch(`/api/tasks?date=${dateStr}`, { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            return Array.isArray(json) ? json : (json.tasks ?? [])
+          }
+        } catch {}
+        // Offline fallback to localStorage
+        try {
+          if (typeof window !== 'undefined') {
+            const raw = window.localStorage.getItem('lifeboard_local_tasks')
+            const list: Task[] = raw ? JSON.parse(raw) : []
+            return list.filter(t => !t.completed && t.due?.date === dateStr)
+          }
+        } catch {}
         return []
       }
       throw error
@@ -68,8 +94,14 @@ export function useTasks(selectedDate?: Date) {
       })
       if (!res.ok) {
         // Handle auth and upstream errors gracefully
-        if (res.status === 401) {
-          console.warn('Authentication error fetching all tasks - user may not be logged in or Todoist not connected')
+        if (res.status === 400 || res.status === 401) {
+          // Treat as no Todoist connection – fall back to Supabase tasks
+          todoistConnectedRef.current = false
+          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            return Array.isArray(json) ? json : (json.tasks ?? [])
+          }
           return []
         }
         if (res.status >= 500 || res.status === 429) {
@@ -79,10 +111,25 @@ export function useTasks(selectedDate?: Date) {
         throw new Error(`Failed to fetch all tasks: ${res.status}`)
       }
       const data = await res.json()
+      todoistConnectedRef.current = true
       return Array.isArray(data) ? data : (data.tasks ?? [])
     } catch (error) {
-      // Return empty array for network errors to prevent UI crashes
+      // Network error – try Supabase API, then local tasks
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        try {
+          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            return Array.isArray(json) ? json : (json.tasks ?? [])
+          }
+        } catch {}
+        try {
+          if (typeof window !== 'undefined') {
+            const raw = window.localStorage.getItem('lifeboard_local_tasks')
+            const list: Task[] = raw ? JSON.parse(raw) : []
+            return list.filter(t => !t.completed)
+          }
+        } catch {}
         return []
       }
       throw error
@@ -122,6 +169,42 @@ export function useTasks(selectedDate?: Date) {
       return;
     }
     
+    // Helper: create local task and persist to localStorage
+    const createLocalTask = (): any => {
+      try {
+        const id = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        const toHourSlot = (h?: number) => {
+          if (typeof h !== 'number') return undefined
+          const hh = Math.max(0, Math.min(23, h))
+          if (hh === 0) return 'hour-12AM'
+          if (hh < 12) return `hour-${hh}AM`
+          if (hh === 12) return 'hour-12PM'
+          return `hour-${hh - 12}PM`
+        }
+        const task: Task = {
+          id,
+          content: trimmed,
+          completed: false,
+          due: dueDate ? { date: dueDate } : undefined,
+          hourSlot: toHourSlot(hourSlot),
+          bucket: bucket || undefined,
+          position: undefined,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        if (typeof window !== 'undefined') {
+          const raw = window.localStorage.getItem('lifeboard_local_tasks')
+          const list: Task[] = raw ? JSON.parse(raw) : []
+          list.unshift(task)
+          window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(list))
+        }
+        return task
+      } catch (e) {
+        console.warn('Failed to create local task', e)
+        return null
+      }
+    }
+
     try {
       console.log('📡 Making API request to create task...');
       const res = await fetch('/api/integrations/todoist/tasks', {
@@ -134,8 +217,34 @@ export function useTasks(selectedDate?: Date) {
       console.log('📡 API response status:', res.status, res.statusText);
       
       if (!res.ok) {
-        const errorText = await res.text();
+        const errorText = await res.text().catch(() => '');
         console.error('❌ API request failed:', { status: res.status, statusText: res.statusText, errorText });
+        // If Todoist not connected or auth missing, use Supabase fallback
+        if (res.status === 400 || res.status === 401) {
+          todoistConnectedRef.current = false
+          const alt = await fetch('/api/tasks', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket })
+          })
+          if (alt.ok) {
+            const json = await alt.json()
+            const task = json.task
+            if (dueDate === dateStr) {
+              updateDailyOptimistically(current => [...(current || []), task as any])
+            }
+            updateAllOptimistically(current => [...(current || []), task as any])
+            return task
+          }
+          // As last resort create local
+          const local = createLocalTask()
+          if (local) {
+            if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
+            updateAllOptimistically(current => [...(current || []), local as any])
+            return local
+          }
+        }
         throw new Error(`Failed to create task: ${res.status} ${res.statusText}`);
       }
       
@@ -190,6 +299,28 @@ export function useTasks(selectedDate?: Date) {
       return task
     } catch (error) {
       console.error('💥 createTask error:', error);
+      // Network or other errors – try Supabase, then local
+      try {
+        const alt = await fetch('/api/tasks', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket })
+        })
+        if (alt.ok) {
+          const json = await alt.json()
+          const task = json.task
+          if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), task as any])
+          updateAllOptimistically(current => [...(current || []), task as any])
+          return task
+        }
+      } catch {}
+      const local = createLocalTask()
+      if (local) {
+        if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
+        updateAllOptimistically(current => [...(current || []), local as any])
+        return local
+      }
       throw error
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
@@ -228,6 +359,18 @@ export function useTasks(selectedDate?: Date) {
     updateAllOptimistically(updater)
     
     try {
+      if (todoistConnectedRef.current === false) {
+        // Use Supabase API for completion toggle
+        const endpoint = newCompleted ? '/api/tasks/complete' : '/api/tasks/reopen'
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId })
+        })
+        if (!res.ok) throw new Error('Failed to toggle task (supabase)')
+        return
+      }
       const endpoint = newCompleted 
         ? `/api/integrations/todoist/tasks/complete`
         : `/api/integrations/todoist/tasks/reopen`
@@ -240,10 +383,33 @@ export function useTasks(selectedDate?: Date) {
       })
       if (!res.ok) throw new Error('Failed to toggle task')
     } catch (error) {
-      // Revert on error
+      // If server not reachable or not connected, try Supabase; otherwise persist locally
+      const isNetwork = error instanceof TypeError && (error.message.includes('Failed to fetch') || error.message.includes('Network'))
+      if (todoistConnectedRef.current === false || isNetwork) {
+        try {
+          const endpoint = newCompleted ? '/api/tasks/complete' : '/api/tasks/reopen'
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId })
+          })
+          if (res.ok) return
+        } catch {}
+        // Offline local persistence
+        try {
+          if (typeof window !== 'undefined') {
+            const raw = window.localStorage.getItem('lifeboard_local_tasks')
+            const list: Task[] = raw ? JSON.parse(raw) : []
+            const updated = list.map(t => t.id?.toString?.() === taskId?.toString?.() ? { ...t, completed: newCompleted, updated_at: new Date().toISOString() } : t)
+            window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(updated))
+          }
+        } catch {}
+        return
+      }
+      // Otherwise revert on true server error
       const revertUpdater = (tasks: Task[] | null) => 
         tasks?.map(t => t.id === taskId ? { ...t, completed: !newCompleted } : t) || []
-      
       updateDailyOptimistically(revertUpdater)
       updateAllOptimistically(revertUpdater)
       throw error
@@ -268,6 +434,17 @@ export function useTasks(selectedDate?: Date) {
     
     // Send batch update to server (soft-fail if API unreachable)
     try {
+      if (todoistConnectedRef.current === false) {
+        // Persist via Supabase
+        const res = await fetch('/api/tasks/batch-update', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates })
+        })
+        if (!res.ok) console.warn('Supabase batch update failed')
+        return
+      }
       console.log('📡 Sending batch update to API...');
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
@@ -287,6 +464,15 @@ export function useTasks(selectedDate?: Date) {
       console.log('✅ Batch update successful:', result);
     } catch (error) {
       console.warn('💥 Batch update network error (continuing with optimistic state):', error);
+      // Try Supabase; if offline, keep optimistic and skip
+      try {
+        await fetch('/api/tasks/batch-update', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates })
+        })
+      } catch {}
       refetchDaily();
       refetchAll();
       // Do not throw to avoid UI crash overlays
@@ -304,6 +490,16 @@ export function useTasks(selectedDate?: Date) {
     updateAllOptimistically(updater)
     
     try {
+      if (todoistConnectedRef.current === false) {
+        const res = await fetch('/api/tasks/delete', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId })
+        })
+        if (!res.ok) throw new Error('Failed to delete task (supabase)')
+        return
+      }
       const res = await fetch('/api/integrations/todoist/tasks/delete', {
         method: 'DELETE',
         credentials: 'same-origin',
@@ -315,7 +511,21 @@ export function useTasks(selectedDate?: Date) {
       
       
     } catch (error) {
-      // On error, refetch to get correct state
+      // On error, if offline/not connected, try Supabase or keep optimistic
+      const isNetwork = error instanceof TypeError && (error.message.includes('Failed to fetch') || error.message.includes('Network'))
+      if (todoistConnectedRef.current === false || isNetwork) {
+        try {
+          await fetch('/api/tasks/delete', {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId })
+          })
+          return
+        } catch {}
+        return
+      }
+      // Otherwise refetch to correct state
       refetchDaily()
       refetchAll()
       throw error

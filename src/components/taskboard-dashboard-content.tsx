@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { format, addDays, isSameDay } from 'date-fns';
+import { format, addDays, isSameDay, parse } from 'date-fns';
 import {
   ChevronDown,
   ChevronRight,
@@ -400,7 +400,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
                                       <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
                                       {t.due?.date && (
                                         <div className="text-xs text-gray-500 mt-1">
-                                          Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                          Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
                                         </div>
                                       )}
                                     </div>
@@ -506,7 +506,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
                                       <span className={t.completed ? "line-through text-gray-400" : ""}>{t.content}</span>
                                       {t.due?.date && (
                                         <div className="text-xs text-gray-500 mt-1">
-                                          Due {format(new Date(t.due.date), "MMM d, yyyy")}
+                                          Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
                                         </div>
                                       )}
                                     </div>

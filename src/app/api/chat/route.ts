@@ -86,6 +86,41 @@ async function createTodoistTaskViaApi(req: NextRequest, payload: { content: str
   }
 }
 
+// Supabase-backed task creation (for users without Todoist)
+async function createSupabaseTask(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
+  try {
+    const supabase = supabaseServer()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { ok: false as const, reason: 'not_authenticated' as const }
+
+    // Normalize hour_slot to hour_slot display string on API layer via our internal tasks endpoint
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+    const res = await fetch(`${origin}/api/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: req.headers.get('cookie') || ''
+      },
+      body: JSON.stringify({
+        content: payload.content,
+        due_date: payload.due_date ?? null,
+        hour_slot: typeof payload.hour_slot === 'number' ? payload.hour_slot : undefined,
+        bucket: payload.bucket
+      })
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      console.error('Supabase task create failed', res.status, (txt || '').slice(0, 200))
+      return { ok: false as const, status: res.status }
+    }
+    const json = await res.json()
+    return { ok: true as const, task: json.task }
+  } catch (e) {
+    console.error('Supabase task create exception', e)
+    return { ok: false as const }
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -265,7 +300,7 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
               }
             }
           } catch {}
-          // Try direct Todoist create first (fast path), then fall back to internal API
+          // Try direct Todoist create first (fast path), then internal API, then Supabase fallback
           let created: any | undefined
           const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
           if (direct.ok) {
@@ -274,14 +309,20 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
           } else {
             const viaApi = await createTodoistTaskViaApi(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
             console.log('CHAT: direct create failed; via API status', { ok: viaApi.ok })
-            if (viaApi.ok) created = (viaApi as any).task
+            if (viaApi.ok) {
+              created = (viaApi as any).task
+            } else {
+              // Fallback to Supabase task if Todoist not connected
+              const supa = await createSupabaseTask(req, { content: cmd.content, due_date: dueDate || null, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
+              if (supa.ok) created = (supa as any).task
+            }
           }
           if (created) {
             createdTask = created
             reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
           } else {
             // Set a helpful message; auth failure will be handled by API route status
-            reply = reply.replace(cmdMatch[0], `\n\n⚠️ Connect Todoist in Integrations to enable task creation.`)
+            reply = reply.replace(cmdMatch[0], `\n\n⚠️ I couldn't create the task right now.`)
           }
         }
       } catch {
@@ -296,7 +337,7 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
       if (parsed) {
         try {
           console.log('CHAT: parsed natural create', parsed)
-          // Try direct first, then internal API
+          // Try Todoist, then Supabase fallback
           const direct2 = await createTodoistTaskDirect(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
           if (direct2.ok) {
             createdTask = (direct2 as any).task
@@ -308,6 +349,12 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
             if (viaApi.ok) {
               createdTask = (viaApi as any).task
               reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
+            } else {
+              const supa = await createSupabaseTask(req, { content: parsed.content, due_date: parsed.due_date || null, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
+              if (supa.ok) {
+                createdTask = (supa as any).task
+                reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
+              }
             }
           }
         } catch {}
