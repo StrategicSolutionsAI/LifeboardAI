@@ -42,7 +42,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-0 md:pl-[120px] pb-16 md:pb-0">
+    <div className="min-h-screen bg-[#F6F6FC] pl-0 md:pl-[120px] pb-16 md:pb-0 overflow-x-hidden">
       {/* Sidebar */}
       <aside className="hidden md:flex w-20 flex-shrink-0 border-r border-gray-100 bg-white flex-col items-center py-4 gap-6 fixed left-0 top-16 bottom-0 z-30">
         {navItems.map(({ href, icon: Icon, label }) => {
@@ -151,7 +151,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <ul className="flex items-center justify-around py-2">
+        <ul className="flex items-center justify-around py-1.5">
           {[
             ...navItems,
             { href: "/dashboard/settings", icon: Settings, label: "Settings" },
@@ -164,9 +164,12 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 <Link
                   href={href}
                   aria-label={label}
-                  className={`flex flex-col items-center px-3 py-1.5 rounded-md text-xs ${active ? 'text-theme-primary' : 'text-gray-500'}`}
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex flex-col items-center justify-center h-14 min-w-[56px] px-3 py-2.5 rounded-md text-[11px] font-medium transition-colors ${
+                    active ? 'text-theme-primary' : 'text-gray-500'
+                  } focus-visible:outline focus-visible:outline-2 focus-visible:outline-theme-primary-500`}
                 >
-                  <Icon className={`h-5 w-5 mb-0.5 ${active ? 'text-theme-primary' : 'text-gray-400'}`} />
+                  <Icon className={`h-6 w-6 mb-0.5 ${active ? 'text-theme-primary' : 'text-gray-400'}`} />
                   {label}
                 </Link>
               </li>
