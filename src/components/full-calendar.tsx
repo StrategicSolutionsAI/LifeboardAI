@@ -118,9 +118,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const today = new Date();
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
+  // Hover-add modal state
+  const [addTaskDate, setAddTaskDate] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [formContent, setFormContent] = useState<string>("");
+  const [formBucket, setFormBucket] = useState<string>(selectedBucket || (availableBuckets[0] || ""));
+  const [formTime, setFormTime] = useState<string>(""); // '' = no time
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
   
   // Get tasks from context
-  const { allTasks, scheduledTasks, batchUpdateTasks } = useTasksContext();
+  const { allTasks, scheduledTasks, batchUpdateTasks, createTask } = useTasksContext();
   
   // Use calendar sync hook
   const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
@@ -255,6 +263,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       setCurrentDate(propSelectedDate);
     }
   }, [propSelectedDate, currentDate]);
+
+  // Keep default bucket in sync when selectedBucket/availableBuckets change
+  useEffect(() => {
+    if (selectedBucket) setFormBucket(selectedBucket);
+    else if (availableBuckets.length > 0) setFormBucket((prev) => prev || availableBuckets[0]);
+  }, [selectedBucket, availableBuckets]);
 
   // Fetch events whenever date range or view changes
   useEffect(() => {
@@ -470,9 +484,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('.lb-day-add')) return;
+                            if (dayEvents.length) setSelectedModalDate(dayStr);
+                          }}
                           className={`
-                            h-full cursor-pointer flex flex-col text-sm p-3
+                            relative group h-full cursor-pointer flex flex-col text-sm p-3
                             transition-all duration-200 hover:shadow-md
                             ${
                               isCurrentMonth 
@@ -505,10 +523,26 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 {dayEvents.length}
                               </span>
                             )}
+                            {/* Hover add button */}
+                            <button
+                              className="lb-day-add hidden group-hover:flex items-center gap-1 absolute top-2 right-2 text-gray-600 hover:text-gray-900 text-xs font-medium px-2 py-1 rounded bg-white/80 hover:bg-white border border-gray-200 shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAddTaskDate(dayStr);
+                                setFormContent("");
+                                setFormTime("");
+                                setEditTaskId(null);
+                                setIsAddModalOpen(true);
+                              }}
+                              title="Add task"
+                            >
+                              + Add
+                            </button>
                           </div>
                           
                           {/* Events Container */}
                           <div className="flex-1 overflow-y-auto space-y-2">
+                            {/* No inline creation here – handled by hover modal */}
                             {dayEvents.length > 0 ? (
                               dayEvents.map((ev: DayEvent, i: number) => {
                                 const getEventStyle = (source: string) => {
@@ -607,10 +641,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          onClick={() => dayEvents.length && setSelectedModalDate(dayStr)}
+                          onClick={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('.lb-day-add')) return;
+                            if (dayEvents.length) setSelectedModalDate(dayStr);
+                          }}
                           className={`
                             ${getCellSize()} 
-                            cursor-pointer flex flex-col items-start justify-start text-sm p-3
+                            relative group cursor-pointer flex flex-col items-start justify-start text-sm p-3
                             transition-all duration-200 hover:shadow-md
                             ${
                               isCurrentMonth 
@@ -646,9 +684,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 {dayEvents.length}
                               </span>
                             )}
+                            {/* Hover add button */}
+                            <button
+                              className="lb-day-add hidden group-hover:flex items-center gap-1 absolute top-2 right-2 text-gray-600 hover:text-gray-900 text-xs font-medium px-2 py-0.5 rounded bg-white/80 hover:bg-white border border-gray-200 shadow-sm"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setAddTaskDate(dayStr);
+                                setFormContent("");
+                                setFormTime("");
+                                setEditTaskId(null);
+                                setIsAddModalOpen(true);
+                              }}
+                              title="Add task"
+                            >
+                              + Add
+                            </button>
                           </div>
                           
                           {/* Clean Event Cards (same as week view) */}
+                          {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
                             <div className="w-full space-y-1">
                               {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
@@ -789,6 +843,130 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               {(eventsByDate[selectedModalDate || '']?.length ?? 0) === 0 && (
                 <p className="text-sm text-gray-500">No events</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Task Modal */}
+      {isAddModalOpen && addTaskDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{editTaskId ? 'Edit Task' : 'Add Task'}</h3>
+                <p className="text-xs text-gray-500 mt-1">{format(parseISO(addTaskDate), 'EEEE, MMMM d, yyyy')}</p>
+              </div>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => { setIsAddModalOpen(false); setEditTaskId(null); }}>&times;</button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Task</label>
+                <input
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="What do you want to do?"
+                  value={formContent}
+                  onChange={(e) => setFormContent(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                {availableBuckets.length > 0 && (
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-1">Bucket</label>
+                    <select
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                      value={formBucket}
+                      onChange={(e) => setFormBucket(e.target.value)}
+                    >
+                      {availableBuckets.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-1">Time (optional)</label>
+                  <select
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                    value={formTime}
+                    onChange={(e) => setFormTime(e.target.value)}
+                  >
+                    <option value="">No time</option>
+                    {['7AM','8AM','9AM','10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  onClick={() => { setIsAddModalOpen(false); setEditTaskId(null); }}
+                >
+                  Close
+                </button>
+                <button
+                  className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  disabled={!formContent.trim() || isSubmitting}
+                  onClick={async () => {
+                    if (!addTaskDate) return;
+                    try {
+                      setIsSubmitting(true);
+                      // Helper: convert time label to hour number
+                      const toHourNumber = (label: string): number | undefined => {
+                        if (!label) return undefined;
+                        const m = label.match(/^(\d{1,2})(AM|PM)$/);
+                        if (!m) return undefined;
+                        let hh = parseInt(m[1], 10);
+                        const ampm = m[2];
+                        if (ampm === 'PM' && hh !== 12) hh += 12;
+                        if (ampm === 'AM' && hh === 12) hh = 0;
+                        return hh;
+                      };
+
+                      if (!editTaskId) {
+                        // Create then remain open in edit mode
+                        const hourNum = toHourNumber(formTime);
+                        const task = await createTask(formContent.trim(), addTaskDate, hourNum, formBucket || undefined);
+                        if (task) {
+                          // Optimistic event add: all-day or lifeboard timed
+                          setEventsByDate((prev) => {
+                            const next = { ...prev } as Record<string, DayEvent[]>;
+                            const list = [...(next[addTaskDate] || [])];
+                            if (hourNum === undefined) {
+                              list.unshift({ source: 'todoist', title: task.content || formContent.trim(), allDay: true, taskId: task.id });
+                            } else {
+                              // Build ISO time for display
+                              const base = parseISO(addTaskDate + 'T00:00:00');
+                              base.setHours(hourNum, 0, 0, 0);
+                              list.unshift({ source: 'lifeboard', title: task.content || formContent.trim(), time: base.toISOString(), allDay: false, taskId: task.id, duration: 60 });
+                            }
+                            next[addTaskDate] = list;
+                            return next;
+                          });
+                          setEditTaskId(task.id?.toString?.() || String(task.id));
+                        }
+                      } else {
+                        // Save edits
+                        const updates: any = {};
+                        updates.content = formContent.trim();
+                        if (formBucket) updates.bucket = formBucket;
+                        if (formTime) updates.hourSlot = `hour-${formTime}`; else updates.hourSlot = null as any;
+                        await batchUpdateTasks([{ taskId: editTaskId, updates }]);
+                        setIsAddModalOpen(false);
+                        setEditTaskId(null);
+                      }
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                >
+                  {editTaskId ? (isSubmitting ? 'Saving…' : 'Save changes') : (isSubmitting ? 'Creating…' : 'Create task')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

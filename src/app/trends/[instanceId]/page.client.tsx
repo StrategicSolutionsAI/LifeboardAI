@@ -22,6 +22,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  const [isMobile, setIsMobile] = useState(false);
 
   const rangeDays = { '7d': 7, '30d': 30, '90d': 90 } as const;
 
@@ -37,6 +38,13 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
   };
 
   useEffect(() => { (async () => { setLoading(true); await loadData(rangeDays[timeRange]); setLoading(false) })() }, [instanceId, timeRange]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 640);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handleRefresh = async () => { setRefreshing(true); await loadData(rangeDays[timeRange]); setRefreshing(false) };
   const handleTimeRangeChange = (range: TimeRange) => setTimeRange(range);
@@ -124,11 +132,21 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
             <CardDescription>Daily values for the last {rangeDays[timeRange]} days</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+            <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
+              <BarChart
+                data={data}
+                margin={isMobile ? { top: 10, right: 10, left: 10, bottom: 20 } : { top: 20, right: 30, left: 20, bottom: 60 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} interval="preserveStartEnd" angle={-45} textAnchor="end" height={60} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                <XAxis
+                  dataKey="date"
+                  tick={isMobile ? false : { fontSize: 12 }}
+                  interval="preserveStartEnd"
+                  angle={isMobile ? 0 : -45}
+                  textAnchor={isMobile ? 'middle' : 'end'}
+                  height={isMobile ? 20 : 60}
+                />
+                <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 10 : 12 }} />
                 <Tooltip formatter={formatTooltip} labelStyle={{ color: '#374151' }} contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
                 <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="hover:opacity-80 transition-opacity" />
               </BarChart>
@@ -139,4 +157,3 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
     </SidebarLayout>
   );
 }
-

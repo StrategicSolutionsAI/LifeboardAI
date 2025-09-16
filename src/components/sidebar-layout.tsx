@@ -40,9 +40,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-[120px]">
+    <div className="min-h-screen bg-[#F6F6FC] pl-0 md:pl-[120px] pb-16 md:pb-0">
       {/* Sidebar */}
-      <aside className="w-20 flex-shrink-0 border-r border-gray-100 bg-white flex flex-col items-center py-4 gap-6 fixed left-0 top-16 bottom-0 z-30">
+      <aside className="hidden md:flex w-20 flex-shrink-0 border-r border-gray-100 bg-white flex-col items-center py-4 gap-6 fixed left-0 top-16 bottom-0 z-30">
         {navItems.map(({ href, icon: Icon, label }) => {
           // More precise active state detection
           let active = false;
@@ -89,7 +89,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </aside>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white pl-5 pr-10 -ml-[120px] w-[calc(100%+120px)]">
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white pl-5 pr-10 md:-ml-[120px] md:w-[calc(100%+120px)]">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3 text-2xl font-semibold">
             <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-lg">
@@ -100,7 +100,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
               <span className="text-gray-800">AI</span>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4">
             <button className="p-2 rounded-full hover:bg-gray-100">
               <Search className="h-5 w-5 text-gray-500" />
             </button>
@@ -115,8 +115,33 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </header>
 
       {/* Main content area */}
-      {/* Main content area */}
       <div className="flex-1 overflow-y-auto pr-10 pt-6 sm:pt-10">{children}</div>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <ul className="flex items-center justify-around py-2">
+          {[
+            ...navItems,
+            { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+          ].map(({ href, icon: Icon, label }) => {
+            const active = href === '/dashboard'
+              ? pathname === '/dashboard' || pathname === '/dashboard/'
+              : pathname?.startsWith(href)
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-label={label}
+                  className={`flex flex-col items-center px-3 py-1.5 rounded-md text-xs ${active ? 'text-theme-primary' : 'text-gray-500'}`}
+                >
+                  <Icon className={`h-5 w-5 mb-0.5 ${active ? 'text-theme-primary' : 'text-gray-400'}`} />
+                  {label}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
     </div>
   )
 }
