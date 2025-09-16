@@ -369,10 +369,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   return (
-    <div className="w-full max-w-none mx-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div className="w-full max-w-none mx-2 sm:mx-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       {/* Clean Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 border-b border-gray-100">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+        <div className="flex items-center gap-2">
           <button
             onClick={prevPeriod}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -403,18 +403,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </button>
         </div>
         
-        <div className="flex items-center space-x-3">
-          <h2 className="font-semibold text-lg text-gray-900">
+        <div className="flex items-center gap-2 sm:space-x-3">
+          <h2 className="font-semibold text-base sm:text-lg text-gray-900">
             {getHeaderTitle()}
           </h2>
           
           {/* Clean View Selector */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 overflow-x-auto">
             {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
               <button
                 key={viewOption}
                 onClick={() => handleViewChange(viewOption)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${
+                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors duration-200 ${
                   view === viewOption
                     ? 'bg-white shadow-sm text-blue-600 font-semibold'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'

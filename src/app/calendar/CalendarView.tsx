@@ -390,7 +390,7 @@ function CalendarContent() {
       }} 
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-6 h-full">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
         {/* Main calendar area */}
         <div className="flex-1 min-w-0">
           <FullCalendar 
@@ -404,7 +404,7 @@ function CalendarContent() {
         </div>
         
         {/* Task list sidebar */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 w-full lg:w-[360px]">
           <CalendarTaskList 
             selectedDate={selectedDate}
             onDateChange={handleDateChange}

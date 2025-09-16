@@ -13,9 +13,11 @@ import {
   Search,
   Bell,
   User,
-  Zap
+  Zap,
+  Menu
 } from "lucide-react"
 import { supabase } from "@/utils/supabase/client"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -89,7 +91,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </aside>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white pl-5 pr-10 md:-ml-[120px] md:w-[calc(100%+120px)]">
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white pl-4 pr-4 md:pl-5 md:pr-10 md:-ml-[120px] md:w-[calc(100%+120px)]">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3 text-2xl font-semibold">
             <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-lg">
@@ -111,11 +113,41 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
               <User className="h-4 w-4 text-gray-600" />
             </button>
           </div>
+
+          {/* Mobile actions */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200" aria-label="Open actions">
+                  <Menu className="h-5 w-5 text-gray-600" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <SheetHeader>
+                  <SheetTitle>Quick actions</SheetTitle>
+                </SheetHeader>
+                <div className="grid grid-cols-3 gap-4 pt-4">
+                  <button className="flex flex-col items-center justify-center rounded-lg border p-3 hover:bg-gray-50">
+                    <Search className="h-5 w-5 text-gray-700 mb-1" />
+                    <span className="text-xs text-gray-700">Search</span>
+                  </button>
+                  <button className="flex flex-col items-center justify-center rounded-lg border p-3 hover:bg-gray-50">
+                    <Bell className="h-5 w-5 text-gray-700 mb-1" />
+                    <span className="text-xs text-gray-700">Notifications</span>
+                  </button>
+                  <button onClick={handleSignOut} className="flex flex-col items-center justify-center rounded-lg border p-3 hover:bg-gray-50">
+                    <User className="h-5 w-5 text-gray-700 mb-1" />
+                    <span className="text-xs text-gray-700">Sign out</span>
+                  </button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </header>
 
       {/* Main content area */}
-      <div className="flex-1 overflow-y-auto pr-10 pt-6 sm:pt-10">{children}</div>
+      <div className="flex-1 overflow-y-auto pr-4 md:pr-10 pt-4 sm:pt-10">{children}</div>
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
