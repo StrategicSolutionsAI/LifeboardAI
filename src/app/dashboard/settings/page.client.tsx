@@ -76,14 +76,14 @@ export default function SettingsPageClient() {
 
   return (
     <SidebarLayout>
-      <div className="p-6 max-w-4xl mx-auto min-h-screen">
-        <div className="flex items-center gap-3 mb-8">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
+        <div className="flex items-center gap-3 mb-6 sm:mb-8">
           <Settings className="w-6 h-6 text-gray-600" />
-          <h1 className="text-3xl font-bold">Settings</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
         </div>
 
         <div className="space-y-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -103,7 +103,7 @@ export default function SettingsPageClient() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <div className="flex items-center gap-3 mb-6">
               <Palette className="w-5 h-5 text-gray-600" />
               <div>
@@ -180,7 +180,7 @@ export default function SettingsPageClient() {
                 </div>
 
                 {showCustomColorForm && (
-                  <div className="mt-6 p-6 bg-gray-50 rounded-lg border">
+                  <div className="mt-6 p-4 sm:p-6 bg-gray-50 rounded-lg border">
                     <h4 className="text-lg font-medium mb-4">{editingTheme ? 'Edit Custom Theme' : 'Create Custom Theme'}</h4>
 
                     <div className="space-y-4">
@@ -246,7 +246,7 @@ export default function SettingsPageClient() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <h2 className="text-xl font-semibold mb-4">Advanced Settings</h2>
             <div className="space-y-4">
               <div className="flex items-start p-4 bg-yellow-50 border border-yellow-100 rounded-lg">
@@ -267,4 +267,3 @@ export default function SettingsPageClient() {
     </SidebarLayout>
   )
 }
-

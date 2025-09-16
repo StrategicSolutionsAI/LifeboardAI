@@ -132,7 +132,7 @@ export default function IntegrationsPageClient() {
     return (
       <SidebarLayout>
         <SectionLoadTimer name="/integrations" />
-        <div className="container mx-auto p-6 max-w-4xl">
+        <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Integrations</h1>
             <p className="text-muted-foreground">Connect your favorite apps and services to LifeboardAI</p>
@@ -150,11 +150,11 @@ export default function IntegrationsPageClient() {
   return (
     <SidebarLayout>
       <SectionLoadTimer name="/integrations" />
-      <div className="container mx-auto p-6 max-w-4xl">
+      <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold">Integrations</h1>
-            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses(true)} disabled={loading} className="relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (⌘R)'}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold">Integrations</h1>
+            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses(true)} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (⌘R)'}>
               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} aria-hidden="true" />
               <span className="relative z-10">{loading ? 'Refreshing...' : 'Refresh All'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -170,7 +170,7 @@ export default function IntegrationsPageClient() {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
           {integrations.map((integration) => {
             const status = integrationStatuses[integration.id]
             const isLoading = refreshing === integration.id
@@ -236,4 +236,3 @@ export default function IntegrationsPageClient() {
     </SidebarLayout>
   )
 }
-
