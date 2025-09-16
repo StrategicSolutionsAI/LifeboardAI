@@ -24,6 +24,7 @@ interface TaskUpdate {
 export function useTasks(selectedDate?: Date) {
   // Track whether Todoist is connected in this session; null = unknown
   const todoistConnectedRef = useRef<boolean | null>(null)
+  const lastSeenUpdateRef = useRef<number>(0)
 
   const dateStr = selectedDate 
     ? format(selectedDate, 'yyyy-MM-dd')
@@ -325,18 +326,60 @@ export function useTasks(selectedDate?: Date) {
     }
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
 
-  // React to global refresh events (e.g., chat-created tasks)
+  // On mount, check if another part of the app recently announced a task update
   useEffect(() => {
-    function onTasksUpdated() {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = window.localStorage.getItem('lifeboard:last-tasks-update')
+      if (stored) {
+        const ts = Number(stored)
+        if (!Number.isNaN(ts) && ts > lastSeenUpdateRef.current) {
+          lastSeenUpdateRef.current = ts
+          try { refetchDaily() } catch {}
+          try { refetchAll() } catch {}
+        }
+      }
+    } catch {}
+  }, [refetchDaily, refetchAll])
+
+  // React to global refresh events (e.g., chat-created tasks) and storage sync
+  useEffect(() => {
+    function triggerRefresh(ts?: number) {
+      if (typeof ts === 'number') {
+        if (ts <= lastSeenUpdateRef.current) {
+          return
+        }
+        lastSeenUpdateRef.current = ts
+      } else {
+        lastSeenUpdateRef.current = Date.now()
+      }
       try { refetchDaily() } catch {}
       try { refetchAll() } catch {}
     }
+
+    function onTasksUpdated(event: Event) {
+      const custom = event as CustomEvent<{ timestamp?: number }>
+      const ts = typeof custom.detail?.timestamp === 'number' ? custom.detail?.timestamp : Date.now()
+      triggerRefresh(ts)
+    }
+
+    function onStorage(event: StorageEvent) {
+      if (event.key === 'lifeboard:last-tasks-update' && event.newValue) {
+        const ts = Number(event.newValue)
+        if (!Number.isNaN(ts)) {
+          triggerRefresh(ts)
+        }
+      }
+    }
+
     if (typeof window !== 'undefined') {
       window.addEventListener('lifeboard:tasks-updated', onTasksUpdated)
+      window.addEventListener('storage', onStorage)
     }
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('lifeboard:tasks-updated', onTasksUpdated)
+        window.removeEventListener('storage', onStorage)
       }
     }
   }, [refetchDaily, refetchAll])

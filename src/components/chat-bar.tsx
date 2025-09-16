@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { MessageSquare, X, Send, Mic, Volume2, VolumeX, Settings } from "lucide-react"
 
 interface Message {
@@ -33,6 +33,13 @@ export function ChatBar() {
   const [micDeviceId, setMicDeviceId] = useState<string>('')
   const [speakerDeviceId, setSpeakerDeviceId] = useState<string>('')
   const [isEnumerating, setIsEnumerating] = useState<boolean>(false)
+  const [hasRequestedDeviceAccess, setHasRequestedDeviceAccess] = useState<boolean>(false)
+
+  const quickPrompts = [
+    'What are my top tasks for today?',
+    'Add a reminder to call the dentist tomorrow at 9am.',
+    'Summarize my progress this week.'
+  ]
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -64,6 +71,16 @@ export function ChatBar() {
   const rtLastTranscriptRef = useRef<string>('')
   const rtCreateLockRef = useRef<boolean>(false)
   const rtAudioTranscriptRef = useRef<string>('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  const notifyTasksUpdated = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const timestamp = Date.now()
+    try {
+      window.localStorage.setItem('lifeboard:last-tasks-update', String(timestamp))
+    } catch {}
+    window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+  }, [])
 
   // Helper to aggressively clean filler phrases from assistant text so we don't
   // accidentally create tasks like "All . You've got a reminder ."
@@ -106,17 +123,18 @@ export function ChatBar() {
     } catch {}
   }, [ttsVoice, ttsRate, micDeviceId, speakerDeviceId, useRealtime])
 
-  // Enumerate audio devices with labels (requires permission)
-  async function enumerateAudioDevices() {
+  // Enumerate audio devices and optionally ask for permission to reveal labels
+  const enumerateAudioDevices = useCallback(async (requestPermission: boolean = false) => {
     if (isEnumerating) return
     setIsEnumerating(true)
+    let permissionStream: MediaStream | null = null
     try {
-      // Request a one-time mic permission to reveal device labels
-      const tmp = await navigator.mediaDevices.getUserMedia({ audio: true })
-      tmp.getTracks().forEach(t => t.stop())
+      if (requestPermission && !hasRequestedDeviceAccess) {
+        permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        setHasRequestedDeviceAccess(true)
+      }
       const list = await navigator.mediaDevices.enumerateDevices()
       setDevices(list)
-      // Default mic: prefer non-iPhone inputs to avoid Continuity mic warning
       if (!micDeviceId) {
         const inputs = list.filter(d => d.kind === 'audioinput')
         const preferred = inputs.find(d => !/iphone|continuity/i.test(d.label)) || inputs[0]
@@ -129,18 +147,35 @@ export function ChatBar() {
         setDevices(list)
       } catch {}
     } finally {
+      if (permissionStream) {
+        permissionStream.getTracks().forEach(t => t.stop())
+        permissionStream = null
+      }
       setIsEnumerating(false)
     }
-  }
+  }, [hasRequestedDeviceAccess, isEnumerating, micDeviceId])
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-      enumerateAudioDevices()
-      const onChange = () => enumerateAudioDevices()
+      enumerateAudioDevices(false)
+      const onChange = () => enumerateAudioDevices(false)
       navigator.mediaDevices.addEventListener?.('devicechange', onChange)
       return () => navigator.mediaDevices.removeEventListener?.('devicechange', onChange)
     }
-  }, [])
+  }, [enumerateAudioDevices])
+
+  useEffect(() => {
+    if (showSettings && typeof navigator !== 'undefined' && navigator.mediaDevices) {
+      enumerateAudioDevices(!hasRequestedDeviceAccess)
+    }
+  }, [showSettings, hasRequestedDeviceAccess, enumerateAudioDevices])
+
+  useEffect(() => {
+    if (isOpen) {
+      const id = setTimeout(() => inputRef.current?.focus(), 0)
+      return () => clearTimeout(id)
+    }
+  }, [isOpen])
 
   // Scroll to bottom whenever messages update
   useEffect(() => {
@@ -307,9 +342,11 @@ export function ChatBar() {
           sampleRate: 44100
         } 
       })
-      
+
       console.log('✅ Microphone access granted')
-      
+      setHasRequestedDeviceAccess(true)
+      enumerateAudioDevices(false)
+
       // Set up audio analysis for silence detection
       const context = new AudioContext()
       const source = context.createMediaStreamSource(stream)
@@ -464,6 +501,8 @@ export function ChatBar() {
       const local = await navigator.mediaDevices.getUserMedia({
         audio: { deviceId: micDeviceId ? { exact: micDeviceId } : undefined, echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
       })
+      setHasRequestedDeviceAccess(true)
+      enumerateAudioDevices(false)
       rtLocalStreamRef.current = local
 
       // 3) Create PeerConnection
@@ -612,9 +651,7 @@ export function ChatBar() {
                         // Add a minimal assistant message immediately for feedback
                         const confirmText = `✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`
                         setMessages(prev => [...prev, { role: 'assistant', content: confirmText, createdTask: json.task || null }])
-                        if (typeof window !== 'undefined') {
-                          window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
-                        }
+                        notifyTasksUpdated()
                       } else {
                         console.warn('⚠️ Realtime transcript task create failed', res.status)
                         rtCreateLockRef.current = false
@@ -650,7 +687,7 @@ export function ChatBar() {
                           const json = await res.json().catch(() => ({}))
                           rtCreateLockRef.current = true
                           setMessages(prev => [...prev, { role: 'assistant', content: `✅ I added “${cmd.content}”${cmd.due_date ? ` for ${cmd.due_date}` : ''}.`, createdTask: json.task || null }])
-                          if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
+                          notifyTasksUpdated()
                           return
                         }
                       }
@@ -717,7 +754,7 @@ export function ChatBar() {
                         const json = await res.json().catch(() => ({}))
                         rtCreateLockRef.current = true
                         setMessages(prev => [...prev, { role: 'assistant', content: `✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`, createdTask: json.task || null }])
-                        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
+                        notifyTasksUpdated()
                       } else {
                         console.warn('⚠️ Realtime assistant transcript task create failed', res.status)
                       }
@@ -758,9 +795,7 @@ export function ChatBar() {
                         createdTask = json.task || null
                         finalText = text.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${cmd.due_date ? ` for ${cmd.due_date}` : ''}.`)
                         // Broadcast update
-                        if (typeof window !== 'undefined') {
-                          window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
-                        }
+                        notifyTasksUpdated()
                       } else {
                         finalText = text.replace(cmdMatch[0], `\n\n⚠️ I couldn’t create the task (auth or server error).`)
                       }
@@ -788,7 +823,7 @@ export function ChatBar() {
                             const json = await res.json().catch(() => ({}))
                             createdTask = json.task || null
                             finalText = `${text}\n\n✅ I added “${cmd2.content}”${cmd2.due_date ? ` for ${cmd2.due_date}` : ''}.`
-                            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
+                            notifyTasksUpdated()
                             rtCreateLockRef.current = true
                           }
                         }
@@ -851,9 +886,7 @@ export function ChatBar() {
                           const json = await res.json()
                           createdTask = json.task || null
                           finalText = `${text}\n\n✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`
-                          if (typeof window !== 'undefined') {
-                            window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
-                          }
+                          notifyTasksUpdated()
                           rtCreateLockRef.current = true
                         } else {
                           console.warn('⚠️ Realtime fallback task create failed', res.status)
@@ -987,8 +1020,8 @@ export function ChatBar() {
       }
       setMessages([...newMessages, assistantMessage])
       // Broadcast a global refresh if a task was created
-      if (assistantMessage.createdTask && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
+      if (assistantMessage.createdTask) {
+        notifyTasksUpdated()
       }
 
       // Auto-play OpenAI TTS audio if available and handle continuous conversation
@@ -1062,6 +1095,28 @@ export function ChatBar() {
     }
   }
 
+  function handleCloseChat() {
+    cancelTTS()
+    stopBargeMonitor()
+    stopRealtime()
+    if (isRecording) {
+      stopRecording()
+    }
+    if (rtRemoteAudioRef.current) {
+      rtRemoteAudioRef.current.pause()
+      rtRemoteAudioRef.current.srcObject = null
+    }
+    setIsVoiceMode(false)
+    setIsProcessing(false)
+    setIsSpeaking(false)
+    setIsOpen(false)
+  }
+
+  function handleQuickPrompt(prompt: string) {
+    setInput(prompt)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
   function speakText(text: string) {
     if (!speakReplies || !text) return
     cancelTTS()
@@ -1119,8 +1174,8 @@ export function ChatBar() {
       const data = await res.json()
       const assistantMessage: Message = { role: "assistant", content: data.reply, audio: data.audioUrl, createdTask: data.createdTask || null }
       setMessages([...newMessages, assistantMessage])
-      if (assistantMessage.createdTask && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated'))
+      if (assistantMessage.createdTask) {
+        notifyTasksUpdated()
       }
 
       // Prefer server TTS audio if present; otherwise use browser TTS
@@ -1181,13 +1236,29 @@ export function ChatBar() {
                 </span>
               )}
             </div>
-            <button onClick={() => setIsOpen(false)} aria-label="Close chat">
+            <button onClick={handleCloseChat} aria-label="Close chat">
               <X className="w-4 h-4 text-gray-500" />
             </button>
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
+            {messages.length === 0 && (
+              <div className="bg-indigo-50 text-indigo-900 rounded-lg p-3 text-xs space-y-2">
+                <div className="font-medium text-indigo-800">Try asking:</div>
+                <div className="flex flex-wrap gap-2">
+                  {quickPrompts.map(prompt => (
+                    <button
+                      key={prompt}
+                      onClick={() => handleQuickPrompt(prompt)}
+                      className="px-2 py-1 rounded-full bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {messages.map((m, i) => (
               <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
                 <div
@@ -1266,6 +1337,7 @@ export function ChatBar() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSend()
               }}
+              ref={inputRef}
             />
             {/* Settings Toggle */}
             <button
@@ -1346,7 +1418,7 @@ export function ChatBar() {
               </label>
               <div className="mb-3">
                 <button
-                  onClick={enumerateAudioDevices}
+                  onClick={() => enumerateAudioDevices(true)}
                   className="text-[11px] text-gray-600 hover:text-gray-900 underline"
                 >
                   {isEnumerating ? 'Detecting devices…' : 'Detect audio devices'}
