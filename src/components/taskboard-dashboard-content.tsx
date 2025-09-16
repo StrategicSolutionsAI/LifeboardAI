@@ -208,25 +208,35 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
   }, [allTodoistTasks]);
 
   return (
-    <aside className={`flex-shrink-0 -mt-12 transition-all duration-300 ease-in-out ${
-      isSidebarCollapsed ? 'w-12' : 'w-[400px]'
-    }`}>
-      <div className="rounded-lg border border-gray-100 bg-white p-6 shadow-sm h-full flex flex-col">
-        {/* Collapse toggle */}
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-sm font-medium text-gray-900">
-            {isSidebarCollapsed ? "" : format(date, "MMMM yyyy")}
-          </h3>
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-          </button>
-        </div>
+    <aside
+      className={`relative -mt-12 flex-shrink-0 transition-[width] duration-300 ease-in-out ${
+        isSidebarCollapsed ? 'w-0' : 'w-[400px]'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+        aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className={`absolute top-4 left-0 z-10 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500`}
+      >
+        {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+      </button>
 
-        {!isSidebarCollapsed && (
+      <div
+        className={`absolute inset-y-0 right-0 w-[400px] transition-transform duration-300 ease-in-out ${
+          isSidebarCollapsed ? 'translate-x-full pointer-events-none opacity-0' : 'translate-x-0 pointer-events-auto opacity-100'
+        }`}
+        aria-hidden={isSidebarCollapsed}
+      >
+        <div className="rounded-lg border border-gray-100 bg-white p-6 shadow-sm h-full flex flex-col">
+          {/* Collapse toggle */}
+          <div className="flex items-center mb-4">
+            <h3 className="text-sm font-medium text-gray-900">
+              {format(date, "MMMM yyyy")}
+            </h3>
+          </div>
+
+          {!isSidebarCollapsed && (
           <>
             {/* Week navigation */}
             <div className="flex gap-1 text-gray-500 mb-4">
@@ -560,7 +570,8 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
               </DragDropContext>
             </div>
           </>
-        )}
+          )}
+        </div>
       </div>
     </aside>
   );

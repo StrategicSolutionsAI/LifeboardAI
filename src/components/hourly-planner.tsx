@@ -283,10 +283,10 @@ export default function HourlyPlanner({
   };
 
   // Handle clicking on a time slot to start creating a task
-  const handleTimeSlotClick = (timeSlot: string) => {
-    // Don't interfere with existing tasks
-    if (hourlyPlan[timeSlot].length > 0) return;
-    
+  const handleTimeSlotClick = (timeSlot: string, force = false) => {
+    // When force is false, we keep the previous guard to avoid accidental overlaps
+    if (!force && hourlyPlan[timeSlot].length > 0) return;
+
     setCreatingTaskAt(timeSlot);
     setNewTaskContent("");
   };
@@ -426,10 +426,25 @@ export default function HourlyPlanner({
     const id = setInterval(() => setCurrentTime(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
-  const currentHourDisplay = useMemo(() => {
-    const h = currentTime.getHours();
-    return `${h % 12 || 12}${h < 12 ? "AM" : "PM"}`;
+
+  const currentSlot = useMemo(() => {
+    const totalMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    for (let i = 0; i < TIME_SLOTS.length; i++) {
+      const slotStart = parseTimeSlot(TIME_SLOTS[i]);
+      const slotEnd = slotStart + 15;
+      if (totalMinutes >= slotStart && totalMinutes < slotEnd) {
+        return TIME_SLOTS[i];
+      }
+    }
+    return "";
   }, [currentTime]);
+
+  const currentHourDisplay = useMemo(() => {
+    if (!currentSlot) return "";
+    const slotMinutes = parseTimeSlot(currentSlot);
+    const hourStart = Math.floor(slotMinutes / 60) * 60;
+    return formatTimeSlot(hourStart);
+  }, [currentSlot]);
 
   // Auto-scroll to current time slot on mount
   useEffect(() => {
@@ -484,6 +499,9 @@ export default function HourlyPlanner({
           // Check if this is a major hour (on the hour)
           const isMainHour = timeSlot.indexOf(':') === -1;
           const hasTask = hourlyPlan[timeSlot].length > 0;
+          const isCurrentSlot = currentSlot === timeSlot;
+          const showQuickAddButton = creatingTaskAt !== timeSlot;
+          const shouldDisableQuickAdd = effectiveDragging || Boolean(resizingTask);
           
           return (
           <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
@@ -494,22 +512,35 @@ export default function HourlyPlanner({
                     ? 'border-t' 
                     : hasTask ? 'group-hover:border-t group-hover:border-dashed group-hover:border-gray-300' : ''
                 } ${index === 0 ? 'border-t-0' : ''} ${
-                  snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : ''
+                  snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : isCurrentSlot ? 'bg-indigo-50/70 border-indigo-100' : ''
                 }`}
               >
                 {/* Enhanced time label with better typography - only show for main hours */}
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
                   {isMainHour ? (
                     <>
-                      <span className="text-sm font-medium text-gray-900 leading-none">
+                      <span className={`text-sm font-medium leading-none ${timeSlot === currentHourDisplay ? 'text-indigo-600' : 'text-gray-900'}`}>
                         {timeSlot}
                       </span>
-                      <span className="text-xs text-gray-500 mt-0.5">
-                        {timeSlot === currentHourDisplay ? 'Now' : ''}
-                      </span>
+                      {timeSlot === currentHourDisplay ? (
+                        <span className="mt-0.5 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                          Now
+                        </span>
+                      ) : (
+                        <div className="h-3" />
+                      )}
                     </>
                   ) : (
-                    <div className="h-4"></div>
+                    <>
+                      <div className="h-3" />
+                      {isCurrentSlot ? (
+                        <span className="inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                          Now
+                        </span>
+                      ) : (
+                        <div className="h-3" />
+                      )}
+                    </>
                   )}
                 </div>
                 
@@ -610,7 +641,8 @@ export default function HourlyPlanner({
                         const isResizing = resizingTask?.taskId === t.id;
                         const taskDuration = isResizing ? resizingTask.currentDuration : t.duration ?? 60;
                         const isDraggingNow = dragSnapshot.isDragging;
-                        
+                        const endTime = calculateEndTime(timeSlot, taskDuration);
+
                         return (
                         <li
                           ref={prov.innerRef}
@@ -634,6 +666,7 @@ export default function HourlyPlanner({
                             // Reset after 3 seconds to avoid permanent z-index changes
                             setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
                           }}
+                          aria-label={`${t.content}. ${timeSlot} to ${endTime}`}
                           className={`group relative flex items-start gap-3 px-4 py-3 
                             bg-white border border-gray-200 
                             shadow-sm hover:shadow-md 
@@ -656,8 +689,9 @@ export default function HourlyPlanner({
                               {taskDuration >= 45 ? (
                                 // Tall tasks: time on top, title below
                                 <>
-                                  <div className="text-xs font-medium text-indigo-600 leading-tight mb-1 tracking-wide">
-                                    {timeSlot} – {calculateEndTime(timeSlot, resizingTask?.taskId === t.id ? resizingTask.currentDuration : t.duration ?? 60)}
+                                  <div className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 leading-tight tracking-wide">
+                                    <span>{timeSlot}</span>
+                                    <span className="text-[11px] font-medium text-gray-500">– {endTime}</span>
                                   </div>
                                   {editingTaskId === t.id.toString() ? (
                                     <input
@@ -692,8 +726,9 @@ export default function HourlyPlanner({
                               ) : (
                                 // Short tasks: time and title on same row
                                 <div className="flex items-center gap-2 w-full">
-                                  <div className="text-xs font-medium text-indigo-600 leading-tight tracking-wide flex-shrink-0">
-                                    {timeSlot}
+                                  <div className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 leading-tight tracking-wide flex-shrink-0">
+                                    <span>{timeSlot}</span>
+                                    <span className="text-[11px] font-medium text-gray-500">– {endTime}</span>
                                   </div>
                                   {editingTaskId === t.id.toString() ? (
                                     <input
@@ -769,11 +804,29 @@ export default function HourlyPlanner({
                   
                 </ul>
 
+                {showQuickAddButton && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTimeSlotClick(timeSlot, true);
+                    }}
+                    disabled={shouldDisableQuickAdd}
+                    className={`absolute right-3 top-1 inline-flex items-center gap-1 rounded-md border border-transparent bg-white/90 px-2 py-1 text-[11px] font-medium text-indigo-600 shadow-sm transition-opacity duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${
+                      shouldDisableQuickAdd ? 'pointer-events-none opacity-0' : 'opacity-80 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100'
+                    }`}
+                    aria-label={`Add task at ${timeSlot}`}
+                  >
+                    <Plus size={12} />
+                    <span>Add</span>
+                  </button>
+                )}
+
                 {/* Enhanced current-time indicator */}
-                {showTimeIndicator && timeSlot === currentHourDisplay && (
+                {showTimeIndicator && isCurrentSlot && (
                   <div
                     className="absolute left-0 right-0 pointer-events-none flex items-center z-10"
-                    style={{ top: `${20 + (currentTime.getMinutes() / 60) * 80}%` }}
+                    style={{ top: `calc(${(((currentTime.getMinutes() % 15) / 15) * 100).toFixed(2)}% - 1px)` }}
                   >
                     <div className="w-16 shrink-0" />
                     <div className="flex items-center flex-1">

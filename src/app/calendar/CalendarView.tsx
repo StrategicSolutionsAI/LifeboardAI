@@ -15,6 +15,7 @@ const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: 
 function CalendarContent() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDragging, setIsDragging] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
   const { batchUpdateTasks } = useTasksContext();
 
@@ -392,7 +393,7 @@ function CalendarContent() {
     >
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
         {/* Main calendar area */}
-        <div className="flex-1 min-w-0">
+        <div className={`flex-1 min-w-0 transition-[margin] duration-300 ${isSidebarCollapsed ? 'lg:mr-0' : ''}`}>
           <FullCalendar 
             selectedDate={selectedDate} 
             onDateChange={handleDateChange}
@@ -404,7 +405,11 @@ function CalendarContent() {
         </div>
         
         {/* Task list sidebar */}
-        <div className="flex-shrink-0 w-full lg:w-[360px]">
+        <div
+          className={`flex-shrink-0 w-full transition-[width] duration-300 ease-in-out ${
+            isSidebarCollapsed ? 'lg:w-[64px]' : 'lg:w-[360px]'
+          }`}
+        >
           <CalendarTaskList 
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
@@ -412,6 +417,7 @@ function CalendarContent() {
             selectedBucket={activeBucket}
             isDragging={isDragging}
             disableInternalDragDrop={true} // Disable internal DragDropContext
+            onCollapsedChange={setIsSidebarCollapsed}
           />
         </div>
       </div>

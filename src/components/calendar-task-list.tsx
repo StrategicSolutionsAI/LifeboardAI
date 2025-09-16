@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
 import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -16,6 +16,7 @@ interface CalendarTaskListProps {
   isDragging?: boolean;
   disableInternalDragDrop?: boolean;
   dashboardView?: boolean; // Simplified view for dashboard usage
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 // Enhanced task card component with priority-based styling and progressive disclosure
@@ -299,7 +300,7 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false }: CalendarTaskListProps) {
+export function CalendarTaskList({ availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -337,6 +338,10 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Group upcoming tasks intelligently
   const taskGroups = useTaskGrouping(filteredUpcomingTasks);
+
+  useEffect(() => {
+    onCollapsedChange?.(isCollapsed);
+  }, [isCollapsed, onCollapsedChange]);
 
   // Combined tasks for dashboard view (all incomplete tasks from the bucket, sorted by due date)
   const dashboardTasks = useMemo(() => {
