@@ -1160,9 +1160,9 @@ export function ChatBar() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-20 md:bottom-4 right-3 sm:right-4 z-50">
       {isOpen ? (
-        <div className="w-80 bg-white shadow-xl rounded-xl flex flex-col h-96 relative">
+        <div className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[70vh] md:h-96 relative">
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b">
             <div className="flex items-center gap-2 font-medium text-sm text-gray-700">

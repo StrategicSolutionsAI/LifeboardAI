@@ -29,23 +29,23 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
 
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Widget Trends Section */}
       {widgets.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <h2 className="text-xl font-semibold">Widget Trends</h2>
             <WidgetSelector
               widgets={widgets}
               selectedWidget={selectedWidget}
               onWidgetChange={setSelectedWidget}
               showAllOption={true}
-              className="w-48"
+              className="w-40 sm:w-48"
             />
           </div>
           
           {/* Range picker */}
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             {ranges.map(({ label, days }) => (
               <button
                 key={days}
@@ -62,7 +62,7 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
           </div>
 
           {/* Charts */}
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {(selectedWidget === 'all' ? widgets : widgets.filter(w => w.instanceId === selectedWidget)).map((w) => (
               <WidgetTrendChart
                 key={w.instanceId}

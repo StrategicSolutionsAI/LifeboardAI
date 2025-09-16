@@ -2430,7 +2430,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     zIndex: b === activeBucket ? 50 : 9 - idx,
                     marginRight: '-10px'
                   }}
-                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-6 text-[14px] font-semibold capitalize transition-all duration-300 ${
+                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 ${
                     b === activeBucket
                       ? 'bg-theme-primary-500 text-white border border-theme-primary-500/30 hover:bg-theme-primary-600 scale-[1.02] shadow-none'
                       : 'bg-white text-theme-primary-600 border border-gray-100 hover:bg-white hover:border-theme-primary-500/30 shadow-none'
@@ -2446,7 +2446,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   zIndex: 0,
                   marginRight: '-10px'
                 }}
-                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-gray-100 shadow-none"
+                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-gray-100 shadow-none"
               >
                 <span className="text-theme-primary-600">
                   +
@@ -2475,7 +2475,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             {/* Content container: white widget box with subtle shadow */}
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-gray-100 bg-white shadow-sm">
               {/* Inner nav */}
-              <nav className="flex items-center gap-8 border-b border-white/20 px-6 pt-4 text-sm font-semibold">
+              <nav className="flex items-center gap-4 sm:gap-8 border-b border-white/20 px-4 sm:px-6 pt-3 sm:pt-4 text-sm font-semibold">
                 {(['Overview','Trends','Logs','Tasks','Settings'] as const).map((item) => (
                   <button
                     key={item}
@@ -2492,7 +2492,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </nav>
 
               {/* Content area */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr' : 'hidden'}>
                   {/* Refresh card */}
@@ -3415,7 +3415,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Widget library sheet */}
         <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-          <SheetContent side="right" className="w-[800px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[800px] max-w-full overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Add a Widget</SheetTitle>
             </SheetHeader>
@@ -3458,7 +3458,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Bucket editor: add/remove tabs */}
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-          <SheetContent side="right" className="w-[520px] sm:w-[560px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[520px] md:w-[560px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-gray-900">Manage Tabs</SheetTitle>
             </SheetHeader>
@@ -3519,7 +3519,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             }, 100)
           }
         }}>
-          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-gray-900">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
@@ -3531,7 +3531,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Medication Widget Modal */}
         <Sheet open={medicationWidgetOpen} onOpenChange={setMedicationWidgetOpen}>
-          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-gray-900">Medication Tracker</SheetTitle>
             </SheetHeader>
@@ -3543,7 +3543,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Exercise Widget Modal */}
         <Sheet open={exerciseWidgetOpen} onOpenChange={setExerciseWidgetOpen}>
-          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Exercise Tracker</SheetTitle>
             </SheetHeader>
@@ -3555,7 +3555,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Home Projects Widget Modal */}
         <Sheet open={homeProjectsWidgetOpen} onOpenChange={setHomeProjectsWidgetOpen}>
-          <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
             </SheetHeader>

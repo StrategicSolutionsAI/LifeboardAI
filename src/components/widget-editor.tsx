@@ -88,7 +88,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-80">
+      <SheetContent side="right" className="w-full sm:w-80">
         <SheetHeader>
           <SheetTitle>{isNewWidget ? 'Add Widget' : 'Edit Widget'}</SheetTitle>
         </SheetHeader>

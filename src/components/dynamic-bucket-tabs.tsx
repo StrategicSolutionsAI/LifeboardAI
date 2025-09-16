@@ -50,8 +50,8 @@ export function DynamicBucketTabs({
   
   if (loading) {
     return (
-      <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-6">
-        <div className="flex space-x-8 h-[41px]">
+      <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-4 sm:px-6">
+        <div className="flex gap-4 sm:gap-8 h-[41px]">
           <div className="animate-pulse bg-theme-neutral-200 w-16 h-4 my-auto rounded"></div>
         </div>
       </div>
@@ -66,8 +66,8 @@ export function DynamicBucketTabs({
   return (
     <>
       {/* Tab Navigation */}
-      <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-6">
-        <div className="flex space-x-8">
+      <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-4 sm:px-6">
+        <div className="flex gap-4 sm:gap-8">
           {userBuckets.map((bucket) => (
             <button
               key={bucket}
@@ -85,9 +85,9 @@ export function DynamicBucketTabs({
       </div>
 
       {/* Dashboard Content for Selected Bucket */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Main Widgets Area */}
             <div className="lg:col-span-3">
               {children ? (
@@ -98,7 +98,7 @@ export function DynamicBucketTabs({
                   <Sheet open={isWidgetLibraryOpen} onOpenChange={setIsWidgetLibraryOpen}>
                     <SheetTrigger asChild>
                       <Card className="border-2 border-dashed border-theme-neutral-300 hover:border-theme-primary-500 cursor-pointer transition-colors group">
-                        <CardContent className="flex flex-col items-center justify-center p-8 min-h-[200px]">
+                        <CardContent className="flex flex-col items-center justify-center p-6 sm:p-8 min-h-[200px]">
                           <div className="w-12 h-12 rounded-full bg-theme-neutral-100 group-hover:bg-theme-primary-50 flex items-center justify-center mb-4 transition-colors">
                             <Plus className="w-6 h-6 text-theme-neutral-400 group-hover:text-theme-primary-600 transition-colors" />
                           </div>
@@ -109,7 +109,7 @@ export function DynamicBucketTabs({
                         </CardContent>
                       </Card>
                     </SheetTrigger>
-                    <SheetContent className="w-[520px] sm:w-[700px]">
+                    <SheetContent className="w-full sm:w-[520px] md:w-[700px]">
                       <SheetHeader>
                         <SheetTitle>Widget Library</SheetTitle>
                         <SheetDescription>
