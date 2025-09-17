@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
+import type { RepeatRule } from './use-tasks'
 
 interface Task {
   id: string
@@ -10,7 +11,7 @@ interface Task {
   hourSlot?: string
   created_at?: string
   updated_at?: string
-  repeatRule?: string
+  repeatRule?: RepeatRule
 }
 
 interface CalendarEvent {
@@ -20,6 +21,7 @@ interface CalendarEvent {
   allDay?: boolean
   taskId?: string
   duration?: number
+  repeatRule?: RepeatRule
 }
 
 // Hour mapping for time conversion
@@ -71,7 +73,8 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
         time: hourSlotToTime((task.hourSlot || '9AM').replace(/^hour-/, '')),
         allDay: false,
         taskId: task.id,
-        duration: task.duration || 60
+        duration: task.duration || 60,
+        repeatRule: task.repeatRule,
       }));
   }, [tasks, selectedDate, hourSlotToTime]);
 
@@ -89,7 +92,8 @@ export function useCalendarTaskSync(tasks: Task[], selectedDate: Date) {
         time: hourSlotToTime((task.hourSlot || '9AM').replace(/^hour-/, '')),
         allDay: false,
         taskId: task.id,
-        duration: task.duration || 60
+        duration: task.duration || 60,
+        repeatRule: task.repeatRule,
       }));
   }, [tasks, hourSlotToTime]);
 

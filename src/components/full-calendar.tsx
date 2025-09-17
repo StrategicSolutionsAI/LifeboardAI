@@ -24,7 +24,7 @@ import HourlyPlanner from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
 import type { RepeatOption } from "@/hooks/use-tasks";
-import { DragDropContext, DropResult, Droppable } from "@hello-pangea/dnd";
+import { Droppable, Draggable } from "@hello-pangea/dnd";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -35,6 +35,18 @@ const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
   { value: 'weekly', label: 'Every week' },
   { value: 'monthly', label: 'Every month' },
 ];
+
+const REPEAT_LABELS: Record<Exclude<RepeatOption, 'none'>, string> = {
+  daily: 'Every day',
+  weekdays: 'Weekdays',
+  weekly: 'Every week',
+  monthly: 'Every month',
+};
+
+const getRepeatLabel = (value?: RepeatOption | null) => {
+  if (!value || value === 'none') return null;
+  return REPEAT_LABELS[value];
+};
 
 function buildMonthMatrix(currentMonth: Date) {
   const monthStart = startOfMonth(currentMonth);
@@ -69,7 +81,19 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; }
+interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; }
+
+interface CalendarTaskMovedDetail {
+  taskId: string;
+  fromDate: string;
+  toDate: string;
+  title?: string;
+  time?: string;
+  hourSlot?: string | null;
+  allDay?: boolean;
+  duration?: number;
+  repeatRule?: RepeatOption | null;
+}
 
 interface FullCalendarProps {
   selectedDate?: Date;
@@ -191,16 +215,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const openTaskModal = useCallback((
     task: any | undefined,
     dateStr: string,
-    options: { fallbackTitle?: string; fallbackHourLabel?: string; fallbackTaskId?: string } = {}
+    options: { fallbackTitle?: string; fallbackHourLabel?: string; fallbackTaskId?: string; fallbackRepeat?: RepeatOption | null } = {}
   ) => {
     const fallbackDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
     const bucketDefault = selectedBucket || availableBuckets[0] || '';
     const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || '';
+    const repeatDefault = task ? deriveRepeatOption(task) : (options.fallbackRepeat ?? 'none');
 
     setFormContent(task?.content ?? options.fallbackTitle ?? '');
     setFormBucket(task?.bucket ?? bucketDefault ?? '');
     setFormTime(hourLabel);
-    setFormRepeat(task ? deriveRepeatOption(task) : 'none');
+    setFormRepeat(repeatDefault);
     setAddTaskDate(fallbackDate);
     setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
     setSelectedModalDate(null);
@@ -217,6 +242,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackTitle: event.title,
       fallbackHourLabel: fallbackHour,
       fallbackTaskId: event.taskId,
+      fallbackRepeat: event.repeatRule ?? null,
     });
   }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
 
@@ -227,6 +253,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     openTaskModal(task, dateStr, {
       fallbackHourLabel: fallbackHour,
       fallbackTaskId: taskId,
+      fallbackRepeat: task?.repeatRule ?? null,
     });
   }, [currentDate, extractHourLabel, openTaskModal, resolveTaskById]);
 
@@ -242,6 +269,75 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
     else setFormBucket('');
   }, [availableBuckets, selectedBucket]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<CalendarTaskMovedDetail>;
+      const detail = custom.detail;
+      if (!detail?.taskId || !detail.fromDate || !detail.toDate) return;
+
+      setEventsByDate((prev) => {
+        const next = { ...prev } as Record<string, DayEvent[]>;
+
+        const sourceList = next[detail.fromDate] ? [...next[detail.fromDate]] : [];
+        let movedEvent: DayEvent | undefined;
+
+        if (sourceList.length > 0) {
+          const index = sourceList.findIndex((ev) => ev.taskId === detail.taskId);
+          if (index >= 0) {
+            movedEvent = sourceList[index];
+            sourceList.splice(index, 1);
+          }
+        }
+
+        if (sourceList.length > 0) {
+          next[detail.fromDate] = sourceList;
+        } else {
+          delete next[detail.fromDate];
+        }
+
+        const repeatRule = detail.repeatRule ?? movedEvent?.repeatRule;
+
+        if (!movedEvent) {
+          movedEvent = {
+            source: 'lifeboard',
+            title: detail.title ?? 'Task',
+            time: detail.time,
+            allDay: detail.allDay ?? !detail.hourSlot,
+            taskId: detail.taskId,
+            duration: detail.duration ?? 60,
+            repeatRule: repeatRule ?? undefined,
+          };
+        } else {
+          movedEvent = {
+            ...movedEvent,
+            title: detail.title ?? movedEvent.title,
+            time: detail.time ?? movedEvent.time,
+            allDay: detail.allDay ?? movedEvent.allDay,
+            duration: detail.duration ?? movedEvent.duration,
+            repeatRule: repeatRule ?? movedEvent.repeatRule,
+          };
+        }
+
+        const destinationList = [...(next[detail.toDate] || [])];
+        destinationList.push(movedEvent);
+        destinationList.sort((a, b) => {
+          if (a.time && b.time) return a.time.localeCompare(b.time);
+          if (a.time) return -1;
+          if (b.time) return 1;
+          const titleA = a.title ?? '';
+          const titleB = b.title ?? '';
+          return titleA.localeCompare(titleB);
+        });
+        next[detail.toDate] = destinationList;
+
+        return next;
+      });
+    };
+
+    window.addEventListener('lifeboard:calendar-task-moved', handler as EventListener);
+    return () => window.removeEventListener('lifeboard:calendar-task-moved', handler as EventListener);
+  }, []);
 
   const nextPeriod = () => {
     const newDate = (() => {
@@ -330,43 +426,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const rows = getMatrix();
 
-  // Use drag state from props or local state
-  const [localDragging, setLocalDragging] = useState(false);
-  const dragState = isDragging || localDragging;
-
-  // Unified drag and drop handler for calendar day view
-  const handleDragEnd = (result: DropResult) => {
-    // Ignore drops if a resize operation is active
-    if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
-      setLocalDragging(false);
-      return;
-    }
-    setLocalDragging(false);
-    if (!result.destination) return;
-
-    const { source, destination, draggableId } = result;
-
-    // Helper functions
-    const isHour = (id: string) => id.startsWith('hour-');
-    const hourKey = (id: string) => id.replace('hour-', '');
-
-    // Handle moves between hour slots in day view
-    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-      // Hour slot → Different hour slot: Update the hourSlot (keep full 'hour-<time>' format for consistency)
-      const dstHour = destination.droppableId; // e.g., 'hour-7AM'
-      console.log('⏰ Moving task between hour slots in calendar day view:', { draggableId, dstHour });
-
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
-      ]).catch(error => {
-        console.error('Failed to update task hourSlot:', error);
-      });
-      return;
-    }
-
-    console.log('Unhandled drag operation in calendar:', result);
-  };
-
   // Sync propSelectedDate prop with currentDate state
   useEffect(() => {
     if (propSelectedDate && propSelectedDate.getTime() !== currentDate.getTime()) {
@@ -422,7 +481,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               time: event.time,
               allDay: event.allDay || false,
               taskId: event.taskId,
-              duration: event.duration
+              duration: event.duration,
+              repeatRule: event.repeatRule,
             });
           });
         }
@@ -685,54 +745,77 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                       };
                                   }
                                 };
-                                
+
                                 const styles = getEventStyle(ev.source);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
-                                
+                                const repeatLabel = getRepeatLabel(ev.repeatRule);
+                                const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
+                                const draggableId = isLifeboardTask
+                                  ? `lifeboard::${ev.taskId}`
+                                  : `event::${dayStr}::${i}`;
+
                                 return (
-                                  <div 
-                                    key={i} 
-                                    role={ev.source === 'lifeboard' ? 'button' : undefined}
-                                    tabIndex={ev.source === 'lifeboard' ? 0 : undefined}
-                                    onClick={(event) => {
-                                      if (ev.source === 'lifeboard' && ev.taskId) {
-                                        event.stopPropagation();
-                                        const target = event.currentTarget as HTMLElement | null;
-                                        if (target && typeof target.blur === 'function') target.blur();
-                                        openTaskEditor(ev, dayStr);
-                                      }
-                                    }}
-                                    onKeyDown={(event) => {
-                                      if (ev.source !== 'lifeboard' || !ev.taskId) return;
-                                      if (event.key === 'Enter' || event.key === ' ') {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        const target = event.currentTarget as HTMLElement | null;
-                                        if (target && typeof target.blur === 'function') target.blur();
-                                        openTaskEditor(ev, dayStr);
-                                      }
-                                    }}
-                                    className={`p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container}`}
-                                    title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
-                                    data-task-id={ev.taskId}
+                                  <Draggable
+                                    key={draggableId}
+                                    draggableId={draggableId}
+                                    index={i}
+                                    isDragDisabled={!isLifeboardTask}
                                   >
-                                    <div className="flex items-start gap-2">
-                                      <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`} />
-                                      <div className="flex-1 min-w-0">
-                                        {timeDisplay && (
-                                          <div className={`text-xs font-medium ${styles.time} mb-1`}>
-                                            {timeDisplay}
+                                    {(dragProvided, dragSnapshot) => (
+                                      <div
+                                        ref={dragProvided.innerRef}
+                                        {...dragProvided.draggableProps}
+                                        {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
+                                        style={dragProvided.draggableProps.style}
+                                        role={isLifeboardTask ? 'button' : undefined}
+                                        tabIndex={isLifeboardTask ? 0 : undefined}
+                                        onClick={(event) => {
+                                          if (isLifeboardTask && ev.taskId) {
+                                            event.stopPropagation();
+                                            const target = event.currentTarget as HTMLElement | null;
+                                            if (target && typeof target.blur === 'function') target.blur();
+                                            openTaskEditor(ev, dayStr);
+                                          }
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (!isLifeboardTask || !ev.taskId) return;
+                                          if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            const target = event.currentTarget as HTMLElement | null;
+                                            if (target && typeof target.blur === 'function') target.blur();
+                                            openTaskEditor(ev, dayStr);
+                                          }
+                                        }}
+                                        className={`p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                        data-task-id={ev.taskId}
+                                      >
+                                        <div className="flex items-start gap-2">
+                                          <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`} />
+                                          <div className="flex-1 min-w-0">
+                                            {timeDisplay && (
+                                              <div className={`text-xs font-medium ${styles.time} mb-1`}>
+                                                {timeDisplay}
+                                              </div>
+                                            )}
+                                            <div className="text-sm font-medium truncate">
+                                              {ev.title}
+                                            </div>
+                                            {repeatLabel && (
+                                              <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">
+                                                <span>↻</span>
+                                                <span className="truncate">{repeatLabel}</span>
+                                              </div>
+                                            )}
                                           </div>
-                                        )}
-                                        <div className="text-sm font-medium truncate">
-                                          {ev.title}
+                                          <span className={`text-xs ${styles.badge} flex-shrink-0`}>
+                                            {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                          </span>
                                         </div>
                                       </div>
-                                      <span className={`text-xs ${styles.badge} flex-shrink-0`}>
-                                        {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
-                                      </span>
-                                    </div>
-                                  </div>
+                                    )}
+                                  </Draggable>
                                 );
                               })
                             ) : (
@@ -828,7 +911,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 setAddTaskDate(dayStr);
                                 setFormContent("");
                                 setFormTime("");
+                                setFormRepeat('none');
                                 setEditTaskId(null);
+                                setIsSubmitting(false);
                                 setIsAddModalOpen(true);
                               }}
                               title="Add task"
@@ -870,50 +955,73 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 
                                 const styles = getEventStyle(ev.source);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
-                                
+                                const repeatLabel = getRepeatLabel(ev.repeatRule);
+                                const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
+                                const draggableId = isLifeboardTask
+                                  ? `lifeboard::${ev.taskId}`
+                                  : `event::${dayStr}::${i}`;
+
                                 return (
-                                  <div 
-                                    key={i} 
-                                    role={ev.source === 'lifeboard' ? 'button' : undefined}
-                                    tabIndex={ev.source === 'lifeboard' ? 0 : undefined}
-                                    onClick={(event) => {
-                                      if (ev.source === 'lifeboard' && ev.taskId) {
-                                        event.stopPropagation();
-                                        const target = event.currentTarget as HTMLElement | null;
-                                        if (target && typeof target.blur === 'function') target.blur();
-                                        openTaskEditor(ev, dayStr);
-                                      }
-                                    }}
-                                    onKeyDown={(event) => {
-                                      if (ev.source !== 'lifeboard' || !ev.taskId) return;
-                                      if (event.key === 'Enter' || event.key === ' ') {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        const target = event.currentTarget as HTMLElement | null;
-                                        if (target && typeof target.blur === 'function') target.blur();
-                                        openTaskEditor(ev, dayStr);
-                                      }
-                                    }}
-                                    className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container}`}
-                                    title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                  <Draggable
+                                    key={draggableId}
+                                    draggableId={draggableId}
+                                    index={i}
+                                    isDragDisabled={!isLifeboardTask}
                                   >
-                                    <div className="flex items-start gap-1.5">
-                                      <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`} />
-                                      <div className="flex-1 min-w-0">
-                                        {timeDisplay && (
-                                          <div className={`text-[10px] font-medium ${styles.time} mb-0.5`}>
-                                            {timeDisplay.replace(' ', '').toLowerCase()}
+                                    {(dragProvided, dragSnapshot) => (
+                                      <div 
+                                        ref={dragProvided.innerRef}
+                                        {...dragProvided.draggableProps}
+                                        {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
+                                        style={dragProvided.draggableProps.style}
+                                        role={isLifeboardTask ? 'button' : undefined}
+                                        tabIndex={isLifeboardTask ? 0 : undefined}
+                                        onClick={(event) => {
+                                          if (isLifeboardTask && ev.taskId) {
+                                            event.stopPropagation();
+                                            const target = event.currentTarget as HTMLElement | null;
+                                            if (target && typeof target.blur === 'function') target.blur();
+                                            openTaskEditor(ev, dayStr);
+                                          }
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (!isLifeboardTask || !ev.taskId) return;
+                                          if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            const target = event.currentTarget as HTMLElement | null;
+                                            if (target && typeof target.blur === 'function') target.blur();
+                                            openTaskEditor(ev, dayStr);
+                                          }
+                                        }}
+                                        className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                      >
+                                        <div className="flex items-start gap-1.5">
+                                          <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`} />
+                                          <div className="flex-1 min-w-0">
+                                            {timeDisplay && (
+                                              <div className={`text-[10px] font-medium ${styles.time} mb-0.5`}>
+                                                {timeDisplay.replace(' ', '').toLowerCase()}
+                                              </div>
+                                            )}
+                                            <div className="text-xs font-medium truncate">
+                                              {ev.title.length > 25 ? ev.title.substring(0, 25) + '...' : ev.title}
+                                            </div>
+                                            {repeatLabel && (
+                                              <div className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">
+                                                <span>↻</span>
+                                                <span className="truncate">{repeatLabel}</span>
+                                              </div>
+                                            )}
                                           </div>
-                                        )}
-                                        <div className="text-xs font-medium truncate">
-                                          {ev.title.length > 25 ? ev.title.substring(0, 25) + '...' : ev.title}
+                                          <span className={`text-[10px] ${styles.badge} flex-shrink-0`}>
+                                            {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                          </span>
                                         </div>
                                       </div>
-                                      <span className={`text-[10px] ${styles.badge} flex-shrink-0`}>
-                                        {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
-                                      </span>
-                                    </div>
-                                  </div>
+                                    )}
+                                  </Draggable>
                                 );
                               })}
                               {dayEvents.length > 3 && (
@@ -1125,12 +1233,34 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               const next = { ...prev } as Record<string, DayEvent[]>;
                               const list = [...(next[dueDateValue] || [])];
                               if (hourNum === undefined) {
-                                list.unshift({ source: 'todoist', title: task.content || formContent.trim(), allDay: true, taskId: task.id });
+                                list.unshift({
+                                  source: 'lifeboard',
+                                  title: task.content || formContent.trim(),
+                                  allDay: true,
+                                  taskId: task.id,
+                                  repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
+                                });
                               } else {
                                 const base = parseISO(dueDateValue + 'T00:00:00');
                                 base.setHours(hourNum, 0, 0, 0);
-                                list.unshift({ source: 'lifeboard', title: task.content || formContent.trim(), time: base.toISOString(), allDay: false, taskId: task.id, duration: 60 });
+                                list.unshift({
+                                  source: 'lifeboard',
+                                  title: task.content || formContent.trim(),
+                                  time: base.toISOString(),
+                                  allDay: false,
+                                  taskId: task.id,
+                                  duration: 60,
+                                  repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
+                                });
                               }
+                              list.sort((a, b) => {
+                                if (a.time && b.time) return a.time.localeCompare(b.time);
+                                if (a.time) return -1;
+                                if (b.time) return 1;
+                                const titleA = a.title ?? '';
+                                const titleB = b.title ?? '';
+                                return titleA.localeCompare(titleB);
+                              });
                               next[dueDateValue] = list;
                               return next;
                             });

@@ -8,6 +8,7 @@ import { TasksProvider } from "@/contexts/tasks-context";
 import { CalendarTaskList } from "@/components/calendar-task-list";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useTasksContext } from "@/contexts/tasks-context";
+import type { RepeatOption } from "@/hooks/use-tasks";
 
 // Load calendar grid on client to avoid SSR issues with date-fns
 const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: false });
@@ -17,7 +18,7 @@ function CalendarContent() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
-  const { batchUpdateTasks } = useTasksContext();
+  const { batchUpdateTasks, allTasks } = useTasksContext();
 
   const handleDateChange = (newDate: Date) => {
     console.log('📅 Calendar date changed:', newDate);
@@ -190,6 +191,56 @@ function CalendarContent() {
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
+      return;
+    }
+
+    // Handle moves between calendar day columns (week/month views)
+    if (isCalendarDay(source.droppableId) && isCalendarDay(destination.droppableId)) {
+      const srcDate = source.droppableId.replace('calendar-day-', '');
+      const destDate = destination.droppableId.replace('calendar-day-', '');
+      if (srcDate === destDate) {
+        console.log('📅➡️📅 Task dropped on same day – no action needed');
+        return;
+      }
+
+      if (!draggableId.startsWith('lifeboard::')) {
+        console.log('📅➡️📅 Dragged item is not a Lifeboard task, ignoring');
+        return;
+      }
+
+      const [, taskId] = draggableId.split('::');
+      if (!taskId) return;
+
+      const task = allTasks.find((t) => t.id?.toString?.() === taskId);
+      const updates: any = { due: { date: destDate } };
+
+      if (task?.hourSlot) {
+        updates.hourSlot = task.hourSlot;
+      } else {
+        updates.hourSlot = null;
+      }
+
+      console.log('📅➡️📅 Moving Lifeboard task between days:', { taskId, srcDate, destDate, updates });
+
+      batchUpdateTasks([
+        { taskId, updates }
+      ]).catch(error => {
+        console.error('Failed to move lifeboard task between days:', error);
+      });
+
+      const isoTime = hourSlotToISO(task?.hourSlot ?? null, destDate);
+      const detail = {
+        taskId,
+        fromDate: srcDate,
+        toDate: destDate,
+        title: task?.content ?? '',
+        time: isoTime,
+        hourSlot: task?.hourSlot ?? null,
+        allDay: !task?.hourSlot,
+        duration: task?.duration,
+        repeatRule: (task?.repeatRule ?? null) as RepeatOption | null,
+      };
+      window.dispatchEvent(new CustomEvent('lifeboard:calendar-task-moved', { detail }));
       return;
     }
 
@@ -432,3 +483,17 @@ export default function CalendarView() {
     </TasksProvider>
   );
 }
+  const hourSlotToISO = (hourSlot: string | undefined | null, dateStr: string): string | undefined => {
+    if (!hourSlot) return undefined;
+    const label = hourSlot.replace(/^hour-/, '');
+    const match = label.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
+    if (!match) return undefined;
+    let hour = parseInt(match[1], 10);
+    const minute = match[2] ? parseInt(match[2], 10) : 0;
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    const base = new Date(`${dateStr}T00:00:00`);
+    base.setHours(hour, minute, 0, 0);
+    return base.toISOString();
+  };
