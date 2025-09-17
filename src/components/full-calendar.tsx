@@ -22,7 +22,6 @@ import {
 
 import HourlyPlanner from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
 import type { RepeatOption } from "@/hooks/use-tasks";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 
@@ -165,13 +164,96 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const { allTasks, scheduledTasks, batchUpdateTasks, createTask } = useTasksContext();
   
   // Use calendar sync hook
-  const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
-
   const resolveTaskById = useCallback((taskId?: string | null) => {
     if (!taskId) return undefined;
     const lookup = taskId.toString();
     return allTasks.find((t) => t.id?.toString?.() === lookup);
   }, [allTasks]);
+
+  const hourSlotToISO = useCallback((hourSlot: string | undefined, dateStr: string): string | undefined => {
+    if (!hourSlot) return undefined;
+    const normalized = hourSlot.replace(/^hour-/, '');
+    const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
+    if (!match) return undefined;
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2] ? parseInt(match[2], 10) : 0;
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    const base = new Date(`${dateStr}T00:00:00`);
+    base.setHours(hours, minutes, 0, 0);
+    return base.toISOString();
+  }, []);
+
+  const shouldIncludeTaskOnDate = useCallback((task: any, dateStr: string): boolean => {
+    if (!task || task.completed) return false;
+    const dueDateStr = task.due?.date;
+    if (!dueDateStr) return false;
+
+    if (!task.repeatRule || task.repeatRule === 'none') {
+      return dueDateStr === dateStr;
+    }
+
+    const target = new Date(`${dateStr}T00:00:00`);
+    const due = new Date(`${dueDateStr}T00:00:00`);
+    if (target < due) return false;
+
+    const day = target.getDay();
+    const dueDay = due.getDay();
+    const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+
+    switch (task.repeatRule) {
+      case 'daily':
+        return true;
+      case 'weekdays':
+        return day >= 1 && day <= 5;
+      case 'weekly':
+        return diffDays % 7 === 0 && day === dueDay;
+      case 'monthly': {
+        const dueDateNum = due.getDate();
+        const targetDateNum = target.getDate();
+        const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+        if (dueDateNum > daysInTargetMonth) {
+          return targetDateNum === daysInTargetMonth;
+        }
+        return targetDateNum === dueDateNum;
+      }
+      default:
+        return false;
+    }
+  }, []);
+
+  const buildLifeboardEventsForDate = useCallback((dateStr: string): DayEvent[] => {
+    const events: DayEvent[] = [];
+
+    allTasks.forEach((task: any) => {
+      if (!shouldIncludeTaskOnDate(task, dateStr)) return;
+      const repeatRule = task.repeatRule && task.repeatRule !== 'none' ? (task.repeatRule as RepeatOption) : undefined;
+
+      if (task.hourSlot) {
+        const isoTime = hourSlotToISO(task.hourSlot, dateStr);
+        events.push({
+          source: 'lifeboard',
+          title: task.content,
+          time: isoTime,
+          allDay: false,
+          taskId: task.id,
+          duration: task.duration || 60,
+          repeatRule,
+        });
+      } else {
+        events.push({
+          source: 'lifeboard',
+          title: task.content,
+          allDay: true,
+          taskId: task.id,
+          repeatRule,
+        });
+      }
+    });
+
+    return events;
+  }, [allTasks, hourSlotToISO, shouldIncludeTaskOnDate]);
 
   const extractHourLabel = useCallback((hourSlot?: string | null) => {
     if (!hourSlot) return '';
@@ -466,27 +548,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       // ---------------- Lifeboard Hourly Tasks ----------------
       // Add hourly scheduled tasks from the current context
-      const dateRange = [];
       let currentDay = new Date(start);
       while (currentDay <= end) {
         const dateStr = format(currentDay, 'yyyy-MM-dd');
-        const dayEvents = getEventsForDate(dateStr);
-        
+        const dayEvents = buildLifeboardEventsForDate(dateStr);
+
         if (dayEvents.length > 0) {
           if (!map[dateStr]) map[dateStr] = [];
           dayEvents.forEach(event => {
-            map[dateStr].push({
-              source: 'lifeboard',
-              title: event.title,
-              time: event.time,
-              allDay: event.allDay || false,
-              taskId: event.taskId,
-              duration: event.duration,
-              repeatRule: event.repeatRule,
-            });
+            map[dateStr].push(event);
           });
         }
-        
+
         currentDay = addDays(currentDay, 1);
       }
 
@@ -523,7 +596,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
 
     fetchEvents();
-  }, [currentDate, view, allTasks, getEventsForDate, getDateRange]);
+  }, [currentDate, view, allTasks, getDateRange, buildLifeboardEventsForDate]);
 
   const getCellSize = () => {
     switch (view) {
