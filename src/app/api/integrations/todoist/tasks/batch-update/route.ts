@@ -3,6 +3,68 @@ import { supabaseServer } from '@/utils/supabase/server';
 
 const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
 
+type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
+
+const normalizeRepeatRule = (value?: string | null): RepeatRule | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  const base = normalized.replace(/\s+starting\s+.+$/, '');
+  switch (normalized) {
+    case 'none':
+      return undefined;
+    case 'every day':
+    case 'daily':
+      return 'daily';
+    case 'every week':
+    case 'weekly':
+      return 'weekly';
+    case 'every weekday':
+    case 'weekdays':
+    case 'every workday':
+      return 'weekdays';
+    case 'every month':
+    case 'monthly':
+      return 'monthly';
+  }
+  switch (base) {
+    case 'every day':
+    case 'daily':
+      return 'daily';
+    case 'every week':
+    case 'weekly':
+      return 'weekly';
+    case 'every weekday':
+    case 'weekdays':
+    case 'every workday':
+      return 'weekdays';
+    case 'every month':
+    case 'monthly':
+      return 'monthly';
+    default:
+      return undefined;
+  }
+};
+
+const buildDueString = (rule: RepeatRule, startDate?: string | null) => {
+  const base = (() => {
+    switch (rule) {
+      case 'daily':
+        return 'every day';
+      case 'weekly':
+        return 'every week';
+      case 'weekdays':
+        return 'every weekday';
+      case 'monthly':
+        return 'every month';
+      default:
+        return '';
+    }
+  })();
+  if (!base) return undefined;
+  if (startDate) return `${base} starting ${startDate}`;
+  return base;
+};
+
 interface TaskUpdate {
   taskId: string;
   updates: {

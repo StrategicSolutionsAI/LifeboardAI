@@ -11,6 +11,7 @@ import {
   Draggable,
 } from "@hello-pangea/dnd";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import type { RepeatOption } from "@/hooks/use-tasks";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -48,6 +49,14 @@ const HOURS = Array.from({ length: 15 }, (_, i) => {
 
 const RESIZE_INCREMENT = 15; // minutes
 const MIN_DURATION = 15; // minutes
+
+const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
+  { value: 'none', label: 'Do not repeat' },
+  { value: 'daily', label: 'Every day' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly', label: 'Every week' },
+  { value: 'monthly', label: 'Every month' },
+];
 
 // Helper function to parse time slot into minutes from midnight
 const parseTimeSlot = (timeSlot: string): number => {
@@ -143,16 +152,21 @@ export default function HourlyPlanner({
   const containerRef = useRef<HTMLDivElement>(null);
   
   // State for inline task creation
-  const [creatingTaskAt, setCreatingTaskAt] = useState<string | null>(null);
   const [newTaskContent, setNewTaskContent] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskBucket, setTaskBucket] = useState(selectedBucket || (availableBuckets.length > 0 ? availableBuckets[0] : ''));
-  
-  // Local state for newly created tasks to show immediately
-  const [pendingTasks, setPendingTasks] = useState<PlannerItem[]>([]);
-  // Keep latest scheduledTasks in a ref for interval checks
-  const scheduledTasksRef = useRef(scheduledTasks);
-  useEffect(() => { scheduledTasksRef.current = scheduledTasks; }, [scheduledTasks]);
+  const [newTaskDuration, setNewTaskDuration] = useState<number>(60);
+  const [newTaskStart, setNewTaskStart] = useState<string>('');
+  const [newTaskRepeat, setNewTaskRepeat] = useState<RepeatOption>('none');
+  const [addModalSlot, setAddModalSlot] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedBucket) {
+      setTaskBucket(selectedBucket);
+    } else if (!taskBucket && availableBuckets.length > 0) {
+      setTaskBucket(availableBuckets[0]);
+    }
+  }, [selectedBucket, availableBuckets, taskBucket]);
   
   // Track which task should be brought to front when overlapping
   const [frontTaskId, setFrontTaskId] = useState<string | null>(null);
@@ -190,93 +204,52 @@ export default function HourlyPlanner({
   };
   
   // Handle creating a new task at a specific time slot
-  const handleCreateTaskAtTime = async (timeSlot: string) => {
+  const handleCreateTaskAtTime = async () => {
+    const timeSlot = addModalSlot;
     console.log('🚀 handleCreateTaskAtTime called:', { timeSlot, content: newTaskContent.trim(), isCreatingTask });
-    
-    if (!newTaskContent.trim() || isCreatingTask) {
-      console.log('❌ Early return:', { hasContent: !!newTaskContent.trim(), isCreatingTask });
+
+    if (!timeSlot || !newTaskContent.trim() || isCreatingTask) {
+      console.log('❌ Early return:', { hasTimeSlot: !!timeSlot, hasContent: !!newTaskContent.trim(), isCreatingTask });
       return;
     }
-    
+
     setIsCreatingTask(true);
     console.log('✅ Starting task creation process');
-    
-    // Create a temporary task to show immediately
-    const tempTask: PlannerItem = {
-      id: `temp-${timeSlot}-${Date.now()}`,
-      content: newTaskContent.trim(),
-      duration: 60
-    };
-    
+
     try {
-      // Use provided planner date (calendar selected day) or fallback to today
       const dateStr = plannerDate || new Date().toISOString().split('T')[0];
-      
-      console.log('📅 Creating task with params:', { 
-        content: newTaskContent.trim(), 
-        date: dateStr, 
-        timeSlot, 
-        bucket: taskBucket 
+
+      console.log('📅 Creating task with params:', {
+        content: newTaskContent.trim(),
+        date: dateStr,
+        timeSlot,
+        bucket: taskBucket,
+        duration: newTaskDuration,
       });
-      
-      // Add to pending tasks for immediate display
-      setPendingTasks(prev => {
-        console.log('➕ Adding temp task to pending:', tempTask);
-        return [...prev, tempTask];
-      });
-      
-      // Create the task via API
-      console.log('🔄 Calling createTask API...');
+
       const newTask = await createTask(newTaskContent.trim(), dateStr, undefined, taskBucket);
       console.log('📝 CreateTask response:', newTask);
-      
-      // Update with the hourSlot and duration if task was created successfully
+
       if (newTask) {
         console.log('🎯 Updating task with hourSlot:', `hour-${timeSlot}`);
-        await batchUpdateTasks([{ 
-          taskId: newTask.id, 
-          updates: { 
-            hourSlot: `hour-${timeSlot}`,
-            duration: 60
-          } 
-        }]);
+        await batchUpdateTasks([
+          {
+            taskId: newTask.id,
+            updates: {
+              hourSlot: `hour-${timeSlot}`,
+              duration: newTaskDuration,
+            },
+          },
+        ]);
         console.log('✅ Task updated successfully');
-        
-        // Keep the temp task visible until the real task shows up in scheduledTasks
-        // This avoids a flash/disappearance caused by async refetch timing
-        const expectedHour = `hour-${timeSlot}`;
-        const realId = newTask.id?.toString?.() || String(newTask.id);
-        let checks = 0;
-        const maxChecks = 40; // ~12s at 300ms intervals
-        const intervalId = setInterval(() => {
-          const found = (scheduledTasksRef.current || []).some(
-            (t: any) => t.id?.toString?.() === realId && t.hourSlot === expectedHour
-          );
-          checks += 1;
-          if (found || checks >= maxChecks) {
-            clearInterval(intervalId);
-            if (found) {
-              console.log('🧹 Removing temp task after confirming real task is present:', tempTask.id);
-              setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
-            } else {
-              console.warn('⏱️ Temp task timeout reached before confirmation; leaving UI as-is');
-            }
-          }
-        }, 300);
-      } else {
-        console.log('❌ Task creation returned null/undefined');
-        // If task creation failed, remove temp task immediately
-        setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
       }
-      
-      // Reset state
+
       setNewTaskContent("");
-      setCreatingTaskAt(null);
+      setNewTaskDuration(60);
+      setAddModalSlot(null);
       console.log('🔄 Reset form state');
     } catch (error) {
       console.error('💥 Failed to create task:', error);
-      // Remove the pending task on error
-      setPendingTasks(prev => prev.filter(t => t.id !== tempTask.id));
       // Don't reset state on error so user can retry
     } finally {
       setIsCreatingTask(false);
@@ -284,20 +257,27 @@ export default function HourlyPlanner({
     }
   };
 
-  // Handle clicking on a time slot to start creating a task
-  const handleTimeSlotClick = (timeSlot: string, force = false) => {
-    // When force is false, we keep the previous guard to avoid accidental overlaps
-    if (!force && hourlyPlan[timeSlot].length > 0) return;
 
-    setCreatingTaskAt(timeSlot);
-    setNewTaskContent("");
-  };
+  const openAddModal = useCallback((timeSlot: string) => {
+    if (!effectiveDragging) {
+      setAddModalSlot(timeSlot);
+      setNewTaskContent("");
+      setNewTaskDuration(60);
+      setNewTaskRepeat('none');
+      setNewTaskStart(timeSlot);
+      if (selectedBucket) setTaskBucket(selectedBucket);
+      else if (availableBuckets.length > 0) setTaskBucket(availableBuckets[0]);
+    }
+  }, [availableBuckets, selectedBucket, effectiveDragging]);
 
   // Handle canceling task creation
   const handleCancelCreation = () => {
-    setCreatingTaskAt(null);
     setNewTaskContent("");
     setIsCreatingTask(false);
+    setNewTaskDuration(60);
+    setNewTaskRepeat('none');
+    setNewTaskStart('');
+    setAddModalSlot(null);
   };
   
   // Build hourly plan from scheduled tasks plus pending tasks
@@ -321,16 +301,8 @@ export default function HourlyPlanner({
       });
     });
     
-    // Add pending tasks to show immediate feedback
-    pendingTasks.forEach((task) => {
-      const slot = task.id.split('-')[1]; // Extract time slot from temp ID like "temp-7AM-123456"
-      if (TIME_SLOTS.includes(slot) && plan[slot]) {
-        plan[slot].push(task);
-      }
-    });
-    
     return plan;
-  }, [scheduledTasks, pendingTasks]);
+  }, [scheduledTasks]);
 
   // Resize state and handlers
   const [resizingTask, setResizingTask] = useState<{
@@ -492,6 +464,129 @@ export default function HourlyPlanner({
   // ---------------------------------------------------------------------------
   // RENDER
   // ---------------------------------------------------------------------------
+  const addTaskModal = addModalSlot ? (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-3" onClick={handleCancelCreation}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Schedule task</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {(plannerDate || new Date().toISOString().slice(0, 10))} · {addModalSlot}
+            </p>
+          </div>
+          <button
+            className="text-gray-400 hover:text-gray-600"
+            onClick={handleCancelCreation}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreateTaskAtTime();
+          }}
+          className="space-y-3"
+        >
+          <label className="block text-xs text-gray-600 font-medium">
+            <span className="block mb-1 uppercase tracking-wide">Start time</span>
+            <select
+              value={newTaskStart || addModalSlot || ''}
+              onChange={(e) => setNewTaskStart(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            >
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>{slot}</option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            {availableBuckets.length > 0 && (
+              <label className="flex-1 text-xs text-gray-600 font-medium">
+                <span className="block mb-1 uppercase tracking-wide">Bucket</span>
+                <select
+                  value={taskBucket}
+                  onChange={(e) => setTaskBucket(e.target.value)}
+                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                >
+                  {availableBuckets.map((bucket) => (
+                    <option key={bucket} value={bucket}>{bucket}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="w-full sm:w-40 text-xs text-gray-600 font-medium">
+              <span className="block mb-1 uppercase tracking-wide">Duration</span>
+              <select
+                value={newTaskDuration}
+                onChange={(e) => setNewTaskDuration(parseInt(e.target.value, 10))}
+                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+              >
+                {[15, 30, 45, 60, 90, 120].map((minutes) => (
+                  <option key={minutes} value={minutes}>{minutes} min</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-xs text-gray-600 font-medium">
+            <span className="block mb-1 uppercase tracking-wide">Repeat</span>
+            <select
+              value={newTaskRepeat}
+              onChange={(e) => setNewTaskRepeat(e.target.value as RepeatOption)}
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+            >
+              {REPEAT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block text-xs text-gray-600 font-medium">
+            <span className="block mb-1 uppercase tracking-wide">Task</span>
+            <input
+              type="text"
+              value={newTaskContent}
+              onChange={(e) => setNewTaskContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  handleCancelCreation();
+                }
+              }}
+              autoFocus
+              placeholder="What needs to be done?"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+              onClick={handleCancelCreation}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!newTaskContent.trim() || isCreatingTask}
+              className="px-4 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isCreatingTask ? 'Adding…' : 'Add task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  ) : null;
+
   const content = (
     <div 
       ref={containerRef}
@@ -502,7 +597,7 @@ export default function HourlyPlanner({
           const isMainHour = timeSlot.indexOf(':') === -1;
           const hasTask = hourlyPlan[timeSlot].length > 0;
           const isCurrentSlot = currentSlot === timeSlot;
-          const showQuickAddButton = creatingTaskAt !== timeSlot;
+          const showQuickAddButton = addModalSlot !== timeSlot;
           const shouldDisableQuickAdd = effectiveDragging || Boolean(resizingTask);
           
           return (
@@ -535,13 +630,7 @@ export default function HourlyPlanner({
                   ) : (
                     <>
                       <div className="h-3" />
-                      {isCurrentSlot ? (
-                        <span className="inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                          Now
-                        </span>
-                      ) : (
-                        <div className="h-3" />
-                      )}
+                      <div className="h-3" />
                     </>
                   )}
                 </div>
@@ -550,82 +639,7 @@ export default function HourlyPlanner({
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className="flex-1 relative overflow-visible min-h-[15px]"
-                  onClick={(e) => {
-                    // Prevent click-to-create during drag or resize to avoid interference
-                    if (effectiveDragging || resizingTask) return;
-                    handleTimeSlotClick(timeSlot);
-                  }}
                 >
-                  {/* Empty time slot indicator */}
-                  {hourlyPlan[timeSlot].length === 0 && creatingTaskAt !== timeSlot && (
-                    <li className={`absolute inset-0 flex items-center justify-center group ${(effectiveDragging || resizingTask) ? 'pointer-events-none' : 'cursor-pointer'} hover:bg-theme-surface-hover/50 rounded-lg transition-colors`}>
-                      <div className="flex items-center gap-2 text-theme-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Plus size={14} />
-                        <span className="text-xs font-medium">Add task</span>
-                      </div>
-                    </li>
-                  )}
-                  
-                  {/* Task creation form */}
-                  {creatingTaskAt === timeSlot && (
-                    <li className="absolute inset-0 flex items-center p-1">
-                      <div className="flex-1 bg-theme-widget-bg border border-theme-primary-200 rounded-lg p-2 shadow-sm">
-                        {availableBuckets.length > 0 && (
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className="text-xs text-gray-600 font-medium min-w-0">Bucket:</span>
-                            <select
-                              value={taskBucket}
-                              onChange={(e) => setTaskBucket(e.target.value)}
-                              className="flex-1 rounded border border-gray-300 px-1 py-0.5 text-xs focus:border-indigo-500 focus:outline-none bg-white"
-                            >
-                              {availableBuckets.map(bucket => (
-                                <option key={bucket} value={bucket}>{bucket}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={newTaskContent}
-                            onChange={(e) => setNewTaskContent(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleCreateTaskAtTime(timeSlot);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                handleCancelCreation();
-                              }
-                            }}
-                            placeholder="What needs to be done?"
-                            className="flex-1 text-xs bg-transparent border-none outline-none placeholder-theme-text-tertiary"
-                            autoFocus
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCreateTaskAtTime(timeSlot);
-                            }}
-                            disabled={isCreatingTask}
-                            className="px-2 py-0.5 text-xs font-medium text-theme-primary-600 hover:text-theme-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            {isCreatingTask ? 'Adding...' : 'Add'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCancelCreation();
-                            }}
-                            className="px-1 py-0.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  )}
-                  
                   {hourlyPlan[timeSlot].map((t, index) => {
                     const taskCount = hourlyPlan[timeSlot].length;
                     // Better spacing calculation for multiple tasks
@@ -841,25 +855,29 @@ export default function HourlyPlanner({
                     );
                   })}
                   {provided.placeholder}
-                  
+
                 </ul>
 
                 {showQuickAddButton && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTimeSlotClick(timeSlot, true);
-                    }}
-                    disabled={shouldDisableQuickAdd}
-                    className={`absolute right-3 top-1 inline-flex items-center gap-1 rounded-md border border-transparent bg-white/90 px-2 py-1 text-[11px] font-medium text-indigo-600 shadow-sm transition-opacity duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 ${
-                      shouldDisableQuickAdd ? 'pointer-events-none opacity-0' : 'opacity-80 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100'
-                    }`}
-                    aria-label={`Add task at ${timeSlot}`}
-                  >
-                    <Plus size={12} />
-                    <span>Add</span>
-                  </button>
+                  <div className="absolute inset-0 z-30 flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAddModal(timeSlot);
+                      }}
+                      disabled={shouldDisableQuickAdd}
+                      className={`w-full h-full max-w-[360px] inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white/95 text-sm font-medium text-indigo-600 shadow-sm transition-opacity duration-150 ${
+                        shouldDisableQuickAdd
+                          ? 'opacity-0 pointer-events-none'
+                          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
+                      }`}
+                      aria-label={`Add task at ${timeSlot}`}
+                    >
+                      <Plus size={16} />
+                      <span>Add task</span>
+                    </button>
+                  </div>
                 )}
 
                 {/* Enhanced current-time indicator */}
@@ -895,8 +913,15 @@ export default function HourlyPlanner({
     return (
       <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={handleDragEnd}>
         {content}
+        {addTaskModal}
       </DragDropContext>
     );
   }
-  return content;
+
+  return (
+    <>
+      {content}
+      {addTaskModal}
+    </>
+  );
 }
