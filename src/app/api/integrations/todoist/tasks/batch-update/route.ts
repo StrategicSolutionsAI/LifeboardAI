@@ -81,13 +81,20 @@ export async function POST(request: NextRequest) {
         }
 
         // Merge updates with existing metadata
-        const newMeta = {
+        const newMeta: any = {
           ...existingMeta,
           ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
           ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
           ...(update.updates.bucket !== undefined && { bucket: update.updates.bucket }),
           ...(update.updates.position !== undefined && { position: update.updates.position }),
         };
+
+        const rawRepeatRule = update.updates.repeatRule;
+        const normalizedRepeatRule = typeof rawRepeatRule === 'string' ? normalizeRepeatRule(rawRepeatRule) : undefined;
+        const removeRepeatRule = rawRepeatRule === null || (typeof rawRepeatRule === 'string' && rawRepeatRule.trim().toLowerCase() === 'none');
+        if (normalizedRepeatRule) {
+          newMeta.repeatRule = normalizedRepeatRule;
+        }
 
         // Handle null values by removing them from metadata  
         if (update.updates.hourSlot === null) {
@@ -106,11 +113,17 @@ export async function POST(request: NextRequest) {
           delete newMeta.position;
           console.log(`Removing position from task ${update.taskId}`);
         }
+        if (removeRepeatRule) {
+          delete newMeta.repeatRule;
+          console.log(`Removing repeat rule from task ${update.taskId}`);
+        }
 
-        // Build new description with metadata
+        const metaKeys = Object.keys(newMeta).filter(key => newMeta[key] !== undefined);
         const baseDescription = currentTask.description?.replace(/\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]/g, '').trim() || '';
-        const newDescription = baseDescription + `\n[LIFEBOARD_META]${JSON.stringify(newMeta)}[/LIFEBOARD_META]`;
-        
+        const newDescription = metaKeys.length > 0
+          ? `${baseDescription}${baseDescription ? '\n' : ''}[LIFEBOARD_META]${JSON.stringify(newMeta)}[/LIFEBOARD_META]`
+          : baseDescription;
+
 
         // Prepare update payload for Todoist
         const todoistUpdate: any = {};
@@ -119,8 +132,27 @@ export async function POST(request: NextRequest) {
           todoistUpdate.content = update.updates.content;
         }
         
-        if (update.updates.due) {
-          todoistUpdate.due_string = update.updates.due.date;
+        const dueUpdate = update.updates.due;
+        const dueDateValue = dueUpdate?.date ?? undefined;
+
+        if (normalizedRepeatRule) {
+          const startingDate = dueDateValue || currentTask?.due?.date || null;
+          const dueString = buildDueString(normalizedRepeatRule, startingDate);
+          if (dueString) {
+            todoistUpdate.due_string = dueString;
+          }
+        } else if (removeRepeatRule) {
+          if (dueDateValue) {
+            todoistUpdate.due_date = dueDateValue;
+          } else if (dueUpdate === null || dueDateValue === undefined) {
+            todoistUpdate.due_string = 'no date';
+          }
+        } else if (dueUpdate !== undefined) {
+          if (dueDateValue) {
+            todoistUpdate.due_date = dueDateValue;
+          } else if (dueUpdate === null) {
+            todoistUpdate.due_string = 'no date';
+          }
         }
 
         // Always update description to include metadata

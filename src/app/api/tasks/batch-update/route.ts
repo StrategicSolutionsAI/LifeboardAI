@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       if (patch.due) updateData.due_date = patch.due?.date ?? null
       if (patch.hourSlot !== undefined) updateData.hour_slot = patch.hourSlot ?? null
       if (patch.bucket !== undefined) updateData.bucket = patch.bucket ?? null
+      if (patch.repeatRule !== undefined) updateData.repeat_rule = patch.repeatRule ?? null
       if (typeof patch.position === 'number') updateData.position = patch.position
       if (typeof patch.duration === 'number') updateData.duration = patch.duration
 
@@ -49,4 +50,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
-

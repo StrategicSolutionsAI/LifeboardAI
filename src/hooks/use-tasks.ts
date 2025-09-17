@@ -2,17 +2,28 @@ import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { useDataCache } from './use-data-cache'
 
+export type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly'
+export type RepeatOption = RepeatRule | 'none'
+
+interface TaskDue {
+  date?: string
+  datetime?: string
+  string?: string
+  is_recurring?: boolean
+}
+
 interface Task {
   id: string
   content: string
   completed: boolean
-  due?: { date: string }
+  due?: TaskDue
   duration?: number
   hourSlot?: string
   bucket?: string
   position?: number
   created_at?: string
   updated_at?: string
+  repeatRule?: RepeatRule
 }
 
 interface TaskUpdate {
@@ -161,14 +172,21 @@ export function useTasks(selectedDate?: Date) {
   })
   
   // Optimistic task creation
-  const createTask = useCallback(async (content: string, dueDate: string | null, hourSlot?: number, bucket?: string) => {
-    console.log('🔧 createTask hook called:', { content, dueDate, hourSlot, bucket });
+  const createTask = useCallback(async (
+    content: string,
+    dueDate: string | null,
+    hourSlot?: number,
+    bucket?: string,
+    repeat: RepeatOption = 'none'
+  ) => {
+    console.log('🔧 createTask hook called:', { content, dueDate, hourSlot, bucket, repeat });
     
     const trimmed = content.trim()
     if (!trimmed) {
       console.log('❌ createTask: Empty content, returning early');
       return;
     }
+    const repeatRule = repeat !== 'none' ? repeat : undefined
     
     // Helper: create local task and persist to localStorage
     const createLocalTask = (): any => {
@@ -192,6 +210,7 @@ export function useTasks(selectedDate?: Date) {
           position: undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          repeatRule: repeatRule,
         }
         if (typeof window !== 'undefined') {
           const raw = window.localStorage.getItem('lifeboard_local_tasks')
@@ -212,7 +231,7 @@ export function useTasks(selectedDate?: Date) {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket }),
+        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule }),
       })
       
       console.log('📡 API response status:', res.status, res.statusText);
@@ -227,7 +246,7 @@ export function useTasks(selectedDate?: Date) {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket })
+            body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule })
           })
           if (alt.ok) {
             const json = await alt.json()
@@ -254,7 +273,7 @@ export function useTasks(selectedDate?: Date) {
       const { task } = responseData;
 
       // Parse and normalize metadata so UI shows bucket/duration immediately
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string } = {}
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string; repeatRule?: RepeatRule } = {}
       let cleanContent: string = task.content
 
       try {
@@ -286,6 +305,7 @@ export function useTasks(selectedDate?: Date) {
         ...(metadata.duration !== undefined ? { duration: metadata.duration } : {}),
         ...(metadata.hourSlot !== undefined ? { hourSlot: metadata.hourSlot } : {}),
         ...(metadata.bucket !== undefined ? { bucket: metadata.bucket } : {}),
+        ...(metadata.repeatRule !== undefined ? { repeatRule: metadata.repeatRule } : {}),
       }
 
       // Add task to appropriate caches
@@ -306,7 +326,7 @@ export function useTasks(selectedDate?: Date) {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket })
+          body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule })
         })
         if (alt.ok) {
           const json = await alt.json()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   addMonths,
   subMonths,
@@ -23,9 +23,18 @@ import {
 import HourlyPlanner from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useCalendarTaskSync } from "@/hooks/use-calendar-task-sync";
+import type { RepeatOption } from "@/hooks/use-tasks";
 import { DragDropContext, DropResult, Droppable } from "@hello-pangea/dnd";
 
 type CalendarView = 'month' | 'week' | 'day';
+
+const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
+  { value: 'none', label: 'Do not repeat' },
+  { value: 'daily', label: 'Every day' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly', label: 'Every week' },
+  { value: 'monthly', label: 'Every month' },
+];
 
 function buildMonthMatrix(currentMonth: Date) {
   const monthStart = startOfMonth(currentMonth);
@@ -124,6 +133,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [formContent, setFormContent] = useState<string>("");
   const [formBucket, setFormBucket] = useState<string>(selectedBucket || (availableBuckets[0] || ""));
   const [formTime, setFormTime] = useState<string>(""); // '' = no time
+  const [formRepeat, setFormRepeat] = useState<RepeatOption>('none');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   
@@ -132,6 +142,106 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   
   // Use calendar sync hook
   const { getEventsForDate } = useCalendarTaskSync(allTasks, currentDate);
+
+  const resolveTaskById = useCallback((taskId?: string | null) => {
+    if (!taskId) return undefined;
+    const lookup = taskId.toString();
+    return allTasks.find((t) => t.id?.toString?.() === lookup);
+  }, [allTasks]);
+
+  const extractHourLabel = useCallback((hourSlot?: string | null) => {
+    if (!hourSlot) return '';
+    return hourSlot.replace(/^hour-/, '');
+  }, []);
+
+  const isoToHourLabel = useCallback((iso?: string | null) => {
+    if (!iso) return '';
+    try {
+      return format(new Date(iso), 'h a').replace(' ', '');
+    } catch (error) {
+      console.error('Failed to parse ISO time for label', error);
+      return '';
+    }
+  }, []);
+
+  const deriveRepeatOption = useCallback((task: any): RepeatOption => {
+    if (!task) return 'none';
+    if (task.repeatRule) return task.repeatRule as RepeatOption;
+    if (task.due?.is_recurring && typeof task.due?.string === 'string') {
+      const normalized = task.due.string.trim().toLowerCase().replace(/\s+starting\s+.+$/, '');
+      switch (normalized) {
+        case 'every day':
+        case 'daily':
+          return 'daily';
+        case 'every week':
+        case 'weekly':
+          return 'weekly';
+        case 'every weekday':
+        case 'weekdays':
+        case 'every workday':
+          return 'weekdays';
+        case 'every month':
+        case 'monthly':
+          return 'monthly';
+      }
+    }
+    return 'none';
+  }, []);
+
+  const openTaskModal = useCallback((
+    task: any | undefined,
+    dateStr: string,
+    options: { fallbackTitle?: string; fallbackHourLabel?: string; fallbackTaskId?: string } = {}
+  ) => {
+    const fallbackDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
+    const bucketDefault = selectedBucket || availableBuckets[0] || '';
+    const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || '';
+
+    setFormContent(task?.content ?? options.fallbackTitle ?? '');
+    setFormBucket(task?.bucket ?? bucketDefault ?? '');
+    setFormTime(hourLabel);
+    setFormRepeat(task ? deriveRepeatOption(task) : 'none');
+    setAddTaskDate(fallbackDate);
+    setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
+    setSelectedModalDate(null);
+    setIsSubmitting(false);
+    setIsAddModalOpen(true);
+  }, [availableBuckets, currentDate, deriveRepeatOption, extractHourLabel, selectedBucket]);
+
+  const openTaskEditor = useCallback((event: DayEvent, dateStr: string) => {
+    if (event.source !== 'lifeboard' || !event.taskId) return;
+    const task = resolveTaskById(event.taskId);
+    const targetDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
+    const fallbackHour = isoToHourLabel(event.time);
+    openTaskModal(task, targetDate, {
+      fallbackTitle: event.title,
+      fallbackHourLabel: fallbackHour,
+      fallbackTaskId: event.taskId,
+    });
+  }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
+
+  const openTaskEditorById = useCallback((taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => {
+    const task = resolveTaskById(taskId);
+    const fallbackHour = extractHourLabel(metadata?.hourSlot);
+    const dateStr = metadata?.plannerDate || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
+    openTaskModal(task, dateStr, {
+      fallbackHourLabel: fallbackHour,
+      fallbackTaskId: taskId,
+    });
+  }, [currentDate, extractHourLabel, openTaskModal, resolveTaskById]);
+
+  const closeTaskModal = useCallback(() => {
+    setIsAddModalOpen(false);
+    setEditTaskId(null);
+    setIsSubmitting(false);
+    setFormContent('');
+    setFormTime('');
+    setFormRepeat('none');
+    setAddTaskDate(null);
+    if (selectedBucket) setFormBucket(selectedBucket);
+    else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
+    else setFormBucket('');
+  }, [availableBuckets, selectedBucket]);
 
   const nextPeriod = () => {
     const newDate = (() => {
@@ -165,7 +275,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     handleDateChange(newDate);
   };
 
-  const getDateRange = () => {
+  const getDateRange = useCallback(() => {
     switch (view) {
       case 'month':
         return {
@@ -188,7 +298,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           end: endOfMonth(currentDate)
         };
     }
-  };
+  }, [currentDate, view]);
 
   const getMatrix = () => {
     switch (view) {
@@ -353,7 +463,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
 
     fetchEvents();
-  }, [currentDate, view, allTasks, getEventsForDate]);
+  }, [currentDate, view, allTasks, getEventsForDate, getDateRange]);
 
   const getCellSize = () => {
     switch (view) {
@@ -461,6 +571,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 selectedBucket={selectedBucket}
                 wrapWithContext={false}
                 plannerDate={format(currentDate, 'yyyy-MM-dd')}
+                onTaskOpen={openTaskEditorById}
               />
             </div>
           </div>
@@ -531,7 +642,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 setAddTaskDate(dayStr);
                                 setFormContent("");
                                 setFormTime("");
+                                setFormRepeat('none');
                                 setEditTaskId(null);
+                                setIsSubmitting(false);
+                                if (selectedBucket) setFormBucket(selectedBucket);
+                                else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
                                 setIsAddModalOpen(true);
                               }}
                               title="Add task"
@@ -577,8 +692,29 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 return (
                                   <div 
                                     key={i} 
-                                    className={`p-2 rounded transition-colors duration-200 cursor-pointer ${styles.container}`}
+                                    role={ev.source === 'lifeboard' ? 'button' : undefined}
+                                    tabIndex={ev.source === 'lifeboard' ? 0 : undefined}
+                                    onClick={(event) => {
+                                      if (ev.source === 'lifeboard' && ev.taskId) {
+                                        event.stopPropagation();
+                                        const target = event.currentTarget as HTMLElement | null;
+                                        if (target && typeof target.blur === 'function') target.blur();
+                                        openTaskEditor(ev, dayStr);
+                                      }
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (ev.source !== 'lifeboard' || !ev.taskId) return;
+                                      if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        const target = event.currentTarget as HTMLElement | null;
+                                        if (target && typeof target.blur === 'function') target.blur();
+                                        openTaskEditor(ev, dayStr);
+                                      }
+                                    }}
+                                    className={`p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container}`}
                                     title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                    data-task-id={ev.taskId}
                                   >
                                     <div className="flex items-start gap-2">
                                       <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`} />
@@ -738,7 +874,27 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 return (
                                   <div 
                                     key={i} 
-                                    className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer ${styles.container}`}
+                                    role={ev.source === 'lifeboard' ? 'button' : undefined}
+                                    tabIndex={ev.source === 'lifeboard' ? 0 : undefined}
+                                    onClick={(event) => {
+                                      if (ev.source === 'lifeboard' && ev.taskId) {
+                                        event.stopPropagation();
+                                        const target = event.currentTarget as HTMLElement | null;
+                                        if (target && typeof target.blur === 'function') target.blur();
+                                        openTaskEditor(ev, dayStr);
+                                      }
+                                    }}
+                                    onKeyDown={(event) => {
+                                      if (ev.source !== 'lifeboard' || !ev.taskId) return;
+                                      if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        const target = event.currentTarget as HTMLElement | null;
+                                        if (target && typeof target.blur === 'function') target.blur();
+                                        openTaskEditor(ev, dayStr);
+                                      }
+                                    }}
+                                    className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container}`}
                                     title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                   >
                                     <div className="flex items-start gap-1.5">
@@ -849,18 +1005,20 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       )}
 
       {/* Add/Edit Task Modal */}
-      {isAddModalOpen && addTaskDate && (
+      {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{editTaskId ? 'Edit Task' : 'Add Task'}</h3>
-                <p className="text-xs text-gray-500 mt-1">{format(parseISO(addTaskDate), 'EEEE, MMMM d, yyyy')}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {addTaskDate ? format(parseISO(addTaskDate), 'EEEE, MMMM d, yyyy') : 'No date selected'}
+                </p>
               </div>
-              <button className="text-gray-400 hover:text-gray-600" onClick={() => { setIsAddModalOpen(false); setEditTaskId(null); }}>&times;</button>
+              <button className="text-gray-400 hover:text-gray-600" onClick={closeTaskModal}>&times;</button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Task</label>
                 <input
@@ -871,22 +1029,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                {availableBuckets.length > 0 && (
-                  <div className="flex-1">
-                    <label className="block text-xs text-gray-600 mb-1">Bucket</label>
-                    <select
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
-                      value={formBucket}
-                      onChange={(e) => setFormBucket(e.target.value)}
-                    >
-                      {availableBuckets.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={addTaskDate ?? ''}
+                    onChange={(e) => setAddTaskDate(e.target.value || null)}
+                  />
+                </div>
+                <div>
                   <label className="block text-xs text-gray-600 mb-1">Time (optional)</label>
                   <select
                     className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
@@ -901,10 +1054,39 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 </div>
               </div>
 
+              <div className={`grid gap-3 ${availableBuckets.length > 0 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                {availableBuckets.length > 0 && (
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Category</label>
+                    <select
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                      value={formBucket}
+                      onChange={(e) => setFormBucket(e.target.value)}
+                    >
+                      {availableBuckets.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Repeat</label>
+                  <select
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                    value={formRepeat}
+                    onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
+                  >
+                    {REPEAT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  onClick={() => { setIsAddModalOpen(false); setEditTaskId(null); }}
+                  onClick={closeTaskModal}
                 >
                   Close
                 </button>
@@ -912,10 +1094,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                   disabled={!formContent.trim() || isSubmitting}
                   onClick={async () => {
-                    if (!addTaskDate) return;
                     try {
                       setIsSubmitting(true);
-                      // Helper: convert time label to hour number
                       const toHourNumber = (label: string): number | undefined => {
                         if (!label) return undefined;
                         const m = label.match(/^(\d{1,2})(AM|PM)$/);
@@ -927,37 +1107,48 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         return hh;
                       };
 
+                      const hourNum = toHourNumber(formTime);
+                      const dueDateValue = addTaskDate && addTaskDate.trim() ? addTaskDate : null;
+
                       if (!editTaskId) {
-                        // Create then remain open in edit mode
-                        const hourNum = toHourNumber(formTime);
-                        const task = await createTask(formContent.trim(), addTaskDate, hourNum, formBucket || undefined);
+                        const task = await createTask(
+                          formContent.trim(),
+                          dueDateValue,
+                          hourNum,
+                          availableBuckets.length > 0 ? (formBucket || undefined) : undefined,
+                          formRepeat
+                        );
                         if (task) {
-                          // Optimistic event add: all-day or lifeboard timed
-                          setEventsByDate((prev) => {
-                            const next = { ...prev } as Record<string, DayEvent[]>;
-                            const list = [...(next[addTaskDate] || [])];
-                            if (hourNum === undefined) {
-                              list.unshift({ source: 'todoist', title: task.content || formContent.trim(), allDay: true, taskId: task.id });
-                            } else {
-                              // Build ISO time for display
-                              const base = parseISO(addTaskDate + 'T00:00:00');
-                              base.setHours(hourNum, 0, 0, 0);
-                              list.unshift({ source: 'lifeboard', title: task.content || formContent.trim(), time: base.toISOString(), allDay: false, taskId: task.id, duration: 60 });
-                            }
-                            next[addTaskDate] = list;
-                            return next;
-                          });
+                          setAddTaskDate(dueDateValue ?? null);
+                          if (dueDateValue) {
+                            setEventsByDate((prev) => {
+                              const next = { ...prev } as Record<string, DayEvent[]>;
+                              const list = [...(next[dueDateValue] || [])];
+                              if (hourNum === undefined) {
+                                list.unshift({ source: 'todoist', title: task.content || formContent.trim(), allDay: true, taskId: task.id });
+                              } else {
+                                const base = parseISO(dueDateValue + 'T00:00:00');
+                                base.setHours(hourNum, 0, 0, 0);
+                                list.unshift({ source: 'lifeboard', title: task.content || formContent.trim(), time: base.toISOString(), allDay: false, taskId: task.id, duration: 60 });
+                              }
+                              next[dueDateValue] = list;
+                              return next;
+                            });
+                          }
                           setEditTaskId(task.id?.toString?.() || String(task.id));
                         }
                       } else {
-                        // Save edits
-                        const updates: any = {};
-                        updates.content = formContent.trim();
-                        if (formBucket) updates.bucket = formBucket;
-                        if (formTime) updates.hourSlot = `hour-${formTime}`; else updates.hourSlot = null as any;
+                        const updates: any = {
+                          content: formContent.trim(),
+                        };
+                        if (availableBuckets.length > 0) {
+                          updates.bucket = formBucket || null;
+                        }
+                        updates.hourSlot = formTime ? `hour-${formTime}` : null;
+                        updates.due = dueDateValue ? { date: dueDateValue } : null;
+                        updates.repeatRule = formRepeat === 'none' ? null : formRepeat;
                         await batchUpdateTasks([{ taskId: editTaskId, updates }]);
-                        setIsAddModalOpen(false);
-                        setEditTaskId(null);
+                        closeTaskModal();
                       }
                     } finally {
                       setIsSubmitting(false);

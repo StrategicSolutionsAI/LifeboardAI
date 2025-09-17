@@ -12,6 +12,7 @@ function mapRowToTask(row: any) {
     bucket: row.bucket || undefined,
     position: row.position ?? undefined,
     duration: row.duration ?? undefined,
+    repeatRule: row.repeat_rule || undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('lifeboard_tasks')
-      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, created_at, updated_at')
+      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, repeat_rule, created_at, updated_at')
       .eq('user_id', user.id)
 
     if (date && !allParam) {
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
     const bucket = body.bucket as string | undefined
     const duration = typeof body.duration === 'number' ? body.duration : undefined
     const position = typeof body.position === 'number' ? body.position : undefined
+    const repeat_rule = typeof body.repeat_rule === 'string' ? body.repeat_rule : (typeof body.repeatRule === 'string' ? body.repeatRule : undefined)
 
     if (!content) {
       return NextResponse.json({ error: 'content required' }, { status: 400 })
@@ -104,12 +106,13 @@ export async function POST(request: NextRequest) {
       bucket: bucket || null,
       duration: duration ?? null,
       position: position ?? null,
+      repeat_rule: repeat_rule ?? null,
     }
 
     const { data, error } = await supabase
       .from('lifeboard_tasks')
       .insert(insert)
-      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, created_at, updated_at')
+      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, repeat_rule, created_at, updated_at')
       .single()
 
     if (error) {
@@ -123,4 +126,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
-

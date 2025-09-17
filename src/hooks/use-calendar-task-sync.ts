@@ -10,6 +10,7 @@ interface Task {
   hourSlot?: string
   created_at?: string
   updated_at?: string
+  repeatRule?: string
 }
 
 interface CalendarEvent {

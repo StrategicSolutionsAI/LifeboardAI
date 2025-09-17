@@ -95,6 +95,7 @@ interface HourlyPlannerProps {
   isDragging?: boolean;
   wrapWithContext?: boolean;
   plannerDate?: string; // yyyy-MM-dd for creating tasks on selected day
+  onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => void;
 }
 
 export default function HourlyPlanner({ 
@@ -105,7 +106,8 @@ export default function HourlyPlanner({
   selectedBucket,
   isDragging = false,
   wrapWithContext = true,
-  plannerDate
+  plannerDate,
+  onTaskOpen,
 }: HourlyPlannerProps) {
   const {
     scheduledTasks,
@@ -662,6 +664,14 @@ export default function HourlyPlanner({
                           onClick={(e) => {
                             e.stopPropagation();
                             const taskId = t.id.toString();
+                            if (onTaskOpen) {
+                              const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                              onTaskOpen(taskId, {
+                                hourSlot: normalizedSlot,
+                                plannerDate: plannerDate ?? null,
+                              });
+                              return;
+                            }
                             setFrontTaskId(taskId);
                             // Reset after 3 seconds to avoid permanent z-index changes
                             setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
@@ -713,8 +723,23 @@ export default function HourlyPlanner({
                                     />
                                   ) : (
                                     <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight cursor-text hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                      className="font-semibold text-gray-900 truncate text-sm leading-tight cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
                                       onClick={(e) => {
+                                        e.stopPropagation();
+                                        const taskId = t.id.toString();
+                                        if (onTaskOpen) {
+                                          const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                          onTaskOpen(taskId, {
+                                            hourSlot: normalizedSlot,
+                                            plannerDate: plannerDate ?? null,
+                                          });
+                                          return;
+                                        }
+                                        setFrontTaskId(taskId);
+                                        setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
+                                        handleStartEdit(t);
+                                      }}
+                                      onDoubleClick={(e) => {
                                         e.stopPropagation();
                                         handleStartEdit(t);
                                       }}
@@ -750,8 +775,23 @@ export default function HourlyPlanner({
                                     />
                                   ) : (
                                     <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1 cursor-text hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                      className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
                                       onClick={(e) => {
+                                        e.stopPropagation();
+                                        const taskId = t.id.toString();
+                                        if (onTaskOpen) {
+                                          const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                          onTaskOpen(taskId, {
+                                            hourSlot: normalizedSlot,
+                                            plannerDate: plannerDate ?? null,
+                                          });
+                                          return;
+                                        }
+                                        setFrontTaskId(taskId);
+                                        setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
+                                        handleStartEdit(t);
+                                      }}
+                                      onDoubleClick={(e) => {
                                         e.stopPropagation();
                                         handleStartEdit(t);
                                       }}

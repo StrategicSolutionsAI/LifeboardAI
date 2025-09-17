@@ -3,6 +3,68 @@ import { supabaseServer } from '@/utils/supabase/server';
 
 const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
 
+type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
+
+const normalizeRepeatRule = (value?: string | null): RepeatRule | undefined => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  const base = normalized.replace(/\s+starting\s+.+$/, '');
+  switch (normalized) {
+    case 'none':
+      return undefined;
+    case 'every day':
+    case 'daily':
+      return 'daily';
+    case 'every week':
+    case 'weekly':
+      return 'weekly';
+    case 'every weekday':
+    case 'weekdays':
+    case 'every workday':
+      return 'weekdays';
+    case 'every month':
+    case 'monthly':
+      return 'monthly';
+  }
+  switch (base) {
+    case 'every day':
+    case 'daily':
+      return 'daily';
+    case 'every week':
+    case 'weekly':
+      return 'weekly';
+    case 'every weekday':
+    case 'weekdays':
+    case 'every workday':
+      return 'weekdays';
+    case 'every month':
+    case 'monthly':
+      return 'monthly';
+    default:
+      return undefined;
+  }
+};
+
+const buildDueString = (rule: RepeatRule, startDate?: string | null) => {
+  const base = (() => {
+    switch (rule) {
+      case 'daily':
+        return 'every day';
+      case 'weekly':
+        return 'every week';
+      case 'weekdays':
+        return 'every weekday';
+      case 'monthly':
+        return 'every month';
+      default:
+        return '';
+    }
+  })();
+  if (!base) return undefined;
+  if (startDate) return `${base} starting ${startDate}`;
+  return base;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -73,7 +135,7 @@ export async function GET(request: NextRequest) {
 
     // Parse metadata from task descriptions and enhance tasks
     const enhancedTasks = list.map((task: any) => {
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number } = {};
+      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number; repeatRule?: RepeatRule } = {};
       let cleanContent = task.content;
       
       if (task.description) {
@@ -115,6 +177,7 @@ export async function GET(request: NextRequest) {
         hourSlot: metadata.hourSlot, // Only include if exists - no default
         bucket: metadata.bucket, // Only include if exists
         position: metadata.position, // Only include if exists
+        repeatRule: metadata.repeatRule ?? (task.due?.is_recurring ? normalizeRepeatRule(task.due?.string) : undefined),
       };
     });
 
@@ -156,8 +219,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, dueDate, due_date, hour_slot, bucket } = await request.json();
+    const { content, dueDate, due_date, hour_slot, bucket, repeat_rule, repeatRule } = await request.json();
     let actualDueDate: string | null = (dueDate || due_date) || null; // Support both formats
+    const requestedRepeat = typeof repeat_rule === 'string' ? repeat_rule : (typeof repeatRule === 'string' ? repeatRule : undefined);
+    const repeatRuleNormalized = normalizeRepeatRule(requestedRepeat);
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content required' }, { status: 400 });
@@ -185,7 +250,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    const metadata: { hourSlot?: string; bucket?: string } = {};
+    const metadata: { hourSlot?: string; bucket?: string; repeatRule?: RepeatRule } = {};
     if (typeof hour_slot === 'number') {
       const h = Math.max(0, Math.min(23, hour_slot))
       const display = (() => {
@@ -197,6 +262,7 @@ export async function POST(request: NextRequest) {
       metadata.hourSlot = `hour-${display}`
     }
     if (bucket) metadata.bucket = bucket;
+    if (repeatRuleNormalized) metadata.repeatRule = repeatRuleNormalized;
     
     // Normalize obviously stale years (e.g., model emitted 2023). If the
     // provided due date is in a past year, bump to the current year while
@@ -213,7 +279,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body: Record<string, string> = { content };
-    if (actualDueDate) {
+    if (repeatRuleNormalized) {
+      const dueString = buildDueString(repeatRuleNormalized, actualDueDate);
+      if (dueString) {
+        body['due_string'] = dueString;
+      }
+    } else if (actualDueDate) {
       body['due_date'] = actualDueDate; // YYYY-MM-DD
     }
     
