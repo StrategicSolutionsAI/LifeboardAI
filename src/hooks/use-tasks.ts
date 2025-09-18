@@ -5,14 +5,14 @@ import { useDataCache } from './use-data-cache'
 export type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly'
 export type RepeatOption = RepeatRule | 'none'
 
-interface TaskDue {
+export interface TaskDue {
   date?: string
   datetime?: string
   string?: string
   is_recurring?: boolean
 }
 
-interface Task {
+export interface Task {
   id: string
   content: string
   completed: boolean

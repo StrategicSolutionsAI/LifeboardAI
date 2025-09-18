@@ -9,14 +9,7 @@ import { useTasksContext } from "@/contexts/tasks-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import HourlyPlanner from "./hourly-planner";
 import { HomeProject, PROJECT_STATUS } from "@/types/home-projects";
-
-interface Task {
-  id: string | number;
-  content: string;
-  completed: boolean;
-  hourSlot?: string;
-  due?: { date: string };
-}
+import type { Task } from "@/hooks/use-tasks";
 
 // Loading skeleton for tasks
 function TaskSkeleton() {

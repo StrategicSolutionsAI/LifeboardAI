@@ -109,7 +109,6 @@ function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
 import WidgetEditorSheet from "@/components/widget-editor";
 import { WidgetLibrary } from "@/components/widget-library";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ChatBar } from "./chat-bar";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import WidgetSelector from "./widget-selector";
@@ -144,6 +143,10 @@ const HomeProjectsWidget = dynamic(
 const TrendsPanel = dynamic(
   () => import("./trends-panel"),
   { loading: () => <Skeleton className="h-48 w-full" /> }
+);
+const ChatBarLazy = dynamic(
+  () => import("./chat-bar").then(m => m.ChatBar),
+  { ssr: false, loading: () => null }
 );
 
 // Icon mapping for serialization
@@ -395,6 +398,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
   const widgetsByBucketRef = useRef(widgetsByBucket);
   widgetsByBucketRef.current = widgetsByBucket;
 
@@ -406,6 +410,64 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
   const [exerciseWidgetOpen, setExerciseWidgetOpen] = useState(false);
   const [homeProjectsWidgetOpen, setHomeProjectsWidgetOpen] = useState(false);
+  const [shouldLoadNutritionWidget, setShouldLoadNutritionWidget] = useState(false);
+  const [shouldLoadMedicationWidget, setShouldLoadMedicationWidget] = useState(false);
+  const [shouldLoadExerciseWidget, setShouldLoadExerciseWidget] = useState(false);
+  const [shouldLoadHomeProjectsWidget, setShouldLoadHomeProjectsWidget] = useState(false);
+  const [chatBarReady, setChatBarReady] = useState(false);
+
+  useEffect(() => {
+    const updateMobileView = () => setIsMobileView(window.innerWidth < 768);
+    updateMobileView();
+    window.addEventListener('resize', updateMobileView);
+    return () => window.removeEventListener('resize', updateMobileView);
+  }, []);
+
+  useEffect(() => {
+    if (!nutritionWidgetOpen) return;
+    setShouldLoadNutritionWidget(true);
+  }, [nutritionWidgetOpen]);
+
+  useEffect(() => {
+    if (!medicationWidgetOpen) return;
+    setShouldLoadMedicationWidget(true);
+  }, [medicationWidgetOpen]);
+
+  useEffect(() => {
+    if (!exerciseWidgetOpen) return;
+    setShouldLoadExerciseWidget(true);
+  }, [exerciseWidgetOpen]);
+
+  useEffect(() => {
+    if (!homeProjectsWidgetOpen) return;
+    setShouldLoadHomeProjectsWidget(true);
+  }, [homeProjectsWidgetOpen]);
+
+  useEffect(() => {
+    if (chatBarReady || typeof window === 'undefined') return;
+    let cancelled = false;
+    const activate = () => {
+      if (!cancelled) {
+        setChatBarReady(true);
+      }
+    };
+
+    if ((window as any).requestIdleCallback) {
+      const handle = (window as any).requestIdleCallback(activate, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        if ((window as any).cancelIdleCallback) {
+          (window as any).cancelIdleCallback(handle);
+        }
+      };
+    }
+
+    const timeout = window.setTimeout(activate, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [chatBarReady]);
 
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
@@ -553,74 +615,68 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     setIsRefreshing(true);
 
     try {
-      // -----------------------------------------------------------
-      // 1) Force-refresh Todoist tasks (clear cache ➜ fetch fresh)
-      // -----------------------------------------------------------
       if (typeof window !== 'undefined') {
         localStorage.removeItem('todoist_all_tasks');
       }
 
-      try {
-        const tasksRes = await fetch(`/api/integrations/todoist/tasks?all=true&cb=${Date.now()}`);
-        if (tasksRes.ok) {
-          const taskData = await tasksRes.json();
-          const allTasks: any[] = taskData.tasks || [];
-          setAllTodoistTasks(allTasks);
+      const refreshPromises: Promise<void>[] = [];
 
-          // Also update the daily list for the currently selected date
-          const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`;
-          setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
+      refreshPromises.push((async () => {
+        try {
+          const tasksRes = await fetch(`/api/integrations/todoist/tasks?all=true&cb=${Date.now()}`);
+          if (tasksRes.ok) {
+            const taskData = await tasksRes.json();
+            const allTasks: any[] = taskData.tasks || [];
+            setAllTodoistTasks(allTasks);
 
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('todoist_all_tasks', JSON.stringify({ tasks: allTasks, savedAt: Date.now() }));
+            const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`;
+            setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
+
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('todoist_all_tasks', JSON.stringify({ tasks: allTasks, savedAt: Date.now() }));
+            }
+          } else {
+            console.error('Failed to refresh Todoist tasks');
           }
-        } else {
-          console.error('Failed to refresh Todoist tasks');
+        } catch (err) {
+          console.error('Error refreshing Todoist tasks', err);
         }
-      } catch (err) {
-        console.error('Error refreshing Todoist tasks', err);
-      }
+      })());
 
-      // -----------------------------------------------------------
-      // 2) Refresh Fitbit metrics if there are Fitbit-backed widgets
-      // -----------------------------------------------------------
       const needFitbit = Object.values(widgetsByBucketRef.current)
         .flat()
         .some((w) => ["water", "steps"].includes(w.id) && w.dataSource === "fitbit");
 
       if (needFitbit) {
-        // Skip cache entirely – always fetch fresh metrics
-        const res = await fetch(`/api/integrations/fitbit/metrics?cb=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          const obj = {
-            water: data.water || 0,
-            steps: data.steps || 0,
-            calories: data.calories || 0,
-          };
-          setFitbitData(obj);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "fitbit_metrics",
-              JSON.stringify({ ...obj, savedAt: Date.now() })
-            );
-          }
-
-          // -----------------------------------------------------------
-          // 2a) Update widget progress & history for Fitbit-backed widgets
-          // -----------------------------------------------------------
+        refreshPromises.push((async () => {
           try {
-            const todayStr = todayStrGlobal;
+            const res = await fetch(`/api/integrations/fitbit/metrics?cb=${Date.now()}`);
+            if (!res.ok) return;
 
-            // Find all Fitbit widgets currently on the dashboard
-            const fitbitWidgets = Object.values(widgetsByBucketRef.current)
-              .flat()
-              .filter(
-                (w) => w.dataSource === "fitbit" && ["water", "steps"].includes(w.id)
+            const data = await res.json();
+            const obj = {
+              water: data.water || 0,
+              steps: data.steps || 0,
+              calories: data.calories || 0,
+            };
+            setFitbitData(obj);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(
+                "fitbit_metrics",
+                JSON.stringify({ ...obj, savedAt: Date.now() })
               );
+            }
 
-            if (fitbitWidgets.length) {
-              // Build updated progress map
+            try {
+              const todayStr = todayStrGlobal;
+              const fitbitWidgets = Object.values(widgetsByBucketRef.current)
+                .flat()
+                .filter(
+                  (w) => w.dataSource === "fitbit" && ["water", "steps"].includes(w.id)
+                );
+
+              if (!fitbitWidgets.length) return;
+
               const updatedProgress: Record<string, ProgressEntry> = {
                 ...progressByWidgetRef.current,
               };
@@ -635,7 +691,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     lastCompleted: "",
                   };
 
-                // Reset value if stored date isn't today yet
                 if (existing.date !== todayStr) {
                   existing.value = 0;
                 }
@@ -643,10 +698,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 updatedProgress[w.instanceId] = existing;
               });
 
-              // Update in-memory state
               setProgressByWidget(updatedProgress);
 
-              // Persist to localStorage
               if (typeof window !== "undefined") {
                 try {
                   localStorage.setItem(
@@ -658,7 +711,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 }
               }
 
-              // Upsert daily snapshot into Supabase history table
               const {
                 data: { user: currentUser },
               } = await supabase.auth.getUser();
@@ -677,9 +729,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       onConflict: "user_id,widget_instance_id,date",
                     });
 
-                  // -------------------------------------------------------
-                  //  Back-fill yesterday's totals exactly once per session
-                  // -------------------------------------------------------
                   if (!fetchedYesterdayRef.current) {
                     fetchedYesterdayRef.current = true;
                     try {
@@ -707,69 +756,70 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 }
               }
 
-              // Persist progress inside user_preferences (non-blocking)
               try {
                 await saveWidgets(widgetsByBucketRef.current, updatedProgress);
               } catch (e) {
                 console.error("Failed to save widget progress to preferences", e);
               }
+            } catch (errFitbitProgress) {
+              console.error("Failed to update Fitbit widget progress", errFitbitProgress);
             }
-          } catch (errFitbitProgress) {
-            console.error("Failed to update Fitbit widget progress", errFitbitProgress);
+          } catch (err) {
+            console.error('Failed to fetch Fitbit metrics', err);
           }
-        }
+        })());
       }
 
-      // -----------------------------------------------------------
-      // 3) Refresh Withings weight if weight widgets use Withings
-      // -----------------------------------------------------------
       const needWithings = Object.values(widgetsByBucketRef.current)
         .flat()
         .some((w) => w.id === 'weight' && w.dataSource === 'withings');
 
       if (needWithings) {
-        try {
-          const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`, { credentials: 'include' });
-          if (resW.ok) {
+        refreshPromises.push((async () => {
+          try {
+            const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`, { credentials: 'include' });
+            if (!resW.ok) {
+              console.error('Failed to fetch Withings metrics');
+              return;
+            }
             const dataW = await resW.json();
             const kg = dataW.weightKg;
-            if (kg !== undefined && kg !== null) {
-              setWithingsData({ weightKg: kg });
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('withings_metrics', JSON.stringify({ weightKg: kg, savedAt: Date.now() }));
-              }
+            if (kg === undefined || kg === null) return;
 
-              // Update widgets in memory
-              setWidgetsByBucket((prev) => {
-                const updated = { ...prev };
-                Object.keys(updated).forEach((bucket) => {
-                  updated[bucket] = updated[bucket].map((w) => {
-                    if (w.id === 'weight' && w.dataSource === 'withings') {
-                      const unit = w.weightData?.unit || w.unit || 'lbs';
-                      const val = unit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
-                      return {
-                        ...w,
-                        weightData: {
-                          ...w.weightData,
-                          currentWeight: val,
-                          lastEntryDate: new Date().toISOString().split('T')[0],
-                          unit,
-                        },
-                      } as typeof w;
-                    }
-                    return w;
-                  });
-                });
-                return updated;
-              });
+            setWithingsData({ weightKg: kg });
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('withings_metrics', JSON.stringify({ weightKg: kg, savedAt: Date.now() }));
             }
-          } else {
-            console.error('Failed to fetch Withings metrics');
+
+            setWidgetsByBucket((prev) => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach((bucket) => {
+                updated[bucket] = updated[bucket].map((w) => {
+                  if (w.id === 'weight' && w.dataSource === 'withings') {
+                    const unit = w.weightData?.unit || w.unit || 'lbs';
+                    const val = unit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
+                    return {
+                      ...w,
+                      weightData: {
+                        ...w.weightData,
+                        currentWeight: val,
+                        lastEntryDate: new Date().toISOString().split('T')[0],
+                        unit,
+                      },
+                    } as typeof w;
+                  }
+                  return w;
+                });
+              });
+              return updated;
+            });
+          } catch (errW) {
+            console.error('Error fetching Withings metrics', errW);
           }
-        } catch (errW) {
-          console.error('Error fetching Withings metrics', errW);
-        }
+        })());
       }
+
+      await Promise.all(refreshPromises);
     } catch (err) {
       console.error("Manual refresh failed", err);
     } finally {
@@ -3415,44 +3465,51 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         {/* Widget library sheet */}
         <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
-          <SheetContent side="right" className="w-full sm:w-[800px] max-w-full overflow-y-auto">
-            <SheetHeader>
+          <SheetContent
+            side={isMobileView ? 'bottom' : 'right'}
+            className={`w-full sm:w-[800px] max-w-full p-0 sm:p-6 flex flex-col ${isMobileView ? 'max-h-[90vh]' : ''}`}
+          >
+            <SheetHeader
+              className={`px-4 pt-6 pb-4 sm:px-0 sm:pt-0 sm:pb-6 border-b border-gray-200 sm:border-none ${isMobileView ? 'sticky top-0 z-10 bg-white/95 backdrop-blur' : ''}`}
+            >
               <SheetTitle>Add a Widget</SheetTitle>
             </SheetHeader>
-            <WidgetLibrary
-              bucket={activeBucket}
-              onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
-                const isInstance = (widgetOrTemplate as any).instanceId !== undefined;
-                const newInstance: WidgetInstance = isInstance
-                  ? (widgetOrTemplate as WidgetInstance)
-                  : {
-                      ...(widgetOrTemplate as WidgetTemplate),
-                      instanceId: `${(widgetOrTemplate as WidgetTemplate).id}-${Date.now()}`,
-                      target: (widgetOrTemplate as WidgetTemplate).defaultTarget || 100,
-                      color: (widgetOrTemplate as WidgetTemplate).color || 'gray',
-                      dataSource: 'manual',
-                      createdAt: new Date().toISOString(),
-                      schedule: [true, true, true, true, true, true, true],
-                    };
+            <div className="flex-1 overflow-y-auto px-4 pb-8 sm:px-0 sm:pb-0">
+              <WidgetLibrary
+                bucket={activeBucket}
+                onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
+                  const isInstance = (widgetOrTemplate as any).instanceId !== undefined;
+                  const newInstance: WidgetInstance = isInstance
+                    ? (widgetOrTemplate as WidgetInstance)
+                    : {
+                        ...(widgetOrTemplate as WidgetTemplate),
+                        instanceId: `${(widgetOrTemplate as WidgetTemplate).id}-${Date.now()}`,
+                        target: (widgetOrTemplate as WidgetTemplate).defaultTarget || 100,
+                        color: (widgetOrTemplate as WidgetTemplate).color || 'gray',
+                        dataSource: 'manual',
+                        createdAt: new Date().toISOString(),
+                        schedule: [true, true, true, true, true, true, true],
+                      };
 
-                setWidgetsByBucket(prev => {
-                  const updated = { ...prev };
-                  updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
-                  // update ref immediately so debounced save reads latest
-                  widgetsByBucketRef.current = updated;
-                  return updated;
-                });
+                  setWidgetsByBucket(prev => {
+                    const updated = { ...prev };
+                    updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
+                    // update ref immediately so debounced save reads latest
+                    widgetsByBucketRef.current = updated;
+                    return updated;
+                  });
 
-                // Open editor for the newly added widget for quick tweaks
-                setEditingBucket(activeBucket);
-                setEditingWidget(newInstance);
-                setNewlyCreatedWidgetId(newInstance.instanceId);
+                  // Open editor for the newly added widget for quick tweaks
+                  setEditingBucket(activeBucket);
+                  setEditingWidget(newInstance);
+                  setNewlyCreatedWidgetId(newInstance.instanceId);
 
-                // Persist
-                debouncedSaveToSupabase();
-                setIsWidgetSheetOpen(false);
-              }}
-            />
+                  // Persist
+                  debouncedSaveToSupabase();
+                  setIsWidgetSheetOpen(false);
+                }}
+              />
+            </div>
           </SheetContent>
         </Sheet>
 
@@ -3512,7 +3569,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         {/* Nutrition Widget Modal */}
         <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => { 
           setNutritionWidgetOpen(open)
-          if (!open) {
+          if (open) {
+            setShouldLoadNutritionWidget(true)
+          } else {
             // Force refresh nutrition widgets when panel closes
             setTimeout(() => {
               window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
@@ -3524,64 +3583,89 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               <SheetTitle className="text-gray-900">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <NutritionMealTracker />
+              { (nutritionWidgetOpen || shouldLoadNutritionWidget) && (
+                shouldLoadNutritionWidget ? <NutritionMealTracker /> : <Skeleton className="h-32 w-full" />
+              )}
             </div>
           </SheetContent>
         </Sheet>
 
         {/* Medication Widget Modal */}
-        <Sheet open={medicationWidgetOpen} onOpenChange={setMedicationWidgetOpen}>
+        <Sheet open={medicationWidgetOpen} onOpenChange={(open) => {
+          setMedicationWidgetOpen(open)
+          if (open) {
+            setShouldLoadMedicationWidget(true)
+          }
+        }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-gray-900">Medication Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <MedicationTrackerWidget />
+              {(medicationWidgetOpen || shouldLoadMedicationWidget) && (
+                shouldLoadMedicationWidget ? <MedicationTrackerWidget /> : <Skeleton className="h-24 w-full" />
+              )}
             </div>
           </SheetContent>
         </Sheet>
 
         {/* Exercise Widget Modal */}
-        <Sheet open={exerciseWidgetOpen} onOpenChange={setExerciseWidgetOpen}>
+        <Sheet open={exerciseWidgetOpen} onOpenChange={(open) => {
+          setExerciseWidgetOpen(open)
+          if (open) {
+            setShouldLoadExerciseWidget(true)
+          }
+        }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Exercise Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <ExerciseWidget onClose={() => setExerciseWidgetOpen(false)} />
+              {(exerciseWidgetOpen || shouldLoadExerciseWidget) && (
+                shouldLoadExerciseWidget ? <ExerciseWidget onClose={() => setExerciseWidgetOpen(false)} /> : <Skeleton className="h-24 w-full" />
+              )}
             </div>
           </SheetContent>
         </Sheet>
 
         {/* Home Projects Widget Modal */}
-        <Sheet open={homeProjectsWidgetOpen} onOpenChange={setHomeProjectsWidgetOpen}>
+        <Sheet open={homeProjectsWidgetOpen} onOpenChange={(open) => {
+          setHomeProjectsWidgetOpen(open)
+          if (open) {
+            setShouldLoadHomeProjectsWidget(true)
+          }
+        }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              <HomeProjectsWidget 
-                widget={{
-                  id: 'home-projects-modal',
-                  instanceId: 'home-projects-modal',
-                  name: 'Home Projects',
-                  description: 'Track and manage home improvement projects',
-                  icon: 'Hammer',
-                  category: 'productivity',
-                  unit: 'projects',
-                  defaultTarget: 5,
-                  color: 'blue',
-                  target: 0,
-                  schedule: [true, true, true, true, true, true, true],
-                  createdAt: new Date().toISOString()
-                }}
-                onUpdate={() => {}}
-              />
+              {(homeProjectsWidgetOpen || shouldLoadHomeProjectsWidget) && (
+                shouldLoadHomeProjectsWidget ? (
+                  <HomeProjectsWidget 
+                    widget={{
+                      id: 'home-projects-modal',
+                      instanceId: 'home-projects-modal',
+                      name: 'Home Projects',
+                      description: 'Track and manage home improvement projects',
+                      icon: 'Hammer',
+                      category: 'productivity',
+                      unit: 'projects',
+                      defaultTarget: 5,
+                      color: 'blue',
+                      target: 0,
+                      schedule: [true, true, true, true, true, true, true],
+                      createdAt: new Date().toISOString()
+                    }}
+                    onUpdate={() => {}}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
             </div>
           </SheetContent>
         </Sheet>
         </div>
-        <ChatBar />
+        {chatBarReady && <ChatBarLazy />}
       </div>
     );
   }

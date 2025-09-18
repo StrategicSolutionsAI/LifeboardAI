@@ -739,7 +739,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
 
   return (
-    <div className="flex gap-6 mt-6">
+    <div className="flex flex-col lg:flex-row gap-6 mt-6">
       {/* Left: list & filters */}
       <div className="flex-1 space-y-6">
         {/* Search */}
@@ -755,9 +755,9 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
         </div>
         
         {/* Category Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">Category:</span>
-          <div className="flex flex-wrap gap-1">
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-gray-700">Category</span>
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:gap-1">
             <button
               className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
                 ? 'bg-indigo-100 text-indigo-700 font-medium' 
@@ -801,7 +801,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
         )}
 
         {/* Widget Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:max-h-[70vh] lg:overflow-y-auto">
           {filteredWidgets.map((widget) => {
             const Icon = widget.icon
             return (
@@ -848,198 +848,202 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
       </div> {/* end left column */}
 
       {/* Right: live preview & config */}
-      <div className="w-72 shrink-0 space-y-4">
-        <h4 className="text-sm font-semibold text-gray-700">Preview</h4>
-        {draftWidget ? (
-          <>
-            <WidgetPreview widget={draftWidget} />
-
-            {/* Target input */}
-            <div className="pt-4 space-y-2 border-t">
-              <p className="text-xs font-medium text-gray-600">Daily target</p>
-              <div className="flex items-center gap-2">
-                <button
-                  aria-label="Decrease target"
-                  className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                  onClick={() =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, target: Math.max(0, prev.target - 1) } : prev
-                    )
-                  }
-                >
-                  –
-                </button>
-                <input
-                  type="number"
-                  value={draftWidget.target}
-                  onChange={(e) =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, target: Number(e.target.value) } : prev
-                    )
-                  }
-                  className="w-16 text-center border rounded"
-                  aria-label="Target value"
-                />
-                <span className="text-sm text-gray-600">{draftWidget.unit}</span>
-                <button
-                  aria-label="Increase target"
-                  className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                  onClick={() =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, target: prev.target + 1 } : prev
-                    )
-                  }
-                >
-                  +
-                </button>
+      <div className="w-full lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h4 className="text-sm font-semibold text-gray-700">Preview</h4>
+          {draftWidget ? (
+            <>
+              <div className="mt-3">
+                <WidgetPreview widget={draftWidget} />
               </div>
-            </div>
 
-            {/* Color picker */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-600">Colour</p>
-              <div className="flex flex-wrap gap-2">
-                {COLORS.map((clr) => (
+              {/* Target input */}
+              <div className="pt-4 space-y-2 border-t">
+                <p className="text-xs font-medium text-gray-600">Daily target</p>
+                <div className="flex items-center gap-2">
                   <button
-                    key={clr}
-                    aria-label={clr}
-                    className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-indigo-500' : 'border-white'}`}
+                    aria-label="Decrease target"
+                    className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
                     onClick={() =>
-                      setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
+                      setDraftWidget((prev) =>
+                        prev ? { ...prev, target: Math.max(0, prev.target - 1) } : prev
+                      )
                     }
+                  >
+                    –
+                  </button>
+                  <input
+                    type="number"
+                    value={draftWidget.target}
+                    onChange={(e) =>
+                      setDraftWidget((prev) =>
+                        prev ? { ...prev, target: Number(e.target.value) } : prev
+                      )
+                    }
+                    className="w-16 text-center border rounded"
+                    aria-label="Target value"
                   />
-                ))}
+                  <span className="text-sm text-gray-600">{draftWidget.unit}</span>
+                  <button
+                    aria-label="Increase target"
+                    className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    onClick={() =>
+                      setDraftWidget((prev) =>
+                        prev ? { ...prev, target: prev.target + 1 } : prev
+                      )
+                    }
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Data Source Selector - Only for water widget with Fitbit connected */}
-            {['water','steps'].includes(draftWidget.id) && (connectedIntegrations.includes('fitbit') || connectedIntegrations.includes('googlefit')) && (
+              {/* Color picker */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-600">Data Source</p>
+                <p className="text-xs font-medium text-gray-600">Colour</p>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.map((clr) => (
+                    <button
+                      key={clr}
+                      aria-label={clr}
+                      className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-indigo-500' : 'border-white'}`}
+                      onClick={() =>
+                        setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Data Source Selector - Only for water widget with Fitbit connected */}
+              {['water','steps'].includes(draftWidget.id) && (connectedIntegrations.includes('fitbit') || connectedIntegrations.includes('googlefit')) && (
                 <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="dataSource"
-                      value="manual"
-                      checked={draftWidget.dataSource === 'manual'}
-                      onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
-                      className="text-indigo-600"
-                    />
-                    <span className="text-sm">Manual tracking</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      name="dataSource"
-                      value="fitbit"
-                      checked={draftWidget.dataSource === 'fitbit'}
-                      onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
-                      className="text-indigo-600"
-                    />
-                    <span className="text-sm">Fitbit (automatic)</span>
-                  </label>
-                  {connectedIntegrations.includes('googlefit') && (
+                  <p className="text-xs font-medium text-gray-600">Data Source</p>
+                  <div className="space-y-2">
                     <label className="flex items-center space-x-2">
                       <input
                         type="radio"
                         name="dataSource"
-                        value="googlefit"
-                        checked={draftWidget.dataSource === 'googlefit'}
-                        onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
+                        value="manual"
+                        checked={draftWidget.dataSource === 'manual'}
+                        onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
                         className="text-indigo-600"
                       />
-                      <span className="text-sm">Google Fit (automatic)</span>
+                      <span className="text-sm">Manual tracking</span>
                     </label>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        name="dataSource"
+                        value="fitbit"
+                        checked={draftWidget.dataSource === 'fitbit'}
+                        onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
+                        className="text-indigo-600"
+                      />
+                      <span className="text-sm">Fitbit (automatic)</span>
+                    </label>
+                    {connectedIntegrations.includes('googlefit') && (
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          name="dataSource"
+                          value="googlefit"
+                          checked={draftWidget.dataSource === 'googlefit'}
+                          onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
+                          className="text-indigo-600"
+                        />
+                        <span className="text-sm">Google Fit (automatic)</span>
+                      </label>
+                    )}
+                  </div>
+                  {draftWidget.dataSource === 'fitbit' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {draftWidget.name} will sync automatically from your Fitbit device
+                    </p>
                   )}
                 </div>
-                {draftWidget.dataSource === 'fitbit' && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {draftWidget.name} will sync automatically from your Fitbit device
-                  </p>
-                )}
-              </div>
-            )}
+              )}
 
-            {/* Schedule picker */}
-            <div className="space-y-2 pt-4 border-t">
-              <p className="text-xs font-medium text-gray-600">Schedule</p>
-              <div className="flex flex-wrap gap-2">
-                {WEEKDAYS.map((d, idx) => (
+              {/* Schedule picker */}
+              <div className="space-y-2 pt-4 border-t">
+                <p className="text-xs font-medium text-gray-600">Schedule</p>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((d, idx) => (
+                    <button
+                      key={d}
+                      aria-label={d}
+                      className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-indigo-500 text-white' : 'bg-white text-gray-600'} hover:bg-indigo-100`}
+                      onClick={() =>
+                        setDraftWidget((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                schedule: prev.schedule.map((v, i) =>
+                                  i === idx ? !v : v
+                                ) as boolean[],
+                              }
+                            : prev
+                        )
+                      }
+                    >
+                      {d.charAt(0)}
+                    </button>
+                  ))}
+                </div>
+                {/* Presets */}
+                <div className="flex flex-wrap gap-2 pt-2">
                   <button
-                    key={d}
-                    aria-label={d}
-                    className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-indigo-500 text-white' : 'bg-white text-gray-600'} hover:bg-indigo-100`}
+                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
                     onClick={() =>
                       setDraftWidget((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              schedule: prev.schedule.map((v, i) =>
-                                i === idx ? !v : v
-                              ) as boolean[],
-                            }
-                          : prev
+                        prev ? { ...prev, schedule: [true, true, true, true, true, true, true] } : prev
                       )
                     }
-                  >
-                    {d.charAt(0)}
-                  </button>
-                ))}
+                  >Every day</button>
+                  <button
+                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    onClick={() =>
+                      setDraftWidget((prev) =>
+                        prev ? { ...prev, schedule: [false, true, true, true, true, true, false] } : prev
+                      )
+                    }
+                  >Weekdays</button>
+                  <button
+                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    onClick={() =>
+                      setDraftWidget((prev) =>
+                        prev ? { ...prev, schedule: [true, false, true, false, true, false, true] } : prev
+                      )
+                    }
+                  >Alternate</button>
+                </div>
               </div>
-              {/* Presets */}
-              <div className="flex gap-2 pt-2">
-                <button
-                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                  onClick={() =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, schedule: [true, true, true, true, true, true, true] } : prev
-                    )
-                  }
-                >Every day</button>
-                <button
-                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                  onClick={() =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, schedule: [false, true, true, true, true, true, false] } : prev
-                    )
-                  }
-                >Weekdays</button>
-                <button
-                  className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
-                  onClick={() =>
-                    setDraftWidget((prev) =>
-                      prev ? { ...prev, schedule: [true, false, true, false, true, false, true] } : prev
-                    )
-                  }
-                >Alternate</button>
-              </div>
-            </div>
 
-            <button
-              className="w-full mt-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
-              onClick={() => {
-                if (!draftWidget) return;
-                // Convert component to its name string for persistence
-                let iconField: string | any = draftWidget.icon;
-                if (typeof draftWidget.icon === 'function') {
-                  iconField = (draftWidget.icon as any).displayName || (draftWidget.icon as any).name || '';
-                }
-                const instance: WidgetInstance = {
-                  ...draftWidget,
-                  icon: iconField,
-                  instanceId: `widget-${Date.now()}`,
-                  createdAt: new Date().toISOString(),
-                };
-                onAdd(instance);
-              }}
-            >
-              Add Widget
-            </button>
-          </>
-        ) : (
-          <p className="text-xs text-gray-500">Select a widget to see a preview</p>
-        )}
+              <button
+                className="w-full mt-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+                onClick={() => {
+                  if (!draftWidget) return;
+                  // Convert component to its name string for persistence
+                  let iconField: string | any = draftWidget.icon;
+                  if (typeof draftWidget.icon === 'function') {
+                    iconField = (draftWidget.icon as any).displayName || (draftWidget.icon as any).name || '';
+                  }
+                  const instance: WidgetInstance = {
+                    ...draftWidget,
+                    icon: iconField,
+                    instanceId: `widget-${Date.now()}`,
+                    createdAt: new Date().toISOString(),
+                  };
+                  onAdd(instance);
+                }}
+              >
+                Add Widget
+              </button>
+            </>
+          ) : (
+            <p className="mt-3 text-xs text-gray-500">Select a widget to see a preview</p>
+          )}
+        </div>
       </div>
     </div>
   )

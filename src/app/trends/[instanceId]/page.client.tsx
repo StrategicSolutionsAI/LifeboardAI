@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
 import SectionLoadTimer from '@/components/section-load-timer';
@@ -15,6 +15,8 @@ interface Point { date: string; value: number }
 type TimeRange = '7d' | '30d' | '90d'
 interface TrendAnalysis { totalValue: number; dailyAverage: number; trend: 'up' | 'down' | 'stable'; trendPercentage: number; bestDay: { date: string; value: number } | null }
 
+const RANGE_DAYS: Record<TimeRange, number> = { '7d': 7, '30d': 30, '90d': 90 } as const;
+
 export default function TrendsPageClient({ params }: { params: { instanceId: string } }) {
   const { instanceId } = params;
   const [data, setData] = useState<Point[] | null>(null);
@@ -24,9 +26,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [isMobile, setIsMobile] = useState(false);
 
-  const rangeDays = { '7d': 7, '30d': 30, '90d': 90 } as const;
-
-  const loadData = async (days: number) => {
+  const loadData = useCallback(async (days: number) => {
     try {
       setError(null);
       const { data: { session } } = await supabase.auth.getSession();
@@ -35,9 +35,9 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
       const json = await res.json();
       setData(json.data);
     } catch (err: any) { setError(err.message) }
-  };
+  }, [instanceId]);
 
-  useEffect(() => { (async () => { setLoading(true); await loadData(rangeDays[timeRange]); setLoading(false) })() }, [instanceId, timeRange]);
+  useEffect(() => { (async () => { setLoading(true); await loadData(RANGE_DAYS[timeRange]); setLoading(false) })() }, [loadData, timeRange]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 640);
@@ -46,7 +46,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const handleRefresh = async () => { setRefreshing(true); await loadData(rangeDays[timeRange]); setRefreshing(false) };
+  const handleRefresh = async () => { setRefreshing(true); await loadData(RANGE_DAYS[timeRange]); setRefreshing(false) };
   const handleTimeRangeChange = (range: TimeRange) => setTimeRange(range);
 
   const analysis: TrendAnalysis = useMemo(() => {
@@ -115,12 +115,12 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
           <Button onClick={handleRefresh} variant="outline" disabled={refreshing} className="self-start sm:self-center"><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh</Button>
         </div>
 
-        <Card><CardContent className="p-4"><div className="flex flex-wrap gap-2">{(Object.keys(rangeDays) as TimeRange[]).map((range) => (
+        <Card><CardContent className="p-4"><div className="flex flex-wrap gap-2">{(Object.keys(RANGE_DAYS) as TimeRange[]).map((range) => (
           <Button key={range} onClick={() => handleTimeRangeChange(range)} variant={timeRange === range ? "default" : "outline"} size="sm" className="min-w-16"><Calendar className="mr-1 h-3 w-3" />{range.toUpperCase()}</Button>
         ))}</div></CardContent></Card>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Total Values</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{analysis.totalValue.toLocaleString()}</div><p className="text-xs text-muted-foreground">Last {rangeDays[timeRange]} days</p></CardContent></Card>
+          <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Total Values</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{analysis.totalValue.toLocaleString()}</div><p className="text-xs text-muted-foreground">Last {RANGE_DAYS[timeRange]} days</p></CardContent></Card>
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Daily Average</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{analysis.dailyAverage.toFixed(1)}</div><p className="text-xs text-muted-foreground">Per day average</p></CardContent></Card>
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Trend</CardTitle></CardHeader><CardContent><div className="flex items-center gap-2">{analysis.trend === 'up' && (<><TrendingUp className="h-4 w-4 text-green-600" /><Badge variant="secondary" className="bg-green-100 text-green-800">+{analysis.trendPercentage.toFixed(1)}%</Badge></>)}{analysis.trend === 'down' && (<><TrendingDown className="h-4 w-4 text-red-600" /><Badge variant="secondary" className="bg-red-100 text-red-800">-{analysis.trendPercentage.toFixed(1)}%</Badge></>)}{analysis.trend === 'stable' && (<><Minus className="h-4 w-4 text-blue-600" /><Badge variant="secondary" className="bg-blue-100 text-blue-800">Stable</Badge></>)}</div><p className="text-xs text-muted-foreground mt-1">Period comparison</p></CardContent></Card>
           <Card><CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-muted-foreground">Best Day</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{analysis.bestDay?.value || 0}</div><p className="text-xs text-muted-foreground">{analysis.bestDay ? new Date(analysis.bestDay.date).toLocaleDateString() : 'N/A'}</p></CardContent></Card>
@@ -129,7 +129,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" />Progress Over Time</CardTitle>
-            <CardDescription>Daily values for the last {rangeDays[timeRange]} days</CardDescription>
+            <CardDescription>Daily values for the last {RANGE_DAYS[timeRange]} days</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>

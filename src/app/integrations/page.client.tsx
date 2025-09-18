@@ -27,17 +27,6 @@ export default function IntegrationsPageClient() {
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [globalError, setGlobalError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const handleKeyboard = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'r' && !loading) {
-        event.preventDefault()
-        fetchIntegrationStatuses(true)
-      }
-    }
-    document.addEventListener('keydown', handleKeyboard)
-    return () => document.removeEventListener('keydown', handleKeyboard)
-  }, [loading])
-
   const fetchIntegrationStatuses = useCallback(async (invalidateCache = false) => {
     setLoading(true)
     setGlobalError(null)
@@ -62,6 +51,17 @@ export default function IntegrationsPageClient() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'r' && !loading) {
+        event.preventDefault()
+        fetchIntegrationStatuses(true)
+      }
+    }
+    document.addEventListener('keydown', handleKeyboard)
+    return () => document.removeEventListener('keydown', handleKeyboard)
+  }, [loading, fetchIntegrationStatuses])
 
   const handleConnect = async (integration: Integration) => {
     if (integration.authUrl) window.location.href = integration.authUrl

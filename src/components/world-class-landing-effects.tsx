@@ -10,12 +10,35 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [scrollY, setScrollY] = useState(0);
+  const [enableDesktopEffects, setEnableDesktopEffects] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const determineEffects = () => {
+      const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+      setEnableDesktopEffects(hasFinePointer && window.innerWidth >= 768);
+    };
+
+    determineEffects();
+    window.addEventListener('resize', determineEffects);
+    return () => window.removeEventListener('resize', determineEffects);
+  }, []);
+
+  useEffect(() => {
+    if (!enableDesktopEffects) return;
+    if (typeof window === 'undefined') return;
+
+    setMousePosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  }, [enableDesktopEffects]);
 
   // Advanced mouse tracking for premium interactions
   useEffect(() => {
+    if (!enableDesktopEffects) return;
+
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
-      
+
       // Add magnetic effect to interactive elements
       const interactiveElements = document.querySelectorAll('.magnetic-hover');
       interactiveElements.forEach((element) => {
@@ -24,7 +47,7 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
         const centerY = rect.top + rect.height / 2;
         const deltaX = (e.clientX - centerX) * 0.1;
         const deltaY = (e.clientY - centerY) * 0.1;
-        
+
         if (Math.abs(deltaX) < 50 && Math.abs(deltaY) < 50) {
           (element as HTMLElement).style.transform = `translate(${deltaX}px, ${deltaY}px)`;
         } else {
@@ -39,69 +62,90 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
 
     document.addEventListener('mousemove', handleMouseMove);
     return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [enableDesktopEffects]);
+
+  useEffect(() => {
+    if (enableDesktopEffects) return;
+    if (typeof document === 'undefined') return;
+
+    document.documentElement.style.setProperty('--mouse-x', '50%');
+    document.documentElement.style.setProperty('--mouse-y', '50%');
+    document.querySelectorAll('.magnetic-hover').forEach((element) => {
+      (element as HTMLElement).style.transform = 'translate(0px, 0px)';
+    });
+  }, [enableDesktopEffects]);
 
   // Advanced scroll effects and parallax
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleScroll = () => {
       const scrolled = window.scrollY;
-      setScrollY(scrolled);
 
-      // Parallax effects
-      const parallaxElements = document.querySelectorAll('.parallax-slow');
-      parallaxElements.forEach((element) => {
-        const speed = 0.5;
-        (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
-      });
+      if (enableDesktopEffects) {
+        setScrollY(scrolled);
 
-      const parallaxMedium = document.querySelectorAll('.parallax-medium');
-      parallaxMedium.forEach((element) => {
-        const speed = 0.3;
-        (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
-      });
+        // Parallax effects
+        const parallaxElements = document.querySelectorAll('.parallax-slow');
+        parallaxElements.forEach((element) => {
+          const speed = 0.5;
+          (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
+        });
 
-      const parallaxFast = document.querySelectorAll('.parallax-fast');
-      parallaxFast.forEach((element) => {
-        const speed = 0.1;
-        (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
-      });
+        const parallaxMedium = document.querySelectorAll('.parallax-medium');
+        parallaxMedium.forEach((element) => {
+          const speed = 0.3;
+          (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
+        });
 
-      // Reveal animations on scroll
-      const scrollRevealElements = document.querySelectorAll('.scroll-reveal');
-      scrollRevealElements.forEach((element) => {
-        const rect = element.getBoundingClientRect();
-        const isVisible = rect.top < window.innerHeight * 0.8;
-        
-        if (isVisible) {
-          element.classList.add('revealed');
-        }
-      });
+        const parallaxFast = document.querySelectorAll('.parallax-fast');
+        parallaxFast.forEach((element) => {
+          const speed = 0.1;
+          (element as HTMLElement).style.transform = `translateY(${scrolled * speed}px)`;
+        });
 
-      // Sticky CTA bar
+        // Reveal animations on scroll
+        const scrollRevealElements = document.querySelectorAll('.scroll-reveal');
+        scrollRevealElements.forEach((element) => {
+          const rect = element.getBoundingClientRect();
+          const isVisible = rect.top < window.innerHeight * 0.8;
+
+          if (isVisible) {
+            element.classList.add('revealed');
+          }
+        });
+
+        // Floating particles respond to scroll
+        const particles = document.querySelectorAll('.floating-particle');
+        particles.forEach((particle, index) => {
+          const speed = (index + 1) * 0.02;
+          const rotation = scrolled * speed;
+          (particle as HTMLElement).style.transform = `rotate(${rotation}deg)`;
+        });
+      } else {
+        setScrollY((prev) => (prev !== 0 ? 0 : prev));
+      }
+
+      // Sticky CTA bar should remain responsive on mobile
       const stickyCtaBar = document.getElementById('sticky-cta');
       if (stickyCtaBar) {
-        if (scrolled > window.innerHeight * 0.8) {
+        if (scrolled > window.innerHeight * 0.6) {
           stickyCtaBar.classList.add('sticky-cta-show');
         } else {
           stickyCtaBar.classList.remove('sticky-cta-show');
         }
       }
-
-      // Floating particles respond to scroll
-      const particles = document.querySelectorAll('.floating-particle');
-      particles.forEach((particle, index) => {
-        const speed = (index + 1) * 0.02;
-        const rotation = scrolled * speed;
-        (particle as HTMLElement).style.transform = `rotate(${rotation}deg)`;
-      });
     };
 
+    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [enableDesktopEffects]);
 
   // Enhanced intersection observer for advanced animations
   useEffect(() => {
+    if (!enableDesktopEffects) return;
+
     const observerOptions = {
       threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
       rootMargin: '0px 0px -10% 0px'
@@ -139,16 +183,18 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
     const elementsToObserve = document.querySelectorAll(
       '.fade-in-on-scroll, .scale-in-on-scroll, .stagger-animation'
     );
-    
+
     elementsToObserve.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, []);
+  }, [enableDesktopEffects]);
 
   // Premium button interactions
   useEffect(() => {
+    if (!enableDesktopEffects) return;
+
     const buttons = document.querySelectorAll('.btn-world-class, .cta-ultra-premium');
-    
+
     const handleButtonMouseEnter = (e: Event) => {
       const button = e.target as HTMLElement;
       button.style.setProperty('--hover-scale', '1.05');
@@ -170,7 +216,7 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
         button.removeEventListener('mouseleave', handleButtonMouseLeave);
       });
     };
-  }, []);
+  }, [enableDesktopEffects]);
 
   // Dynamic gradient animations
   useEffect(() => {
@@ -197,6 +243,8 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
 
   // Performance optimization: Request Animation Frame for smooth animations
   useEffect(() => {
+    if (!enableDesktopEffects) return;
+
     let ticking = false;
 
     const updateAnimations = () => {
@@ -213,15 +261,19 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
 
     window.addEventListener('scroll', requestTick, { passive: true });
     return () => window.removeEventListener('scroll', requestTick);
-  }, []);
+  }, [enableDesktopEffects]);
 
   return (
     <div 
       ref={containerRef}
       className="relative overflow-hidden"
       style={{
-        '--mouse-x': `${(mousePosition.x / (typeof window !== 'undefined' ? window.innerWidth : 1)) * 100}%`,
-        '--mouse-y': `${(mousePosition.y / (typeof window !== 'undefined' ? window.innerHeight : 1)) * 100}%`
+        '--mouse-x': enableDesktopEffects && typeof window !== 'undefined'
+          ? `${(mousePosition.x / window.innerWidth) * 100}%`
+          : '50%',
+        '--mouse-y': enableDesktopEffects && typeof window !== 'undefined'
+          ? `${(mousePosition.y / window.innerHeight) * 100}%`
+          : '50%'
       } as React.CSSProperties}
     >
       {/* Advanced background elements */}
