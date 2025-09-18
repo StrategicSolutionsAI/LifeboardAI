@@ -636,7 +636,7 @@ export function useTasks(selectedDate?: Date) {
         return true;
       }
 
-      if (!task.repeatRule || task.repeatRule === 'none') {
+      if (!task.repeatRule) {
         return dueDateStr === todayStr;
       }
 
