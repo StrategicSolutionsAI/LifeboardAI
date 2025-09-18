@@ -159,9 +159,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [formRepeat, setFormRepeat] = useState<RepeatOption>('none');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string } | null>(null);
   
   // Get tasks from context
-  const { allTasks, scheduledTasks, batchUpdateTasks, createTask } = useTasksContext();
+  const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask } = useTasksContext();
   
   // Use calendar sync hook
   const resolveTaskById = useCallback((taskId?: string | null) => {
@@ -860,7 +861,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             openTaskEditor(ev, dayStr);
                                           }
                                         }}
-                                        className={`p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        className={`group p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                         data-task-id={ev.taskId}
                                       >
@@ -882,9 +883,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               </div>
                                             )}
                                           </div>
-                                          <span className={`text-xs ${styles.badge} flex-shrink-0`}>
-                                            {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
-                                          </span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            {isLifeboardTask && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title });
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                                                title="Delete task"
+                                              >
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                              </button>
+                                            )}
+                                            <span className={`text-xs ${styles.badge}`}>
+                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     )}
@@ -1067,7 +1084,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             openTaskEditor(ev, dayStr);
                                           }
                                         }}
-                                        className={`p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        className={`group p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                       >
                                         <div className="flex items-start gap-1.5">
@@ -1088,9 +1105,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               </div>
                                             )}
                                           </div>
-                                          <span className={`text-[10px] ${styles.badge} flex-shrink-0`}>
-                                            {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
-                                          </span>
+                                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                                            {isLifeboardTask && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title });
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-0.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                                                title="Delete task"
+                                              >
+                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                              </button>
+                                            )}
+                                            <span className={`text-[10px] ${styles.badge}`}>
+                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     )}
@@ -1361,6 +1394,69 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   {editTaskId ? (isSubmitting ? 'Saving…' : 'Save changes') : (isSubmitting ? 'Creating…' : 'Create task')}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg w-96 max-w-[90%] p-6 shadow-xl">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Task</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Are you sure you want to delete this task?
+                </p>
+              </div>
+              <button 
+                className="text-gray-400 hover:text-gray-600" 
+                onClick={() => setDeleteConfirmTask(null)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {deleteConfirmTask.title}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                className="px-4 py-2 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => setDeleteConfirmTask(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                onClick={async () => {
+                  try {
+                    await deleteTask(deleteConfirmTask.id);
+                    setDeleteConfirmTask(null);
+                    
+                    // Remove from local event state to update UI immediately
+                    setEventsByDate(prev => {
+                      const updated = { ...prev };
+                      Object.keys(updated).forEach(dateKey => {
+                        updated[dateKey] = updated[dateKey].filter(ev => ev.taskId !== deleteConfirmTask.id);
+                        if (updated[dateKey].length === 0) {
+                          delete updated[dateKey];
+                        }
+                      });
+                      return updated;
+                    });
+                  } catch (error) {
+                    console.error('Failed to delete task:', error);
+                    // Could add error toast here
+                  }
+                }}
+              >
+                Delete Task
+              </button>
             </div>
           </div>
         </div>
