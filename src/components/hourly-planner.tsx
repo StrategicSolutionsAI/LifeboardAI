@@ -3,9 +3,9 @@
 // Enhanced hourly planner component with improved UX
 // Features: better visual hierarchy, time ranges, quick actions, and intuitive interactions
 
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { X, Plus } from "lucide-react";
+import { X } from "lucide-react";
 import {
   Droppable,
   Draggable,
@@ -107,7 +107,11 @@ interface HourlyPlannerProps {
   onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => void;
 }
 
-export default function HourlyPlanner({ 
+export interface HourlyPlannerHandle {
+  openAddTaskModal: (slot?: string) => void;
+}
+
+const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   className = "", 
   showTimeIndicator = true,
   allowResize = true,
@@ -117,7 +121,7 @@ export default function HourlyPlanner({
   wrapWithContext = true,
   plannerDate,
   onTaskOpen,
-}: HourlyPlannerProps) {
+}, ref) => {
   const {
     scheduledTasks,
     batchUpdateTasks,
@@ -420,6 +424,24 @@ export default function HourlyPlanner({
     return formatTimeSlot(hourStart);
   }, [currentSlot]);
 
+  useImperativeHandle(ref, () => ({
+    openAddTaskModal: (slot?: string) => {
+      const normalized = (() => {
+        if (slot) {
+          const cleaned = slot.startsWith('hour-') ? slot.replace('hour-', '') : slot;
+          if (TIME_SLOTS.includes(cleaned)) {
+            return cleaned;
+          }
+        }
+        if (currentSlot && TIME_SLOTS.includes(currentSlot)) {
+          return currentSlot;
+        }
+        return TIME_SLOTS[0];
+      })();
+      openAddModal(normalized);
+    },
+  }), [openAddModal, currentSlot]);
+
   // Auto-scroll to current time slot on mount
   useEffect(() => {
     if (!containerRef.current) return;
@@ -597,8 +619,6 @@ export default function HourlyPlanner({
           const isMainHour = timeSlot.indexOf(':') === -1;
           const hasTask = hourlyPlan[timeSlot].length > 0;
           const isCurrentSlot = currentSlot === timeSlot;
-          const showQuickAddButton = addModalSlot !== timeSlot;
-          const shouldDisableQuickAdd = effectiveDragging || Boolean(resizingTask);
           
           return (
           <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
@@ -858,28 +878,6 @@ export default function HourlyPlanner({
 
                 </ul>
 
-                {showQuickAddButton && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openAddModal(timeSlot);
-                      }}
-                      disabled={shouldDisableQuickAdd}
-                      className={`w-full h-full max-w-[360px] inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white/95 text-sm font-medium text-indigo-600 shadow-sm transition-opacity duration-150 ${
-                        shouldDisableQuickAdd
-                          ? 'opacity-0 pointer-events-none'
-                          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto'
-                      }`}
-                      aria-label={`Add task at ${timeSlot}`}
-                    >
-                      <Plus size={16} />
-                      <span>Add task</span>
-                    </button>
-                  </div>
-                )}
-
                 {/* Enhanced current-time indicator */}
                 {showTimeIndicator && isCurrentSlot && (
                   <div
@@ -924,4 +922,8 @@ export default function HourlyPlanner({
       {addTaskModal}
     </>
   );
-}
+});
+
+HourlyPlanner.displayName = "HourlyPlanner";
+
+export default HourlyPlanner;

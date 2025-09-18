@@ -40,7 +40,10 @@ function TaskError({ error, onRetry }: { error: Error; onRetry: () => void }) {
   );
 }
 
-export function TaskSidePanel() {
+export function TaskSidePanel({ onDragStart, onDragEnd }: {
+  onDragStart?: (result: any) => void;
+  onDragEnd?: (result: DropResult) => void;
+} = {}) {
   // Basic calendar / date state
   const [date, setDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -76,8 +79,8 @@ export function TaskSidePanel() {
 
   // Filter tasks for display - show all open tasks, including those without due dates
   const openTasksToShow = useMemo(() => {
-    // Include all non-completed tasks
-    return allTasks.filter(t => !t.completed);
+    // Include all non-completed tasks (master backlog)
+    return allTasks.filter((t) => !t.completed);
   }, [allTasks]);
 
   // New task input state
@@ -123,6 +126,11 @@ export function TaskSidePanel() {
 
   // Unified drag and drop handler
   function handleDragEnd(result: DropResult) {
+    console.log('📦 drag end', {
+      source: result.source?.droppableId,
+      destination: result.destination?.droppableId,
+      draggableId: result.draggableId,
+    });
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       setIsDragging(false);
@@ -133,18 +141,61 @@ export function TaskSidePanel() {
 
     const { source, destination, draggableId } = result;
 
+    const matches = (value: string | undefined | null, target: string) => {
+      if (!value) return false;
+      const normalized = value.toLowerCase();
+      const simpleTarget = target.toLowerCase();
+      return normalized === simpleTarget || normalized.includes(simpleTarget);
+    };
+
+    const sourceIs = (target: string) => matches(source.droppableId, target);
+    const destinationIs = (target: string) => matches(destination?.droppableId, target);
+
+    const findTask = (id: string) => allTasks.find(t => t.id?.toString?.() === id?.toString?.());
+
     // Helper functions
     const isHour = (id: string) => id.startsWith('hour-');
-    const hourKey = (id: string) => id.replace('hour-', '');
 
     // Same list reorder - no API call needed for now
-    if (source.droppableId === destination.droppableId && source.index !== destination.index) {
+    if (source.droppableId === destination?.droppableId && source.index !== destination.index) {
       // not implemented yet
       return;
     }
 
+    if ((sourceIs('openTasks') || sourceIs('upcomingTasks')) && destinationIs('dailyTasks')) {
+      const task = findTask(draggableId);
+      const updatedDue = task?.due ? { ...task.due, date: selectedDateStr, datetime: undefined } : { date: selectedDateStr };
+      batchUpdateTasks([
+        {
+          taskId: draggableId,
+          updates: {
+            due: updatedDue as any,
+            hourSlot: null as any,
+          },
+        },
+      ]).catch(error => {
+        console.error('Failed to schedule task for today:', error);
+      });
+      return;
+    }
+
+    if (sourceIs('dailyTasks') && (destinationIs('openTasks') || destinationIs('upcomingTasks'))) {
+      batchUpdateTasks([
+        {
+          taskId: draggableId,
+          updates: {
+            due: null as any,
+            hourSlot: null as any,
+          },
+        },
+      ]).catch(error => {
+        console.error('Failed to move task out of today list:', error);
+      });
+      return;
+    }
+
     // Handle moves to/from hourly planner
-    if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
+    if (sourceIs('dailyTasks') && isHour(destination?.droppableId ?? '')) {
       // Daily task → Hour slot: Set the hourSlot to schedule the task
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
@@ -155,7 +206,7 @@ export function TaskSidePanel() {
       return;
     }
 
-    if ((source.droppableId === 'openTasks' || source.droppableId === 'upcomingTasks') && isHour(destination.droppableId)) {
+    if ((sourceIs('openTasks') || sourceIs('upcomingTasks')) && isHour(destination?.droppableId ?? '')) {
       // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
@@ -166,7 +217,7 @@ export function TaskSidePanel() {
       return;
     }
 
-    if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
+    if (isHour(source.droppableId) && destinationIs('dailyTasks')) {
       // Hour slot → Daily list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: null as any } }
@@ -176,7 +227,7 @@ export function TaskSidePanel() {
       return;
     }
 
-    if (isHour(source.droppableId) && (destination.droppableId === 'openTasks' || destination.droppableId === 'upcomingTasks')) {
+    if (isHour(source.droppableId) && (destinationIs('openTasks') || destinationIs('upcomingTasks'))) {
       // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: null as any } }
@@ -321,8 +372,14 @@ export function TaskSidePanel() {
         {/* Lists */}
         <div className="mt-6 flex-1 overflow-y-auto flex flex-col" style={{ transform: 'none' }}>
           <DragDropContext 
-            onDragStart={() => setIsDragging(true)}
-            onDragEnd={handleDragEnd}
+            onDragStart={(initial) => {
+              setIsDragging(true);
+              onDragStart?.(initial);
+            }}
+            onDragEnd={(result) => {
+              handleDragEnd(result);
+              onDragEnd?.(result);
+            }}
           >
             {/* Today view */}
             {taskView === "Today" && (
@@ -496,6 +553,79 @@ export function TaskSidePanel() {
             {/* Master List view */}
             {taskView === "Master List" && (
               <>
+                <Droppable droppableId="dailyTasks">
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="mb-6 rounded-2xl border border-theme-neutral-200 bg-theme-surface-raised shadow-sm"
+                    >
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-theme-neutral-200">
+                        <div>
+                          <h4 className="text-sm font-semibold text-theme-text-primary">Today's Tasks</h4>
+                          <p className="text-xs text-theme-text-tertiary mt-1">
+                            Drag a task from your master list to focus on it today.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setTaskView("Today")}
+                          className="text-xs font-semibold text-theme-primary-600 hover:text-theme-primary-700"
+                        >
+                          View list
+                        </button>
+                      </div>
+                      <ul
+                        className="space-y-3 px-4 py-4 text-sm text-theme-text-secondary min-h-[120px]"
+                      >
+                        {error ? (
+                          <TaskError error={error} onRetry={refetch} />
+                        ) : loading && dailyVisibleTasks.length === 0 ? (
+                          Array.from({ length: 2 }).map((_, i) => <TaskSkeleton key={i} />)
+                        ) : !loading && dailyVisibleTasks.length === 0 ? (
+                          <li className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-theme-neutral-200 bg-theme-surface px-6 py-6 text-center text-theme-text-tertiary">
+                            <span className="text-base font-semibold text-theme-text-secondary">No tasks for today</span>
+                            <span className="text-xs text-theme-text-tertiary">
+                              Drag a task from "All open tasks" below to add it here.
+                            </span>
+                          </li>
+                        ) : (
+                          dailyVisibleTasks.map((t: Task, index: number) => (
+                            <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                              {(prov) => (
+                                <li
+                                  ref={prov.innerRef}
+                                  {...prov.draggableProps}
+                                  {...prov.dragHandleProps}
+                                  style={prov.draggableProps.style}
+                                  className="flex items-start gap-3 px-4 py-4 bg-theme-surface-raised border border-theme-neutral-200 shadow-sm rounded-lg"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    aria-label={t.content}
+                                    checked={t.completed ?? false}
+                                    disabled={isCompletingTask[t.id.toString()]}
+                                    onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                    className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
+                                  />
+                                  <div className="flex-1">
+                                    <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
+                                    {t.due?.date && (
+                                      <div className="text-xs text-theme-text-tertiary mt-1">
+                                        Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              )}
+                            </Draggable>
+                          ))
+                        )}
+                        {provided.placeholder}
+                      </ul>
+                    </div>
+                  )}
+                </Droppable>
+
                 <div className="flex items-center justify-between text-sm font-medium text-theme-text-primary mb-2">
                   <div 
                     className="flex items-center gap-2 cursor-pointer select-none flex-1"

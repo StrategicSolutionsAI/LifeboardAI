@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   addMonths,
   subMonths,
@@ -20,10 +20,11 @@ import {
   isWithinInterval,
 } from "date-fns";
 
-import HourlyPlanner from "@/components/hourly-planner";
+import { Droppable, Draggable } from "@hello-pangea/dnd";
+import { Plus } from "lucide-react";
+import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
-import { Droppable, Draggable } from "@hello-pangea/dnd";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -160,6 +161,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string } | null>(null);
+  const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   
   // Get tasks from context
   const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask } = useTasksContext();
@@ -688,16 +690,29 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         <div className="w-full">
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
             <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                {format(currentDate, "EEEE, MMMM d, yyyy")}
-              </h2>
-              <p className="text-sm text-gray-600 mt-2 font-medium">
-                Plan your day with precision scheduling
-              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                    {format(currentDate, "EEEE, MMMM d, yyyy")}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-2 font-medium">
+                    Plan your day with precision scheduling
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                >
+                  <Plus size={16} />
+                  <span>Add task</span>
+                </button>
+              </div>
             </div>
             
             <div className="p-6">
               <HourlyPlanner 
+                ref={hourlyPlannerRef}
                 className="max-h-[75vh] overflow-y-auto rounded-xl" 
                 showTimeIndicator={true}
                 allowResize={true}

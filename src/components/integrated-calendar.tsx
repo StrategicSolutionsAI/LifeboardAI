@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   addDays,
   addMonths,
@@ -16,7 +16,7 @@ import {
   subMonths,
 } from "date-fns";
 import { Plus } from "lucide-react";
-import HourlyPlanner from "@/components/hourly-planner";
+import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
 
@@ -60,6 +60,7 @@ export default function IntegratedCalendar() {
   const [anchorDate, setAnchorDate] = useState<Date>(startOfDay(new Date()));
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   const today = startOfDay(new Date());
 
   // Navigation helpers
@@ -419,12 +420,24 @@ export default function IntegratedCalendar() {
         <div className="mx-6 mb-6">
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
             <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
-              <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
-                {format(anchorDate, "EEEE, MMMM d, yyyy")}
-              </h3>
-              <p className="text-sm text-gray-600 mt-2 font-medium">
-                Plan your day with precision scheduling
-              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
+                    {format(anchorDate, "EEEE, MMMM d, yyyy")}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-2 font-medium">
+                    Plan your day with precision scheduling
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                >
+                  <Plus size={16} />
+                  <span>Add task</span>
+                </button>
+              </div>
             </div>
             
             <div className="p-6">
@@ -449,7 +462,11 @@ export default function IntegratedCalendar() {
                   }
                 }}
               >
-                <HourlyPlanner className="max-h-[75vh] overflow-y-auto rounded-xl" isDragging={isDragging} />
+                <HourlyPlanner
+                  ref={hourlyPlannerRef}
+                  className="max-h-[75vh] overflow-y-auto rounded-xl"
+                  isDragging={isDragging}
+                />
               </DragDropContext>
             </div>
           </div>

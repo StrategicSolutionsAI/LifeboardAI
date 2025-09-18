@@ -309,11 +309,43 @@ function CalendarContent() {
       return;
     }
 
+    if (source.droppableId === 'openTasks' && destination.droppableId === 'masterTodayTasks') {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+      batchUpdateTasks([
+        {
+          taskId: draggableId,
+          updates: {
+            due: { date: dateStr },
+            hourSlot: null as any,
+          },
+        },
+      ]).catch((error) => {
+        console.error('Failed to move task into Today list:', error);
+      });
+      return;
+    }
+
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
       batchUpdateTasks([
         { taskId: draggableId, updates: { due: undefined } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
+      });
+      return;
+    }
+
+    if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
+      batchUpdateTasks([
+        {
+          taskId: draggableId,
+          updates: {
+            due: null as any,
+            hourSlot: null as any,
+          },
+        },
+      ]).catch((error) => {
+        console.error('Failed to move task out of Today list:', error);
       });
       return;
     }

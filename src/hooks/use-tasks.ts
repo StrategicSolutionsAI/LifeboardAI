@@ -482,18 +482,42 @@ export function useTasks(selectedDate?: Date) {
   // Batch update for drag and drop
   const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task> }[]) => {
     console.log('🚀 batchUpdateTasks called with:', updates);
-    
-    // Update optimistically by applying updates to matching tasks
-    const updater = (tasks: Task[] | null) => {
-      if (!tasks) return []
-      return tasks.map(task => {
-        const update = updates.find(u => u.taskId?.toString?.() === task.id?.toString?.())
-        return update ? { ...task, ...update.updates } : task
-      })
-    }
-    
-    updateDailyOptimistically(updater)
-    updateAllOptimistically(updater)
+
+    const resolveTask = (id: string): Task | undefined => {
+      const lookup = id.toString();
+      return (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
+        || (allTasks || []).find(t => t.id?.toString?.() === lookup);
+    };
+
+    const mergeTasks = (current: Task[] | null, { constrainToDate }: { constrainToDate?: boolean } = {}) => {
+      const map = new Map<string, Task>();
+      (current || []).forEach(task => {
+        map.set(task.id?.toString?.() ?? '', task);
+      });
+
+      updates.forEach(({ taskId, updates: partial }) => {
+        const key = taskId?.toString?.() ?? '';
+        if (!key) return;
+        const original = map.get(key) ?? resolveTask(key);
+        const merged: Task = {
+          id: original?.id ?? key,
+          content: partial.content ?? original?.content ?? '',
+          completed: partial.completed ?? original?.completed ?? false,
+          ...original,
+          ...partial,
+        };
+        map.set(key, merged);
+      });
+
+      let next = Array.from(map.values());
+      if (constrainToDate) {
+        next = next.filter(task => task.due?.date === dateStr);
+      }
+      return next;
+    };
+
+    updateDailyOptimistically(tasks => mergeTasks(tasks, { constrainToDate: true }));
+    updateAllOptimistically(tasks => mergeTasks(tasks));
     
     // Send batch update to server (soft-fail if API unreachable)
     try {
@@ -602,19 +626,53 @@ export function useTasks(selectedDate?: Date) {
   );
 
   const scheduledTasks = useMemo(() => {
-    // Use the selected date for context instead of always "today"
     const targetDateStr = dateStr;
 
-    // From daily tasks (already scoped to selected date)
-    const dailyScheduled = (dailyTasks || []).filter(t => !t.completed && t.hourSlot);
+    const occursOnDate = (task: Task, todayStr: string) => {
+      if (!task || task.completed || !task.hourSlot) return false;
+      const dueDateStr = task.due?.date;
+      if (!dueDateStr) {
+        // Legacy tasks without a due date fallback to displaying whenever selected
+        return true;
+      }
 
-    // From all tasks: include tasks with hourSlot that are undated or dated to the selected date
-    const allScheduled = (allTasks || []).filter(t => {
-      if (t.completed || !t.hourSlot) return false;
-      return !t.due?.date || t.due.date === targetDateStr;
-    });
+      if (!task.repeatRule || task.repeatRule === 'none') {
+        return dueDateStr === todayStr;
+      }
 
-    // Combine and deduplicate by id
+      const target = new Date(`${todayStr}T00:00:00`);
+      const due = new Date(`${dueDateStr}T00:00:00`);
+      if (target < due) return false;
+
+      const day = target.getDay();
+      const dueDay = due.getDay();
+      const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+
+      switch (task.repeatRule) {
+        case 'daily':
+          return true;
+        case 'weekdays':
+          return day >= 1 && day <= 5;
+        case 'weekly':
+          return diffDays % 7 === 0 && day === dueDay;
+        case 'monthly': {
+          const dueDateNum = due.getDate();
+          const targetDateNum = target.getDate();
+          const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          if (dueDateNum > daysInTargetMonth) {
+            return targetDateNum === daysInTargetMonth;
+          }
+          return targetDateNum === dueDateNum;
+        }
+        default:
+          return false;
+      }
+    };
+
+    const dailyScheduled = (dailyTasks || []).filter(t => occursOnDate(t as Task, targetDateStr));
+
+    const allScheduled = (allTasks || []).filter(t => occursOnDate(t as Task, targetDateStr));
+
     const taskMap = new Map<string, Task>();
     [...dailyScheduled, ...allScheduled].forEach(task => {
       taskMap.set(task.id, task);
