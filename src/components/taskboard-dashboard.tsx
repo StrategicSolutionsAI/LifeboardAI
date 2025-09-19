@@ -591,6 +591,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Widget selection for filtering
   const [selectedLogsWidget, setSelectedLogsWidget] = useState<string | 'all'>('all');
   const [selectedSettingsWidget, setSelectedSettingsWidget] = useState<string | 'all'>('all');
+  const activeWidgets = useMemo(() => getDisplayWidgets(activeBucket), [widgetsByBucket, activeBucket]);
   
   // Debounced persistence of bucket order to Supabase
   const debouncedSaveBucketsToSupabase = useRef(
@@ -1917,10 +1918,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   // Filter out debug widgets when displaying
-  const getDisplayWidgets = (bucket: string) => {
+  function getDisplayWidgets(bucket: string) {
     const widgets = widgetsByBucket[bucket] ?? [];
-    return widgets.filter(w => !w.instanceId?.startsWith('debug-'));
-  };
+    return widgets.filter((w) => !w.instanceId?.startsWith('debug-'));
+  }
 
   const handleSaveWidget = (updated: WidgetInstance) => {
     if (!editingBucket) return;
@@ -2546,27 +2547,29 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr' : 'hidden'}>
                   {/* Refresh card */}
-                  <div
-                    onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                    className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02]"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
-                        {isRefreshing ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-white" />
-                        ) : (
-                          <RotateCw className="h-5 w-5 text-white" />
-                        )}
+                  {activeWidgets.length > 0 && (
+                    <div
+                      onClick={isRefreshing ? undefined : fetchIntegrationsData}
+                      className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02]"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
+                          {isRefreshing ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                          ) : (
+                            <RotateCw className="h-5 w-5 text-white" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium truncate">Refresh</span>
                       </div>
-                      <span className="text-sm font-medium truncate">Refresh</span>
+                      <p className="mt-2 text-xs text-gray-500 truncate">Sync integrations</p>
+                      {/* Invisible progress bar placeholder to equalize height */}
+                      <div className="mt-3 h-1 bg-transparent" />
                     </div>
-                    <p className="mt-2 text-xs text-gray-500 truncate">Sync integrations</p>
-                    {/* Invisible progress bar placeholder to equalize height */}
-                    <div className="mt-3 h-1 bg-transparent" />
-                  </div>
+                  )}
 
                   {/* Widget cards */}
-                  {getDisplayWidgets(activeBucket).map((w) => {
+                  {activeWidgets.map((w) => {
                     // Determine today's progress value and percentage towards target
                     let todayVal = 0;
                     let isFitbitData = false;
@@ -3262,7 +3265,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                 {activeSubTab === 'Trends' && (
                   <TrendsPanel 
-                    widgets={getDisplayWidgets(activeBucket)} 
+                    widgets={activeWidgets} 
                     bucketName={activeBucket}
                   />
                 )}
@@ -3296,7 +3299,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-xl font-semibold">Widget Logs</h2>
                       <WidgetSelector
-                        widgets={getDisplayWidgets(activeBucket)}
+                        widgets={activeWidgets}
                         selectedWidget={selectedLogsWidget}
                         onWidgetChange={setSelectedLogsWidget}
                         showAllOption={true}
@@ -3306,7 +3309,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     
                     {/* Logs Content */}
                     <div className="space-y-4">
-                      {getDisplayWidgets(activeBucket).length === 0 ? (
+                      {activeWidgets.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                           <p>No widgets available to show logs for.</p>
                           <p className="text-sm mt-2">Add some widgets to see their activity logs here.</p>
@@ -3315,7 +3318,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         <div className="bg-white rounded-lg border border-gray-200 p-6">
                           <h3 className="text-lg font-medium mb-4">
                             {selectedLogsWidget === 'all' ? 'All Widget Activity' : 
-                             `${getDisplayWidgets(activeBucket).find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
+                             `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
                           </h3>
                           <div className="space-y-3">
                             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
@@ -3352,7 +3355,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-xl font-semibold">Widget Settings</h2>
                       <WidgetSelector
-                        widgets={getDisplayWidgets(activeBucket)}
+                        widgets={activeWidgets}
                         selectedWidget={selectedSettingsWidget}
                         onWidgetChange={setSelectedSettingsWidget}
                         showAllOption={true}
@@ -3362,14 +3365,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     
                     {/* Settings Content */}
                     <div className="space-y-6">
-                      {getDisplayWidgets(activeBucket).length === 0 ? (
+                      {activeWidgets.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
                           <p>No widgets available to configure.</p>
                           <p className="text-sm mt-2">Add some widgets to manage their settings here.</p>
                         </div>
                       ) : (
                         <div className="grid gap-6">
-                          {(selectedSettingsWidget === 'all' ? getDisplayWidgets(activeBucket) : getDisplayWidgets(activeBucket).filter(w => w.instanceId === selectedSettingsWidget)).map((widget) => (
+                          {(selectedSettingsWidget === 'all' ? activeWidgets : activeWidgets.filter(w => w.instanceId === selectedSettingsWidget)).map((widget) => (
                             <div key={widget.instanceId} className="bg-white rounded-lg border border-gray-200 p-6">
                               <div className="flex items-center gap-3 mb-4">
                                 <span className="text-2xl">{typeof widget.icon === 'string' ? widget.icon : '📊'}</span>
