@@ -16,7 +16,7 @@ export interface Task {
   id: string
   content: string
   completed: boolean
-  due?: TaskDue
+  due?: TaskDue | null
   duration?: number
   hourSlot?: string
   bucket?: string
@@ -36,6 +36,7 @@ export function useTasks(selectedDate?: Date) {
   // Track whether Todoist is connected in this session; null = unknown
   const todoistConnectedRef = useRef<boolean | null>(null)
   const lastSeenUpdateRef = useRef<number>(0)
+  const sharedFetchRef = useRef<Promise<Task[]> | null>(null)
 
   const dateStr = selectedDate 
     ? format(selectedDate, 'yyyy-MM-dd')
@@ -45,108 +46,91 @@ export function useTasks(selectedDate?: Date) {
   // Cache key includes date for date-specific tasks
   const dailyCacheKey = `tasks-daily-${dateStr}`
   const allCacheKey = 'tasks-all-open'
-  
-  // Fetch daily tasks
-  const dailyTasksFetcher = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/integrations/todoist/tasks?date=${dateStr}`, {
-        credentials: 'same-origin'
-      })
-      if (!res.ok) {
-        // Handle auth and upstream errors gracefully
-        if (res.status === 400 || res.status === 401) {
-          // Treat as no Todoist connection – fall back to Supabase tasks
-          todoistConnectedRef.current = false
-          const supa = await fetch(`/api/tasks?date=${dateStr}`, { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            return Array.isArray(json) ? json : (json.tasks ?? [])
-          }
-          return []
-        }
-        if (res.status >= 500 || res.status === 429) {
-          console.warn(`Upstream error fetching daily tasks: ${res.status} (treat as empty to avoid UI crash)`) 
-          return []
-        }
-        throw new Error(`Failed to fetch daily tasks: ${res.status}`)
-      }
-      const data = await res.json()
-      todoistConnectedRef.current = true
-      return Array.isArray(data) ? data : (data.tasks ?? [])
-    } catch (error) {
-      // Network error – fall back to local tasks if available
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        // Try Supabase API first
-        try {
-          const supa = await fetch(`/api/tasks?date=${dateStr}`, { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            return Array.isArray(json) ? json : (json.tasks ?? [])
-          }
-        } catch {}
-        // Offline fallback to localStorage
-        try {
-          if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('lifeboard_local_tasks')
-            const list: Task[] = raw ? JSON.parse(raw) : []
-            return list.filter(t => !t.completed && t.due?.date === dateStr)
-          }
-        } catch {}
-        return []
-      }
-      throw error
+
+  const fetchAllOpenTasks = useCallback(async (): Promise<Task[]> => {
+    if (sharedFetchRef.current) {
+      return sharedFetchRef.current
     }
-  }, [dateStr])
-  
-  // Fetch all open tasks
-  const allTasksFetcher = useCallback(async () => {
-    try {
-      const res = await fetch('/api/integrations/todoist/tasks?all=true', {
-        credentials: 'same-origin'
-      })
-      if (!res.ok) {
-        // Handle auth and upstream errors gracefully
-        if (res.status === 400 || res.status === 401) {
-          // Treat as no Todoist connection – fall back to Supabase tasks
-          todoistConnectedRef.current = false
-          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            return Array.isArray(json) ? json : (json.tasks ?? [])
+
+    const inflight = (async () => {
+      try {
+        const res = await fetch('/api/integrations/todoist/tasks?all=true', {
+          credentials: 'same-origin'
+        })
+        if (!res.ok) {
+          if (res.status === 400 || res.status === 401) {
+            todoistConnectedRef.current = false
+            const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+            if (supa.ok) {
+              const json = await supa.json()
+              return Array.isArray(json) ? json : (json.tasks ?? [])
+            }
+            return []
           }
+          if (res.status >= 500 || res.status === 429) {
+            console.warn(`Upstream error fetching tasks: ${res.status} (treat as empty to avoid UI crash)`)
+            return []
+          }
+          throw new Error(`Failed to fetch tasks: ${res.status}`)
+        }
+        const data = await res.json()
+        todoistConnectedRef.current = true
+        return Array.isArray(data) ? data : (data.tasks ?? [])
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          try {
+            const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+            if (supa.ok) {
+              const json = await supa.json()
+              return Array.isArray(json) ? json : (json.tasks ?? [])
+            }
+          } catch {}
+          try {
+            if (typeof window !== 'undefined') {
+              const raw = window.localStorage.getItem('lifeboard_local_tasks')
+              const list: Task[] = raw ? JSON.parse(raw) : []
+              return list.filter(t => !t.completed)
+            }
+          } catch {}
           return []
         }
-        if (res.status >= 500 || res.status === 429) {
-          console.warn(`Upstream error fetching all tasks: ${res.status} (treat as empty to avoid UI crash)`) 
-          return []
-        }
-        throw new Error(`Failed to fetch all tasks: ${res.status}`)
+        throw error
+      } finally {
+        sharedFetchRef.current = null
       }
-      const data = await res.json()
-      todoistConnectedRef.current = true
-      return Array.isArray(data) ? data : (data.tasks ?? [])
-    } catch (error) {
-      // Network error – try Supabase API, then local tasks
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        try {
-          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            return Array.isArray(json) ? json : (json.tasks ?? [])
-          }
-        } catch {}
-        try {
-          if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('lifeboard_local_tasks')
-            const list: Task[] = raw ? JSON.parse(raw) : []
-            return list.filter(t => !t.completed)
-          }
-        } catch {}
-        return []
-      }
-      throw error
-    }
+    })()
+
+    sharedFetchRef.current = inflight
+    return inflight
   }, [])
+
+  // Fetch daily tasks by filtering the shared payload
+  const dailyTasksFetcher = useCallback(async () => {
+    const tasks = await fetchAllOpenTasks()
+    return tasks.filter(task => {
+      const due = task?.due
+      if (!due) return false
+      if (typeof due.date === 'string') {
+        return due.date.slice(0, 10) === dateStr
+      }
+      if (typeof due.datetime === 'string') {
+        return due.datetime.slice(0, 10) === dateStr
+      }
+      return false
+    })
+  }, [fetchAllOpenTasks, dateStr])
+
+  // Fetch all open tasks (reuses shared fetch)
+  const allTasksFetcher = useCallback(async () => {
+    const tasks = await fetchAllOpenTasks()
+    const normalized = Array.isArray(tasks) ? [...tasks] : []
+    normalized.sort((a: any, b: any) => {
+      const posA = a.position ?? Number.MAX_SAFE_INTEGER
+      const posB = b.position ?? Number.MAX_SAFE_INTEGER
+      return posA - posB
+    })
+    return normalized
+  }, [fetchAllOpenTasks])
   
   // Use data cache for both daily and all tasks
   const {

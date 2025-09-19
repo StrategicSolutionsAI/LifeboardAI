@@ -29,6 +29,9 @@ interface EnhancedTaskCardProps {
   onQuickAction?: (taskId: string, action: string) => void;
   availableBuckets?: string[];
   batchUpdateTasks?: any;
+  isRescheduleActive?: boolean;
+  onRescheduleSelect?: (taskId: string, newDate: string | null) => void | Promise<void>;
+  onRescheduleCancel?: () => void;
 }
 
 function EnhancedTaskCard({ 
@@ -39,7 +42,10 @@ function EnhancedTaskCard({
   onExpand, 
   onQuickAction, 
   availableBuckets = [],
-  batchUpdateTasks 
+  batchUpdateTasks,
+  isRescheduleActive = false,
+  onRescheduleSelect,
+  onRescheduleCancel,
 }: EnhancedTaskCardProps) {
   const getPriorityStyles = (priority?: string | number) => {
     const priorityStr = priority?.toString().toLowerCase();
@@ -97,6 +103,36 @@ function EnhancedTaskCard({
 
   const dueDateInfo = formatDueDate(task.due);
   const priorityStyles = getPriorityStyles(task.priority);
+  const [customRescheduleDate, setCustomRescheduleDate] = useState(task.due?.date ?? '');
+
+  useEffect(() => {
+    if (isRescheduleActive) {
+      setCustomRescheduleDate(task.due?.date ?? '');
+    }
+  }, [isRescheduleActive, task.due?.date]);
+
+  const quickRescheduleOptions = useMemo(() => {
+    const base = task.due?.date
+      ? parse(task.due.date, 'yyyy-MM-dd', new Date())
+      : new Date();
+    const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+    const today = new Date();
+
+    return [
+      { label: 'Today', value: format(today, 'yyyy-MM-dd') },
+      { label: 'Tomorrow', value: format(addDays(today, 1), 'yyyy-MM-dd') },
+      { label: 'Next Week', value: format(addDays(safeBase, 7), 'yyyy-MM-dd') },
+      { label: 'Next Monday', value: format(startOfWeek(addDays(safeBase, 7), { weekStartsOn: 1 }), 'yyyy-MM-dd') },
+      { label: 'Clear due date', value: null as string | null },
+    ];
+  }, [task.due?.date]);
+
+  const currentDueDate = task.due?.date ?? null;
+  const rescheduleButtonClasses = `group flex items-center gap-2 px-3 py-2 text-xs font-medium transition-all duration-200 rounded-lg shadow-sm border ${
+    isRescheduleActive
+      ? 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
+      : 'text-gray-600 hover:text-indigo-600 bg-white/80 hover:bg-indigo-50 border-gray-200/60 hover:border-indigo-200'
+  }`;
   
   return (
     <Draggable draggableId={task.id.toString()} index={index} key={task.id}>
@@ -204,46 +240,106 @@ function EnhancedTaskCard({
               )}
               
               {/* Premium Action Buttons */}
-              <div className="flex items-center gap-2 mt-4 flex-wrap">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAction?.(task.id.toString(), 'reschedule');
-                  }}
-                  className="group flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 hover:text-indigo-600 bg-white/80 hover:bg-indigo-50 border border-gray-200/60 hover:border-indigo-200 rounded-lg transition-all duration-200 shadow-sm hover:shadow"
-                >
-                  <Calendar size={14} className="group-hover:scale-110 transition-transform duration-200" />
-                  Reschedule
-                </button>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAction?.(task.id.toString(), 'priority');
-                  }}
-                  className="group flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 hover:text-orange-600 bg-white/80 hover:bg-orange-50 border border-gray-200/60 hover:border-orange-200 rounded-lg transition-all duration-200 shadow-sm hover:shadow"
-                >
-                  <Star size={14} className="group-hover:scale-110 transition-transform duration-200" />
-                  Priority
-                </button>
-                
-                {availableBuckets?.length > 0 && (
-                  <select
-                    value={task.bucket || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      batchUpdateTasks?.([
-                        { taskId: task.id.toString(), updates: { bucket: val || undefined } }
-                      ]).catch((err: any) => console.error('Failed to update bucket', err));
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAction?.(task.id.toString(), 'reschedule');
                     }}
-                    className="px-3 py-2 text-xs font-medium bg-white/80 border border-gray-200/60 rounded-lg hover:bg-gray-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all duration-200 shadow-sm"
-                    onClick={(e) => e.stopPropagation()}
+                    className={rescheduleButtonClasses}
                   >
-                    <option value="">No project</option>
-                    {availableBuckets.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
+                    <Calendar
+                      size={14}
+                      className={`transition-transform duration-200 ${
+                        isRescheduleActive ? 'text-indigo-600' : 'text-gray-500 group-hover:text-indigo-600'
+                      } group-hover:scale-110`}
+                    />
+                    Reschedule
+                  </button>
+
+                  {availableBuckets?.length > 0 && (
+                    <select
+                      value={task.bucket || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        batchUpdateTasks?.([
+                          { taskId: task.id.toString(), updates: { bucket: val || undefined } }
+                        ]).catch((err: any) => console.error('Failed to update bucket', err));
+                      }}
+                      className="px-3 py-2 text-xs font-medium bg-white/80 border border-gray-200/60 rounded-lg hover:bg-gray-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all duration-200 shadow-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="">No project</option>
+                      {availableBuckets.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {isRescheduleActive && (
+                  <div
+                    className="w-full rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 shadow-inner"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <p className="text-xs font-semibold text-indigo-700 mb-2">Quick reschedule</p>
+                    <div className="flex flex-wrap gap-2">
+                      {quickRescheduleOptions.map(({ label, value }) => {
+                        const isCurrent = value === currentDueDate || (!value && !currentDueDate);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors duration-200 ${
+                              isCurrent
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                : 'bg-white text-gray-600 border-indigo-200 hover:bg-indigo-100 hover:text-indigo-700'
+                            }`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void onRescheduleSelect?.(task.id.toString(), value);
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <input
+                        type="date"
+                        value={customRescheduleDate}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => setCustomRescheduleDate(event.target.value)}
+                        className="rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed"
+                        disabled={!customRescheduleDate}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!customRescheduleDate) return;
+                          void onRescheduleSelect?.(task.id.toString(), customRescheduleDate);
+                        }}
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-transparent text-indigo-600 hover:underline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRescheduleCancel?.();
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -326,6 +422,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     nextWeek: true,
     later: true
   });
+  const [rescheduleTaskId, setRescheduleTaskId] = useState<string | null>(null);
 
   // Filter upcoming tasks by selected bucket if provided
   const filteredUpcomingTasks = useMemo(() => {
@@ -388,8 +485,25 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
   // Handle quick actions
   const handleQuickAction = useCallback((taskId: string, action: string) => {
-    console.log(`Quick action: ${action} for task ${taskId}`);
-    // TODO: Implement quick actions like reschedule, priority change, etc.
+    if (action === 'reschedule') {
+      setRescheduleTaskId((prev) => (prev === taskId ? null : taskId));
+    }
+  }, []);
+
+  const handleRescheduleSelect = useCallback(async (taskId: string, newDate: string | null) => {
+    try {
+      await batchUpdateTasks([
+        { taskId, updates: { due: newDate ? { date: newDate } : null } },
+      ]);
+    } catch (error) {
+      console.error('Failed to reschedule task', error);
+    } finally {
+      setRescheduleTaskId(null);
+    }
+  }, [batchUpdateTasks]);
+
+  const handleRescheduleCancel = useCallback(() => {
+    setRescheduleTaskId(null);
   }, []);
 
   // Toggle group collapse state
@@ -1257,6 +1371,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                 onQuickAction={handleQuickAction}
                                 availableBuckets={availableBuckets}
                                 batchUpdateTasks={batchUpdateTasks}
+                                isRescheduleActive={rescheduleTaskId === task.id.toString()}
+                                onRescheduleSelect={handleRescheduleSelect}
+                                onRescheduleCancel={handleRescheduleCancel}
                               />
                             ))}
                             {provided.placeholder}
