@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   addMonths,
   subMonths,
@@ -25,6 +25,7 @@ import { Plus } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
+import { useDataCache } from "@/hooks/use-data-cache";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -481,6 +482,47 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
   }, [currentDate, view]);
 
+  const dateRange = useMemo(() => getDateRange(), [getDateRange]);
+  const rangeStartMs = dateRange.start.getTime();
+  const rangeEndMs = dateRange.end.getTime();
+
+  const googleCacheKey = useMemo(() => {
+    const startKey = format(new Date(rangeStartMs), 'yyyy-MM-dd');
+    const endKey = format(new Date(rangeEndMs), 'yyyy-MM-dd');
+    return `calendar-google-${view}-${startKey}-${endKey}`;
+  }, [rangeStartMs, rangeEndMs, view]);
+
+  const googleEventsFetcher = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        timeMin: new Date(rangeStartMs).toISOString(),
+        timeMax: new Date(rangeEndMs).toISOString(),
+        maxResults: '2500',
+      });
+      const resp = await fetch(`/api/integrations/google/calendar/events?${params.toString()}`);
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          return [];
+        }
+        throw new Error(`Failed to fetch Google events: ${resp.status}`);
+      }
+      const payload = await resp.json();
+      return Array.isArray(payload.events) ? payload.events : [];
+    } catch (error) {
+      console.error('Failed to fetch Google events', error);
+      return [];
+    }
+  }, [rangeStartMs, rangeEndMs]);
+
+  const {
+    data: googleEventsRaw,
+  } = useDataCache<any[] | null>(googleCacheKey, googleEventsFetcher, {
+    ttl: 5 * 60 * 1000,
+    prefetch: false,
+  });
+
+  const googleEvents = useMemo(() => (Array.isArray(googleEventsRaw) ? googleEventsRaw : []), [googleEventsRaw]);
+
   const getMatrix = () => {
     switch (view) {
       case 'month':
@@ -524,82 +566,40 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     else if (availableBuckets.length > 0) setFormBucket((prev) => prev || availableBuckets[0]);
   }, [selectedBucket, availableBuckets]);
 
-  // Fetch events whenever date range or view changes
+  // Build events map whenever data sources change
   useEffect(() => {
-    async function fetchEvents() {
-      const { start, end } = getDateRange();
-      const timeMin = start.toISOString();
-      const timeMax = end.toISOString();
+    const map: Record<string, DayEvent[]> = {};
 
-      const map: Record<string, DayEvent[]> = {};
+    googleEvents.forEach((ev: any) => {
+      const startInfo = ev?.start ?? {};
+      const dateStr = startInfo.date ?? (startInfo.dateTime ? startInfo.dateTime.slice(0, 10) : undefined);
+      if (!dateStr) return;
+      const bucket = map[dateStr] ?? (map[dateStr] = []);
+      bucket.push({
+        source: 'google',
+        title: ev.summary ?? 'Event',
+        time: startInfo.dateTime ?? undefined,
+        allDay: Boolean(startInfo.date),
+      });
+    });
 
-      // ---------------- Google Calendar ----------------
-      try {
-        const resp = await fetch(`/api/integrations/google/calendar/events?timeMin=${timeMin}&timeMax=${timeMax}&maxResults=2500`);
-        if (resp.ok) {
-          const data = await resp.json();
-          (data.events ?? []).forEach((ev: any) => {
-            const dateStr = ev.start?.date ?? (ev.start?.dateTime ? ev.start.dateTime.slice(0,10) : null);
-            if (!dateStr) return;
-            if (!map[dateStr]) map[dateStr] = [];
-            map[dateStr].push({ source: 'google', title: ev.summary ?? 'Event', time: ev.start?.dateTime ?? undefined, allDay: !!ev.start?.date });
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch Google events', err);
+    let cursor = startOfDay(new Date(rangeStartMs));
+    const rangeEndDate = startOfDay(new Date(rangeEndMs));
+
+    while (cursor.getTime() <= rangeEndDate.getTime()) {
+      const dateStr = format(cursor, 'yyyy-MM-dd');
+      const lifeboardEvents = buildLifeboardEventsForDate(dateStr);
+      if (lifeboardEvents.length > 0) {
+        const bucket = map[dateStr] ?? (map[dateStr] = []);
+        lifeboardEvents.forEach(event => {
+          bucket.push(event);
+        });
       }
-
-      // ---------------- Lifeboard Hourly Tasks ----------------
-      // Add hourly scheduled tasks from the current context
-      let currentDay = new Date(start);
-      while (currentDay <= end) {
-        const dateStr = format(currentDay, 'yyyy-MM-dd');
-        const dayEvents = buildLifeboardEventsForDate(dateStr);
-
-        if (dayEvents.length > 0) {
-          if (!map[dateStr]) map[dateStr] = [];
-          dayEvents.forEach(event => {
-            map[dateStr].push(event);
-          });
-        }
-
-        currentDay = addDays(currentDay, 1);
-      }
-
-      // ---------------- Todoist Tasks (non-hourly) ----------------
-      try {
-        const resp = await fetch('/api/integrations/todoist/tasks?all=true');
-        if (resp.ok) {
-          const data = await resp.json();
-          const tasks: any[] = Array.isArray(data) ? data : (data.tasks ?? []);
-          tasks.forEach((t: any) => {
-            const dateStr: string | undefined = t.due?.date;
-            if (!dateStr) return;
-            // Only include tasks within the current date range
-            if (dateStr >= timeMin.slice(0,10) && dateStr <= timeMax.slice(0,10)) {
-              if (!map[dateStr]) map[dateStr] = [];
-              
-              // Skip tasks that already have hourSlot (they're handled above as lifeboard events)
-              if (t.hourSlot) return;
-              
-              map[dateStr].push({ 
-                source: 'todoist', 
-                title: t.content ?? 'Task', 
-                time: t.due?.datetime ?? undefined,
-                taskId: t.id
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch Todoist tasks', err);
-      }
-
-      setEventsByDate(map);
+      cursor = addDays(cursor, 1);
     }
 
-    fetchEvents();
-  }, [currentDate, view, allTasks, getDateRange, buildLifeboardEventsForDate]);
+    setEventsByDate(map);
+  }, [googleEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate]);
 
   const getCellSize = () => {
     switch (view) {
