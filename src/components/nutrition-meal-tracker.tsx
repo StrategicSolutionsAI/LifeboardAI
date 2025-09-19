@@ -1092,8 +1092,14 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
 
     {/* Quick Add Modal */}
     {showQuickAdd && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <Card className="w-full max-w-md mx-4">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        onClick={() => setShowQuickAdd(false)}
+      >
+        <Card
+          className="w-full max-w-md mx-4"
+          onClick={(event) => event.stopPropagation()}
+        >
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">

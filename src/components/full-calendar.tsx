@@ -1166,8 +1166,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Modal */}
       {selectedModalDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg w-96 max-w-[90%] p-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setSelectedModalDate(null)}
+        >
+          <div
+            className="bg-white rounded-lg w-96 max-w-[90%] p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium">{selectedModalDate ? format(parseISO(selectedModalDate), 'MMMM d, yyyy') : 'Event Details'}</h3>
               <button
@@ -1235,8 +1241,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Add/Edit Task Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={closeTaskModal}
+        >
+          <div
+            className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">{editTaskId ? 'Edit Task' : 'Add Task'}</h3>
@@ -1416,8 +1428,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg w-96 max-w-[90%] p-6 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setDeleteConfirmTask(null)}
+        >
+          <div
+            className="bg-white rounded-lg w-96 max-w-[90%] p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Delete Task</h3>

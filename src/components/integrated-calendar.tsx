@@ -475,8 +475,14 @@ export default function IntegratedCalendar() {
 
       {/* Enhanced Modal for event details */}
       {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 overflow-hidden">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setSelectedDate(null)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
