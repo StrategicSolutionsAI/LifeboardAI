@@ -1,7 +1,7 @@
 /* eslint-disable */
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, addDays, isSameDay, parse } from "date-fns";
 import { ChevronRight, ChevronDown, AlertCircle, RefreshCw, ListPlus } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -10,6 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import HourlyPlanner from "./hourly-planner";
 import { HomeProject, PROJECT_STATUS } from "@/types/home-projects";
 import type { Task } from "@/hooks/use-tasks";
+import { TaskSortControls } from "./task-sort-controls";
+import { sortTasks, saveSortPreference, loadSortPreference, type SortOption, type SortDirection } from "@/lib/task-sorting";
+import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
+import { useBuckets } from "@/hooks/use-buckets";
 
 // Loading skeleton for tasks
 function TaskSkeleton() {
@@ -38,6 +42,38 @@ function TaskError({ error, onRetry }: { error: Error; onRetry: () => void }) {
       </button>
     </div>
   );
+}
+
+const UNASSIGNED_BUCKET_ID = "__unassigned";
+const UNASSIGNED_BUCKET_LABEL = "Unsorted";
+const UNASSIGNED_BUCKET_COLOR = "#94A3B8";
+const BUCKET_COLOR_PALETTE = [
+  "#4F46E5",
+  "#22C55E",
+  "#F97316",
+  "#EC4899",
+  "#14B8A6",
+  "#8B5CF6",
+  "#F59E0B",
+  "#06B6D4",
+];
+
+function normalizeBucketId(name?: string | null) {
+  const trimmed = (name ?? "").trim();
+  return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
+}
+
+function bucketColorFromId(id: string) {
+  if (id === UNASSIGNED_BUCKET_ID) {
+    return UNASSIGNED_BUCKET_COLOR;
+  }
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0; // keep 32bit int
+  }
+  const index = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
+  return BUCKET_COLOR_PALETTE[index];
 }
 
 export function TaskSidePanel({ onDragStart, onDragEnd }: {
@@ -77,11 +113,81 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
     refetch,
   } = useTasksContext();
 
-  // Filter tasks for display - show all open tasks, including those without due dates
+  const { buckets: storedBuckets } = useBuckets();
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<SortOption>('smart');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [masterLayout, setMasterLayout] = useState<"list" | "board">("list");
+
+  // Load saved sort preferences on mount
+  useEffect(() => {
+    const savedPref = loadSortPreference();
+    if (savedPref) {
+      setSortBy(savedPref.sortBy);
+      setSortDirection(savedPref.direction);
+    }
+  }, []);
+
+  // Handle sort change
+  const handleSortChange = (newSort: SortOption, newDirection: SortDirection) => {
+    setSortBy(newSort);
+    setSortDirection(newDirection);
+    saveSortPreference(newSort, newDirection);
+  };
+
+  // Filter and sort tasks for display
   const openTasksToShow = useMemo(() => {
     // Include all non-completed tasks (master backlog)
-    return allTasks.filter((t) => !t.completed);
-  }, [allTasks]);
+    const openTasks = allTasks.filter((t) => !t.completed);
+    // Apply sorting
+    return sortTasks(openTasks, sortBy, sortDirection);
+  }, [allTasks, sortBy, sortDirection]);
+
+  const boardTasks: BoardTask[] = useMemo(() => {
+    return openTasksToShow.map((task) => ({
+      id: task.id.toString(),
+      title: task.content,
+      bucketId: normalizeBucketId(task.bucket),
+      status: task.completed ? "done" : "open",
+      position: typeof task.position === "number" ? task.position : null,
+    }));
+  }, [openTasksToShow]);
+
+  const boardBuckets: BoardBucket[] = useMemo(() => {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const labels = new Map<string, string>();
+
+    const push = (id: string, label: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+      labels.set(id, label);
+    };
+
+    storedBuckets.forEach((name) => {
+      if (!name) return;
+      const id = normalizeBucketId(name);
+      push(id, name);
+    });
+
+    boardTasks.forEach((task) => {
+      const id = task.bucketId;
+      const label = id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id;
+      push(id, label);
+    });
+
+    if (ids.length === 0) {
+      push(UNASSIGNED_BUCKET_ID, UNASSIGNED_BUCKET_LABEL);
+    }
+
+    return ids.map((id) => ({
+      id,
+      name: labels.get(id) ?? (id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id),
+      color: bucketColorFromId(id),
+    }));
+  }, [storedBuckets, boardTasks]);
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -120,6 +226,15 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       setIsCompletingTask(prev => ({ ...prev, [taskId]: false }));
     }
   };
+
+  const handleBoardComplete = useCallback((taskId: string) => {
+    void handleToggleTaskCompletion(taskId);
+  }, [handleToggleTaskCompletion]);
+
+  const handleBoardAddTask = useCallback((bucketId: string, title: string) => {
+    const resolvedBucket = bucketId === UNASSIGNED_BUCKET_ID ? undefined : bucketId;
+    void createTask(title, null, undefined, resolvedBucket);
+  }, [createTask]);
 
   // Drag state and handler
   const [isDragging, setIsDragging] = useState(false);
@@ -626,94 +741,141 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
                   )}
                 </Droppable>
 
-                <div className="flex items-center justify-between text-sm font-medium text-theme-text-primary mb-2">
-                  <div 
-                    className="flex items-center gap-2 cursor-pointer select-none flex-1"
-                    onClick={() => setIsOpenCollapsed((c) => !c)}
-                  >
-                    <span>All open tasks ({openTasksToShow.length})</span>
-                    {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div
+                      className={`flex items-center gap-2 select-none flex-1 text-sm font-medium text-theme-text-primary ${masterLayout === "list" ? "cursor-pointer" : "cursor-default"}`}
+                      onClick={() => {
+                        if (masterLayout === "list") {
+                          setIsOpenCollapsed((c) => !c);
+                        }
+                      }}
+                    >
+                      <span>All open tasks ({openTasksToShow.length})</span>
+                      {masterLayout === "list" && (isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />)}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex rounded-full border border-theme-neutral-200 bg-theme-surface-raised p-0.5">
+                        {(["list", "board"] as const).map((layout) => (
+                          <button
+                            key={layout}
+                            type="button"
+                            onClick={() => setMasterLayout(layout)}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                              masterLayout === layout
+                                ? "bg-theme-primary-500 text-theme-text-inverse shadow"
+                                : "text-theme-text-secondary hover:text-theme-primary-600"
+                            }`}
+                          >
+                            {layout === "list" ? "List" : "Board"}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          refetch();
+                        }}
+                        className="p-1 hover:bg-theme-hover rounded transition-colors"
+                        title="Refresh tasks"
+                      >
+                        <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      refetch();
-                    }}
-                    className="p-1 hover:bg-theme-hover rounded transition-colors"
-                    title="Refresh tasks"
-                  >
-                    <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                  </button>
+
+                  {masterLayout === "list" && !isOpenCollapsed && openTasksToShow.length > 0 && (
+                    <TaskSortControls
+                      currentSort={sortBy}
+                      currentDirection={sortDirection}
+                      onSortChange={handleSortChange}
+                      taskCount={openTasksToShow.length}
+                      className="w-full"
+                    />
+                  )}
                 </div>
 
-                <Droppable droppableId="openTasks">
-                  {(provided) => (
-                    <ul
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
-                      style={{ maxHeight: isOpenCollapsed ? 0 : "40rem" }}
-                    >
-                      {error ? (
-                        <TaskError error={error} onRetry={refetch} />
-                      ) : loading && openTasksToShow.length === 0 ? (
-                        Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
-                      ) : !loading && openTasksToShow.length === 0 ? (
-                        <li className="text-theme-text-tertiary text-center py-4">
-                          <div>No open tasks</div>
-                          <div className="text-xs mt-1">This shows all active tasks from Todoist</div>
-                        </li>
-                      ) : (
-                        openTasksToShow.map((t: Task, index: number) => (
-                          <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
-                            {(prov) => (
-                              <li
-                                ref={prov.innerRef}
-                                {...prov.draggableProps}
-                                {...prov.dragHandleProps}
-                                style={prov.draggableProps.style}
-                                className="flex items-start gap-3 px-4 py-4 bg-theme-surface-raised border border-theme-neutral-200 shadow-sm rounded-lg"
-                              >
-                                <input
-                                  type="checkbox"
-                                  aria-label={t.content}
-                                  checked={t.completed ?? false}
-                                  disabled={isCompletingTask[t.id.toString()]}
-                                  onChange={() => handleToggleTaskCompletion(t.id.toString())}
-                                  className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
-                                />
-                                <div className="flex-1">
-                                  <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
-                                  {t.due?.date && (
-                                    <div className="text-xs text-theme-text-tertiary mt-1">
-                                      Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
+                {masterLayout === "list" ? (
+                  <>
+                    <Droppable droppableId="openTasks">
+                      {(provided) => (
+                        <ul
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className="space-y-3 text-sm text-theme-text-secondary overflow-y-auto pr-1 transition-[max-height] duration-200"
+                          style={{ maxHeight: isOpenCollapsed ? 0 : "40rem" }}
+                        >
+                          {error ? (
+                            <TaskError error={error} onRetry={refetch} />
+                          ) : loading && openTasksToShow.length === 0 ? (
+                            Array.from({ length: 3 }).map((_, i) => <TaskSkeleton key={i} />)
+                          ) : !loading && openTasksToShow.length === 0 ? (
+                            <li className="text-theme-text-tertiary text-center py-4">
+                              <div>No open tasks</div>
+                              <div className="text-xs mt-1">This shows all active tasks from Todoist</div>
+                            </li>
+                          ) : (
+                            openTasksToShow.map((t: Task, index: number) => (
+                              <Draggable key={t.id} draggableId={t.id.toString()} index={index}>
+                                {(prov) => (
+                                  <li
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    style={prov.draggableProps.style}
+                                    className="flex items-start gap-3 px-4 py-4 bg-theme-surface-raised border border-theme-neutral-200 shadow-sm rounded-lg"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      aria-label={t.content}
+                                      checked={t.completed ?? false}
+                                      disabled={isCompletingTask[t.id.toString()]}
+                                      onChange={() => handleToggleTaskCompletion(t.id.toString())}
+                                      className={`${t.completed ? "accent-theme-success-600" : "accent-theme-primary-500"} mt-0.5`}
+                                    />
+                                    <div className="flex-1">
+                                      <span className={t.completed ? "line-through text-theme-text-quaternary" : "text-theme-text-primary"}>{t.content}</span>
+                                      {t.due?.date && (
+                                        <div className="text-xs text-theme-text-tertiary mt-1">
+                                          Due {format(parse(t.due.date, 'yyyy-MM-dd', new Date()), "MMM d, yyyy")}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              </li>
-                            )}
-                          </Draggable>
-                        ))
+                                  </li>
+                                )}
+                              </Draggable>
+                            ))
+                          )}
+                          {provided.placeholder}
+                        </ul>
                       )}
-                      {provided.placeholder}
-                    </ul>
-                  )}
-                </Droppable>
+                    </Droppable>
 
-                {/* Add new open task */}
-                {!isOpenCollapsed && (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add task…"
-                      value={newOpenTask}
-                      onChange={(e) => setNewOpenTask(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddOpenTask()}
-                      className="input-field flex-1 text-sm"
+                    {!isOpenCollapsed && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Add task…"
+                          value={newOpenTask}
+                          onChange={(e) => setNewOpenTask(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleAddOpenTask()}
+                          className="input-field flex-1 text-sm"
+                        />
+                        <button onClick={handleAddOpenTask} className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline">
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-theme-neutral-200 bg-theme-surface-raised shadow-sm p-4 min-h-[520px]">
+                    <TasksBoard
+                      buckets={boardBuckets}
+                      tasks={boardTasks}
+                      onCompleteTask={handleBoardComplete}
+                      onAddTask={handleBoardAddTask}
                     />
-                    <button onClick={handleAddOpenTask} className="text-sm text-theme-primary-600 hover:text-theme-primary-700 hover:underline">
-                      Add
-                    </button>
                   </div>
                 )}
               </>

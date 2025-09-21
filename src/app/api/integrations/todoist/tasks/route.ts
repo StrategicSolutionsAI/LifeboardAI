@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import {
+  readTodoistTaskCache,
+  writeTodoistTaskCache,
+  getTodoistPendingFetch,
+  setTodoistPendingFetch,
+  clearTodoistPendingFetch,
+  invalidateTodoistTaskCache
+} from '@/lib/todoist-task-cache';
 
 const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
 
@@ -65,6 +73,84 @@ const buildDueString = (rule: RepeatRule, startDate?: string | null) => {
   return base;
 };
 
+class TodoistFetchError extends Error {
+  status: number;
+  body?: string;
+
+  constructor(status: number, body?: string) {
+    super(`Todoist request failed with status ${status}`);
+    this.status = status;
+    this.body = body;
+  }
+}
+
+const filterTasksByDate = (tasks: any[], date: string) =>
+  tasks.filter((task: any) => {
+    const due = task?.due;
+    if (!due) return false;
+    if (typeof due.date === 'string') {
+      return due.date.slice(0, 10) === date;
+    }
+    if (typeof due.datetime === 'string') {
+      return due.datetime.slice(0, 10) === date;
+    }
+    return false;
+  });
+
+const sortTasksByPosition = (tasks: any[]) => {
+  const sorted = [...tasks];
+  sorted.sort((a: any, b: any) => {
+    const posA = a?.position ?? Number.MAX_SAFE_INTEGER;
+    const posB = b?.position ?? Number.MAX_SAFE_INTEGER;
+    return posA - posB;
+  });
+  return sorted;
+};
+
+const enhanceTodoistTask = (task: any) => {
+  let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number; repeatRule?: RepeatRule } = {};
+  let cleanContent = task.content;
+
+  if (task.description) {
+    try {
+      const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
+      if (metaMatch) {
+        metadata = JSON.parse(metaMatch[1]);
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+  }
+
+  if (task.content) {
+    try {
+      const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/);
+      if (contentMetaMatch) {
+        cleanContent = contentMetaMatch[1].trim();
+
+        if (Object.keys(metadata).length === 0) {
+          const metaMatch = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
+          if (metaMatch) {
+            metadata = JSON.parse(metaMatch[1]);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors, keep original content
+    }
+  }
+
+  return {
+    ...task,
+    content: cleanContent,
+    duration: metadata.duration,
+    hourSlot: metadata.hourSlot,
+    bucket: metadata.bucket,
+    position: metadata.position,
+    repeatRule: metadata.repeatRule ?? (task.due?.is_recurring ? normalizeRepeatRule(task.due?.string) : undefined),
+  };
+};
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -105,112 +191,74 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    // Call Todoist REST API – fetch all open tasks then filter client-side
-    const url = `${TODOIST_TASKS_ENDPOINT}`;
-
-    const todoistRes = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${integration.access_token}`,
-      },
-    });
-
-    if (!todoistRes.ok) {
-      const text = await todoistRes.text().catch(() => '');
-      console.error('Todoist API error', todoistRes.status, text);
-      // Map common auth errors so the client can prompt reconnection instead of crashing
-      if (todoistRes.status === 401 || todoistRes.status === 403) {
-        return NextResponse.json({ error: 'Todoist auth error', status: todoistRes.status }, { status: 401 });
+    const respondWithTasks = (tasks: any[]) => {
+      if (date && !allParam) {
+        return NextResponse.json({ tasks: filterTasksByDate(tasks, date) });
       }
-      // Propagate rate limits distinctly
-      if (todoistRes.status === 429) {
-        return NextResponse.json({ error: 'Todoist rate limited', status: 429 }, { status: 429 });
+      if (allParam) {
+        return NextResponse.json({ tasks: sortTasksByPosition(tasks) });
       }
-      // Attach minimal upstream debug to help client diagnose (no secrets)
-      return NextResponse.json({ error: 'Todoist API error', status: 502, upstreamStatus: todoistRes.status, upstreamBody: (text || '').slice(0, 400) }, { status: 502 });
+      return NextResponse.json({ tasks });
+    };
+
+    const cachedTasks = readTodoistTaskCache(user.id);
+    if (cachedTasks) {
+      return respondWithTasks(cachedTasks);
     }
 
-    const tasks = await todoistRes.json();
-    // Defensive: ensure array
-    const list = Array.isArray(tasks) ? tasks : []
-
-    // Parse metadata from task descriptions and enhance tasks
-    const enhancedTasks = list.map((task: any) => {
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number; repeatRule?: RepeatRule } = {};
-      let cleanContent = task.content;
-      
-      if (task.description) {
-        try {
-          const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
-          if (metaMatch) {
-            metadata = JSON.parse(metaMatch[1]);
-          }
-        } catch (e) {
-          // Ignore parsing errors
-        }
+    const pending = getTodoistPendingFetch(user.id);
+    if (pending) {
+      try {
+        const tasks = await pending;
+        return respondWithTasks(tasks);
+      } catch (err) {
+        clearTodoistPendingFetch(user.id);
+        throw err;
       }
-      
-      // Also check content for metadata (in case it was stored there)
-      if (task.content) {
-        try {
-          const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/);
-          if (contentMetaMatch) {
-            // Extract clean content before metadata
-            cleanContent = contentMetaMatch[1].trim();
-            
-            // Also parse metadata from content if not found in description
-            if (Object.keys(metadata).length === 0) {
-              const metaMatch = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/);
-              if (metaMatch) {
-                metadata = JSON.parse(metaMatch[1]);
-              }
-            }
-          }
-        } catch (e) {
-          // Ignore parsing errors, keep original content
-        }
-      }
-      
-      return {
-        ...task,
-        content: cleanContent, // Use cleaned content
-        duration: metadata.duration, // Only include if exists
-        hourSlot: metadata.hourSlot, // Only include if exists - no default
-        bucket: metadata.bucket, // Only include if exists
-        position: metadata.position, // Only include if exists
-        repeatRule: metadata.repeatRule ?? (task.due?.is_recurring ? normalizeRepeatRule(task.due?.string) : undefined),
-      };
-    });
+    }
 
-    let responseTasks = enhancedTasks;
-
-    if (date && !allParam) {
-      // Include tasks due on the specific date. Support both `due.date` and `due.datetime`.
-      responseTasks = enhancedTasks.filter((t: any) => {
-        const due = t.due
-        if (!due) return false
-        if (typeof due.date === 'string') {
-          // Todoist returns YYYY-MM-DD for all-day tasks
-          return due.date.slice(0, 10) === date
-        }
-        if (typeof due.datetime === 'string') {
-          // Timed due date
-          return due.datetime.slice(0, 10) === date
-        }
-        return false
+    const fetchPromise = (async () => {
+      const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {
+        headers: {
+          Authorization: `Bearer ${integration.access_token}`,
+        },
       });
+
+      if (!todoistRes.ok) {
+        const text = await todoistRes.text().catch(() => '');
+        throw new TodoistFetchError(todoistRes.status, text);
+      }
+
+      const tasks = await todoistRes.json();
+      const list = Array.isArray(tasks) ? tasks : [];
+      return list.map(enhanceTodoistTask);
+    })();
+
+    setTodoistPendingFetch(user.id, fetchPromise);
+
+    let enhancedTasks: any[];
+    try {
+      enhancedTasks = await fetchPromise;
+    } catch (err) {
+      clearTodoistPendingFetch(user.id);
+      if (err instanceof TodoistFetchError) {
+        console.error('Todoist API error', err.status, err.body);
+        if (err.status === 401 || err.status === 403) {
+          return NextResponse.json({ error: 'Todoist auth error', status: err.status }, { status: 401 });
+        }
+        if (err.status === 429) {
+          return NextResponse.json({ error: 'Todoist rate limited', status: 429 }, { status: 429 });
+        }
+        const body = (err.body || '').slice(0, 400);
+        return NextResponse.json({ error: 'Todoist API error', status: 502, upstreamStatus: err.status, upstreamBody: body }, { status: 502 });
+      }
+      throw err;
     }
 
-    // For all=true we return all open tasks (no filtering), sorted by position
-    if (allParam) {
-      // Sort tasks by position (ascending), with tasks without position at the end
-      responseTasks.sort((a: any, b: any) => {
-        const posA = a.position ?? Number.MAX_SAFE_INTEGER;
-        const posB = b.position ?? Number.MAX_SAFE_INTEGER;
-        return posA - posB;
-      });
-    }
-    
-    return NextResponse.json({ tasks: responseTasks });
+    clearTodoistPendingFetch(user.id);
+    writeTodoistTaskCache(user.id, enhancedTasks);
+
+    return respondWithTasks(enhancedTasks);
   } catch (err) {
     console.error('Todoist tasks endpoint error', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -310,6 +358,7 @@ export async function POST(request: NextRequest) {
 
     const task = await todoistRes.json();
     console.log('Todoist create task ok', { id: task?.id, due: task?.due?.date })
+    invalidateTodoistTaskCache(user.id)
     return NextResponse.json({ task });
   } catch (err) {
     console.error('Todoist create task endpoint error', err);

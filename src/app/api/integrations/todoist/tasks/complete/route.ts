@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
 
 const TODOIST_TASK_URL = 'https://api.todoist.com/rest/v2/tasks';
 
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to complete task' }, { status: 500 });
     }
 
+    invalidateTodoistTaskCache(user.id);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Complete task error', err);

@@ -7,6 +7,7 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { useTasksContext } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
 
 interface CalendarTaskListProps {
   selectedDate: Date;
@@ -401,6 +402,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [taskView, setTaskView] = useState<'Today' | 'Upcoming' | 'Master List'>('Today');
+  const [masterLayout, setMasterLayout] = useState<'list' | 'board'>('list');
 
   // Use unified task context
   const {
@@ -614,6 +616,45 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const openTasksToShow = useMemo(() => {
     return openTasksLocal.length ? openTasksLocal : openTasksBase;
   }, [openTasksLocal, openTasksBase]);
+
+  // ---- Board mapping helpers ----
+  const UNASSIGNED_BUCKET_ID = "__unassigned";
+  const UNASSIGNED_BUCKET_LABEL = "Unsorted";
+  const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
+  const normalizeBucketId = (name?: string | null) => {
+    const trimmed = (name ?? '').trim();
+    return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
+  };
+  const bucketColorFromId = (id: string) => {
+    if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
+    const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
+    return BUCKET_COLOR_PALETTE[idx];
+  };
+
+  const boardTasks: BoardTask[] = useMemo(() => (
+    openTasksToShow.map((t) => ({
+      id: t.id.toString(),
+      title: t.content,
+      bucketId: normalizeBucketId(t.bucket),
+      status: t.completed ? 'done' : 'open',
+      position: typeof t.position === 'number' ? t.position : null,
+    }))
+  ), [openTasksToShow]);
+
+  const boardBuckets: BoardBucket[] = useMemo(() => {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const labels = new Map<string, string>();
+    const push = (id: string, label: string) => { if (!seen.has(id)) { seen.add(id); ids.push(id); labels.set(id, label) } };
+    // User-provided buckets first for stable order
+    availableBuckets.forEach((name) => { const id = normalizeBucketId(name); push(id, name) });
+    // Ensure any bucket present on tasks is represented
+    boardTasks.forEach((t) => { const id = t.bucketId; const label = id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id; push(id, label) });
+    if (ids.length === 0) push(UNASSIGNED_BUCKET_ID, UNASSIGNED_BUCKET_LABEL);
+    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: bucketColorFromId(id) }));
+  }, [availableBuckets, boardTasks]);
 
   // Listen for reorder events from parent DragDropContext
   React.useEffect(() => {
@@ -1606,14 +1647,40 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
 
           {/* All Open Tasks Section */}
           <div className="space-y-4">
-            <div
-              className="flex items-center justify-between text-sm font-medium text-gray-900 mb-2 cursor-pointer select-none"
-              onClick={() => setIsOpenCollapsed((c) => !c)}
-            >
-              <span>All Open Tasks</span>
-              {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div
+                className={`flex items-center gap-2 text-sm font-medium text-gray-900 select-none ${masterLayout === 'list' ? 'cursor-pointer' : 'cursor-default'}`}
+                onClick={() => { if (masterLayout === 'list') setIsOpenCollapsed((c) => !c) }}
+              >
+                <span>All Open Tasks</span>
+                {masterLayout === 'list' && (isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />)}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/tasks/board"
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline"
+                  title="Open full-width board"
+                >
+                  Expand
+                </a>
+                <div className="flex rounded-full border border-gray-200 bg-white p-0.5">
+                  {(['list','board'] as const).map((layout) => (
+                    <button
+                      key={layout}
+                      type="button"
+                      onClick={() => setMasterLayout(layout)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        masterLayout === layout ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      {layout === 'list' ? 'List' : 'Board'}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           
+          {masterLayout === 'list' ? (
           <Droppable droppableId="openTasks">
             {(provided: any) => (
               <ul
@@ -1710,6 +1777,19 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
               </ul>
             )}
           </Droppable>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 min-h-[520px]">
+              <TasksBoard
+                buckets={boardBuckets}
+                tasks={boardTasks}
+                onCompleteTask={(id) => toggleTaskCompletion(id)}
+                onAddTask={(bucketId, title) => {
+                  const resolvedBucket = bucketId === '__unassigned' ? undefined : bucketId;
+                  void createTask(title, null, undefined, resolvedBucket);
+                }}
+              />
+            </div>
+          )}
 
           {/* Add open task */}
           {!isOpenCollapsed && (

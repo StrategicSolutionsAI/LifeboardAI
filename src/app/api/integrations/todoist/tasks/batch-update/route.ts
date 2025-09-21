@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
 
 const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
 
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Process each update
     const results = [];
+    let anySuccess = false;
     for (const update of updates) {
       try {
         // For Todoist API, we need to update the task content and description
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
         if (updateRes.ok) {
           const updatedTask = await updateRes.json();
           console.log(`Successfully updated task ${update.taskId}`);
+          anySuccess = true;
           results.push({ 
             taskId: update.taskId, 
             success: true, 
@@ -256,6 +259,10 @@ export async function POST(request: NextRequest) {
         console.error(`Error updating task ${update.taskId}:`, error);
         results.push({ taskId: update.taskId, success: false, error: error instanceof Error ? error.message : String(error) });
       }
+    }
+
+    if (anySuccess) {
+      invalidateTodoistTaskCache(user.id);
     }
 
     return NextResponse.json({ results });

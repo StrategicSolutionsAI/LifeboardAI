@@ -16,6 +16,7 @@ const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
 
 // Global cache for sharing between components
 const globalCache = new Map<string, CacheEntry<any>>()
+const globalPendingRequests = new Map<string, Promise<any>>()
 
 // Global cache invalidation functions that can be called from anywhere
 export function invalidateTaskCaches() {
@@ -27,6 +28,7 @@ export function invalidateTaskCaches() {
     }
   })
   keysToDelete.forEach(key => globalCache.delete(key))
+  keysToDelete.forEach(key => globalPendingRequests.delete(key))
 }
 
 // Invalidate all integration-related caches
@@ -57,6 +59,7 @@ export function invalidateIntegrationCaches(integrationId?: string) {
     }
   })
   keysToDelete.forEach(key => globalCache.delete(key))
+  keysToDelete.forEach(key => globalPendingRequests.delete(key))
   console.log(`🗑️ Invalidated ${keysToDelete.length} cache entries${integrationId ? ` for ${integrationId}` : ''}`)
 }
 
@@ -64,6 +67,7 @@ export function invalidateIntegrationCaches(integrationId?: string) {
 export function invalidateAllCaches() {
   const count = globalCache.size
   globalCache.clear()
+  globalPendingRequests.clear()
   console.log(`🗑️ Cleared all ${count} cache entries`)
 }
 
@@ -74,12 +78,19 @@ export function useDataCache<T>(
 ) {
   const { ttl = DEFAULT_TTL, prefetch = false, optimisticUpdate = true } = options
   
-  const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  
   const cacheRef = useRef<Map<string, CacheEntry<T>>>(new Map())
   const pendingRef = useRef<Map<string, Promise<T>>>(new Map())
+
+  const [data, setData] = useState<T | null>(() => {
+    const cached = globalCache.get(key) as CacheEntry<T> | undefined
+    if (cached && Date.now() < cached.expiresAt) {
+      cacheRef.current.set(key, cached)
+      return cached.data as T
+    }
+    return null
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
   
   // Check if cache entry is still valid
   const isValidCache = useCallback((entry: CacheEntry<T>) => {
@@ -88,38 +99,72 @@ export function useDataCache<T>(
   
   // Get from cache or fetch
   const fetchWithCache = useCallback(async () => {
-    // Check if we have a valid cache entry
-    const cached = cacheRef.current.get(key)
-    if (cached && isValidCache(cached)) {
-      setData(cached.data)
-      return cached.data
+    const localCached = cacheRef.current.get(key)
+    if (localCached && isValidCache(localCached)) {
+      setData(localCached.data)
+      return localCached.data
     }
-    
-    // Check if there's already a pending request
-    const pending = pendingRef.current.get(key)
-    if (pending) {
-      const result = await pending
-      setData(result)
-      return result
+
+    const globalCached = globalCache.get(key) as CacheEntry<T> | undefined
+    if (globalCached && isValidCache(globalCached)) {
+      cacheRef.current.set(key, globalCached)
+      setData(globalCached.data)
+      return globalCached.data
     }
-    
+
+    const localPending = pendingRef.current.get(key)
+    if (localPending) {
+      setLoading(true)
+      try {
+        const result = await localPending
+        setData(result)
+        return result
+      } catch (err) {
+        setError(err as Error)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const globalPending = globalPendingRequests.get(key) as Promise<T> | undefined
+    if (globalPending) {
+      pendingRef.current.set(key, globalPending)
+      setLoading(true)
+      try {
+        const result = await globalPending
+        setData(result)
+        return result
+      } catch (err) {
+        setError(err as Error)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    }
+
     // Fetch new data
     setLoading(true)
     setError(null)
     
-    const promise = fetcher()
-    pendingRef.current.set(key, promise)
-    
-    try {
-      const result = await promise
-      
-      // Update cache
-      cacheRef.current.set(key, {
+    const loadPromise = (async () => {
+      const result = await fetcher()
+      const now = Date.now()
+      const entry: CacheEntry<T> = {
         data: result,
-        timestamp: Date.now(),
-        expiresAt: Date.now() + ttl
-      })
-      
+        timestamp: now,
+        expiresAt: now + ttl
+      }
+      cacheRef.current.set(key, entry)
+      globalCache.set(key, entry)
+      return result
+    })()
+
+    pendingRef.current.set(key, loadPromise)
+    globalPendingRequests.set(key, loadPromise)
+
+    try {
+      const result = await loadPromise
       setData(result)
       return result
     } catch (err) {
@@ -128,6 +173,7 @@ export function useDataCache<T>(
     } finally {
       setLoading(false)
       pendingRef.current.delete(key)
+      globalPendingRequests.delete(key)
     }
   }, [key, fetcher, ttl, isValidCache])
   
@@ -139,16 +185,22 @@ export function useDataCache<T>(
     setData(newData)
     
     // Update cache immediately
-    cacheRef.current.set(key, {
+    const now = Date.now()
+    const entry: CacheEntry<T> = {
       data: newData,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + ttl
-    })
+      timestamp: now,
+      expiresAt: now + ttl
+    }
+    cacheRef.current.set(key, entry)
+    globalCache.set(key, entry)
   }, [data, key, ttl, optimisticUpdate])
   
   // Invalidate cache entry
   const invalidate = useCallback(() => {
     cacheRef.current.delete(key)
+    globalCache.delete(key)
+    pendingRef.current.delete(key)
+    globalPendingRequests.delete(key)
   }, [key])
   
   // Refetch data (bypassing cache)

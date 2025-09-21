@@ -41,6 +41,7 @@ export function useWidgets() {
   // Ref for debouncing
   const widgetsByBucketRef = useRef(widgetsByBucket)
   const progressByWidgetRef = useRef(progressByWidget)
+  const localHydratedRef = useRef(false)
   
   // Update refs when state changes
   useEffect(() => {
@@ -53,12 +54,62 @@ export function useWidgets() {
   
   // Initialize from user preferences
   useEffect(() => {
-    if (userPrefs) {
-      setWidgetsByBucket(userPrefs.widgets_by_bucket || {})
-      setProgressByWidget(userPrefs.progress_by_widget || {})
+    if (!userPrefs) return
+
+    const nextWidgets = userPrefs.widgets_by_bucket || {}
+    const nextProgress = userPrefs.progress_by_widget || {}
+
+    const hasWidgets = Object.keys(nextWidgets).length > 0
+    const hasProgress = Object.keys(nextProgress).length > 0
+
+    if (!hasWidgets && !hasProgress && localHydratedRef.current) {
+      return
     }
+
+    setWidgetsByBucket(nextWidgets)
+    setProgressByWidget(nextProgress)
   }, [userPrefs])
   
+  useEffect(() => {
+    if (localHydratedRef.current) return
+    if (typeof window === 'undefined') return
+
+    const hasRemoteWidgets = userPrefs && Object.keys(userPrefs.widgets_by_bucket || {}).length > 0
+    const hasRemoteProgress = userPrefs && Object.keys(userPrefs.progress_by_widget || {}).length > 0
+    if (hasRemoteWidgets || hasRemoteProgress) {
+      return
+    }
+
+    try {
+      const rawWidgets = window.localStorage.getItem('widgets_by_bucket')
+      if (rawWidgets) {
+        const parsed = JSON.parse(rawWidgets)
+        const candidate = typeof parsed === 'object' && parsed !== null
+          ? (parsed.widgets && typeof parsed.widgets === 'object' ? parsed.widgets : parsed)
+          : {}
+        if (candidate && typeof candidate === 'object') {
+          setWidgetsByBucket(candidate as Record<string, WidgetInstance[]>)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to hydrate widgets from localStorage', error)
+    }
+
+    try {
+      const rawProgress = window.localStorage.getItem('progress_by_widget')
+      if (rawProgress) {
+        const parsedProgress = JSON.parse(rawProgress)
+        if (parsedProgress && typeof parsedProgress === 'object') {
+          setProgressByWidget(parsedProgress as Record<string, ProgressEntry>)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to hydrate widget progress from localStorage', error)
+    }
+
+    localHydratedRef.current = true
+  }, [userPrefs])
+
   // Save to both localStorage and Supabase
   const saveWidgets = useCallback(async (
     widgets: Record<string, WidgetInstance[]>,
