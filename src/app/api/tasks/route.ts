@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('lifeboard_tasks')
-      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, repeat_rule, created_at, updated_at')
+      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, created_at, updated_at')
       .eq('user_id', user.id)
 
     if (date && !allParam) {
@@ -106,13 +106,12 @@ export async function POST(request: NextRequest) {
       bucket: bucket || null,
       duration: duration ?? null,
       position: position ?? null,
-      repeat_rule: repeat_rule ?? null,
     }
 
     const { data, error } = await supabase
       .from('lifeboard_tasks')
       .insert(insert)
-      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, repeat_rule, created_at, updated_at')
+      .select('id, user_id, content, completed, due_date, hour_slot, bucket, position, duration, created_at, updated_at')
       .single()
 
     if (error) {

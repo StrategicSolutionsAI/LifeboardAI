@@ -54,6 +54,22 @@ export function useTasks(selectedDate?: Date) {
 
     const inflight = (async () => {
       try {
+        // If we already know Todoist is not connected, skip trying it
+        if (todoistConnectedRef.current === false) {
+          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            return Array.isArray(json) ? json : (json.tasks ?? [])
+          }
+          // If Supabase also fails, try localStorage
+          if (typeof window !== 'undefined') {
+            const raw = window.localStorage.getItem('lifeboard_local_tasks')
+            const list: Task[] = raw ? JSON.parse(raw) : []
+            return list.filter(t => !t.completed)
+          }
+          return []
+        }
+
         const res = await fetch('/api/integrations/todoist/tasks?all=true', {
           credentials: 'same-origin'
         })
@@ -78,6 +94,7 @@ export function useTasks(selectedDate?: Date) {
         return Array.isArray(data) ? data : (data.tasks ?? [])
       } catch (error) {
         if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          todoistConnectedRef.current = false
           try {
             const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
             if (supa.ok) {
@@ -175,7 +192,15 @@ export function useTasks(selectedDate?: Date) {
     // Helper: create local task and persist to localStorage
     const createLocalTask = (): any => {
       try {
-        const id = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        // Generate a proper UUID for local tasks to be compatible with Supabase
+        const generateUUID = () => {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+        };
+        const id = generateUUID()
         const toHourSlot = (h?: number) => {
           if (typeof h !== 'number') return undefined
           const hh = Math.max(0, Math.min(23, h))
@@ -239,6 +264,12 @@ export function useTasks(selectedDate?: Date) {
               updateDailyOptimistically(current => [...(current || []), task as any])
             }
             updateAllOptimistically(current => [...(current || []), task as any])
+            // Announce the task update to other components
+            if (typeof window !== 'undefined') {
+              const timestamp = Date.now()
+              window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+              window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+            }
             return task
           }
           // As last resort create local
@@ -246,6 +277,12 @@ export function useTasks(selectedDate?: Date) {
           if (local) {
             if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
             updateAllOptimistically(current => [...(current || []), local as any])
+            // Announce the task update to other components
+            if (typeof window !== 'undefined') {
+              const timestamp = Date.now()
+              window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+              window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+            }
             return local
           }
         }
@@ -300,6 +337,13 @@ export function useTasks(selectedDate?: Date) {
       console.log('📋 Adding task to all tasks cache');
       updateAllOptimistically(current => [...(current || []), enhancedTask as any])
       
+      // Announce the task update to other components
+      if (typeof window !== 'undefined') {
+        const timestamp = Date.now()
+        window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+      }
+      
       console.log('✅ createTask returning task:', task);
       return task
     } catch (error) {
@@ -317,6 +361,12 @@ export function useTasks(selectedDate?: Date) {
           const task = json.task
           if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), task as any])
           updateAllOptimistically(current => [...(current || []), task as any])
+          // Announce the task update to other components
+          if (typeof window !== 'undefined') {
+            const timestamp = Date.now()
+            window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+            window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+          }
           return task
         }
       } catch {}
@@ -324,6 +374,12 @@ export function useTasks(selectedDate?: Date) {
       if (local) {
         if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
         updateAllOptimistically(current => [...(current || []), local as any])
+        // Announce the task update to other components
+        if (typeof window !== 'undefined') {
+          const timestamp = Date.now()
+          window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+          window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+        }
         return local
       }
       throw error
