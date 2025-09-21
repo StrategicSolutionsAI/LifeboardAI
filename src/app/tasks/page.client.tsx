@@ -198,6 +198,7 @@ function TasksBoardShell() {
           buckets={boardBuckets}
           tasks={boardTasks}
           onCompleteTask={(id) => toggleTaskCompletion(id)}
+          onUncompleteTask={(id) => toggleTaskCompletion(id)}
           onAddTask={(bucketId, title) => {
             const resolvedBucket = bucketId === UNASSIGNED_BUCKET_ID ? undefined : bucketId;
             void createTask(title, null, undefined, resolvedBucket);

@@ -98,7 +98,6 @@ function TaskCard({
   availableBuckets?: Bucket[];
   onBucketChange?: (taskId: string, newBucketId: string) => void;
 }) {
-  const [checked, setChecked] = useState(false);
   const [showBucketDropdown, setShowBucketDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const due = useMemo(() => formatDueDate(task.dueDate), [task.dueDate]);
@@ -133,16 +132,13 @@ function TaskCard({
         >
       <div className="flex items-start gap-3">
         <Checkbox
-          checked={checked}
+          checked={task.status === "done"}
           onCheckedChange={(value) => {
             const isChecked = value === true;
-            setChecked(isChecked);
-            if (isChecked) {
-              onToggle?.(task.id, true);
-            }
+            onToggle?.(task.id, isChecked);
           }}
           className="mt-1"
-          aria-label={`Complete ${task.title}`}
+          aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"} ${task.title}`}
         />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium leading-5 text-foreground line-clamp-2 pr-6">
@@ -170,20 +166,6 @@ function TaskCard({
           </div>
         </div>
         <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-primary"
-            aria-label="Mark complete"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle?.(task.id, true);
-            }}
-            type="button"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-          </Button>
-          
           {/* Bucket Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <Button 
@@ -388,12 +370,14 @@ export default function TasksBoard({
   buckets: bucketsProp,
   tasks: tasksProp,
   onCompleteTask,
+  onUncompleteTask,
   onAddTask,
   onMoveTask,
 }: {
   buckets?: Bucket[];
   tasks?: Task[];
   onCompleteTask?: (id: string) => void;
+  onUncompleteTask?: (id: string) => void;
   onAddTask?: (bucketId: string, title: string) => void;
   onMoveTask?: (taskId: string, newBucketId: string) => void;
 }) {
@@ -537,7 +521,11 @@ export default function TasksBoard({
                 summary={summaries[bucket.id] ?? { tasks: [], dueSoonCount: 0 }}
                 onAddTask={onAddTask}
                 onToggleTask={(id, checked) => {
-                  if (checked) onCompleteTask?.(id);
+                  if (checked) {
+                    onCompleteTask?.(id);
+                  } else {
+                    onUncompleteTask?.(id);
+                  }
                 }}
                 availableBuckets={buckets}
                 onBucketChange={onMoveTask}
