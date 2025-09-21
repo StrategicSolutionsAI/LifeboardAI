@@ -85,8 +85,21 @@ function formatDueDate(due?: string | null) {
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? "accent" as const : "default" as const };
 }
 
-function TaskCard({ task, index, onToggle }: { task: Task; index: number; onToggle?: (id: string, checked: boolean) => void }) {
+function TaskCard({ 
+  task, 
+  index, 
+  onToggle, 
+  availableBuckets = [], 
+  onBucketChange 
+}: { 
+  task: Task; 
+  index: number; 
+  onToggle?: (id: string, checked: boolean) => void;
+  availableBuckets?: Bucket[];
+  onBucketChange?: (taskId: string, newBucketId: string) => void;
+}) {
   const [checked, setChecked] = useState(false);
+  const [showBucketDropdown, setShowBucketDropdown] = useState(false);
   const due = useMemo(() => formatDueDate(task.dueDate), [task.dueDate]);
 
   return (
@@ -149,9 +162,67 @@ function TaskCard({ task, index, onToggle }: { task: Task; index: number; onTogg
           >
             <CheckCircle2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" aria-label="More actions" type="button">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+          
+          {/* Bucket Dropdown */}
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 text-muted-foreground hover:text-primary" 
+              aria-label="Change bucket"
+              onMouseEnter={() => setShowBucketDropdown(true)}
+              onMouseLeave={() => setShowBucketDropdown(false)}
+              type="button"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+            
+            {showBucketDropdown && (
+              <div 
+                className="absolute top-8 right-0 z-50 min-w-[140px] rounded-lg border border-border bg-background shadow-lg"
+                onMouseEnter={() => setShowBucketDropdown(true)}
+                onMouseLeave={() => setShowBucketDropdown(false)}
+              >
+                <div className="p-1">
+                  <div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                    Move to bucket
+                  </div>
+                  
+                  {/* No bucket option */}
+                  <button
+                    className="w-full text-left px-2 py-1 text-sm hover:bg-muted rounded text-muted-foreground"
+                    onClick={() => {
+                      onBucketChange?.(task.id, '__unassigned');
+                      setShowBucketDropdown(false);
+                    }}
+                  >
+                    No bucket
+                  </button>
+                  
+                  {/* Available buckets */}
+                  {availableBuckets.map((bucket) => (
+                    <button
+                      key={bucket.id}
+                      className="w-full text-left px-2 py-1 text-sm hover:bg-muted rounded flex items-center gap-2"
+                      onClick={() => {
+                        onBucketChange?.(task.id, bucket.id);
+                        setShowBucketDropdown(false);
+                      }}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: bucket.color ?? "var(--primary)" }}
+                      />
+                      {bucket.name}
+                      {task.bucketId === bucket.id && (
+                        <span className="ml-auto text-xs text-primary">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
         </div>
@@ -165,11 +236,15 @@ function BucketColumn({
   summary,
   onAddTask,
   onToggleTask,
+  availableBuckets = [],
+  onBucketChange,
 }: {
   bucket: Bucket;
   summary: BucketSummary;
   onAddTask?: (bucketId: string, title: string) => void;
   onToggleTask?: (id: string, checked: boolean) => void;
+  availableBuckets?: Bucket[];
+  onBucketChange?: (taskId: string, newBucketId: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -235,7 +310,16 @@ function BucketColumn({
                   <p className="mt-1 text-xs text-muted-foreground">Add something you want to tackle next in {bucket.name}.</p>
                 </div>
               ) : (
-                tasks.map((task, index) => <TaskCard key={task.id} task={task} index={index} onToggle={onToggleTask} />)
+                tasks.map((task, index) => (
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    index={index} 
+                    onToggle={onToggleTask}
+                    availableBuckets={availableBuckets}
+                    onBucketChange={onBucketChange}
+                  />
+                ))
               )}
               {provided.placeholder}
             </div>
@@ -433,6 +517,8 @@ export default function TasksBoard({
                 onToggleTask={(id, checked) => {
                   if (checked) onCompleteTask?.(id);
                 }}
+                availableBuckets={buckets}
+                onBucketChange={onMoveTask}
               />
             </div>
           ))}
