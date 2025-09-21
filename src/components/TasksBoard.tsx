@@ -111,7 +111,7 @@ function TaskCard({
           {...provided.dragHandleProps}
           className={`group relative rounded-2xl border border-border/70 bg-background/70 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
             snapshot.isDragging ? 'rotate-2 shadow-lg scale-105' : ''
-          }`}
+          } ${showBucketDropdown ? 'z-[9998]' : ''}`}
         >
       <div className="flex items-start gap-3">
         <Checkbox
@@ -179,7 +179,7 @@ function TaskCard({
             
             {showBucketDropdown && (
               <div 
-                className="absolute top-8 right-0 z-50 min-w-[140px] rounded-lg border border-border bg-background shadow-lg"
+                className="absolute top-8 right-0 z-[9999] min-w-[140px] rounded-lg border border-border bg-background shadow-lg"
                 onMouseEnter={() => setShowBucketDropdown(true)}
                 onMouseLeave={() => setShowBucketDropdown(false)}
               >
