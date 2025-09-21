@@ -91,10 +91,10 @@ export function useTasks(selectedDate?: Date) {
         }
         const todoistData = await res.json()
         todoistConnectedRef.current = true
-        const todoistTasks = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
+        const todoistTasks: Task[] = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
         
         // When Todoist is connected, also fetch Supabase tasks and merge them
-        let supabaseTasks: any[] = []
+        let supabaseTasks: Task[] = []
         try {
           const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
           if (supa.ok) {
@@ -106,15 +106,15 @@ export function useTasks(selectedDate?: Date) {
         }
         
         // Merge Todoist and Supabase tasks, with Todoist taking precedence for duplicates
-        const taskMap = new Map()
+        const taskMap = new Map<string, Task>()
         
         // Add Supabase tasks first
-        supabaseTasks.forEach(task => {
+        supabaseTasks.forEach((task: Task) => {
           taskMap.set(task.id, task)
         })
         
         // Add Todoist tasks (will overwrite any duplicates)
-        todoistTasks.forEach(task => {
+        todoistTasks.forEach((task: Task) => {
           taskMap.set(task.id, task)
         })
         
