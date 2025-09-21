@@ -64,7 +64,7 @@ function TasksBoardShell() {
       status: 'open',
       position: typeof t.position === 'number' ? t.position : null,
       dueDate: t.due?.date ?? null,
-      createdAt: t.created_at ?? t.createdAt ?? null,
+      createdAt: t.created_at ?? null,
     }))
   ), [openTasks]);
 
