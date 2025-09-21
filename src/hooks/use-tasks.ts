@@ -89,9 +89,36 @@ export function useTasks(selectedDate?: Date) {
           }
           throw new Error(`Failed to fetch tasks: ${res.status}`)
         }
-        const data = await res.json()
+        const todoistData = await res.json()
         todoistConnectedRef.current = true
-        return Array.isArray(data) ? data : (data.tasks ?? [])
+        const todoistTasks = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
+        
+        // When Todoist is connected, also fetch Supabase tasks and merge them
+        let supabaseTasks: any[] = []
+        try {
+          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+          if (supa.ok) {
+            const json = await supa.json()
+            supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+          }
+        } catch (error) {
+          console.warn('Failed to fetch Supabase tasks while connected to Todoist:', error)
+        }
+        
+        // Merge Todoist and Supabase tasks, with Todoist taking precedence for duplicates
+        const taskMap = new Map()
+        
+        // Add Supabase tasks first
+        supabaseTasks.forEach(task => {
+          taskMap.set(task.id, task)
+        })
+        
+        // Add Todoist tasks (will overwrite any duplicates)
+        todoistTasks.forEach(task => {
+          taskMap.set(task.id, task)
+        })
+        
+        return Array.from(taskMap.values())
       } catch (error) {
         if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
           todoistConnectedRef.current = false
