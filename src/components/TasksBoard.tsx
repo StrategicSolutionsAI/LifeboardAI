@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +100,25 @@ function TaskCard({
 }) {
   const [checked, setChecked] = useState(false);
   const [showBucketDropdown, setShowBucketDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const due = useMemo(() => formatDueDate(task.dueDate), [task.dueDate]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowBucketDropdown(false);
+      }
+    }
+
+    if (showBucketDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBucketDropdown]);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -157,21 +175,26 @@ function TaskCard({
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-primary"
             aria-label="Mark complete"
-            onClick={() => onToggle?.(task.id, true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle?.(task.id, true);
+            }}
             type="button"
           >
             <CheckCircle2 className="h-4 w-4" />
           </Button>
           
           {/* Bucket Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             <Button 
               variant="ghost" 
               size="icon" 
               className="h-7 w-7 text-muted-foreground hover:text-primary" 
               aria-label="Change bucket"
-              onMouseEnter={() => setShowBucketDropdown(true)}
-              onMouseLeave={() => setShowBucketDropdown(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBucketDropdown(!showBucketDropdown);
+              }}
               type="button"
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -180,8 +203,7 @@ function TaskCard({
             {showBucketDropdown && (
               <div 
                 className="absolute top-8 right-0 z-[9999] min-w-[140px] rounded-lg border border-border bg-background shadow-lg"
-                onMouseEnter={() => setShowBucketDropdown(true)}
-                onMouseLeave={() => setShowBucketDropdown(false)}
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="p-1">
                   <div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border mb-1">
