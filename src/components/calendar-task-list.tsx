@@ -9,6 +9,46 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
 
+// ---- Bucket mapping helpers ----
+const UNASSIGNED_BUCKET_ID = "__unassigned";
+const UNASSIGNED_BUCKET_LABEL = "Unsorted";
+const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
+
+const normalizeBucketId = (name?: string | null) => {
+  const trimmed = (name ?? '').trim();
+  return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
+};
+
+const bucketColorFromId = (id: string) => {
+  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
+  const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
+  return BUCKET_COLOR_PALETTE[idx];
+};
+
+const getBucketColorClasses = (bucketName?: string | null) => {
+  if (!bucketName) return "bg-gray-100 text-gray-600 border-gray-200";
+  
+  const bucketId = normalizeBucketId(bucketName);
+  const color = bucketColorFromId(bucketId);
+  
+  // Map hex colors to Tailwind classes
+  const colorMap: Record<string, string> = {
+    "#4F46E5": "bg-indigo-100 text-indigo-700 border-indigo-200", // indigo
+    "#22C55E": "bg-green-100 text-green-700 border-green-200",   // green
+    "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange
+    "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink
+    "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal
+    "#8B5CF6": "bg-violet-100 text-violet-700 border-violet-200", // violet
+    "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber
+    "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
+    "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200"      // gray (unassigned)
+  };
+  
+  return colorMap[color] || "bg-gray-100 text-gray-600 border-gray-200";
+};
+
 interface CalendarTaskListProps {
   selectedDate: Date;
   onDateChange?: (date: Date) => void;
@@ -617,43 +657,6 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     return openTasksLocal.length ? openTasksLocal : openTasksBase;
   }, [openTasksLocal, openTasksBase]);
 
-  // ---- Board mapping helpers ----
-  const UNASSIGNED_BUCKET_ID = "__unassigned";
-  const UNASSIGNED_BUCKET_LABEL = "Unsorted";
-  const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
-  const normalizeBucketId = (name?: string | null) => {
-    const trimmed = (name ?? '').trim();
-    return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
-  };
-  const bucketColorFromId = (id: string) => {
-    if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
-    const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
-    return BUCKET_COLOR_PALETTE[idx];
-  };
-
-  const getBucketColorClasses = (bucketName?: string | null) => {
-    if (!bucketName) return "bg-gray-100 text-gray-600 border-gray-200";
-    
-    const bucketId = normalizeBucketId(bucketName);
-    const color = bucketColorFromId(bucketId);
-    
-    // Map hex colors to Tailwind classes
-    const colorMap: Record<string, string> = {
-      "#4F46E5": "bg-indigo-100 text-indigo-700 border-indigo-200", // indigo
-      "#22C55E": "bg-green-100 text-green-700 border-green-200",   // green
-      "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange
-      "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink
-      "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal
-      "#8B5CF6": "bg-violet-100 text-violet-700 border-violet-200", // violet
-      "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber
-      "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
-      "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200"      // gray (unassigned)
-    };
-    
-    return colorMap[color] || "bg-gray-100 text-gray-600 border-gray-200";
-  };
 
   const boardTasks: BoardTask[] = useMemo(() => (
     openTasksToShow.map((t) => ({
