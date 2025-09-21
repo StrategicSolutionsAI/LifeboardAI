@@ -10,27 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { differenceInCalendarDays, parseISO, isValid } from "date-fns";
 import { Plus } from "lucide-react";
+import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
+import { getUserPreferencesClient } from "@/lib/user-preferences";
 
-const UNASSIGNED_BUCKET_ID = "__unassigned";
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
-const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
 
 function normalizeBucketId(name?: string | null) {
   const trimmed = (name ?? '').trim();
   return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
 }
 
-function bucketColorFromId(id: string) {
-  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8";
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
-  const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
-  return BUCKET_COLOR_PALETTE[idx];
-}
-
 function TasksBoardShell() {
   const { allTasks, toggleTaskCompletion, createTask, batchUpdateTasks } = useTasksContext();
   const { buckets } = useBuckets();
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [quickTask, setQuickTask] = useState("");
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -41,6 +34,20 @@ function TasksBoardShell() {
       setQuickBucket(buckets[0]);
     }
   }, [buckets, quickBucket]);
+
+  useEffect(() => {
+    const loadBucketColors = async () => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs?.bucket_colors) {
+          setBucketColors(prefs.bucket_colors);
+        }
+      } catch (error) {
+        console.error("Failed to load bucket colors:", error);
+      }
+    };
+    loadBucketColors();
+  }, []);
 
   const openTasks = useMemo(() => allTasks.filter(t => !t.completed), [allTasks]);
   const completedTasks = useMemo(() => allTasks.filter(t => t.completed), [allTasks]);
@@ -81,8 +88,8 @@ function TasksBoardShell() {
     // Include any task bucket id
     boardTasks.forEach((t) => { const id = t.bucketId; const label = id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id; push(id, label) });
     if (ids.length === 0) push(UNASSIGNED_BUCKET_ID, UNASSIGNED_BUCKET_LABEL);
-    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: bucketColorFromId(id) }));
-  }, [buckets, boardTasks]);
+    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: getBucketColorSync(id, bucketColors) }));
+  }, [buckets, boardTasks, bucketColors]);
 
   const totalOpen = openTasks.length;
   const totalCompleted = completedTasks.length;

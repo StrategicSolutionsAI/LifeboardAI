@@ -14,6 +14,8 @@ import { TaskSortControls } from "./task-sort-controls";
 import { sortTasks, saveSortPreference, loadSortPreference, type SortOption, type SortDirection } from "@/lib/task-sorting";
 import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
 import { useBuckets } from "@/hooks/use-buckets";
+import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
+import { getUserPreferencesClient } from "@/lib/user-preferences";
 
 // Loading skeleton for tasks
 function TaskSkeleton() {
@@ -44,42 +46,19 @@ function TaskError({ error, onRetry }: { error: Error; onRetry: () => void }) {
   );
 }
 
-const UNASSIGNED_BUCKET_ID = "__unassigned";
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
-const UNASSIGNED_BUCKET_COLOR = "#94A3B8";
-const BUCKET_COLOR_PALETTE = [
-  "#4F46E5",
-  "#22C55E",
-  "#F97316",
-  "#EC4899",
-  "#14B8A6",
-  "#8B5CF6",
-  "#F59E0B",
-  "#06B6D4",
-];
 
 function normalizeBucketId(name?: string | null) {
   const trimmed = (name ?? "").trim();
   return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
 }
 
-function bucketColorFromId(id: string) {
-  if (id === UNASSIGNED_BUCKET_ID) {
-    return UNASSIGNED_BUCKET_COLOR;
-  }
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash << 5) - hash + id.charCodeAt(i);
-    hash |= 0; // keep 32bit int
-  }
-  const index = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
-  return BUCKET_COLOR_PALETTE[index];
-}
-
 export function TaskSidePanel({ onDragStart, onDragEnd }: {
   onDragStart?: (result: any) => void;
   onDragEnd?: (result: DropResult) => void;
 } = {}) {
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
+
   // Basic calendar / date state
   const [date, setDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -127,6 +106,32 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       setSortBy(savedPref.sortBy);
       setSortDirection(savedPref.direction);
     }
+  }, []);
+
+  useEffect(() => {
+    const loadBucketColors = async () => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs?.bucket_colors) {
+          setBucketColors(prefs.bucket_colors);
+        }
+      } catch (error) {
+        console.error("Failed to load bucket colors:", error);
+      }
+    };
+
+    loadBucketColors();
+
+    // Listen for bucket color changes
+    const handleBucketColorsChanged = () => {
+      loadBucketColors();
+    };
+
+    window.addEventListener('bucketColorsChanged', handleBucketColorsChanged);
+
+    return () => {
+      window.removeEventListener('bucketColorsChanged', handleBucketColorsChanged);
+    };
   }, []);
 
   // Handle sort change
@@ -185,9 +190,9 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
     return ids.map((id) => ({
       id,
       name: labels.get(id) ?? (id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id),
-      color: bucketColorFromId(id),
+      color: getBucketColorSync(id, bucketColors),
     }));
-  }, [storedBuckets, boardTasks]);
+  }, [storedBuckets, boardTasks, bucketColors]);
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");

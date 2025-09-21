@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getUserPreferencesClient } from "@/lib/user-preferences"
+import { getUserPreferencesClient, UserPreferences } from "@/lib/user-preferences"
 import { Plus, Cloud, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { WidgetLibrary } from "./widget-library"
@@ -21,6 +21,7 @@ export function DynamicBucketTabs({
   children?: React.ReactNode
 }) {
   const [userBuckets, setUserBuckets] = useState<string[]>(DEFAULT_BUCKETS)
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [isWidgetLibraryOpen, setIsWidgetLibraryOpen] = useState(false)
   
@@ -31,7 +32,8 @@ export function DynamicBucketTabs({
         
         if (userPrefs && userPrefs.life_buckets && userPrefs.life_buckets.length > 0) {
           setUserBuckets(userPrefs.life_buckets)
-          
+          setBucketColors(userPrefs.bucket_colors || {})
+
           // If the currently selected bucket isn't in the user's buckets,
           // select the first one of their buckets
           if (!userPrefs.life_buckets.includes(selectedBucket) && userPrefs.life_buckets.length > 0) {
@@ -62,25 +64,49 @@ export function DynamicBucketTabs({
   const formatBucketName = (name: string) => {
     return name.toUpperCase()
   }
+
+  // Get bucket color with fallback to default theme color
+  const getBucketColor = (bucket: string) => {
+    return bucketColors[bucket] || '#8491FF'
+  }
   
   return (
     <>
       {/* Tab Navigation */}
       <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-4 sm:px-6">
         <div className="flex gap-4 sm:gap-8">
-          {userBuckets.map((bucket) => (
-            <button
-              key={bucket}
-              onClick={() => onSelectBucket(bucket)}
-              className={`py-4 px-2 text-xs font-medium tracking-wide border-b-2 transition-colors ${
-                selectedBucket === bucket
-                  ? 'border-theme-primary-500 text-theme-primary-600'
-                  : 'border-transparent text-theme-text-secondary hover:text-theme-primary-600'
-              }`}
-            >
-              {formatBucketName(bucket)}
-            </button>
-          ))}
+          {userBuckets.map((bucket) => {
+            const bucketColor = getBucketColor(bucket)
+            const isSelected = selectedBucket === bucket
+            return (
+              <button
+                key={bucket}
+                onClick={() => onSelectBucket(bucket)}
+                className={`py-4 px-2 text-xs font-medium tracking-wide border-b-2 transition-colors ${
+                  isSelected
+                    ? 'border-transparent text-white'
+                    : 'border-transparent text-theme-text-secondary hover:text-white hover:opacity-80'
+                }`}
+                style={{
+                  borderBottomColor: isSelected ? bucketColor : 'transparent',
+                  color: isSelected ? bucketColor : undefined,
+                  backgroundColor: isSelected ? 'transparent' : undefined
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.color = bucketColor
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.color = ''
+                  }
+                }}
+              >
+                {formatBucketName(bucket)}
+              </button>
+            )
+          })}
         </div>
       </div>
 

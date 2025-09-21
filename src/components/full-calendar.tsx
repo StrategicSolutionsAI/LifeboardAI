@@ -26,6 +26,8 @@ import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner"
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
+import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
+import { getUserPreferencesClient } from "@/lib/user-preferences";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -50,23 +52,12 @@ const getRepeatLabel = (value?: RepeatOption | null) => {
 };
 
 // Bucket color system for calendar events
-const UNASSIGNED_BUCKET_ID = "__unassigned";
-const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
-
 const normalizeBucketId = (name?: string | null) => {
   const trimmed = (name ?? '').trim();
   return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
 };
 
-const bucketColorFromId = (id: string) => {
-  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
-  const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
-  return BUCKET_COLOR_PALETTE[idx];
-};
-
-const getBucketEventStyles = (bucketName?: string | null) => {
+const getBucketEventStyles = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
   if (!bucketName) {
     // Default emerald for no bucket
     return {
@@ -76,9 +67,9 @@ const getBucketEventStyles = (bucketName?: string | null) => {
       badge: 'text-emerald-600'
     };
   }
-  
+
   const bucketId = normalizeBucketId(bucketName);
-  const color = bucketColorFromId(bucketId);
+  const color = getBucketColorSync(bucketId, bucketColors);
   
   // Map hex colors to Tailwind classes for calendar events
   const colorMap: Record<string, any> = {
@@ -135,14 +126,28 @@ const getBucketEventStyles = (bucketName?: string | null) => {
       time: 'text-gray-600',
       dot: 'bg-gray-400',
       badge: 'text-gray-600'
+    },
+    "#ff52bf": { // pink (custom)
+      container: 'bg-pink-50 border-l-4 border-pink-400 text-pink-900 hover:bg-pink-100',
+      time: 'text-pink-600',
+      dot: 'bg-pink-400',
+      badge: 'text-pink-600'
     }
   };
   
-  return colorMap[color] || {
-    container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
-    time: 'text-emerald-600',
-    dot: 'bg-emerald-400',
-    badge: 'text-emerald-600'
+  // Check if we have a predefined style for this color
+  const predefinedStyle = colorMap[color];
+  if (predefinedStyle) {
+    return predefinedStyle;
+  }
+
+  // For custom colors, return dynamic styles
+  return {
+    container: 'border-l-4 text-gray-900 hover:opacity-90',
+    time: 'text-gray-600',
+    dot: 'w-2 h-2 rounded-full',
+    badge: 'text-gray-600',
+    customColor: color
   };
 };
 
@@ -203,6 +208,8 @@ interface FullCalendarProps {
 }
 
 export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: FullCalendarProps = {}) {
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
+
   // Initialize current date from localStorage or prop or default to today
   const [currentDate, setCurrentDate] = useState(() => {
     if (propSelectedDate) return propSelectedDate;
@@ -665,6 +672,33 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     else if (availableBuckets.length > 0) setFormBucket((prev) => prev || availableBuckets[0]);
   }, [selectedBucket, availableBuckets]);
 
+  // Load bucket colors
+  useEffect(() => {
+    const loadBucketColors = async () => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs?.bucket_colors) {
+          setBucketColors(prefs.bucket_colors);
+        }
+      } catch (error) {
+        console.error("Failed to load bucket colors:", error);
+      }
+    };
+
+    loadBucketColors();
+
+    // Listen for bucket color changes
+    const handleBucketColorsChanged = () => {
+      loadBucketColors();
+    };
+
+    window.addEventListener('bucketColorsChanged', handleBucketColorsChanged);
+
+    return () => {
+      window.removeEventListener('bucketColorsChanged', handleBucketColorsChanged);
+    };
+  }, []);
+
   // Build events map whenever data sources change
   useEffect(() => {
     const map: Record<string, DayEvent[]> = {};
@@ -918,7 +952,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         badge: 'text-blue-600'
                                       };
                                     case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket);
+                                      return getBucketEventStyles(ev?.bucket, bucketColors);
                                     default:
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
@@ -971,11 +1005,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         className={`group p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        style={styles.customColor ? {
+                                          backgroundColor: styles.customColor + '20',
+                                          borderLeftColor: styles.customColor,
+                                          borderLeftWidth: '4px'
+                                        } : {}}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                         data-task-id={ev.taskId}
                                       >
                                         <div className="flex items-start gap-2">
-                                          <div className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`} />
+                                          <div
+                                            className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`}
+                                            style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                          />
                                           <div className="flex-1 min-w-0">
                                             {timeDisplay && (
                                               <div className={`text-xs font-medium ${styles.time} mb-1`}>
@@ -1136,7 +1178,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         badge: 'text-blue-600'
                                       };
                                     case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket);
+                                      return getBucketEventStyles(ev?.bucket, bucketColors);
                                     default:
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
@@ -1189,10 +1231,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         className={`group p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                        style={styles.customColor ? {
+                                          backgroundColor: styles.customColor + '20',
+                                          borderLeftColor: styles.customColor,
+                                          borderLeftWidth: '4px'
+                                        } : {}}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                       >
                                         <div className="flex items-start gap-1.5">
-                                          <div className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`} />
+                                          <div
+                                            className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`}
+                                            style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                          />
                                           <div className="flex-1 min-w-0">
                                             {timeDisplay && (
                                               <div className={`text-[10px] font-medium ${styles.time} mb-0.5`}>
@@ -1279,7 +1329,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     case 'google':
                       return 'bg-blue-500';
                     case 'lifeboard':
-                      return getBucketEventStyles(ev?.bucket).dot;
+                      const styles = getBucketEventStyles(ev?.bucket, bucketColors);
+                      return styles.customColor || styles.dot;
                     default:
                       return 'bg-indigo-500';
                   }
@@ -1300,7 +1351,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 
                 return (
                   <div key={idx} className="flex items-start gap-2">
-                    <span className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source, ev)}`} />
+                    <span
+                      className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source, ev)}`}
+                      style={ev.source === 'lifeboard' && typeof getDotColor(ev.source, ev) === 'string' && getDotColor(ev.source, ev).startsWith('#') ?
+                        { backgroundColor: getDotColor(ev.source, ev) } : {}
+                      }
+                    />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">{ev.title}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">

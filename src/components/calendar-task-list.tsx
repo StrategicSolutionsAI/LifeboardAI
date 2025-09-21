@@ -8,31 +8,23 @@ import { useTasksContext } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
+import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
+import { getUserPreferencesClient } from "@/lib/user-preferences";
 
 // ---- Bucket mapping helpers ----
-const UNASSIGNED_BUCKET_ID = "__unassigned";
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
-const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
 
 const normalizeBucketId = (name?: string | null) => {
   const trimmed = (name ?? '').trim();
   return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
 };
 
-const bucketColorFromId = (id: string) => {
-  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
-  const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
-  return BUCKET_COLOR_PALETTE[idx];
-};
-
-const getBucketColorClasses = (bucketName?: string | null) => {
+const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
   if (!bucketName) return "bg-gray-100 text-gray-600 border-gray-200";
-  
+
   const bucketId = normalizeBucketId(bucketName);
-  const color = bucketColorFromId(bucketId);
-  
+  const color = getBucketColorSync(bucketId, bucketColors);
+
   // Map hex colors to Tailwind classes
   const colorMap: Record<string, string> = {
     "#4F46E5": "bg-indigo-100 text-indigo-700 border-indigo-200", // indigo
@@ -45,7 +37,7 @@ const getBucketColorClasses = (bucketName?: string | null) => {
     "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
     "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200"      // gray (unassigned)
   };
-  
+
   return colorMap[color] || "bg-gray-100 text-gray-600 border-gray-200";
 };
 
@@ -73,20 +65,22 @@ interface EnhancedTaskCardProps {
   isRescheduleActive?: boolean;
   onRescheduleSelect?: (taskId: string, newDate: string | null) => void | Promise<void>;
   onRescheduleCancel?: () => void;
+  bucketColors?: Record<string, string>;
 }
 
-function EnhancedTaskCard({ 
-  task, 
-  index, 
-  isExpanded, 
-  onToggle, 
-  onExpand, 
-  onQuickAction, 
+function EnhancedTaskCard({
+  task,
+  index,
+  isExpanded,
+  onToggle,
+  onExpand,
+  onQuickAction,
   availableBuckets = [],
   batchUpdateTasks,
   isRescheduleActive = false,
   onRescheduleSelect,
   onRescheduleCancel,
+  bucketColors = {},
 }: EnhancedTaskCardProps) {
   const getPriorityStyles = (priority?: string | number) => {
     const priorityStr = priority?.toString().toLowerCase();
@@ -227,7 +221,7 @@ function EnhancedTaskCard({
                   {/* Metadata Row */}
                   <div className="flex items-center gap-2 mt-2">
                     {task.bucket && (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket)}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket, bucketColors)}`}>
                         {task.bucket}
                       </span>
                     )}
@@ -443,6 +437,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [taskView, setTaskView] = useState<'Today' | 'Upcoming' | 'Master List'>('Today');
   const [masterLayout, setMasterLayout] = useState<'list' | 'board'>('list');
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
 
   // Use unified task context
   const {
@@ -481,6 +476,32 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   useEffect(() => {
     onCollapsedChange?.(isCollapsed);
   }, [isCollapsed, onCollapsedChange]);
+
+  useEffect(() => {
+    const loadBucketColors = async () => {
+      try {
+        const prefs = await getUserPreferencesClient();
+        if (prefs?.bucket_colors) {
+          setBucketColors(prefs.bucket_colors);
+        }
+      } catch (error) {
+        console.error("Failed to load bucket colors:", error);
+      }
+    };
+
+    loadBucketColors();
+
+    // Listen for bucket color changes
+    const handleBucketColorsChanged = () => {
+      loadBucketColors();
+    };
+
+    window.addEventListener('bucketColorsChanged', handleBucketColorsChanged);
+
+    return () => {
+      window.removeEventListener('bucketColorsChanged', handleBucketColorsChanged);
+    };
+  }, []);
 
   // Combined tasks for dashboard view (all incomplete tasks from the bucket, sorted by due date)
   const dashboardTasks = useMemo(() => {
@@ -678,8 +699,8 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     // Ensure any bucket present on tasks is represented
     boardTasks.forEach((t) => { const id = t.bucketId; const label = id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id; push(id, label) });
     if (ids.length === 0) push(UNASSIGNED_BUCKET_ID, UNASSIGNED_BUCKET_LABEL);
-    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: bucketColorFromId(id) }));
-  }, [availableBuckets, boardTasks]);
+    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: getBucketColorSync(id, bucketColors) }));
+  }, [availableBuckets, boardTasks, bucketColors]);
 
   // Listen for reorder events from parent DragDropContext
   React.useEffect(() => {
@@ -1245,7 +1266,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
                                           {t.bucket}
                                         </span>
                                       </div>
@@ -1440,6 +1461,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                 isRescheduleActive={rescheduleTaskId === task.id.toString()}
                                 onRescheduleSelect={handleRescheduleSelect}
                                 onRescheduleCancel={handleRescheduleCancel}
+                                bucketColors={bucketColors}
                               />
                             ))}
                             {provided.placeholder}
@@ -1630,7 +1652,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                   </p>
                                   {t.bucket && (
                                     <div className="mt-2">
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
                                         {t.bucket}
                                       </span>
                                     </div>
@@ -1765,7 +1787,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
                                           {t.bucket}
                                         </span>
                                       </div>

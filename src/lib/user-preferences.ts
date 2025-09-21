@@ -4,6 +4,7 @@ export interface UserPreferences {
   id?: string;
   user_id: string;
   life_buckets: string[];
+  bucket_colors?: Record<string, string>;
   widgets_by_bucket: Record<string, any[]>;
   progress_by_widget?: Record<string, any>;
   hourly_plan?: Record<string, any[]>;
@@ -33,6 +34,7 @@ export async function getUserPreferencesClient() {
       const initialPrefs = {
         user_id: user.id,
         life_buckets: [],
+        bucket_colors: {},
         widgets_by_bucket: {},
         progress_by_widget: {},
         hourly_plan: {},
@@ -51,6 +53,7 @@ export async function getUserPreferencesClient() {
         return {
           user_id: user.id,
           life_buckets: [],
+          bucket_colors: {},
           widgets_by_bucket: {},
           progress_by_widget: {},
           hourly_plan: {}
@@ -67,6 +70,7 @@ export async function getUserPreferencesClient() {
       return {
         user_id: user.id,
         life_buckets: [],
+        bucket_colors: {},
         widgets_by_bucket: {},
         progress_by_widget: {}
       };
@@ -75,6 +79,7 @@ export async function getUserPreferencesClient() {
     // Ensure required fields are present
     return {
       ...data,
+      bucket_colors: data.bucket_colors || {},
       widgets_by_bucket: data.widgets_by_bucket || {},
       progress_by_widget: data.progress_by_widget || {},
       hourly_plan: data.hourly_plan || {}
@@ -84,6 +89,7 @@ export async function getUserPreferencesClient() {
     return {
       user_id: user.id,
       life_buckets: [],
+      bucket_colors: {},
       widgets_by_bucket: {},
       progress_by_widget: {},
       hourly_plan: {}
@@ -104,6 +110,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
     // Ensure widgets_by_bucket exists and is properly formatted before saving
     const safePreferences = {
       ...preferences,
+      bucket_colors: preferences.bucket_colors || {},
       widgets_by_bucket: preferences.widgets_by_bucket || {},
       progress_by_widget: preferences.progress_by_widget || {},
       hourly_plan: preferences.hourly_plan || {},
@@ -119,7 +126,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
     // Log the actual data being saved
     console.log('Safe preferences being saved:', safePreferences);
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_preferences')
       .upsert(
         safePreferences,

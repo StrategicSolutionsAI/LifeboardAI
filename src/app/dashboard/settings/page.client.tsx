@@ -1,15 +1,34 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3 } from 'lucide-react'
+import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square } from 'lucide-react'
 import { ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 import { SidebarLayout } from '@/components/sidebar-layout'
+import { getUserPreferencesClient, saveUserPreferences, UserPreferences } from '@/lib/user-preferences'
+import { invalidateBucketColorCache } from '@/lib/bucket-colors'
 
 export default function SettingsPageClient() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      console.log('Loading user preferences...')
+      const prefs = await getUserPreferencesClient()
+      console.log('User preferences loaded:', prefs)
+      if (prefs) {
+        console.log('Life buckets:', prefs.life_buckets)
+        console.log('Bucket colors:', prefs.bucket_colors)
+        setUserPreferences(prefs)
+        setBucketColors(prefs.bucket_colors || {})
+      }
+    }
+    if (mounted) {
+      loadUserPreferences()
+    }
+  }, [mounted])
 
   const { theme, setTheme } = useTheme()
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
@@ -19,6 +38,8 @@ export default function SettingsPageClient() {
   const [customSecondary, setCustomSecondary] = useState('#9CA3FF')
   const [customAccent, setCustomAccent] = useState('#B4BAFF')
   const [allThemes, setAllThemes] = useState<ThemeColor[]>(getAllThemes())
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null)
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({})
 
   const handleCreateCustomTheme = () => {
     if (!customThemeName.trim()) return
@@ -72,6 +93,31 @@ export default function SettingsPageClient() {
     else handleCreateCustomTheme()
   }
 
+  const handleBucketColorChange = async (bucketName: string, color: string) => {
+    const newBucketColors = { ...bucketColors, [bucketName]: color }
+    setBucketColors(newBucketColors)
+
+    // Store in localStorage as backup
+    localStorage.setItem('bucket_colors', JSON.stringify(newBucketColors))
+
+    if (userPreferences) {
+      const updatedPrefs = {
+        ...userPreferences,
+        bucket_colors: newBucketColors
+      }
+      try {
+        await saveUserPreferences(updatedPrefs)
+        setUserPreferences(updatedPrefs)
+        // Invalidate cache so other components get fresh colors
+        invalidateBucketColorCache()
+      } catch (error) {
+        console.log('Could not save to database, using localStorage fallback:', error)
+      }
+    }
+  }
+
+  const getDefaultBucketColor = () => '#6B7280'
+
   if (!mounted) return null
 
   return (
@@ -83,6 +129,20 @@ export default function SettingsPageClient() {
         </div>
 
         <div className="space-y-8">
+          {/* Debug Section - Remove after testing */}
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <h3 className="font-medium text-yellow-800 mb-2">Debug Info</h3>
+            <div className="text-sm text-yellow-700 space-y-1">
+              <p>Mounted: {mounted.toString()}</p>
+              <p>User Preferences: {userPreferences ? 'Loaded' : 'Not loaded'}</p>
+              <p>Life Buckets: {userPreferences?.life_buckets?.length || 0}</p>
+              <p>Bucket Colors: {Object.keys(bucketColors).length}</p>
+              {userPreferences?.life_buckets && (
+                <p>Buckets: {userPreferences.life_buckets.join(', ')}</p>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
             <div className="space-y-4">
@@ -245,6 +305,51 @@ export default function SettingsPageClient() {
               </div>
             </div>
           </div>
+
+          {((userPreferences && userPreferences.life_buckets.length > 0) || true) && (
+            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
+              <div className="flex items-center gap-3 mb-6">
+                <Square className="w-5 h-5 text-gray-600" />
+                <div>
+                  <h2 className="text-xl font-semibold">Bucket Colors</h2>
+                  <p className="text-gray-500">Customize the colors for your life buckets</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {(userPreferences?.life_buckets || ['Health', 'Work', 'Personal', 'Finance']).map((bucket) => (
+                  <div key={bucket} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-6 h-6 rounded-full border border-gray-200"
+                        style={{ backgroundColor: bucketColors[bucket] || getDefaultBucketColor() }}
+                      />
+                      <div>
+                        <h3 className="font-medium">{bucket}</h3>
+                        <p className="text-sm text-gray-500">Change the color for this bucket</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={bucketColors[bucket] || getDefaultBucketColor()}
+                        onChange={(e) => handleBucketColorChange(bucket, e.target.value)}
+                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer"
+                        title={`Choose color for ${bucket}`}
+                      />
+                      <input
+                        type="text"
+                        value={bucketColors[bucket] || getDefaultBucketColor()}
+                        onChange={(e) => handleBucketColorChange(bucket, e.target.value)}
+                        placeholder="#6B7280"
+                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <h2 className="text-xl font-semibold mb-4">Advanced Settings</h2>
