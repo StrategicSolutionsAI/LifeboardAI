@@ -187,7 +187,7 @@ function EnhancedTaskCard({
                   {/* Metadata Row */}
                   <div className="flex items-center gap-2 mt-2">
                     {task.bucket && (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${priorityStyles.badge}`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket)}`}>
                         {task.bucket}
                       </span>
                     )}
@@ -631,6 +631,28 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
     const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
     return BUCKET_COLOR_PALETTE[idx];
+  };
+
+  const getBucketColorClasses = (bucketName?: string | null) => {
+    if (!bucketName) return "bg-gray-100 text-gray-600 border-gray-200";
+    
+    const bucketId = normalizeBucketId(bucketName);
+    const color = bucketColorFromId(bucketId);
+    
+    // Map hex colors to Tailwind classes
+    const colorMap: Record<string, string> = {
+      "#4F46E5": "bg-indigo-100 text-indigo-700 border-indigo-200", // indigo
+      "#22C55E": "bg-green-100 text-green-700 border-green-200",   // green
+      "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange
+      "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink
+      "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal
+      "#8B5CF6": "bg-violet-100 text-violet-700 border-violet-200", // violet
+      "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber
+      "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
+      "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200"      // gray (unassigned)
+    };
+    
+    return colorMap[color] || "bg-gray-100 text-gray-600 border-gray-200";
   };
 
   const boardTasks: BoardTask[] = useMemo(() => (
@@ -1220,7 +1242,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
                                           {t.bucket}
                                         </span>
                                       </div>
@@ -1605,7 +1627,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                   </p>
                                   {t.bucket && (
                                     <div className="mt-2">
-                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
                                         {t.bucket}
                                       </span>
                                     </div>
@@ -1740,7 +1762,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket)}`}>
                                           {t.bucket}
                                         </span>
                                       </div>

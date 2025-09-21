@@ -21,10 +21,11 @@ import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
 
 interface DayEvent {
-  source: "google" | "todoist";
+  source: "google" | "todoist" | "lifeboard";
   title: string;
   time?: string;
   allDay?: boolean;
+  bucket?: string;
 }
 
 type ViewMode = "month" | "week" | "day";

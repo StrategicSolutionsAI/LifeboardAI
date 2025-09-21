@@ -49,6 +49,103 @@ const getRepeatLabel = (value?: RepeatOption | null) => {
   return REPEAT_LABELS[value];
 };
 
+// Bucket color system for calendar events
+const UNASSIGNED_BUCKET_ID = "__unassigned";
+const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
+
+const normalizeBucketId = (name?: string | null) => {
+  const trimmed = (name ?? '').trim();
+  return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
+};
+
+const bucketColorFromId = (id: string) => {
+  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8"; // slate-400
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) { hash = (hash << 5) - hash + id.charCodeAt(i); hash |= 0 }
+  const idx = Math.abs(hash) % BUCKET_COLOR_PALETTE.length;
+  return BUCKET_COLOR_PALETTE[idx];
+};
+
+const getBucketEventStyles = (bucketName?: string | null) => {
+  if (!bucketName) {
+    // Default emerald for no bucket
+    return {
+      container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
+      time: 'text-emerald-600',
+      dot: 'bg-emerald-400',
+      badge: 'text-emerald-600'
+    };
+  }
+  
+  const bucketId = normalizeBucketId(bucketName);
+  const color = bucketColorFromId(bucketId);
+  
+  // Map hex colors to Tailwind classes for calendar events
+  const colorMap: Record<string, any> = {
+    "#4F46E5": { // indigo
+      container: 'bg-indigo-50 border-l-4 border-indigo-400 text-indigo-900 hover:bg-indigo-100',
+      time: 'text-indigo-600',
+      dot: 'bg-indigo-400',
+      badge: 'text-indigo-600'
+    },
+    "#22C55E": { // green
+      container: 'bg-green-50 border-l-4 border-green-400 text-green-900 hover:bg-green-100',
+      time: 'text-green-600',
+      dot: 'bg-green-400',
+      badge: 'text-green-600'
+    },
+    "#F97316": { // orange
+      container: 'bg-orange-50 border-l-4 border-orange-400 text-orange-900 hover:bg-orange-100',
+      time: 'text-orange-600',
+      dot: 'bg-orange-400',
+      badge: 'text-orange-600'
+    },
+    "#EC4899": { // pink
+      container: 'bg-pink-50 border-l-4 border-pink-400 text-pink-900 hover:bg-pink-100',
+      time: 'text-pink-600',
+      dot: 'bg-pink-400',
+      badge: 'text-pink-600'
+    },
+    "#14B8A6": { // teal
+      container: 'bg-teal-50 border-l-4 border-teal-400 text-teal-900 hover:bg-teal-100',
+      time: 'text-teal-600',
+      dot: 'bg-teal-400',
+      badge: 'text-teal-600'
+    },
+    "#8B5CF6": { // violet
+      container: 'bg-violet-50 border-l-4 border-violet-400 text-violet-900 hover:bg-violet-100',
+      time: 'text-violet-600',
+      dot: 'bg-violet-400',
+      badge: 'text-violet-600'
+    },
+    "#F59E0B": { // amber
+      container: 'bg-amber-50 border-l-4 border-amber-400 text-amber-900 hover:bg-amber-100',
+      time: 'text-amber-600',
+      dot: 'bg-amber-400',
+      badge: 'text-amber-600'
+    },
+    "#06B6D4": { // cyan
+      container: 'bg-cyan-50 border-l-4 border-cyan-400 text-cyan-900 hover:bg-cyan-100',
+      time: 'text-cyan-600',
+      dot: 'bg-cyan-400',
+      badge: 'text-cyan-600'
+    },
+    "#94A3B8": { // gray (unassigned)
+      container: 'bg-gray-50 border-l-4 border-gray-400 text-gray-900 hover:bg-gray-100',
+      time: 'text-gray-600',
+      dot: 'bg-gray-400',
+      badge: 'text-gray-600'
+    }
+  };
+  
+  return colorMap[color] || {
+    container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
+    time: 'text-emerald-600',
+    dot: 'bg-emerald-400',
+    badge: 'text-emerald-600'
+  };
+};
+
 function buildMonthMatrix(currentMonth: Date) {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -82,7 +179,7 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; }
+interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; }
 
 interface CalendarTaskMovedDetail {
   taskId: string;
@@ -244,6 +341,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           taskId: task.id,
           duration: task.duration || 60,
           repeatRule,
+          bucket: task.bucket,
         });
       } else {
         events.push({
@@ -252,6 +350,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           allDay: true,
           taskId: task.id,
           repeatRule,
+          bucket: task.bucket,
         });
       }
     });
@@ -809,7 +908,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             {/* No inline creation here – handled by hover modal */}
                             {dayEvents.length > 0 ? (
                               dayEvents.map((ev: DayEvent, i: number) => {
-                                const getEventStyle = (source: string) => {
+                                const getEventStyle = (source: string, ev?: DayEvent) => {
                                   switch (source) {
                                     case 'google':
                                       return {
@@ -819,12 +918,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         badge: 'text-blue-600'
                                       };
                                     case 'lifeboard':
-                                      return {
-                                        container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
-                                        time: 'text-emerald-600',
-                                        dot: 'bg-emerald-400',
-                                        badge: 'text-emerald-600'
-                                      };
+                                      return getBucketEventStyles(ev?.bucket);
                                     default:
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
@@ -835,7 +929,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   }
                                 };
 
-                                const styles = getEventStyle(ev.source);
+                                const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
@@ -1032,7 +1126,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {dayEvents.length > 0 && (
                             <div className="w-full space-y-1">
                               {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
-                                const getEventStyle = (source: string) => {
+                                const getEventStyle = (source: string, ev?: DayEvent) => {
                                   switch (source) {
                                     case 'google':
                                       return {
@@ -1042,12 +1136,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         badge: 'text-blue-600'
                                       };
                                     case 'lifeboard':
-                                      return {
-                                        container: 'bg-emerald-50 border-l-4 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
-                                        time: 'text-emerald-600',
-                                        dot: 'bg-emerald-400',
-                                        badge: 'text-emerald-600'
-                                      };
+                                      return getBucketEventStyles(ev?.bucket);
                                     default:
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
@@ -1058,7 +1147,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   }
                                 };
                                 
-                                const styles = getEventStyle(ev.source);
+                                const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
@@ -1185,12 +1274,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </div>
             <div className="space-y-3 max-h-80 overflow-auto">
               {(eventsByDate[selectedModalDate || ''] ?? []).map((ev: DayEvent, idx: number) => {
-                const getDotColor = (source: string) => {
+                const getDotColor = (source: string, ev?: DayEvent) => {
                   switch (source) {
                     case 'google':
                       return 'bg-blue-500';
                     case 'lifeboard':
-                      return 'bg-green-500';
+                      return getBucketEventStyles(ev?.bucket).dot;
                     default:
                       return 'bg-indigo-500';
                   }
@@ -1211,7 +1300,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 
                 return (
                   <div key={idx} className="flex items-start gap-2">
-                    <span className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source)}`} />
+                    <span className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source, ev)}`} />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800">{ev.title}</p>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
