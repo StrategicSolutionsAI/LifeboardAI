@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 export type Bucket = {
   id: string;
@@ -84,12 +85,21 @@ function formatDueDate(due?: string | null) {
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? "accent" as const : "default" as const };
 }
 
-function TaskCard({ task, onToggle }: { task: Task; onToggle?: (id: string, checked: boolean) => void }) {
+function TaskCard({ task, index, onToggle }: { task: Task; index: number; onToggle?: (id: string, checked: boolean) => void }) {
   const [checked, setChecked] = useState(false);
   const due = useMemo(() => formatDueDate(task.dueDate), [task.dueDate]);
 
   return (
-    <div className="group relative rounded-2xl border border-border/70 bg-background/70 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <Draggable draggableId={task.id} index={index}>
+      {(provided, snapshot) => (
+        <div 
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className={`group relative rounded-2xl border border-border/70 bg-background/70 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+            snapshot.isDragging ? 'rotate-2 shadow-lg scale-105' : ''
+          }`}
+        >
       <div className="flex items-start gap-3">
         <Checkbox
           checked={checked}
@@ -144,7 +154,9 @@ function TaskCard({ task, onToggle }: { task: Task; onToggle?: (id: string, chec
           </Button>
         </div>
       </div>
-    </div>
+        </div>
+      )}
+    </Draggable>
   );
 }
 
@@ -207,17 +219,28 @@ function BucketColumn({
         </div>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {tasks.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-              <Plus className="h-4 w-4" />
+        <Droppable droppableId={bucket.id}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className={`flex-1 space-y-3 ${snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg' : ''}`}
+            >
+              {tasks.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center text-sm text-muted-foreground min-h-[200px]">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                  <p className="font-medium text-foreground">No tasks yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Add something you want to tackle next in {bucket.name}.</p>
+                </div>
+              ) : (
+                tasks.map((task, index) => <TaskCard key={task.id} task={task} index={index} onToggle={onToggleTask} />)
+              )}
+              {provided.placeholder}
             </div>
-            <p className="font-medium text-foreground">No tasks yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">Add something you want to tackle next in {bucket.name}.</p>
-          </div>
-        ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} onToggle={onToggleTask} />)
-        )}
+          )}
+        </Droppable>
 
         <div className="mt-2 rounded-2xl border border-dashed border-border/60 bg-background/70 p-3">
           {isAdding ? (
@@ -260,11 +283,13 @@ export default function TasksBoard({
   tasks: tasksProp,
   onCompleteTask,
   onAddTask,
+  onMoveTask,
 }: {
   buckets?: Bucket[];
   tasks?: Task[];
   onCompleteTask?: (id: string) => void;
   onAddTask?: (bucketId: string, title: string) => void;
+  onMoveTask?: (taskId: string, newBucketId: string) => void;
 }) {
   const mockBuckets: Bucket[] = [
     { id: "b1", name: "Health", color: "#7C4DFF" },
@@ -304,7 +329,24 @@ export default function TasksBoard({
 
   const totalOpen = tasks.filter((task) => task.status === "open").length;
 
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const { source, destination, draggableId } = result;
+    
+    // If dropped in the same position, do nothing
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+    
+    // If moved to a different bucket, call onMoveTask
+    if (source.droppableId !== destination.droppableId) {
+      onMoveTask?.(draggableId, destination.droppableId);
+    }
+  };
+
   return (
+    <DragDropContext onDragEnd={handleDragEnd}>
     <div className="flex h-full w-full flex-col gap-4">
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-xs uppercase tracking-wide text-muted-foreground">
         <div className="flex items-center gap-4">
@@ -397,5 +439,6 @@ export default function TasksBoard({
         </div>
       </div>
     </div>
+    </DragDropContext>
   );
 }

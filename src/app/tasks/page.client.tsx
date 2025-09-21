@@ -29,7 +29,7 @@ function bucketColorFromId(id: string) {
 }
 
 function TasksBoardShell() {
-  const { allTasks, toggleTaskCompletion, createTask } = useTasksContext();
+  const { allTasks, toggleTaskCompletion, createTask, batchUpdateTasks } = useTasksContext();
   const { buckets } = useBuckets();
   const [quickTask, setQuickTask] = useState("");
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
@@ -91,6 +91,13 @@ function TasksBoardShell() {
     await createTask(trimmed, null, undefined, quickBucket || undefined);
     setQuickTask("");
     setQuickAddOpen(false);
+  };
+
+  const handleMoveTask = async (taskId: string, newBucketId: string) => {
+    const newBucket = newBucketId === UNASSIGNED_BUCKET_ID ? null : newBucketId;
+    await batchUpdateTasks([
+      { taskId, updates: { bucket: newBucket } }
+    ]);
   };
 
   return (
@@ -195,6 +202,7 @@ function TasksBoardShell() {
             const resolvedBucket = bucketId === UNASSIGNED_BUCKET_ID ? undefined : bucketId;
             void createTask(title, null, undefined, resolvedBucket);
           }}
+          onMoveTask={handleMoveTask}
         />
       </div>
     </div>
