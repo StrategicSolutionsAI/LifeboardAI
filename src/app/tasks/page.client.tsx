@@ -94,7 +94,7 @@ function TasksBoardShell() {
   };
 
   const handleMoveTask = async (taskId: string, newBucketId: string) => {
-    const newBucket = newBucketId === UNASSIGNED_BUCKET_ID ? null : newBucketId;
+    const newBucket = newBucketId === UNASSIGNED_BUCKET_ID ? undefined : newBucketId;
     await batchUpdateTasks([
       { taskId, updates: { bucket: newBucket } }
     ]);
