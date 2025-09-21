@@ -7,7 +7,6 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { useTasksContext } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 
@@ -35,10 +34,49 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
     "#8B5CF6": "bg-violet-100 text-violet-700 border-violet-200", // violet
     "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber
     "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
-    "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200"      // gray (unassigned)
+    "#94A3B8": "bg-gray-100 text-gray-600 border-gray-200",     // gray (unassigned)
+    "#ff52bf": "bg-pink-100 text-pink-700 border-pink-200"      // custom pink
   };
 
-  return colorMap[color] || "bg-gray-100 text-gray-600 border-gray-200";
+  // Check if we have a predefined style for this color
+  if (colorMap[color]) {
+    return colorMap[color];
+  }
+
+  // For custom colors, return a generic class and let parent apply inline styles
+  return "border border-gray-300 custom-bucket-color";
+};
+
+const getCustomBucketStyles = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
+  if (!bucketName) return {};
+
+  const bucketId = normalizeBucketId(bucketName);
+  const color = getBucketColorSync(bucketId, bucketColors);
+
+  // Check if this is a custom color (not in predefined map)
+  const colorMap: Record<string, string> = {
+    "#4F46E5": "predefined",
+    "#22C55E": "predefined",
+    "#F97316": "predefined",
+    "#EC4899": "predefined",
+    "#14B8A6": "predefined",
+    "#8B5CF6": "predefined",
+    "#F59E0B": "predefined",
+    "#06B6D4": "predefined",
+    "#94A3B8": "predefined",
+    "#ff52bf": "predefined"
+  };
+
+  if (!colorMap[color]) {
+    // This is a custom color, return inline styles
+    return {
+      backgroundColor: color + '20', // 20 = ~12% opacity
+      borderColor: color,
+      color: color
+    };
+  }
+
+  return {};
 };
 
 interface CalendarTaskListProps {
@@ -221,7 +259,10 @@ function EnhancedTaskCard({
                   {/* Metadata Row */}
                   <div className="flex items-center gap-2 mt-2">
                     {task.bucket && (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket, bucketColors)}`}>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket, bucketColors)}`}
+                        style={getCustomBucketStyles(task.bucket, bucketColors)}
+                      >
                         {task.bucket}
                       </span>
                     )}
@@ -436,7 +477,6 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [taskView, setTaskView] = useState<'Today' | 'Upcoming' | 'Master List'>('Today');
-  const [masterLayout, setMasterLayout] = useState<'list' | 'board'>('list');
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
 
   // Use unified task context
@@ -679,28 +719,6 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
   }, [openTasksLocal, openTasksBase]);
 
 
-  const boardTasks: BoardTask[] = useMemo(() => (
-    openTasksToShow.map((t) => ({
-      id: t.id.toString(),
-      title: t.content,
-      bucketId: normalizeBucketId(t.bucket),
-      status: t.completed ? 'done' : 'open',
-      position: typeof t.position === 'number' ? t.position : null,
-    }))
-  ), [openTasksToShow]);
-
-  const boardBuckets: BoardBucket[] = useMemo(() => {
-    const ids: string[] = [];
-    const seen = new Set<string>();
-    const labels = new Map<string, string>();
-    const push = (id: string, label: string) => { if (!seen.has(id)) { seen.add(id); ids.push(id); labels.set(id, label) } };
-    // User-provided buckets first for stable order
-    availableBuckets.forEach((name) => { const id = normalizeBucketId(name); push(id, name) });
-    // Ensure any bucket present on tasks is represented
-    boardTasks.forEach((t) => { const id = t.bucketId; const label = id === UNASSIGNED_BUCKET_ID ? UNASSIGNED_BUCKET_LABEL : id; push(id, label) });
-    if (ids.length === 0) push(UNASSIGNED_BUCKET_ID, UNASSIGNED_BUCKET_LABEL);
-    return ids.map((id) => ({ id, name: labels.get(id) ?? id, color: getBucketColorSync(id, bucketColors) }));
-  }, [availableBuckets, boardTasks, bucketColors]);
 
   // Listen for reorder events from parent DragDropContext
   React.useEffect(() => {
@@ -1266,7 +1284,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}
+                                          style={getCustomBucketStyles(t.bucket, bucketColors)}
+                                        >
                                           {t.bucket}
                                         </span>
                                       </div>
@@ -1652,7 +1672,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                   </p>
                                   {t.bucket && (
                                     <div className="mt-2">
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}
+                                          style={getCustomBucketStyles(t.bucket, bucketColors)}
+                                        >
                                         {t.bucket}
                                       </span>
                                     </div>
@@ -1696,38 +1718,14 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div
-                className={`flex items-center gap-2 text-sm font-medium text-gray-900 select-none ${masterLayout === 'list' ? 'cursor-pointer' : 'cursor-default'}`}
-                onClick={() => { if (masterLayout === 'list') setIsOpenCollapsed((c) => !c) }}
+                className="flex items-center gap-2 text-sm font-medium text-gray-900 select-none cursor-pointer"
+                onClick={() => setIsOpenCollapsed((c) => !c)}
               >
                 <span>All Open Tasks</span>
-                {masterLayout === 'list' && (isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />)}
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href="/tasks/board"
-                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 underline"
-                  title="Open full-width board"
-                >
-                  Expand
-                </a>
-                <div className="flex rounded-full border border-gray-200 bg-white p-0.5">
-                  {(['list','board'] as const).map((layout) => (
-                    <button
-                      key={layout}
-                      type="button"
-                      onClick={() => setMasterLayout(layout)}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                        masterLayout === layout ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-indigo-600'
-                      }`}
-                    >
-                      {layout === 'list' ? 'List' : 'Board'}
-                    </button>
-                  ))}
-                </div>
+                {isOpenCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
               </div>
             </div>
           
-          {masterLayout === 'list' ? (
           <Droppable droppableId="openTasks">
             {(provided: any) => (
               <ul
@@ -1787,7 +1785,9 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
                                     </p>
                                     {t.bucket && (
                                       <div className="mt-2">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(t.bucket, bucketColors)}`}
+                                          style={getCustomBucketStyles(t.bucket, bucketColors)}
+                                        >
                                           {t.bucket}
                                         </span>
                                       </div>
@@ -1824,19 +1824,6 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
               </ul>
             )}
           </Droppable>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-3 min-h-[520px]">
-              <TasksBoard
-                buckets={boardBuckets}
-                tasks={boardTasks}
-                onCompleteTask={(id) => toggleTaskCompletion(id)}
-                onAddTask={(bucketId, title) => {
-                  const resolvedBucket = bucketId === '__unassigned' ? undefined : bucketId;
-                  void createTask(title, null, undefined, resolvedBucket);
-                }}
-              />
-            </div>
-          )}
 
           {/* Add open task */}
           {!isOpenCollapsed && (

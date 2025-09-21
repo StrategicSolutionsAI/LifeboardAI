@@ -378,6 +378,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [activeBucket, setActiveBucket] = useState<string>("Health");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
@@ -387,7 +388,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  // Bucket color utility functions
+  const getBucketColor = (bucket: string) => {
+    return bucketColors[bucket] || '#8491FF'
+  }
+
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+
+  // Create lighter opaque colors by blending with white
+  const getLighterColor = (hex: string, amount: number) => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+
+    // Blend with white (255, 255, 255)
+    const newR = Math.round(r + (255 - r) * amount)
+    const newG = Math.round(g + (255 - g) * amount)
+    const newB = Math.round(b + (255 - b) * amount)
+
+    return `rgb(${newR}, ${newG}, ${newB})`
+  }
+
   // Debug logging for bucket state
   useEffect(() => {
     console.log('🔍 DEBUG - Current buckets state:', buckets);
@@ -395,6 +422,24 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     console.log('🔍 DEBUG - User:', user?.id);
     console.log('🔍 DEBUG - Is loading:', isLoading);
   }, [buckets, activeBucket, user, isLoading]);
+
+  // Listen for bucket color changes
+  useEffect(() => {
+    const handleBucketColorsChanged = () => {
+      getUserPreferencesClient()
+        .then(userPrefs => {
+          if (userPrefs?.bucket_colors) {
+            setBucketColors(userPrefs.bucket_colors)
+          }
+        })
+        .catch(error => {
+          console.error("Failed to reload bucket colors:", error)
+        })
+    }
+
+    window.addEventListener('bucketColorsChanged', handleBucketColorsChanged)
+    return () => window.removeEventListener('bucketColorsChanged', handleBucketColorsChanged)
+  }, [])
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -1796,6 +1841,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const prefs = await getUserPreferencesClient();
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
         setBuckets(prefs.life_buckets);
+        setBucketColors(prefs.bucket_colors || {});
         const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
         const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
         setActiveBucket(initialActive);
@@ -2476,16 +2522,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   }}
                   onDragEnd={() => setDragIndex(null)}
                   onClick={() => setActiveBucket(b)}
-                  style={{ 
+                  style={{
                     // Active tab always highest; otherwise cascade left-over-right
                     zIndex: b === activeBucket ? 50 : 9 - idx,
-                    marginRight: '-10px'
+                    marginRight: '-10px',
+                    backgroundColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.85),
+                    borderColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.6),
+                    color: b === activeBucket ? 'white' : '#374151'
                   }}
-                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 ${
+                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 border-2 ${
                     b === activeBucket
-                      ? 'bg-theme-primary-500 text-white border border-theme-primary-500/30 hover:bg-theme-primary-600 scale-[1.02] shadow-none'
-                      : 'bg-white text-theme-primary-600 border border-gray-100 hover:bg-white hover:border-theme-primary-500/30 shadow-none'
+                      ? 'scale-[1.02] shadow-lg text-white'
+                      : 'hover:scale-[1.01] shadow-none'
                   }`}
+                  onMouseEnter={(e) => {
+                    if (b !== activeBucket) {
+                      e.currentTarget.style.backgroundColor = getLighterColor(getBucketColor(b), 0.7)
+                      e.currentTarget.style.borderColor = getLighterColor(getBucketColor(b), 0.4)
+                      e.currentTarget.style.color = '#1F2937'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (b !== activeBucket) {
+                      e.currentTarget.style.backgroundColor = getLighterColor(getBucketColor(b), 0.85)
+                      e.currentTarget.style.borderColor = getLighterColor(getBucketColor(b), 0.6)
+                      e.currentTarget.style.color = '#374151'
+                    }
+                  }}
                 >
                   {b}
                 </button>

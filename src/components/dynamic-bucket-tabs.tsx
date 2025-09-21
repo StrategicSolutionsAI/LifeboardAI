@@ -49,6 +49,25 @@ export function DynamicBucketTabs({
     
     loadUserBuckets()
   }, [selectedBucket, onSelectBucket])
+
+  // Listen for bucket color changes
+  useEffect(() => {
+    const handleBucketColorsChanged = () => {
+      // Reload bucket colors when they change
+      getUserPreferencesClient()
+        .then(userPrefs => {
+          if (userPrefs?.bucket_colors) {
+            setBucketColors(userPrefs.bucket_colors)
+          }
+        })
+        .catch(error => {
+          console.error("Failed to reload bucket colors:", error)
+        })
+    }
+
+    window.addEventListener('bucketColorsChanged', handleBucketColorsChanged)
+    return () => window.removeEventListener('bucketColorsChanged', handleBucketColorsChanged)
+  }, [])
   
   if (loading) {
     return (
@@ -69,12 +88,20 @@ export function DynamicBucketTabs({
   const getBucketColor = (bucket: string) => {
     return bucketColors[bucket] || '#8491FF'
   }
+
+  // Convert hex to rgba for background colors
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
   
   return (
     <>
       {/* Tab Navigation */}
-      <div className="bg-theme-surface-base border-b border-theme-neutral-200 px-4 sm:px-6">
-        <div className="flex gap-4 sm:gap-8">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6">
+        <div className="flex gap-1 sm:gap-2">
           {userBuckets.map((bucket) => {
             const bucketColor = getBucketColor(bucket)
             const isSelected = selectedBucket === bucket
@@ -82,27 +109,38 @@ export function DynamicBucketTabs({
               <button
                 key={bucket}
                 onClick={() => onSelectBucket(bucket)}
-                className={`py-4 px-2 text-xs font-medium tracking-wide border-b-2 transition-colors ${
+                className={`relative px-4 sm:px-6 py-3 text-xs font-medium tracking-wide transition-all duration-200 rounded-t-lg border-2 ${
                   isSelected
-                    ? 'border-transparent text-white'
-                    : 'border-transparent text-theme-text-secondary hover:text-white hover:opacity-80'
+                    ? 'text-white shadow-lg transform scale-105'
+                    : 'text-gray-700 hover:text-white border-gray-200 hover:border-opacity-50'
                 }`}
                 style={{
-                  borderBottomColor: isSelected ? bucketColor : 'transparent',
-                  color: isSelected ? bucketColor : undefined,
-                  backgroundColor: isSelected ? 'transparent' : undefined
+                  backgroundColor: isSelected ? bucketColor : hexToRgba(bucketColor, 0.1),
+                  borderColor: isSelected ? bucketColor : hexToRgba(bucketColor, 0.3),
+                  borderBottom: isSelected ? `3px solid ${bucketColor}` : `2px solid ${hexToRgba(bucketColor, 0.3)}`
                 }}
                 onMouseEnter={(e) => {
                   if (!isSelected) {
-                    e.currentTarget.style.color = bucketColor
+                    e.currentTarget.style.backgroundColor = hexToRgba(bucketColor, 0.2)
+                    e.currentTarget.style.borderColor = hexToRgba(bucketColor, 0.5)
+                    e.currentTarget.style.color = 'white'
+                    e.currentTarget.style.transform = 'scale(1.02)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = hexToRgba(bucketColor, 0.1)
+                    e.currentTarget.style.borderColor = hexToRgba(bucketColor, 0.3)
                     e.currentTarget.style.color = ''
+                    e.currentTarget.style.transform = 'scale(1)'
                   }
                 }}
               >
+                {/* Color accent dot */}
+                <div
+                  className="absolute top-1 right-1 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: bucketColor, opacity: isSelected ? 1 : 0.7 }}
+                />
                 {formatBucketName(bucket)}
               </button>
             )
