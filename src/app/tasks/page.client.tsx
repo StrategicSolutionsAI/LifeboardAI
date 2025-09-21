@@ -34,6 +34,7 @@ function TasksBoardShell() {
   const [quickTask, setQuickTask] = useState("");
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"open" | "completed">("open");
 
   useEffect(() => {
     if (!quickBucket && buckets.length > 0) {
@@ -42,6 +43,7 @@ function TasksBoardShell() {
   }, [buckets, quickBucket]);
 
   const openTasks = useMemo(() => allTasks.filter(t => !t.completed), [allTasks]);
+  const completedTasks = useMemo(() => allTasks.filter(t => t.completed), [allTasks]);
 
   const isDueSoon = (due?: string | null) => {
     if (!due) return false;
@@ -56,17 +58,18 @@ function TasksBoardShell() {
     return diff >= 0 && diff <= 3;
   };
 
-  const boardTasks: BoardTask[] = useMemo(() => (
-    openTasks.map((t) => ({
+  const boardTasks: BoardTask[] = useMemo(() => {
+    const tasksToShow = viewMode === "open" ? openTasks : completedTasks;
+    return tasksToShow.map((t) => ({
       id: t.id.toString(),
       title: t.content,
       bucketId: normalizeBucketId(t.bucket),
-      status: 'open',
+      status: t.completed ? 'done' : 'open',
       position: typeof t.position === 'number' ? t.position : null,
       dueDate: t.due?.date ?? null,
       createdAt: t.created_at ?? null,
-    }))
-  ), [openTasks]);
+    }));
+  }, [openTasks, completedTasks, viewMode]);
 
   const boardBuckets: BoardBucket[] = useMemo(() => {
     const ids: string[] = [];
@@ -82,6 +85,7 @@ function TasksBoardShell() {
   }, [buckets, boardTasks]);
 
   const totalOpen = openTasks.length;
+  const totalCompleted = completedTasks.length;
   const dueSoonCount = openTasks.filter((t) => isDueSoon(t.due?.date ?? null)).length;
   const bucketCount = boardBuckets.length;
 
@@ -111,6 +115,26 @@ function TasksBoardShell() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <Button
+                variant={viewMode === "open" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("open")}
+                className="h-8 px-3 text-xs"
+              >
+                Open ({openTasks.length})
+              </Button>
+              <Button
+                variant={viewMode === "completed" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("completed")}
+                className="h-8 px-3 text-xs"
+              >
+                Completed ({completedTasks.length})
+              </Button>
+            </div>
+            
             <Button
               variant="default"
               size="sm"
@@ -130,14 +154,26 @@ function TasksBoardShell() {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Open tasks</p>
-            <p className="mt-2 text-2xl font-semibold">{totalOpen}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Active items across every bucket.</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {viewMode === "open" ? "Open tasks" : "Completed tasks"}
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {viewMode === "open" ? totalOpen : totalCompleted}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {viewMode === "open" ? "Active items across every bucket." : "Tasks you've completed."}
+            </p>
           </Card>
           <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Due soon</p>
-            <p className="mt-2 text-2xl font-semibold">{dueSoonCount}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Within the next three days.</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {viewMode === "open" ? "Due soon" : "Total open"}
+            </p>
+            <p className="mt-2 text-2xl font-semibold">
+              {viewMode === "open" ? dueSoonCount : totalOpen}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {viewMode === "open" ? "Within the next three days." : "Still need to be done."}
+            </p>
           </Card>
           <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Buckets</p>
