@@ -687,9 +687,14 @@ export function useTasks(selectedDate?: Date) {
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   
   // Filter tasks for different views
-  const dailyVisibleTasks = useMemo(() => 
+  const dailyVisibleTasks = useMemo(() =>
     (dailyTasks || []).filter(t => !t.completed && !t.hourSlot),
     [dailyTasks]
+  );
+
+  const completedTasks = useMemo(() =>
+    (allTasks || []).filter(t => t.completed),
+    [allTasks]
   );
 
   const scheduledTasks = useMemo(() => {
@@ -770,6 +775,7 @@ export function useTasks(selectedDate?: Date) {
     dailyVisibleTasks, // Tasks that should appear in daily list (no hourSlot)
     scheduledTasks,    // Tasks that should appear in hourly planner (has hourSlot)
     upcomingTasks,     // Tasks with future due dates
+    completedTasks,    // All completed tasks
     loading: dailyLoading || allLoading,
     error: dailyError || allError,
     createTask,
