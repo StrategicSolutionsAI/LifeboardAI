@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +33,7 @@ export default function WidgetTrendChart({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setError(null);
       const { data: { session } } = await supabase.auth.getSession();
@@ -48,11 +48,11 @@ export default function WidgetTrendChart({
     } finally {
       setLoading(false);
     }
-  };
+  }, [instanceId, rangeDays]);
 
   useEffect(() => {
     loadData();
-  }, [instanceId, rangeDays]);
+  }, [loadData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

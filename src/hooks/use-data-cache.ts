@@ -214,7 +214,8 @@ export function useDataCache<T>(
     if (prefetch || data === null) {
       fetchWithCache()
     }
-  }, []) // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefetch]) // Only run on mount or when prefetch changes
   
   return {
     data,
@@ -305,7 +306,8 @@ export function useGlobalCache<T>(
     if (data === null) {
       fetchData()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount
   
   return {
     data,
