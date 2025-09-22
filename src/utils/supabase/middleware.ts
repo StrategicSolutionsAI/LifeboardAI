@@ -18,17 +18,10 @@ export async function updateSession(request: NextRequest) {
         // The `set` and `remove` helpers accept an `opts` bag for expiry, path, etc.
         // The `cookies.set()` typings currently only allow 2 params, so we suppress here.
         set(name: string, value: string, opts: any) {
-          // Ensure secure cookie settings for production
-          const cookieOpts = {
-            ...opts,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax' as const,
-            httpOnly: name.includes('auth-token'), // Only auth cookies should be httpOnly
-          }
           // eslint-disable-next-line
-          (request.cookies as any).set(name, value, cookieOpts)
+          (request.cookies as any).set(name, value, opts)
           // eslint-disable-next-line
-          (response.cookies as any).set(name, value, cookieOpts)
+          (response.cookies as any).set(name, value, opts)
         },
         remove(name: string, opts: any) {
           // eslint-disable-next-line

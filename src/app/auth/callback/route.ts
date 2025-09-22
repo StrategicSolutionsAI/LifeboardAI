@@ -33,18 +33,11 @@ export async function GET(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          // Ensure secure cookie settings for production
-          const cookieOpts = {
-            ...options,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax' as const,
-            httpOnly: name.includes('auth-token'), // Only auth cookies should be httpOnly
-          }
           // write to both request and response so subsequent reads in this handler see the cookie
           // eslint-disable-next-line
-          ;(request.cookies as any).set(name, value, cookieOpts)
+          ;(request.cookies as any).set(name, value, options)
           // eslint-disable-next-line
-          ;(response.cookies as any).set(name, value, cookieOpts)
+          ;(response.cookies as any).set(name, value, options)
         },
         remove(name: string, options: any) {
           // eslint-disable-next-line
@@ -113,10 +106,13 @@ export async function GET(request: NextRequest) {
   // Ensure all auth cookies are properly copied with production settings
   for (const cookie of response.cookies.getAll()) {
     redirectResponse.cookies.set({
-      ...cookie,
+      name: cookie.name,
+      value: cookie.value,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       httpOnly: cookie.name.includes('auth-token'),
+      path: cookie.path || '/',
+      maxAge: cookie.maxAge,
     })
   }
 
