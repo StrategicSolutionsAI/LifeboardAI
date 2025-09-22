@@ -632,7 +632,7 @@ export function useTasks(selectedDate?: Date) {
       // Do not throw to avoid UI crash overlays
       return;
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr])
   
   // Optimistic task deletion
   const deleteTask = useCallback(async (taskId: string) => {

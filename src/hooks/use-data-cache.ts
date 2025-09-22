@@ -214,7 +214,7 @@ export function useDataCache<T>(
     if (prefetch || data === null) {
       fetchWithCache()
     }
-  }, []) // Only run on mount
+  }, [prefetch, data, fetchWithCache])
   
   return {
     data,
@@ -305,7 +305,7 @@ export function useGlobalCache<T>(
     if (data === null) {
       fetchData()
     }
-  }, [])
+  }, [data, fetchData])
   
   return {
     data,

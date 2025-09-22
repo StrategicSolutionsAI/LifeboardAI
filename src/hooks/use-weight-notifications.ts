@@ -83,7 +83,7 @@ export function useWeightNotifications(options: UseWeightNotificationsOptions = 
     }
 
     return newNotification.id
-  }, [enableToasts, enableBrowserNotifications, hasPermission])
+  }, [enableToasts, enableBrowserNotifications, hasPermission, toast])
 
   // Handle new weight data
   const handleNewWeight = useCallback((currentWeight: number, previousWeight?: number) => {

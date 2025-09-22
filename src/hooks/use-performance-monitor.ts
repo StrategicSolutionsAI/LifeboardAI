@@ -18,20 +18,21 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
 
   useEffect(() => {
     // Start tracking when component mounts
-    metricsRef.current.startTime = performance.now()
-    
+    const startTime = performance.now()
+    metricsRef.current.startTime = startTime
+
     return () => {
       // Track when component unmounts
       const endTime = performance.now()
-      const duration = endTime - metricsRef.current.startTime
-      
+      const duration = endTime - startTime
+
       metricsRef.current.endTime = endTime
       metricsRef.current.duration = duration
 
       // Log slow operations (> 1 second)
       if (duration > 1000) {
         console.warn(`Slow operation detected: ${operationName} took ${duration.toFixed(2)}ms`)
-        
+
         // Send to Sentry
         Sentry.addBreadcrumb({
           message: `Slow operation: ${operationName}`,

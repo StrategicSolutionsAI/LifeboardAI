@@ -983,7 +983,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
                                         {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
-                                        style={dragProvided.draggableProps.style}
                                         role={isLifeboardTask ? 'button' : undefined}
                                         tabIndex={isLifeboardTask ? 0 : undefined}
                                         onClick={(event) => {
@@ -1005,11 +1004,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         className={`group p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
-                                        style={styles.customColor ? {
-                                          backgroundColor: styles.customColor + '20',
-                                          borderLeftColor: styles.customColor,
-                                          borderLeftWidth: '4px'
-                                        } : {}}
+                                        style={{
+                                          ...dragProvided.draggableProps.style,
+                                          ...(styles.customColor ? {
+                                            backgroundColor: styles.customColor + '20',
+                                            borderLeftColor: styles.customColor,
+                                            borderLeftWidth: '4px'
+                                          } : {})
+                                        }}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                         data-task-id={ev.taskId}
                                       >
@@ -1209,7 +1211,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
                                         {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
-                                        style={dragProvided.draggableProps.style}
                                         role={isLifeboardTask ? 'button' : undefined}
                                         tabIndex={isLifeboardTask ? 0 : undefined}
                                         onClick={(event) => {
@@ -1231,11 +1232,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         className={`group p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
-                                        style={styles.customColor ? {
-                                          backgroundColor: styles.customColor + '20',
-                                          borderLeftColor: styles.customColor,
-                                          borderLeftWidth: '4px'
-                                        } : {}}
+                                        style={{
+                                          ...dragProvided.draggableProps.style,
+                                          ...(styles.customColor ? {
+                                            backgroundColor: styles.customColor + '20',
+                                            borderLeftColor: styles.customColor,
+                                            borderLeftWidth: '4px'
+                                          } : {})
+                                        }}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                       >
                                         <div className="flex items-start gap-1.5">

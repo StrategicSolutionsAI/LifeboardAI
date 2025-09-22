@@ -82,8 +82,14 @@ export function useNutritionTracker() {
   )
 
   // Extract data with defaults
-  const dailyMeals = mealsCache.data || { breakfast: [], lunch: [], dinner: [], snacks: [] }
-  const nutritionGoals = goalsCache.data || { calories: 2000, protein: 150, carbs: 250, fat: 65 }
+  const dailyMeals = useMemo(() =>
+    mealsCache.data || { breakfast: [], lunch: [], dinner: [], snacks: [] },
+    [mealsCache.data]
+  )
+  const nutritionGoals = useMemo(() =>
+    goalsCache.data || { calories: 2000, protein: 150, carbs: 250, fat: 65 },
+    [goalsCache.data]
+  )
   const favoriteFoods = favoritesCache.data || []
 
   // Memoized calculations
@@ -150,10 +156,10 @@ export function useNutritionTracker() {
 
       // Update favorites
       await updateFavoriteFood(foodId, foodName, serving)
-      
+
       // Emit event to update other nutrition components immediately
       window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
-      
+
       return newMeal
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to add food'
