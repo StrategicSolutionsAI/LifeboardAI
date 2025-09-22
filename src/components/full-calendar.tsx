@@ -209,11 +209,59 @@ interface FullCalendarProps {
 
 export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: FullCalendarProps = {}) {
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
+  const [selectedBucketFilters, setSelectedBucketFilters] = useState<string[]>(['all']);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  // Helper function to toggle bucket filter selection
+  const toggleBucketFilter = useCallback((filter: string) => {
+    setSelectedBucketFilters(prev => {
+      if (filter === 'all') {
+        return ['all'];
+      }
+
+      const newFilters = prev.filter(f => f !== 'all');
+
+      if (newFilters.includes(filter)) {
+        const filtered = newFilters.filter(f => f !== filter);
+        return filtered.length === 0 ? ['all'] : filtered;
+      } else {
+        return [...newFilters, filter];
+      }
+    });
+  }, []);
+
+  // Get display text for selected filters
+  const getFilterDisplayText = useCallback(() => {
+    if (selectedBucketFilters.includes('all')) {
+      return 'All Categories';
+    }
+    if (selectedBucketFilters.length === 1) {
+      const filter = selectedBucketFilters[0];
+      return filter === 'google' ? 'Google Calendar' :
+             filter === 'unassigned' ? 'Unassigned' : filter;
+    }
+    return `${selectedBucketFilters.length} selected`;
+  }, [selectedBucketFilters]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isFilterDropdownOpen && !target.closest('.bucket-filter-dropdown')) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isFilterDropdownOpen]);
 
   // Initialize current date from localStorage or prop or default to today
   const [currentDate, setCurrentDate] = useState(() => {
     if (propSelectedDate) return propSelectedDate;
-    
+
     if (typeof window !== 'undefined') {
       const savedDate = localStorage.getItem('calendar-selected-date');
       if (savedDate) {
@@ -336,6 +384,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
     allTasks.forEach((task: any) => {
       if (!shouldIncludeTaskOnDate(task, dateStr)) return;
+
+      // Apply bucket filter - multi-select logic
+      if (!selectedBucketFilters.includes('all')) {
+        const taskBucket = task.bucket || 'unassigned';
+        if (!selectedBucketFilters.includes(taskBucket)) return;
+      }
+
       const repeatRule = task.repeatRule && task.repeatRule !== 'none' ? (task.repeatRule as RepeatOption) : undefined;
 
       if (task.hourSlot) {
@@ -363,7 +418,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     });
 
     return events;
-  }, [allTasks, hourSlotToISO, shouldIncludeTaskOnDate]);
+  }, [allTasks, hourSlotToISO, shouldIncludeTaskOnDate, selectedBucketFilters]);
 
   const extractHourLabel = useCallback((hourSlot?: string | null) => {
     if (!hourSlot) return '';
@@ -704,6 +759,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     const map: Record<string, DayEvent[]> = {};
 
     googleEvents.forEach((ev: any) => {
+      // Apply bucket filter for Google Calendar events
+      if (!selectedBucketFilters.includes('all') && !selectedBucketFilters.includes('google')) {
+        return; // Skip Google events when specific buckets are selected (unless 'google' is included)
+      }
+
       const startInfo = ev?.start ?? {};
       const dateStr = startInfo.date ?? (startInfo.dateTime ? startInfo.dateTime.slice(0, 10) : undefined);
       if (!dateStr) return;
@@ -732,7 +792,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
 
     setEventsByDate(map);
-  }, [googleEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate]);
+  }, [googleEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate, selectedBucketFilters]);
 
   const getCellSize = () => {
     switch (view) {
@@ -786,7 +846,86 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <h2 className="font-semibold text-base sm:text-lg text-gray-900">
             {getHeaderTitle()}
           </h2>
-          
+
+          {/* Multi-Select Bucket Filter */}
+          {(availableBuckets.length > 0 || googleEvents.length > 0) && (
+            <div className="relative flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Filter:</label>
+              <div className="relative bucket-filter-dropdown">
+                <button
+                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                  className="text-xs border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center gap-1 min-w-[120px] text-left"
+                >
+                  <span className="truncate flex-1">{getFilterDisplayText()}</span>
+                  <svg
+                    className={`w-3 h-3 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {isFilterDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-50 min-w-[160px]">
+                    <div className="py-1">
+                      {/* All Categories Option */}
+                      <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedBucketFilters.includes('all')}
+                          onChange={() => toggleBucketFilter('all')}
+                          className="w-3 h-3 text-blue-600 rounded mr-2"
+                        />
+                        <span className="text-xs">All Categories</span>
+                      </label>
+
+                      {/* Bucket Options */}
+                      {availableBuckets.map((bucket) => (
+                        <label key={bucket} className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBucketFilters.includes(bucket)}
+                            onChange={() => toggleBucketFilter(bucket)}
+                            className="w-3 h-3 text-blue-600 rounded mr-2"
+                          />
+                          <span className="text-xs">{bucket}</span>
+                        </label>
+                      ))}
+
+                      {/* Unassigned Option */}
+                      {availableBuckets.length > 0 && (
+                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBucketFilters.includes('unassigned')}
+                            onChange={() => toggleBucketFilter('unassigned')}
+                            className="w-3 h-3 text-blue-600 rounded mr-2"
+                          />
+                          <span className="text-xs">Unassigned</span>
+                        </label>
+                      )}
+
+                      {/* Google Calendar Option */}
+                      {googleEvents.length > 0 && (
+                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBucketFilters.includes('google')}
+                            onChange={() => toggleBucketFilter('google')}
+                            className="w-3 h-3 text-blue-600 rounded mr-2"
+                          />
+                          <span className="text-xs">Google Calendar</span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Clean View Selector */}
           <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 overflow-x-auto">
             {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
