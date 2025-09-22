@@ -632,7 +632,7 @@ export function useTasks(selectedDate?: Date) {
       // Do not throw to avoid UI crash overlays
       return;
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
   
   // Optimistic task deletion
   const deleteTask = useCallback(async (taskId: string) => {

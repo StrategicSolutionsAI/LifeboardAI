@@ -21,15 +21,12 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
     metricsRef.current.startTime = performance.now()
     
     return () => {
-      // Copy ref value to avoid potential issues with cleanup function
-      const metrics = metricsRef.current
-      
       // Track when component unmounts
       const endTime = performance.now()
-      const duration = endTime - metrics.startTime
+      const duration = endTime - metricsRef.current.startTime
       
-      metrics.endTime = endTime
-      metrics.duration = duration
+      metricsRef.current.endTime = endTime
+      metricsRef.current.duration = duration
 
       // Log slow operations (> 1 second)
       if (duration > 1000) {

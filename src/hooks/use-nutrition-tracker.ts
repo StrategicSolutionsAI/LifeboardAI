@@ -82,14 +82,8 @@ export function useNutritionTracker() {
   )
 
   // Extract data with defaults
-  const dailyMeals = useMemo(() => 
-    mealsCache.data || { breakfast: [], lunch: [], dinner: [], snacks: [] },
-    [mealsCache.data]
-  )
-  const nutritionGoals = useMemo(() => 
-    goalsCache.data || { calories: 2000, protein: 150, carbs: 250, fat: 65 },
-    [goalsCache.data]
-  )
+  const dailyMeals = mealsCache.data || { breakfast: [], lunch: [], dinner: [], snacks: [] }
+  const nutritionGoals = goalsCache.data || { calories: 2000, protein: 150, carbs: 250, fat: 65 }
   const favoriteFoods = favoritesCache.data || []
 
   // Memoized calculations
@@ -168,7 +162,7 @@ export function useNutritionTracker() {
     } finally {
       setIsLoading(false)
     }
-  }, [mealsCache]) // updateFavoriteFood is stable and doesn't need to be in deps
+  }, [mealsCache])
 
   const removeFoodFromMeal = useCallback(async (mealType: keyof DailyMeals, foodId: string) => {
     setIsLoading(true)
