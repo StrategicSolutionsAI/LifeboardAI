@@ -21,13 +21,14 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
+import { CalendarFileUpload } from "@/components/calendar-file-upload";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -184,7 +185,7 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist' | 'lifeboard'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; }
+interface DayEvent { source: 'google' | 'todoist' | 'lifeboard' | 'uploaded'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; location?: string; }
 
 interface CalendarTaskMovedDetail {
   taskId: string;
@@ -211,6 +212,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [selectedBucketFilters, setSelectedBucketFilters] = useState<string[]>(['all']);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // Helper function to toggle bucket filter selection
   const toggleBucketFilter = useCallback((filter: string) => {
@@ -238,6 +240,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     if (selectedBucketFilters.length === 1) {
       const filter = selectedBucketFilters[0];
       return filter === 'google' ? 'Google Calendar' :
+             filter === 'uploaded' ? 'Uploaded Calendar' :
              filter === 'unassigned' ? 'Unassigned' : filter;
     }
     return `${selectedBucketFilters.length} selected`;
@@ -684,6 +687,34 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const googleEvents = useMemo(() => (Array.isArray(googleEventsRaw) ? googleEventsRaw : []), [googleEventsRaw]);
 
+  // Fetch uploaded calendar events
+  const uploadedEventsCacheKey = 'uploaded-calendar-events';
+  const uploadedEventsFetcher = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/calendar/upload');
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          return [];
+        }
+        throw new Error(`Failed to fetch uploaded events: ${resp.status}`);
+      }
+      const payload = await resp.json();
+      return Array.isArray(payload.events) ? payload.events : [];
+    } catch (error) {
+      console.error('Failed to fetch uploaded calendar events', error);
+      return [];
+    }
+  }, []);
+
+  const {
+    data: uploadedEventsRaw,
+  } = useDataCache<any[] | null>(uploadedEventsCacheKey, uploadedEventsFetcher, {
+    ttl: 5 * 60 * 1000,
+    prefetch: false,
+  });
+
+  const uploadedEvents = useMemo(() => (Array.isArray(uploadedEventsRaw) ? uploadedEventsRaw : []), [uploadedEventsRaw]);
+
   const getMatrix = () => {
     switch (view) {
       case 'month':
@@ -776,6 +807,33 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       });
     });
 
+    // Add uploaded calendar events
+    uploadedEvents.forEach((ev: any) => {
+      // Apply bucket filter for uploaded calendar events
+      if (!selectedBucketFilters.includes('all') && !selectedBucketFilters.includes('uploaded')) {
+        return; // Skip uploaded events when specific buckets are selected (unless 'uploaded' is included)
+      }
+
+      // Determine the date for this event
+      const dateStr = ev.start_date || (ev.start_time ? ev.start_time.slice(0, 10) : undefined);
+      if (!dateStr) return;
+
+      // Check if the event falls within our date range
+      const eventDate = new Date(dateStr);
+      if (eventDate < new Date(rangeStartMs) || eventDate > new Date(rangeEndMs)) {
+        return;
+      }
+
+      const bucket = map[dateStr] ?? (map[dateStr] = []);
+      bucket.push({
+        source: 'uploaded',
+        title: ev.title ?? 'Uploaded Event',
+        time: ev.start_time ?? undefined,
+        allDay: ev.all_day || Boolean(ev.start_date),
+        location: ev.location ?? undefined,
+      });
+    });
+
     let cursor = startOfDay(new Date(rangeStartMs));
     const rangeEndDate = startOfDay(new Date(rangeEndMs));
 
@@ -792,7 +850,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
 
     setEventsByDate(map);
-  }, [googleEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate, selectedBucketFilters]);
+  }, [googleEvents, uploadedEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate, selectedBucketFilters]);
 
   const getCellSize = () => {
     switch (view) {
@@ -840,6 +898,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="ml-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            title="Upload calendar file"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">Upload</span>
+          </button>
         </div>
         
         <div className="flex items-center gap-2 sm:space-x-3">
@@ -848,7 +915,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </h2>
 
           {/* Multi-Select Bucket Filter */}
-          {(availableBuckets.length > 0 || googleEvents.length > 0) && (
+          {(availableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0) && (
             <div className="relative flex items-center gap-2">
               <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Filter:</label>
               <div className="relative bucket-filter-dropdown">
@@ -917,6 +984,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             className="w-3 h-3 text-blue-600 rounded mr-2"
                           />
                           <span className="text-xs">Google Calendar</span>
+                        </label>
+                      )}
+
+                      {/* Uploaded Calendar Option */}
+                      {uploadedEvents.length > 0 && (
+                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBucketFilters.includes('uploaded')}
+                            onChange={() => toggleBucketFilter('uploaded')}
+                            className="w-3 h-3 text-blue-600 rounded mr-2"
+                          />
+                          <span className="text-xs">Uploaded Calendar</span>
                         </label>
                       )}
                     </div>
@@ -1090,14 +1170,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         dot: 'bg-blue-400',
                                         badge: 'text-blue-600'
                                       };
-                                    case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket, bucketColors);
-                                    default:
+                                    case 'uploaded':
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
                                         time: 'text-purple-600',
                                         dot: 'bg-purple-400',
                                         badge: 'text-purple-600'
+                                      };
+                                    case 'lifeboard':
+                                      return getBucketEventStyles(ev?.bucket, bucketColors);
+                                    default:
+                                      return {
+                                        container: 'bg-gray-50 border-l-4 border-gray-400 text-gray-900 hover:bg-gray-100',
+                                        time: 'text-gray-600',
+                                        dot: 'bg-gray-400',
+                                        badge: 'text-gray-600'
                                       };
                                   }
                                 };
@@ -1191,7 +1278,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               </button>
                                             )}
                                             <span className={`text-xs ${styles.badge}`}>
-                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : ev.source === 'uploaded' ? 'U' : 'T'}
                                             </span>
                                           </div>
                                         </div>
@@ -1318,14 +1405,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                         dot: 'bg-blue-400',
                                         badge: 'text-blue-600'
                                       };
-                                    case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket, bucketColors);
-                                    default:
+                                    case 'uploaded':
                                       return {
                                         container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
                                         time: 'text-purple-600',
                                         dot: 'bg-purple-400',
                                         badge: 'text-purple-600'
+                                      };
+                                    case 'lifeboard':
+                                      return getBucketEventStyles(ev?.bucket, bucketColors);
+                                    default:
+                                      return {
+                                        container: 'bg-gray-50 border-l-4 border-gray-400 text-gray-900 hover:bg-gray-100',
+                                        time: 'text-gray-600',
+                                        dot: 'bg-gray-400',
+                                        badge: 'text-gray-600'
                                       };
                                   }
                                 };
@@ -1418,7 +1512,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               </button>
                                             )}
                                             <span className={`text-[10px] ${styles.badge}`}>
-                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : 'T'}
+                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : ev.source === 'uploaded' ? 'U' : 'T'}
                                             </span>
                                           </div>
                                         </div>
@@ -1471,11 +1565,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   switch (source) {
                     case 'google':
                       return 'bg-blue-500';
+                    case 'uploaded':
+                      return 'bg-purple-500';
                     case 'lifeboard':
                       const styles = getBucketEventStyles(ev?.bucket, bucketColors);
                       return styles.customColor || styles.dot;
                     default:
-                      return 'bg-indigo-500';
+                      return 'bg-gray-500';
                   }
                 };
                 
@@ -1483,6 +1579,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   switch (source) {
                     case 'google':
                       return 'Google Calendar';
+                    case 'uploaded':
+                      return 'Uploaded Calendar';
                     case 'lifeboard':
                       return 'Hourly Schedule';
                     case 'todoist':
@@ -1779,6 +1877,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 Delete Task
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Calendar Modal */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="max-w-4xl w-full mx-4">
+            <CalendarFileUpload
+              onUploadComplete={async (result) => {
+                if (result.success) {
+                  // Clear the cache for uploaded events to force a refresh
+                  try {
+                    // Use a custom event to trigger cache invalidation
+                    window.dispatchEvent(new CustomEvent('calendar-upload-complete'));
+
+                    // Force re-fetch of uploaded events by updating the cache key
+                    setTimeout(() => {
+                      window.location.reload(); // Still do a refresh for now to ensure everything updates
+                    }, 1000);
+                  } catch (error) {
+                    console.error('Error refreshing calendar data:', error);
+                    window.location.reload(); // Fallback to page reload
+                  }
+                }
+                setIsUploadModalOpen(false);
+              }}
+              onClose={() => setIsUploadModalOpen(false)}
+            />
           </div>
         </div>
       )}
