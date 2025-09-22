@@ -33,11 +33,18 @@ export async function GET(request: NextRequest) {
           return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
+          // Ensure secure cookie settings for production
+          const cookieOpts = {
+            ...options,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            httpOnly: name.includes('auth-token'), // Only auth cookies should be httpOnly
+          }
           // write to both request and response so subsequent reads in this handler see the cookie
           // eslint-disable-next-line
-          ;(request.cookies as any).set(name, value, options)
+          ;(request.cookies as any).set(name, value, cookieOpts)
           // eslint-disable-next-line
-          ;(response.cookies as any).set(name, value, options)
+          ;(response.cookies as any).set(name, value, cookieOpts)
         },
         remove(name: string, options: any) {
           // eslint-disable-next-line
@@ -50,17 +57,28 @@ export async function GET(request: NextRequest) {
   )
 
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    console.log('AuthCallback → Exchanging code for session...')
+    const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       console.error('AuthCallback → exchangeCodeForSession error', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
       return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url))
     }
+    console.log('AuthCallback → Session exchanged successfully, user:', sessionData?.user?.email)
   }
 
   // Ensure the session cookie is present and then look up the user
-  await supabase.auth.getSession()
+  // Add a small delay to allow cookies to be fully set in production
+  if (process.env.NODE_ENV === 'production') {
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  const { data: { session } } = await supabase.auth.getSession()
   const { data: { user } } = await supabase.auth.getUser()
+
+  console.log('AuthCallback → Session found:', !!session)
+  console.log('AuthCallback → User found:', !!user, user?.email)
+
   if (!user) {
     console.error('AuthCallback → No user found after code exchange')
     return NextResponse.redirect(new URL('/login?error=Authentication failed', request.url))
@@ -91,8 +109,19 @@ export async function GET(request: NextRequest) {
 
   // Create the final redirect, copying cookies set earlier into the redirect response
   const redirectResponse = NextResponse.redirect(new URL(destination!, request.url))
+
+  // Ensure all auth cookies are properly copied with production settings
   for (const cookie of response.cookies.getAll()) {
-    redirectResponse.cookies.set(cookie)
+    redirectResponse.cookies.set({
+      ...cookie,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      httpOnly: cookie.name.includes('auth-token'),
+    })
   }
+
+  console.log('AuthCallback → Redirecting to:', destination)
+  console.log('AuthCallback → Cookies set:', response.cookies.getAll().map(c => c.name))
+
   return redirectResponse
 }
