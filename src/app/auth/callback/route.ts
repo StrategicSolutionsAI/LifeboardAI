@@ -103,16 +103,17 @@ export async function GET(request: NextRequest) {
   // Create the final redirect, copying cookies set earlier into the redirect response
   const redirectResponse = NextResponse.redirect(new URL(destination!, request.url))
 
-  // Ensure all auth cookies are properly copied with production settings
+  // Copy Supabase cookies exactly as they were provided so the browser session persists
   for (const cookie of response.cookies.getAll()) {
     redirectResponse.cookies.set({
       name: cookie.name,
       value: cookie.value,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      httpOnly: cookie.name.includes('auth-token'),
+      secure: typeof cookie.secure === 'boolean' ? cookie.secure : process.env.NODE_ENV === 'production',
+      sameSite: cookie.sameSite ?? 'lax',
+      httpOnly: cookie.httpOnly ?? cookie.name.includes('auth-token'),
       path: cookie.path || '/',
       maxAge: cookie.maxAge,
+      expires: cookie.expires,
     })
   }
 

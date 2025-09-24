@@ -13,9 +13,16 @@ export interface UserPreferences {
 }
 
 export async function getUserPreferencesClient() {
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const { data: sessionData } = await supabase.auth.getSession();
+  let user = sessionData?.session?.user ?? null;
+
   if (!user) {
+    const { data: directUser } = await supabase.auth.getUser();
+    user = directUser?.user ?? null;
+  }
+
+  if (!user) {
+    console.warn('getUserPreferencesClient: no authenticated user');
     return null;
   }
 
