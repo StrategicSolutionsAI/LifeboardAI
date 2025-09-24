@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
         rrule TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
+        task_id UUID REFERENCES lifeboard_tasks(id) ON DELETE SET NULL,
         UNIQUE(user_id, external_id, source)
       );
     `;
@@ -50,7 +51,8 @@ export async function POST(request: NextRequest) {
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON calendar_events(user_id);',
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_start_time ON calendar_events(start_time);',
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_start_date ON calendar_events(start_date);',
-      'CREATE INDEX IF NOT EXISTS idx_calendar_events_source ON calendar_events(source);'
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_source ON calendar_events(source);',
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);'
     ];
 
     for (const indexQuery of indexQueries) {

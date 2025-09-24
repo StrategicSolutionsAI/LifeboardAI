@@ -9,6 +9,10 @@ interface UploadResult {
   message: string;
   totalEvents?: number;
   importedEvents?: number;
+  tasksCreated?: number;
+  tasksUpdated?: number;
+  taskSyncErrors?: number;
+  warnings?: string;
   error?: string;
 }
 
@@ -100,7 +104,11 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           success: true,
           message: result.message,
           totalEvents: result.totalEvents,
-          importedEvents: result.importedEvents
+          importedEvents: result.importedEvents,
+          tasksCreated: result.tasksCreated,
+          tasksUpdated: result.tasksUpdated,
+          taskSyncErrors: result.taskSyncErrors,
+          warnings: result.warnings
         };
         setUploadResult(successResult);
         onUploadComplete?.(successResult);
@@ -253,6 +261,20 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
                     Found {uploadResult.totalEvents} events, imported {uploadResult.importedEvents} successfully.
                   </p>
                 )}
+                {uploadResult.success && ((uploadResult.tasksCreated ?? 0) > 0 || (uploadResult.tasksUpdated ?? 0) > 0) && (
+                  <p className="text-sm mt-1">
+                    Converted {uploadResult.tasksCreated ?? 0} new events into tasks
+                    {uploadResult.tasksUpdated ? ` and refreshed ${uploadResult.tasksUpdated} existing tasks.` : '.'}
+                  </p>
+                )}
+                {uploadResult.success && (uploadResult.taskSyncErrors ?? 0) > 0 && (
+                  <p className="text-sm mt-1 text-yellow-700">
+                    {uploadResult.taskSyncErrors} events could not be converted into tasks. Check server logs for more details.
+                  </p>
+                )}
+                {uploadResult.success && uploadResult.warnings && (
+                  <p className="text-sm mt-1 text-yellow-700">{uploadResult.warnings}</p>
+                )}
               </div>
             </div>
           </div>
@@ -293,8 +315,8 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
             <li>Maximum file size: 5MB</li>
           </ul>
           <p className="mt-3 text-xs">
-            Your calendar events will be imported and made available in your calendar view.
-            Duplicate events will be updated automatically.
+            Imported events appear as editable tasks in the "Imported Calendar" bucket and sync with your calendar view.
+            Duplicate events will update automatically.
           </p>
         </div>
       </CardContent>
