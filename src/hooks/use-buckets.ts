@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getUserPreferencesClient } from '@/lib/user-preferences';
+import { getUserPreferencesClient, saveUserPreferences } from '@/lib/user-preferences';
 
 export function useBuckets() {
   const [buckets, setBuckets] = useState<string[]>(['Health', 'Work', 'Personal', 'Finance']);
@@ -31,11 +31,29 @@ export function useBuckets() {
         // Then load from Supabase (source of truth)
         const prefs = await getUserPreferencesClient();
         if (prefs?.life_buckets && prefs.life_buckets.length > 0) {
-          setBuckets(prefs.life_buckets);
-          const initialActive = localActiveBucket && prefs.life_buckets.includes(localActiveBucket) 
-            ? localActiveBucket 
-            : prefs.life_buckets[0];
-          setActiveBucket(initialActive);
+          const localList: string[] = (localBuckets ? JSON.parse(localBuckets) : []) || [];
+          const serverList: string[] = prefs.life_buckets || [];
+          const union = Array.from(new Set([...(Array.isArray(localList) ? localList : []), ...serverList]));
+
+          // Use the union in UI
+          setBuckets(union);
+          const initialActive = localActiveBucket && union.includes(localActiveBucket)
+            ? localActiveBucket
+            : union[0];
+          if (initialActive) setActiveBucket(initialActive);
+
+          // Persist union back to localStorage and Supabase if it adds anything new
+          if (union.length !== serverList.length) {
+            try {
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('life_buckets', JSON.stringify(union));
+                window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+              }
+              await saveUserPreferences({ ...prefs, life_buckets: union });
+            } catch (e) {
+              console.error('Failed to persist merged buckets', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading buckets:', error);
@@ -45,6 +63,25 @@ export function useBuckets() {
     };
 
     loadBuckets();
+
+    // React to broadcast events from dashboard/settings and cross-tab storage changes
+    const onBucketsChanged = () => {
+      // Quickly reload; keep UX snappy
+      loadBuckets();
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'life_buckets') loadBuckets();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('lifeBucketsChanged', onBucketsChanged);
+      window.addEventListener('storage', onStorage);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('lifeBucketsChanged', onBucketsChanged);
+        window.removeEventListener('storage', onStorage);
+      }
+    };
   }, []);
 
   return { buckets, activeBucket, loading };

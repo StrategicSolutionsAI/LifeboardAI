@@ -28,6 +28,22 @@ export default function SettingsPageClient() {
     if (mounted) {
       loadUserPreferences()
     }
+    // Listen for cross-tab/dashboard updates to bucket colors
+    const onBucketColorsChanged = async () => {
+      const prefs = await getUserPreferencesClient()
+      if (prefs) {
+        setUserPreferences(prefs)
+        setBucketColors(prefs.bucket_colors || {})
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('bucketColorsChanged', onBucketColorsChanged)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('bucketColorsChanged', onBucketColorsChanged)
+      }
+    }
   }, [mounted])
 
   const { theme, setTheme } = useTheme()
@@ -110,6 +126,10 @@ export default function SettingsPageClient() {
         setUserPreferences(updatedPrefs)
         // Invalidate cache so other components get fresh colors
         invalidateBucketColorCache()
+        // Broadcast to live views (dashboard etc.)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bucketColorsChanged'))
+        }
       } catch (error) {
         console.log('Could not save to database, using localStorage fallback:', error)
       }

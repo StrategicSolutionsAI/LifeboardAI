@@ -374,8 +374,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [newOpenTask, setNewOpenTask] = useState('');
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
-  const [buckets, setBuckets] = useState<string[]>(['Health', 'Work', 'Personal', 'Finance']);
-  const [activeBucket, setActiveBucket] = useState<string>("Health");
+  const [buckets, setBuckets] = useState<string[]>([]);
+  const [activeBucket, setActiveBucket] = useState<string>('');
+  const [bucketsInitialized, setBucketsInitialized] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
@@ -388,6 +389,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Track when we've completed the initial auth check to avoid clearing
+  // localStorage/state before Supabase auth resolves on first load
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Bucket color utility functions
   const getBucketColor = (bucket: string) => {
@@ -400,6 +404,60 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const b = parseInt(hex.slice(5, 7), 16)
     return `rgba(${r}, ${g}, ${b}, ${alpha})`
   }
+
+  // Suggested bucket presets for quick adding in the Manage Tabs sheet
+  const SUGGESTED_BUCKETS = [
+    'Health',
+    'Wellness',
+    'Family',
+    'Social',
+    'Work',
+    'Finance',
+    'Personal',
+    'Fitness',
+    'Projects',
+    'Home'
+  ] as const
+
+  // Recommended color per common bucket name
+  const SUGGESTED_BUCKET_COLOR_MAP: Record<string, string> = {
+    health: '#22C55E',     // green-500
+    wellness: '#10B981',   // emerald-500
+    family: '#60A5FA',     // blue-400
+    social: '#F43F5E',     // rose-500
+    work: '#6366F1',       // indigo-500
+    personal: '#8B5CF6',   // violet-500
+    projects: '#0EA5E9',   // sky-500
+    home: '#64748B',       // slate-500
+    finance: '#EAB308',    // yellow-500
+    fitness: '#EF4444',    // red-500
+  }
+
+  function getSuggestedColorForBucket(name: string): string {
+    const key = name?.toLowerCase?.().trim() || ''
+    return SUGGESTED_BUCKET_COLOR_MAP[key] || '#6366F1'
+  }
+
+  const suggestedToShow = useMemo(
+    () => SUGGESTED_BUCKETS.filter((name) => !buckets.includes(name)),
+    [buckets]
+  )
+
+  // Preset color palette (hex) for bucket color selection
+  const BUCKET_COLOR_PALETTE = [
+    '#6366F1', // indigo-500
+    '#22C55E', // green-500
+    '#EF4444', // red-500
+    '#F59E0B', // amber-500
+    '#8B5CF6', // violet-500
+    '#06B6D4', // cyan-500
+    '#F43F5E', // rose-500
+    '#0EA5E9', // sky-500
+    '#10B981', // emerald-500
+    '#EAB308', // yellow-500
+    '#64748B', // slate-500
+    '#A3A3A3', // neutral-400
+  ] as const
 
   // Create lighter opaque colors by blending with white
   const getLighterColor = (hex: string, amount: number) => {
@@ -1558,9 +1616,96 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!name || buckets.includes(name)) return;
     const updated = [...buckets, name];
     setBuckets(updated);
+    if (!activeBucket) {
+      setActiveBucket(name);
+    }
     setNewBucket("");
+    // Auto-assign suggested color if this bucket has no color yet
+    const existingColor = bucketColors[name];
+    const colorToUse = existingColor || getSuggestedColorForBucket(name);
+    if (!existingColor) {
+      const nextColors = { ...bucketColors, [name]: colorToUse } as Record<string,string>;
+      setBucketColors(nextColors);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
+      }
+      // Broadcast change so any listeners update immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+      }
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(updated));
+      // Notify other views (e.g., Calendar) that buckets changed
+      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+    }
+    
+    // Save to Supabase for persistence
+    try {
+      const prefs = await getUserPreferencesClient();
+      if (prefs) {
+        const mergedColors = { ...(prefs.bucket_colors || {}), [name]: colorToUse } as Record<string,string>;
+        await saveUserPreferences({
+          ...prefs,
+          life_buckets: updated,
+          bucket_colors: mergedColors,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save buckets to Supabase:', err);
+    }
+  };
+
+  // Quick-add helper for suggested buckets
+  const handleAddBucketQuick = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || buckets.includes(trimmed)) return;
+    const updated = [...buckets, trimmed];
+    setBuckets(updated);
+    if (!activeBucket) {
+      setActiveBucket(trimmed);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+    }
+    try {
+      const prefs = await getUserPreferencesClient();
+      if (prefs) {
+        // Auto-assign suggested color if missing
+        const existing = (bucketColors[trimmed] || (prefs.bucket_colors || {})[trimmed]);
+        const colorToUse = existing || getSuggestedColorForBucket(trimmed);
+        const nextColors = { ...(prefs.bucket_colors || {}), [trimmed]: colorToUse } as Record<string,string>;
+        setBucketColors(prev => ({ ...nextColors }));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
+        }
+        // Broadcast
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+        }
+        await saveUserPreferences({
+          ...prefs,
+          life_buckets: updated,
+          bucket_colors: nextColors,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save buckets to Supabase:', err);
+    }
+  };
+
+  const handleRemoveBucket = async (bucket: string) => {
+    const updated = buckets.filter(b => b !== bucket);
+    setBuckets(updated);
+    if (activeBucket === bucket && updated.length) {
+      setActiveBucket(updated[0]);
+    } else if (!updated.length) {
+      setActiveBucket('');
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
     
     // Save to Supabase for persistence
@@ -1577,27 +1722,29 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
   };
 
-  const handleRemoveBucket = async (bucket: string) => {
-    const updated = buckets.filter(b => b !== bucket);
-    setBuckets(updated);
-    if (activeBucket === bucket && updated.length) {
-      setActiveBucket(updated[0]);
-    }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('life_buckets', JSON.stringify(updated));
-    }
-    
-    // Save to Supabase for persistence
+  // Assign / update a color for a given bucket and persist
+  const handleBucketColorChange = async (bucket: string, colorHex: string) => {
+    setBucketColors(prev => ({ ...prev, [bucket]: colorHex }));
+
     try {
       const prefs = await getUserPreferencesClient();
       if (prefs) {
+        const nextColors = { ...(prefs.bucket_colors || {}), [bucket]: colorHex } as Record<string, string>;
         await saveUserPreferences({
           ...prefs,
-          life_buckets: updated
+          bucket_colors: nextColors,
         });
+        // Persist locally as well
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
+        }
+        // Notify any listeners that colors changed
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+        }
       }
     } catch (err) {
-      console.error('Failed to save buckets to Supabase:', err);
+      console.error('Failed to save bucket color to Supabase:', err);
     }
   };
 
@@ -1714,8 +1861,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     } catch (err) {
       console.error('Failed to load widgets from preferences', err);
     } finally {
-        console.log('Widget load complete');
-        setIsWidgetLoadComplete(true);
+      console.log('Widget load complete');
+      setIsWidgetLoadComplete(true);
     }
   }
 
@@ -1724,11 +1871,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     supabase.auth.getUser().then(({ data: { user }, error }) => {
       console.log('Client auth check:', { user: user?.id, error });
       setUser(user);
+      // Mark auth as initialized after the initial getUser resolves
+      setAuthInitialized(true);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state change:', event, { user: session?.user?.id });
       setUser(session?.user ?? null);
+      // Ensure we mark initialized when we receive any auth event
+      setAuthInitialized(true);
     });
 
     return () => {
@@ -1738,27 +1889,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Effect for user state changes (login/logout)
   useEffect(() => {
+    // Do not act until the initial auth status has been determined
+    if (!authInitialized) return;
+
     if (user) {
-      console.log('User detected, loading data...');
-      loadBuckets();
+      console.log('User detected, loading dashboard data...');
+      loadBuckets({ fetchFromSupabase: true });
       loadWidgets();
       ensureUserOnboarded();
     } else {
-      // This logic runs when the user is not signed in, or after they sign out.
-      console.log('No user detected, clearing data and redirecting...');
-      setBuckets([]);
-      setActiveBucket('');
-      setWidgetsByBucket({});
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('life_buckets');
-        localStorage.removeItem('widgets_by_bucket');
-      }
-      
-      // Redirect to home page if not already there.
-      // No redirect here, as it is handled by the component that calls signout
-      // or by the user navigating away.
+      console.log('No authenticated user yet; loading dashboard state from local cache');
+      loadBuckets({ fetchFromSupabase: false });
     }
-  }, [user]);
+  }, [user, authInitialized]);
 
   // Save widgets whenever they change
   useEffect(() => {
@@ -1816,18 +1959,41 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     debouncedSaveToSupabase();
   }, [progressByWidget, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
 
-  async function loadBuckets() {
+  async function loadBuckets(options?: { fetchFromSupabase?: boolean }) {
+    const shouldFetchFromSupabase = options?.fetchFromSupabase ?? true;
+    console.log('[Buckets] loadBuckets start', {
+      bucketsState: buckets,
+      activeBucketState: activeBucket,
+      shouldFetchFromSupabase,
+    });
     let loadedFromLocal = false;
+    let localBuckets: string[] = [];
+    let localBucketColors: Record<string, string> | null = null;
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('life_buckets');
         if (stored) {
           const parsed: string[] = JSON.parse(stored);
+          console.log('[Buckets] Parsed localStorage value', parsed);
           if (Array.isArray(parsed) && parsed.length) {
+            localBuckets = parsed;
             setBuckets(parsed);
             const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
             setActiveBucket(savedActive && parsed.includes(savedActive) ? savedActive : parsed[0]);
             loadedFromLocal = true;
+            // Load any locally cached bucket colors immediately for smooth UX
+            const storedColors = localStorage.getItem('bucket_colors');
+            if (storedColors) {
+              try {
+                const parsedColors = JSON.parse(storedColors);
+                if (parsedColors && typeof parsedColors === 'object') {
+                  localBucketColors = parsedColors;
+                  setBucketColors(parsedColors);
+                }
+              } catch (e) {
+                console.warn('Failed to parse local bucket_colors');
+              }
+            }
           }
         }
       } catch(e) {
@@ -1835,35 +2001,101 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
     }
 
-    if (loadedFromLocal) return;
-
     try {
+      if (!shouldFetchFromSupabase) {
+        console.log('[Buckets] Skipping Supabase fetch (no authenticated user yet)');
+        return;
+      }
+
+      console.log('[Buckets] Attempting to load from Supabase');
       const prefs = await getUserPreferencesClient();
+      console.log('[Buckets] Supabase preferences response', {
+        lifeBuckets: prefs?.life_buckets,
+        bucketColors: prefs?.bucket_colors,
+      });
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
-        setBuckets(prefs.life_buckets);
-        setBucketColors(prefs.bucket_colors || {});
-        const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-        const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
-        setActiveBucket(initialActive);
-      } else {
-        // If no buckets found, set default buckets
-        console.log('No buckets found, setting defaults');
-        const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
-        setBuckets(defaultBuckets);
-        const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
-        
-        // Save the default buckets
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
+        // If we already loaded buckets from localStorage, prefer them to avoid flicker
+        if (!loadedFromLocal) {
+          console.log('[Buckets] Loading buckets from Supabase');
+          setBuckets(prefs.life_buckets);
+          const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+          const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
+          console.log('[Buckets] Setting active bucket to', initialActive);
+          setActiveBucket(initialActive);
         }
-        
-        // Save to Supabase
-        if (prefs) {
-          await saveUserPreferences({
-            ...prefs,
-            life_buckets: defaultBuckets
-          });
+        // Apply colors from Supabase only if non-empty to avoid wiping out locally cached colors
+        const serverColors = prefs.bucket_colors || {};
+        if (serverColors && Object.keys(serverColors).length > 0) {
+          setBucketColors(serverColors);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('bucket_colors', JSON.stringify(serverColors));
+          }
+        }
+        // If we have locally cached buckets that aren't yet on the server, merge and persist them
+        if (loadedFromLocal && localBuckets.length) {
+          const union = Array.from(new Set([...(prefs.life_buckets ?? []), ...localBuckets]));
+          if (union.length !== prefs.life_buckets.length) {
+            setBuckets(union);
+            const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || union[0];
+            setActiveBucket(union.includes(active || '') ? (active as string) : union[0]);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('life_buckets', JSON.stringify(union));
+              window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+            }
+            const mergedColors = {
+              ...(prefs.bucket_colors || {}),
+              ...(localBucketColors || {}),
+            } as Record<string, string>;
+            await saveUserPreferences({
+              ...prefs,
+              life_buckets: union,
+              bucket_colors: mergedColors,
+            });
+          }
+        }
+      } else {
+        if (loadedFromLocal && localBuckets.length) {
+          console.log('No buckets found on server, preserving locally cached buckets');
+          if (prefs) {
+            const mergedColors = {
+              ...(prefs.bucket_colors || {}),
+              ...(localBucketColors || {}),
+            } as Record<string, string>;
+            await saveUserPreferences({
+              ...prefs,
+              life_buckets: localBuckets,
+              bucket_colors: mergedColors,
+            });
+          }
+        } else {
+          // If no buckets found anywhere, set default buckets
+          console.log('No buckets found locally or on server, setting defaults');
+          const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
+          setBuckets(defaultBuckets);
+          // Assign default colors for defaults if none exist
+          const defaultColors: Record<string, string> = Object.fromEntries(
+            defaultBuckets.map((n) => [n, getSuggestedColorForBucket(n)])
+          );
+          setBucketColors(defaultColors);
+          const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+          setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
+          
+          // Save the default buckets
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
+            localStorage.setItem('bucket_colors', JSON.stringify(defaultColors));
+            // Broadcast so any open views refresh colors
+            window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+          }
+          
+          // Save to Supabase
+          if (prefs) {
+            await saveUserPreferences({
+              ...prefs,
+              life_buckets: defaultBuckets,
+              bucket_colors: { ...(prefs.bucket_colors || {}), ...defaultColors },
+            });
+          }
         }
       }
     } catch (err) {
@@ -1872,7 +2104,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
       setBuckets(defaultBuckets);
       const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
+      setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
+    } finally {
+      console.log('[Buckets] loadBuckets finished', {
+        bucketsAfter: buckets,
+        localBuckets,
+        activeBucketAfter: activeBucket,
+        loadedFromLocal,
+      });
+      setBucketsInitialized(true);
     }
   }
 
@@ -2500,7 +2740,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             style={{ width: '100%' }}
           >
             <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
-              {buckets.length > 0 && buckets.map((b, idx) => (
+              {bucketsInitialized && buckets.length === 0 && (
+                <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-gray-300 bg-white/70 px-4 text-sm text-gray-500">
+                  <span>No tabs yet. Click + to add your first bucket.</span>
+                </div>
+              )}
+              {bucketsInitialized && buckets.length > 0 && buckets.map((b, idx) => (
                 <button
                   key={b}
                   draggable
@@ -3608,18 +3853,60 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </div>
 
               <div>
+                <div className="text-sm font-medium text-gray-700 mb-2">Suggested tabs</div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedToShow.length > 0 ? (
+                    suggestedToShow.map((name) => (
+                      <button
+                        key={name}
+                        onClick={() => handleAddBucketQuick(name)}
+                        className="px-3 py-1.5 rounded-full border border-gray-200 text-sm hover:bg-gray-50 active:bg-gray-100"
+                        aria-label={`Add ${name} tab`}
+                      >
+                        {name}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-xs text-gray-500">All suggested tabs are already added</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
                 <div className="text-sm font-medium text-gray-700 mb-2">Existing tabs</div>
                 <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 overflow-hidden">
                   {buckets.map((b) => (
-                    <li key={b} className="flex items-center justify-between px-3 py-2 bg-white">
-                      <span className={`text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleRemoveBucket(b)}
-                          className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          Remove
-                        </button>
+                    <li key={b} className="px-3 py-3 bg-white">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span
+                            className="inline-block w-4 h-4 rounded-full border border-gray-200"
+                            style={{ backgroundColor: getBucketColor(b) }}
+                            aria-hidden
+                          />
+                          <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRemoveBucket(b)}
+                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      {/* Custom color picker only (auto-assigned initially) */}
+                      <div className="mt-3 flex items-center justify-end gap-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>Custom</span>
+                          <input
+                            type="color"
+                            value={(bucketColors[b] || getSuggestedColorForBucket(b)) as string}
+                            onChange={(e) => handleBucketColorChange(b, e.target.value)}
+                            className="h-6 w-6 p-0 border rounded cursor-pointer"
+                            aria-label={`Choose custom color for ${b}`}
+                          />
+                        </label>
                       </div>
                     </li>
                   ))}
