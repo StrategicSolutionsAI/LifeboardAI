@@ -102,6 +102,29 @@ export interface LifeboardTaskLike {
   hour_slot?: string | null;
   duration?: number | null;
   repeat_rule?: string | null;
+  bucket?: string | null;
+  completed?: boolean | null;
+  position?: number | null;
+}
+
+export interface CalendarEventRow {
+  id: string;
+  title: string | null;
+  content: string | null;
+  start_time: string | null;
+  start_date: string | null;
+  end_time: string | null;
+  end_date: string | null;
+  all_day: boolean | null;
+  rrule: string | null;
+  repeat_rule: string | null;
+  due_date: string | null;
+  hour_slot: string | null;
+  bucket: string | null;
+  duration: number | null;
+  completed: boolean | null;
+  position: number | null;
+  task_id: string | null;
 }
 
 export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
@@ -128,15 +151,26 @@ export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
   }
 
   const repeatRule = mapRepeatRuleToRrule(task.repeat_rule as CalendarRepeatRule | null);
+const normalizedBucket = task.bucket ?? IMPORTED_CALENDAR_BUCKET;
+  const completed = task.completed ?? false;
+  const position = typeof task.position === 'number' ? task.position : null;
 
   return {
     title: task.content ?? null,
+    content: task.content ?? null,
     start_date: startDate,
     start_time: startTime,
     end_date: endDate,
     end_time: endTime,
     all_day: startTime ? false : true,
     rrule: repeatRule,
+    repeat_rule: task.repeat_rule ?? null,
+    due_date: startDate,
+    hour_slot: task.hour_slot ?? null,
+    bucket: normalizedBucket,
+    duration: durationMinutes,
+    completed,
+    position,
     updated_at: new Date().toISOString(),
   };
 }
@@ -177,4 +211,151 @@ export async function syncTaskToCalendarEvent(
   if (updateError) {
     console.error('Failed to sync task changes to calendar event', { taskId: task.id, eventId, updateError });
   }
+}
+
+export class MissingTasksTableError extends Error {
+  constructor() {
+    super('lifeboard_tasks table missing');
+    this.name = 'MissingTasksTableError';
+  }
+}
+
+export async function syncEventsToTasks(
+  supabase: GenericSupabaseClient,
+  userId: string,
+  events: CalendarEventRow[]
+): Promise<{ created: number; updated: number; errors: number }> {
+  let created = 0;
+  let updated = 0;
+  let errors = 0;
+
+  for (const event of events) {
+    const rawTitle = event.content ?? event.title ?? '';
+    const title = rawTitle.trim();
+    if (!title) continue;
+
+    const dueDate = event.due_date ?? event.start_date ?? (event.start_time ? event.start_time.slice(0, 10) : null);
+    const hourSlot = event.hour_slot ?? isoToHourSlot(event.start_time);
+    const duration = typeof event.duration === 'number'
+      ? event.duration
+      : calculateDurationMinutes(event.start_time, event.end_time);
+    const repeatRule = event.repeat_rule ?? mapRruleToRepeatRule(event.rrule);
+    const bucket = event.bucket ?? IMPORTED_CALENDAR_BUCKET;
+    const completed = event.completed ?? false;
+    const position = typeof event.position === 'number' ? event.position : null;
+    const timestamp = new Date().toISOString();
+
+    if (!event.task_id) {
+      const { data: taskData, error: taskError } = await supabase
+        .from('lifeboard_tasks')
+        .insert([{
+          user_id: userId,
+          content: title,
+          completed,
+          due_date: dueDate,
+          hour_slot: hourSlot ?? null,
+          bucket,
+          duration: duration ?? null,
+          repeat_rule: repeatRule ?? null,
+          position,
+        }])
+        .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
+        .single();
+
+      if (taskError) {
+        if (taskError.code === '42P01') {
+          throw new MissingTasksTableError();
+        }
+        errors++;
+        console.error('Failed to create task for calendar event', { eventId: event.id, taskError });
+        continue;
+      }
+
+      const newTaskId = taskData?.id;
+      if (!newTaskId) {
+        errors++;
+        console.error('Task creation response missing id', { eventId: event.id });
+        continue;
+      }
+
+      const { error: linkError } = await supabase
+        .from('calendar_events')
+        .update({
+          task_id: newTaskId,
+          title,
+          content: taskData?.content ?? title,
+          due_date: taskData?.due_date ?? dueDate,
+          hour_slot: taskData?.hour_slot ?? hourSlot ?? null,
+          bucket: taskData?.bucket ?? bucket,
+          duration: taskData?.duration ?? (typeof duration === 'number' ? duration : null),
+          repeat_rule: taskData?.repeat_rule ?? repeatRule ?? null,
+          completed: taskData?.completed ?? false,
+          position: taskData?.position ?? position,
+          updated_at: timestamp,
+        })
+        .eq('id', event.id)
+        .eq('user_id', userId);
+
+      if (linkError) {
+        if (linkError.code === '42P01') {
+          throw new MissingTasksTableError();
+        }
+        errors++;
+        console.error('Failed to link task to calendar event', { eventId: event.id, linkError });
+        continue;
+      }
+
+      event.task_id = newTaskId;
+      created++;
+      continue;
+    }
+
+    const { error: updateError, data: taskData } = await supabase
+      .from('lifeboard_tasks')
+      .update({
+        content: title,
+        due_date: dueDate,
+        hour_slot: hourSlot ?? null,
+        duration: duration ?? null,
+        repeat_rule: repeatRule ?? null,
+      })
+      .eq('id', event.task_id)
+      .eq('user_id', userId)
+      .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
+      .single();
+
+    if (updateError) {
+      if (updateError.code === '42P01') {
+        throw new MissingTasksTableError();
+      }
+      errors++;
+      console.error('Failed to update task from calendar event', { eventId: event.id, taskId: event.task_id, updateError });
+      continue;
+    }
+
+    const { error: mirrorError } = await supabase
+      .from('calendar_events')
+      .update({
+        title,
+        content: taskData?.content ?? title,
+        due_date: taskData?.due_date ?? dueDate,
+        hour_slot: taskData?.hour_slot ?? hourSlot ?? null,
+        bucket: taskData?.bucket ?? bucket,
+        duration: taskData?.duration ?? (typeof duration === 'number' ? duration : null),
+        repeat_rule: taskData?.repeat_rule ?? repeatRule ?? null,
+        completed: taskData?.completed ?? completed,
+        position: taskData?.position ?? position,
+        updated_at: timestamp,
+      })
+      .eq('id', event.id)
+      .eq('user_id', userId);
+
+    if (mirrorError) {
+      console.error('Failed to mirror task changes onto calendar event', { eventId: event.id, taskId: event.task_id, mirrorError });
+    }
+
+    updated++;
+  }
+
+  return { created, updated, errors };
 }

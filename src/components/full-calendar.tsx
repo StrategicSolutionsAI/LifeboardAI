@@ -52,6 +52,15 @@ const getRepeatLabel = (value?: RepeatOption | null) => {
   return REPEAT_LABELS[value];
 };
 
+const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
+  if (!value) return undefined;
+  const normalized = String(value).toLowerCase();
+  if (normalized === 'daily' || normalized === 'weekly' || normalized === 'weekdays' || normalized === 'monthly') {
+    return normalized as RepeatOption;
+  }
+  return undefined;
+};
+
 // Bucket color system for calendar events
 const normalizeBucketId = (name?: string | null) => {
   const trimmed = (name ?? '').trim();
@@ -185,7 +194,7 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist' | 'lifeboard' | 'uploaded'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; location?: string; }
+interface DayEvent { source: 'google' | 'todoist' | 'lifeboard' | 'uploaded'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; location?: string; eventId?: string; }
 
 interface CalendarTaskMovedDetail {
   taskId: string;
@@ -497,6 +506,52 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     });
   }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
 
+  const ensureTaskForEvent = useCallback(async (eventId: string) => {
+    try {
+      const resp = await fetch(`/api/calendar/events/${eventId}/ensure-task`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      if (resp.ok) {
+        const payload = await resp.json();
+        if (!payload?.taskId) return null;
+        return {
+          taskId: payload.taskId as string,
+          bucket: (payload.bucket as string | undefined) ?? IMPORTED_CALENDAR_BUCKET_NAME,
+          repeatRule: normalizeRepeatOption(payload.repeatRule),
+        };
+      }
+
+      if (resp.status !== 404) {
+        console.error('Failed to ensure calendar event has task', resp.status);
+        try {
+          const errorPayload = await resp.json();
+          console.error('Ensure task error payload', errorPayload);
+        } catch {}
+        return null;
+      }
+
+      // Fallback for older deployments where the ensure-task endpoint is unavailable
+      const fallbackResp = await fetch('/api/calendar/upload', { cache: 'no-store' });
+      if (!fallbackResp.ok) {
+        console.error('Fallback calendar fetch failed', fallbackResp.status);
+        return null;
+      }
+      const payload = await fallbackResp.json();
+      const events = Array.isArray(payload.events) ? payload.events : [];
+      const target = events.find((event: any) => event?.id === eventId);
+      if (!target?.task_id) return null;
+      return {
+        taskId: target.task_id as string,
+        bucket: (target.bucket as string | undefined) ?? IMPORTED_CALENDAR_BUCKET_NAME,
+        repeatRule: normalizeRepeatOption(target.repeat_rule),
+      };
+    } catch (error) {
+      console.error('Failed to ensure calendar event has task', error);
+      return null;
+    }
+  }, []);
+
   const openTaskEditorById = useCallback((taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => {
     const task = resolveTaskById(taskId);
     const fallbackHour = extractHourLabel(metadata?.hourSlot);
@@ -507,6 +562,68 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackRepeat: task?.repeatRule ?? null,
     });
   }, [currentDate, extractHourLabel, openTaskModal, resolveTaskById]);
+
+  const openCalendarEvent = useCallback(async (calendarEvent: DayEvent, dateStr: string) => {
+    if (calendarEvent.source !== 'lifeboard' && calendarEvent.source !== 'uploaded') {
+      return;
+    }
+
+    let taskId = calendarEvent.taskId;
+    let resolvedBucket = calendarEvent.bucket;
+    let resolvedRepeat = calendarEvent.repeatRule;
+
+    const needsTask = !taskId && calendarEvent.source === 'uploaded' && calendarEvent.eventId;
+
+    if (needsTask && calendarEvent.eventId) {
+      const ensured = await ensureTaskForEvent(calendarEvent.eventId);
+      if (ensured?.taskId) {
+        taskId = ensured.taskId;
+        resolvedBucket = ensured.bucket ?? resolvedBucket ?? IMPORTED_CALENDAR_BUCKET_NAME;
+        resolvedRepeat = ensured.repeatRule ?? resolvedRepeat;
+
+        setEventsByDate((prev) => {
+          const next = { ...prev };
+          const dayEvents = next[dateStr];
+          if (Array.isArray(dayEvents)) {
+            next[dateStr] = dayEvents.map((event) => {
+              if (event.eventId === calendarEvent.eventId) {
+                return {
+                  ...event,
+                  taskId,
+                  bucket: resolvedBucket,
+                  repeatRule: resolvedRepeat,
+                  source: 'lifeboard',
+                };
+              }
+              return event;
+            });
+          }
+          return next;
+        });
+
+        setUploadRefreshIndex((prev) => prev + 1);
+        try {
+          await refetch();
+        } catch (error) {
+          console.error('Failed to refresh tasks after ensuring calendar task', error);
+        }
+      }
+    }
+
+    if (!taskId) {
+      return;
+    }
+
+    const hydratedEvent: DayEvent = {
+      ...calendarEvent,
+      taskId,
+      bucket: resolvedBucket ?? IMPORTED_CALENDAR_BUCKET_NAME,
+      repeatRule: resolvedRepeat,
+      source: 'lifeboard',
+    };
+
+    openTaskEditor(hydratedEvent, dateStr);
+  }, [ensureTaskForEvent, setEventsByDate, setUploadRefreshIndex, refetch, openTaskEditor]);
 
   const closeTaskModal = useCallback(() => {
     setIsAddModalOpen(false);
@@ -692,7 +809,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const uploadedEventsCacheKey = `uploaded-calendar-events-${uploadRefreshIndex}`;
   const uploadedEventsFetcher = useCallback(async () => {
     try {
-      const resp = await fetch('/api/calendar/upload');
+      const resp = await fetch('/api/calendar/upload', { cache: 'no-store' });
       if (!resp.ok) {
         if (resp.status === 401) {
           return [];
@@ -845,19 +962,33 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       }
 
       let resolvedTaskId: string | undefined = ev.task_id ?? undefined;
+      let matchedTask: any | undefined;
 
-      if (!resolvedTaskId) {
+      if (resolvedTaskId) {
+        matchedTask = allTasks.find((task: any) => task.id?.toString?.() === resolvedTaskId);
+      }
+
+      if (!matchedTask) {
         const normalizedTitle = (ev.title ?? '').trim().toLowerCase();
-        const matchedTask = allTasks.find((task: any) => {
-          if ((task.bucket ?? '') !== IMPORTED_CALENDAR_BUCKET_NAME) return false;
+        matchedTask = allTasks.find((task: any) => {
+          const isImportedBucket = (task.bucket ?? '') === IMPORTED_CALENDAR_BUCKET_NAME;
+          if (resolvedTaskId) {
+            return task.id?.toString?.() === resolvedTaskId;
+          }
+          if (!isImportedBucket) return false;
           if ((task.due?.date ?? '') !== dateStr) return false;
           const taskTitle = (task.content ?? '').trim().toLowerCase();
           return taskTitle === normalizedTitle;
         });
-        if (matchedTask?.id) {
+        if (matchedTask?.id && !resolvedTaskId) {
           resolvedTaskId = matchedTask.id?.toString?.() ?? matchedTask.id;
         }
       }
+
+      const resolvedBucket = matchedTask?.bucket
+        ?? ev.bucket
+        ?? (resolvedTaskId ? IMPORTED_CALENDAR_BUCKET_NAME : undefined);
+      const resolvedRepeatRule = normalizeRepeatOption(matchedTask?.repeatRule ?? ev.repeat_rule);
 
       const bucket = map[dateStr] ?? (map[dateStr] = []);
       const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
@@ -872,7 +1003,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         allDay: ev.all_day || Boolean(ev.start_date),
         location: ev.location ?? undefined,
         taskId: resolvedTaskId,
-        bucket: resolvedTaskId ? IMPORTED_CALENDAR_BUCKET_NAME : undefined,
+        bucket: resolvedBucket,
+        repeatRule: resolvedRepeatRule,
+        eventId: ev.id,
       });
 
       if (taskIdKey) {
@@ -1253,8 +1386,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
-                                const isTaskEvent = Boolean(ev.taskId);
-                                const draggableId = isTaskEvent
+                                const hasTask = Boolean(ev.taskId);
+                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
+                                const draggableId = hasTask
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;
 
@@ -1263,31 +1397,30 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     key={draggableId}
                                     draggableId={draggableId}
                                     index={i}
-                                    isDragDisabled={!isTaskEvent}
+                                    isDragDisabled={!hasTask}
                                   >
                                     {(dragProvided, dragSnapshot) => (
                                       <div
                                         ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...(isTaskEvent ? dragProvided.dragHandleProps : {})}
-                                        role={isTaskEvent ? 'button' : undefined}
-                                        tabIndex={isTaskEvent ? 0 : undefined}
-                                        onClick={(event) => {
-                                          if (isTaskEvent && ev.taskId) {
-                                            event.stopPropagation();
-                                            const target = event.currentTarget as HTMLElement | null;
-                                            if (target && typeof target.blur === 'function') target.blur();
-                                            openTaskEditor(ev, dayStr);
-                                          }
+                                          {...dragProvided.draggableProps}
+                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                        role={canEditEvent ? 'button' : undefined}
+                                        tabIndex={canEditEvent ? 0 : undefined}
+                                        onClick={async (event) => {
+                                          if (!canEditEvent) return;
+                                          event.stopPropagation();
+                                          const target = event.currentTarget as HTMLElement | null;
+                                          if (target && typeof target.blur === 'function') target.blur();
+                                          await openCalendarEvent(ev, dayStr);
                                         }}
-                                        onKeyDown={(event) => {
-                                          if (!isTaskEvent || !ev.taskId) return;
+                                        onKeyDown={async (event) => {
+                                          if (!canEditEvent) return;
                                           if (event.key === 'Enter' || event.key === ' ') {
                                             event.preventDefault();
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
-                                            openTaskEditor(ev, dayStr);
+                                            await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
                                         className={`group p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
@@ -1324,7 +1457,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             )}
                                           </div>
                                           <div className="flex items-center gap-1 flex-shrink-0">
-                                            {isTaskEvent && (
+                                            {hasTask && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -1488,8 +1621,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
-                                const isTaskEvent = Boolean(ev.taskId);
-                                const draggableId = isTaskEvent
+                                const hasTask = Boolean(ev.taskId);
+                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
+                                const draggableId = hasTask
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;
 
@@ -1498,31 +1632,30 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     key={draggableId}
                                     draggableId={draggableId}
                                     index={i}
-                                    isDragDisabled={!isTaskEvent}
+                                    isDragDisabled={!hasTask}
                                   >
                                     {(dragProvided, dragSnapshot) => (
                                       <div 
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
-                                        {...(isTaskEvent ? dragProvided.dragHandleProps : {})}
-                                        role={isTaskEvent ? 'button' : undefined}
-                                        tabIndex={isTaskEvent ? 0 : undefined}
-                                        onClick={(event) => {
-                                          if (isTaskEvent && ev.taskId) {
-                                            event.stopPropagation();
-                                            const target = event.currentTarget as HTMLElement | null;
-                                            if (target && typeof target.blur === 'function') target.blur();
-                                            openTaskEditor(ev, dayStr);
-                                          }
+                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                        role={canEditEvent ? 'button' : undefined}
+                                        tabIndex={canEditEvent ? 0 : undefined}
+                                        onClick={async (event) => {
+                                          if (!canEditEvent) return;
+                                          event.stopPropagation();
+                                          const target = event.currentTarget as HTMLElement | null;
+                                          if (target && typeof target.blur === 'function') target.blur();
+                                          await openCalendarEvent(ev, dayStr);
                                         }}
-                                        onKeyDown={(event) => {
-                                          if (!isTaskEvent || !ev.taskId) return;
+                                        onKeyDown={async (event) => {
+                                          if (!canEditEvent) return;
                                           if (event.key === 'Enter' || event.key === ' ') {
                                             event.preventDefault();
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
-                                            openTaskEditor(ev, dayStr);
+                                            await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
                                         className={`group p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
@@ -1558,7 +1691,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             )}
                                           </div>
                                           <div className="flex items-center gap-0.5 flex-shrink-0">
-                                            {isTaskEvent && (
+                                            {hasTask && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();

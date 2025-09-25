@@ -5,7 +5,9 @@ import {
   isoToHourSlot,
   mapRruleToRepeatRule,
   IMPORTED_CALENDAR_BUCKET,
-  type CalendarRepeatRule,
+  syncEventsToTasks,
+  MissingTasksTableError,
+  type CalendarEventRow,
 } from '@/lib/calendar-sync';
 
 interface ICSEvent {
@@ -149,126 +151,6 @@ function formatDateOnly(icsDate: string): string {
   return icsDate;
 }
 
-type ServerSupabaseClient = ReturnType<typeof supabaseServer>;
-
-type RepeatRule = CalendarRepeatRule;
-
-interface CalendarEventRow {
-  id: string;
-  title: string | null;
-  start_time: string | null;
-  start_date: string | null;
-  end_time: string | null;
-  end_date: string | null;
-  all_day: boolean | null;
-  rrule: string | null;
-  task_id: string | null;
-}
-
-class MissingTasksTableError extends Error {
-  constructor() {
-    super('lifeboard_tasks table missing');
-    this.name = 'MissingTasksTableError';
-  }
-}
-
-async function syncEventsToTasks(
-  supabase: ServerSupabaseClient,
-  userId: string,
-  events: CalendarEventRow[]
-): Promise<{ created: number; updated: number; errors: number; }> {
-  let created = 0;
-  let updated = 0;
-  let errors = 0;
-
-  for (const event of events) {
-    const title = (event.title ?? '').trim();
-    if (!title) {
-      continue;
-    }
-
-    const dueDate = event.start_date || (event.start_time ? event.start_time.slice(0, 10) : null);
-    const hourSlot = isoToHourSlot(event.start_time);
-    const duration = calculateDurationMinutes(event.start_time, event.end_time);
-    const repeatRule = mapRruleToRepeatRule(event.rrule);
-
-    if (!event.task_id) {
-      const { data: taskData, error: taskError } = await supabase
-        .from('lifeboard_tasks')
-        .insert([{
-          user_id: userId,
-          content: title,
-          completed: false,
-          due_date: dueDate,
-          hour_slot: hourSlot ?? null,
-          bucket: IMPORTED_CALENDAR_BUCKET,
-          duration: duration ?? null,
-          repeat_rule: repeatRule ?? null,
-        }])
-        .select('id')
-        .single();
-
-      if (taskError) {
-        if (taskError.code === '42P01') {
-          throw new MissingTasksTableError();
-        }
-        errors++;
-        console.error('Failed to create task for calendar event', { eventId: event.id, taskError });
-        continue;
-      }
-
-      const newTaskId = taskData?.id;
-      if (!newTaskId) {
-        errors++;
-        console.error('Task creation response missing id', { eventId: event.id });
-        continue;
-      }
-
-      const { error: linkError } = await supabase
-        .from('calendar_events')
-        .update({ task_id: newTaskId, updated_at: new Date().toISOString() })
-        .eq('id', event.id);
-
-      if (linkError) {
-        if (linkError.code === '42P01') {
-          throw new MissingTasksTableError();
-        }
-        errors++;
-        console.error('Failed to link task to calendar event', { eventId: event.id, linkError });
-        continue;
-      }
-
-      event.task_id = newTaskId;
-      created++;
-      continue;
-    }
-
-    const { error: updateError } = await supabase
-      .from('lifeboard_tasks')
-      .update({
-        content: title,
-        due_date: dueDate,
-        hour_slot: hourSlot ?? null,
-        duration: duration ?? null,
-        repeat_rule: repeatRule ?? null,
-      })
-      .eq('id', event.task_id)
-      .eq('user_id', userId);
-
-    if (updateError) {
-      if (updateError.code === '42P01') {
-        throw new MissingTasksTableError();
-      }
-      errors++;
-      console.error('Failed to update task from calendar event', { eventId: event.id, taskId: event.task_id, updateError });
-      continue;
-    }
-
-    updated++;
-  }
-
-  return { created, updated, errors };
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -325,6 +207,10 @@ export async function POST(request: NextRequest) {
 
       const startTime = start.dateTime || null;
       const startDate = start.date || (startTime ? startTime.slice(0, 10) : null);
+      const hourSlot = startTime ? isoToHourSlot(startTime) : null;
+      const durationMinutes = calculateDurationMinutes(startTime, end.dateTime || null);
+      const normalizedRepeatRule = mapRruleToRepeatRule(event.rrule);
+      const timestamp = new Date().toISOString();
 
       if (!startDate && !startTime) {
         console.warn('Skipping calendar event without start date/time', { uid: event.uid });
@@ -336,6 +222,7 @@ export async function POST(request: NextRequest) {
         external_id: event.uid,
         source: 'uploaded_calendar',
         title: event.summary,
+        content: event.summary,
         description: event.description || null,
         start_time: startTime,
         start_date: startDate,
@@ -345,8 +232,15 @@ export async function POST(request: NextRequest) {
         location: event.location || null,
         all_day: Boolean(start.date),
         rrule: event.rrule || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        repeat_rule: normalizedRepeatRule ?? null,
+        due_date: startDate,
+        hour_slot: hourSlot,
+        bucket: IMPORTED_CALENDAR_BUCKET,
+        duration: durationMinutes ?? null,
+        completed: false,
+        position: null,
+        created_at: timestamp,
+        updated_at: timestamp,
       });
 
       return acc;
@@ -425,7 +319,7 @@ export async function POST(request: NextRequest) {
           onConflict: 'user_id,external_id,source',
           ignoreDuplicates: false
         })
-        .select('id, title, start_time, start_date, end_time, end_date, all_day, rrule, task_id');
+        .select('id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id');
 
       let rowsToProcess: CalendarEventRow[] = Array.isArray(upsertedRows) ? upsertedRows as CalendarEventRow[] : [];
 
@@ -440,7 +334,7 @@ export async function POST(request: NextRequest) {
               onConflict: 'user_id,external_id,source',
               ignoreDuplicates: false
             })
-            .select('id, title, start_time, start_date, end_time, end_date, all_day, rrule, task_id')
+            .select('id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id')
             .single();
 
           if (error) {

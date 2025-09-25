@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         external_id TEXT NOT NULL,
         source TEXT NOT NULL DEFAULT 'uploaded_calendar',
         title TEXT NOT NULL,
+        content TEXT,
         description TEXT,
         start_time TIMESTAMPTZ,
         start_date DATE,
@@ -95,6 +96,13 @@ export async function POST(request: NextRequest) {
         location TEXT,
         all_day BOOLEAN DEFAULT FALSE,
         rrule TEXT,
+        completed BOOLEAN DEFAULT FALSE,
+        due_date DATE,
+        hour_slot TEXT,
+        bucket TEXT DEFAULT 'Imported Calendar',
+        position INTEGER,
+        duration INTEGER,
+        repeat_rule TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         task_id UUID REFERENCES lifeboard_tasks(id) ON DELETE SET NULL,
@@ -114,6 +122,7 @@ export async function POST(request: NextRequest) {
       CREATE INDEX IF NOT EXISTS idx_calendar_events_start_date ON calendar_events(start_date);
       CREATE INDEX IF NOT EXISTS idx_calendar_events_source ON calendar_events(source);
       CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);
+      CREATE INDEX IF NOT EXISTS idx_calendar_events_bucket ON calendar_events(bucket);
     `;
 
     // For now, let's skip the complex table creation and just try to create the table directly
@@ -125,9 +134,11 @@ export async function POST(request: NextRequest) {
       external_id: 'test-event-' + Date.now(),
       source: 'uploaded_calendar',
       title: 'Test Calendar Event',
+      content: 'Test Calendar Event',
       description: 'This is a test event created by the debug endpoint',
       start_date: '2025-09-23',
       all_day: true,
+      bucket: 'Imported Calendar',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

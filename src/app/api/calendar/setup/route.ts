@@ -19,9 +19,11 @@ export async function POST(request: NextRequest) {
       external_id: 'setup-test-' + Date.now(),
       source: 'uploaded_calendar',
       title: 'Setup Test Event',
+      content: 'Setup Test Event',
       description: 'This is a test event created during table setup',
       start_date: '2025-09-23',
       all_day: true,
+      bucket: 'Imported Calendar',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
           instructions: [
             '1. Go to your Supabase dashboard',
             '2. Navigate to the SQL Editor',
-            '3. Run the migration file: supabase/migrations/20250922_create_calendar_events_table.sql',
+            '3. Run the migration files: supabase/migrations/20250922_create_calendar_events_table.sql and supabase/migrations/20251010_align_calendar_events_with_tasks.sql',
             '4. Or manually create the table using the provided SQL'
           ],
           sqlToCopy: `-- Create calendar_events table for uploaded calendar files
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     external_id TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'uploaded_calendar',
     title TEXT NOT NULL,
+    content TEXT,
     description TEXT,
     start_time TIMESTAMPTZ,
     start_date DATE,
@@ -61,6 +64,13 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     location TEXT,
     all_day BOOLEAN DEFAULT FALSE,
     rrule TEXT,
+    completed BOOLEAN DEFAULT FALSE,
+    due_date DATE,
+    hour_slot TEXT,
+    bucket TEXT DEFAULT 'Imported Calendar',
+    position INTEGER,
+    duration INTEGER,
+    repeat_rule TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     task_id UUID REFERENCES lifeboard_tasks(id) ON DELETE SET NULL,
@@ -92,7 +102,8 @@ CREATE INDEX IF NOT EXISTS idx_calendar_events_user_id ON calendar_events(user_i
 CREATE INDEX IF NOT EXISTS idx_calendar_events_start_time ON calendar_events(start_time);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_start_date ON calendar_events(start_date);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_source ON calendar_events(source);
-CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);`
+CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_bucket ON calendar_events(bucket);`
         }, { status: 500 });
       }
 

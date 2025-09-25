@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
         external_id TEXT NOT NULL,
         source TEXT NOT NULL DEFAULT 'uploaded_calendar',
         title TEXT NOT NULL,
+        content TEXT,
         description TEXT,
         start_time TIMESTAMPTZ,
         start_date DATE,
@@ -28,6 +29,13 @@ export async function POST(request: NextRequest) {
         location TEXT,
         all_day BOOLEAN DEFAULT FALSE,
         rrule TEXT,
+        completed BOOLEAN DEFAULT FALSE,
+        due_date DATE,
+        hour_slot TEXT,
+        bucket TEXT DEFAULT 'Imported Calendar',
+        position INTEGER,
+        duration INTEGER,
+        repeat_rule TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         task_id UUID REFERENCES lifeboard_tasks(id) ON DELETE SET NULL,
@@ -52,7 +60,8 @@ export async function POST(request: NextRequest) {
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_start_time ON calendar_events(start_time);',
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_start_date ON calendar_events(start_date);',
       'CREATE INDEX IF NOT EXISTS idx_calendar_events_source ON calendar_events(source);',
-      'CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);'
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_task_id ON calendar_events(task_id);',
+      'CREATE INDEX IF NOT EXISTS idx_calendar_events_bucket ON calendar_events(bucket);'
     ];
 
     for (const indexQuery of indexQueries) {

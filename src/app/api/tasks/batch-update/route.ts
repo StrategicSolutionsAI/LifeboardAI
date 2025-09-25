@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id)
-        .select('id, content, due_date, hour_slot, duration, repeat_rule')
+        .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
         .single()
       if (error) {
         console.warn('Supabase batch update error for', taskId, error)
@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
             hour_slot: data.hour_slot,
             duration: data.duration,
             repeat_rule: data.repeat_rule,
+            bucket: data.bucket,
+            completed: data.completed,
+            position: data.position,
           })
         } catch (syncError) {
           console.error('Failed to sync calendar event after task update', { taskId, syncError })
