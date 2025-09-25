@@ -447,21 +447,9 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    let normalizedEvents = events || [];
+    let normalizedEvents = (events ?? []) as CalendarEventRow[];
 
-    const eventsMissingTask = normalizedEvents
-      .filter((event) => !event.task_id)
-      .map((event) => ({
-        id: event.id,
-        title: event.title,
-        start_time: event.start_time,
-        start_date: event.start_date,
-        end_time: event.end_time,
-        end_date: event.end_date,
-        all_day: event.all_day,
-        rrule: event.rrule,
-        task_id: event.task_id,
-      }));
+    const eventsMissingTask = normalizedEvents.filter((event) => !event.task_id);
 
     if (eventsMissingTask.length > 0) {
       try {
@@ -474,7 +462,7 @@ export async function GET(request: NextRequest) {
           .order('start_time', { ascending: true });
 
         if (!refreshError && Array.isArray(refreshedEvents)) {
-          normalizedEvents = refreshedEvents;
+          normalizedEvents = refreshedEvents as CalendarEventRow[];
         }
       } catch (syncError) {
         console.error('Failed to backfill missing calendar task links', syncError);
