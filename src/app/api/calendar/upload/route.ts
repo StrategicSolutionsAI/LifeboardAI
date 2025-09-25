@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import {
+  calculateDurationMinutes,
+  isoToHourSlot,
+  mapRruleToRepeatRule,
+  IMPORTED_CALENDAR_BUCKET,
+  type CalendarRepeatRule,
+} from '@/lib/calendar-sync';
 
 interface ICSEvent {
   uid: string;
@@ -107,28 +114,28 @@ function parseICSFile(icsContent: string): ICSEvent[] {
   return events;
 }
 
-function formatDateTime(icsDateTime: string): string {
-  // ICS format: YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ
-  if (icsDateTime.length === 15 && icsDateTime.endsWith('Z')) {
-    // UTC time
-    const year = icsDateTime.substring(0, 4);
-    const month = icsDateTime.substring(4, 6);
-    const day = icsDateTime.substring(6, 8);
-    const hour = icsDateTime.substring(9, 11);
-    const minute = icsDateTime.substring(11, 13);
-    const second = icsDateTime.substring(13, 15);
-    return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
-  } else if (icsDateTime.length === 15) {
-    // Local time
-    const year = icsDateTime.substring(0, 4);
-    const month = icsDateTime.substring(4, 6);
-    const day = icsDateTime.substring(6, 8);
-    const hour = icsDateTime.substring(9, 11);
-    const minute = icsDateTime.substring(11, 13);
-    const second = icsDateTime.substring(13, 15);
-    return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+function formatDateTime(raw: string): string {
+  const normalized = raw.trim();
+
+  // Match YYYYMMDDT followed by a variable length time (2-6 digits) with optional Z
+  const match = normalized.match(/^(\d{8})T(\d{1,6})(Z)?$/i);
+  if (!match) {
+    return normalized;
   }
-  return icsDateTime;
+
+  const [, datePart, timePart, zFlag] = match;
+  const year = datePart.substring(0, 4);
+  const month = datePart.substring(4, 6);
+  const day = datePart.substring(6, 8);
+
+  // Pad the time section to HHMMSS
+  const paddedTime = timePart.padEnd(6, '0').slice(0, 6);
+  const hour = paddedTime.substring(0, 2);
+  const minute = paddedTime.substring(2, 4);
+  const second = paddedTime.substring(4, 6);
+  const suffix = zFlag ? 'Z' : '';
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}${suffix}`;
 }
 
 function formatDateOnly(icsDate: string): string {
@@ -144,9 +151,7 @@ function formatDateOnly(icsDate: string): string {
 
 type ServerSupabaseClient = ReturnType<typeof supabaseServer>;
 
-type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
-
-const IMPORTED_CALENDAR_BUCKET = 'Imported Calendar';
+type RepeatRule = CalendarRepeatRule;
 
 interface CalendarEventRow {
   id: string;
@@ -165,55 +170,6 @@ class MissingTasksTableError extends Error {
     super('lifeboard_tasks table missing');
     this.name = 'MissingTasksTableError';
   }
-}
-
-function mapRruleToRepeatRule(rrule?: string | null): RepeatRule | null {
-  if (!rrule) return null;
-  const freqMatch = rrule.match(/FREQ=([^;]+)/i);
-  if (!freqMatch) return null;
-  const freq = freqMatch[1].toLowerCase();
-  if (freq === 'daily') return 'daily';
-  if (freq === 'monthly') return 'monthly';
-  if (freq === 'weekly') {
-    const byDayMatch = rrule.match(/BYDAY=([^;]+)/i);
-    if (byDayMatch) {
-      const days = byDayMatch[1]
-        .split(',')
-        .map((d) => d.trim().toUpperCase())
-        .filter(Boolean);
-      const weekdays = ['MO', 'TU', 'WE', 'TH', 'FR'];
-      if (days.length === weekdays.length && days.every((d) => weekdays.includes(d))) {
-        return 'weekdays';
-      }
-    }
-    return 'weekly';
-  }
-  return null;
-}
-
-function isoToHourSlot(dateTime?: string | null): string | null {
-  if (!dateTime) return null;
-  const timePart = dateTime.split('T')[1];
-  if (!timePart) return null;
-  const match = timePart.match(/^(\d{2}):(\d{2})/);
-  if (!match) return null;
-  const hour = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  if (Number.isNaN(hour) || Number.isNaN(minutes)) return null;
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const normalizedHour = hour % 12 === 0 ? 12 : hour % 12;
-  const minuteSegment = minutes > 0 ? `:${match[2]}` : '';
-  return `hour-${normalizedHour}${minuteSegment}${suffix}`;
-}
-
-function calculateDurationMinutes(start?: string | null, end?: string | null): number | null {
-  if (!start || !end) return null;
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  const diffMs = endDate.getTime() - startDate.getTime();
-  if (!Number.isFinite(diffMs) || diffMs <= 0) return null;
-  const minutes = Math.round(diffMs / 60000);
-  return minutes > 0 ? minutes : null;
 }
 
 async function syncEventsToTasks(
@@ -282,6 +238,7 @@ async function syncEventsToTasks(
         continue;
       }
 
+      event.task_id = newTaskId;
       created++;
       continue;
     }
@@ -425,6 +382,8 @@ export async function POST(request: NextRequest) {
     let tasksUpdated = 0;
     let tasksErrored = 0;
 
+    const insertionWarnings: string[] = [];
+
     for (let i = 0; i < eventsToInsert.length; i += batchSize) {
       const batch = eventsToInsert.slice(i, i + batchSize);
 
@@ -468,21 +427,50 @@ export async function POST(request: NextRequest) {
         })
         .select('id, title, start_time, start_date, end_time, end_date, all_day, rrule, task_id');
 
+      let rowsToProcess: CalendarEventRow[] = Array.isArray(upsertedRows) ? upsertedRows as CalendarEventRow[] : [];
+
       if (insertError) {
-        console.error('Error inserting batch:', insertError);
-        return NextResponse.json({
-          error: `Failed to save events (batch ${Math.floor(i / batchSize) + 1}): ${insertError.message}`,
-          details: insertError,
-          partialSuccess: insertedCount > 0
-        }, { status: 500 });
+        console.error('Error inserting batch, falling back to individual inserts:', insertError);
+        // Attempt to salvage by inserting rows one-by-one so one bad event does not kill the entire import.
+        const recoveredRows: CalendarEventRow[] = [];
+        for (const event of batchWithTaskIds) {
+          const { data, error } = await supabase
+            .from('calendar_events')
+            .upsert(event, {
+              onConflict: 'user_id,external_id,source',
+              ignoreDuplicates: false
+            })
+            .select('id, title, start_time, start_date, end_time, end_date, all_day, rrule, task_id')
+            .single();
+
+          if (error) {
+            console.error('Failed to save individual calendar event, skipping:', { externalId: event.external_id, error });
+            insertionWarnings.push(`Skipped event ${event.title || event.external_id}: ${error.message}`);
+            continue;
+          }
+
+          if (data) {
+            recoveredRows.push(data as CalendarEventRow);
+          }
+        }
+
+        if (recoveredRows.length === 0 && insertedCount === 0) {
+          return NextResponse.json({
+            error: `Failed to save events (batch ${Math.floor(i / batchSize) + 1}): ${insertError.message}`,
+            details: insertError,
+            partialSuccess: false
+          }, { status: 500 });
+        }
+
+        rowsToProcess = recoveredRows;
       }
 
-      const processedCount = Array.isArray(upsertedRows) ? upsertedRows.length : batch.length;
+      const processedCount = rowsToProcess.length;
       insertedCount += processedCount;
 
-      if (upsertedRows && upsertedRows.length > 0) {
+      if (rowsToProcess.length > 0) {
         try {
-          const syncResult = await syncEventsToTasks(supabase, user.id, upsertedRows as CalendarEventRow[]);
+          const syncResult = await syncEventsToTasks(supabase, user.id, rowsToProcess);
           tasksCreated += syncResult.created;
           tasksUpdated += syncResult.updated;
           tasksErrored += syncResult.errors;
@@ -523,6 +511,12 @@ export async function POST(request: NextRequest) {
       responsePayload.warnings = 'Some events were saved but could not be converted into tasks. Check server logs for details.';
     }
 
+    if (insertionWarnings.length > 0) {
+      responsePayload.warnings = responsePayload.warnings
+        ? `${responsePayload.warnings} ${insertionWarnings.join(' ')}`
+        : insertionWarnings.join(' ');
+    }
+
     return NextResponse.json(responsePayload);
 
   } catch (error) {
@@ -559,7 +553,41 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    return NextResponse.json({ events: events || [] });
+    let normalizedEvents = events || [];
+
+    const eventsMissingTask = normalizedEvents
+      .filter((event) => !event.task_id)
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        start_time: event.start_time,
+        start_date: event.start_date,
+        end_time: event.end_time,
+        end_date: event.end_date,
+        all_day: event.all_day,
+        rrule: event.rrule,
+        task_id: event.task_id,
+      }));
+
+    if (eventsMissingTask.length > 0) {
+      try {
+        await syncEventsToTasks(supabase, user.id, eventsMissingTask);
+        const { data: refreshedEvents, error: refreshError } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('source', 'uploaded_calendar')
+          .order('start_time', { ascending: true });
+
+        if (!refreshError && Array.isArray(refreshedEvents)) {
+          normalizedEvents = refreshedEvents;
+        }
+      } catch (syncError) {
+        console.error('Failed to backfill missing calendar task links', syncError);
+      }
+    }
+
+    return NextResponse.json({ events: normalizedEvents });
 
   } catch (error) {
     console.error('Calendar fetch error:', error);

@@ -318,9 +318,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string } | null>(null);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
-  
+  const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
+
   // Get tasks from context
-  const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask } = useTasksContext();
+  const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask, refetch } = useTasksContext();
   
   // Use calendar sync hook
   const resolveTaskById = useCallback((taskId?: string | null) => {
@@ -484,7 +485,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, [availableBuckets, currentDate, deriveRepeatOption, extractHourLabel, selectedBucket]);
 
   const openTaskEditor = useCallback((event: DayEvent, dateStr: string) => {
-    if (event.source !== 'lifeboard' || !event.taskId) return;
+    if (!event.taskId) return;
     const task = resolveTaskById(event.taskId);
     const targetDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
     const fallbackHour = isoToHourLabel(event.time);
@@ -688,7 +689,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const googleEvents = useMemo(() => (Array.isArray(googleEventsRaw) ? googleEventsRaw : []), [googleEventsRaw]);
 
   // Fetch uploaded calendar events
-  const uploadedEventsCacheKey = 'uploaded-calendar-events';
+  const uploadedEventsCacheKey = `uploaded-calendar-events-${uploadRefreshIndex}`;
   const uploadedEventsFetcher = useCallback(async () => {
     try {
       const resp = await fetch('/api/calendar/upload');
@@ -785,9 +786,28 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, []);
 
+  useEffect(() => {
+    const handleCalendarUploadComplete = () => {
+      setUploadRefreshIndex((prev) => prev + 1);
+      try {
+        refetch();
+      } catch (error) {
+        console.error('Failed to refetch tasks after calendar upload:', error);
+      }
+    };
+
+    window.addEventListener('calendar-upload-complete', handleCalendarUploadComplete);
+    return () => {
+      window.removeEventListener('calendar-upload-complete', handleCalendarUploadComplete);
+    };
+  }, [refetch]);
+
+  const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
+
   // Build events map whenever data sources change
   useEffect(() => {
     const map: Record<string, DayEvent[]> = {};
+    const seenTaskIds = new Set<string>();
 
     googleEvents.forEach((ev: any) => {
       // Apply bucket filter for Google Calendar events
@@ -824,14 +844,40 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         return;
       }
 
+      let resolvedTaskId: string | undefined = ev.task_id ?? undefined;
+
+      if (!resolvedTaskId) {
+        const normalizedTitle = (ev.title ?? '').trim().toLowerCase();
+        const matchedTask = allTasks.find((task: any) => {
+          if ((task.bucket ?? '') !== IMPORTED_CALENDAR_BUCKET_NAME) return false;
+          if ((task.due?.date ?? '') !== dateStr) return false;
+          const taskTitle = (task.content ?? '').trim().toLowerCase();
+          return taskTitle === normalizedTitle;
+        });
+        if (matchedTask?.id) {
+          resolvedTaskId = matchedTask.id?.toString?.() ?? matchedTask.id;
+        }
+      }
+
       const bucket = map[dateStr] ?? (map[dateStr] = []);
+      const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
+      if (taskIdKey && seenTaskIds.has(taskIdKey)) {
+        return;
+      }
+
       bucket.push({
-        source: 'uploaded',
+        source: resolvedTaskId ? 'lifeboard' : 'uploaded',
         title: ev.title ?? 'Uploaded Event',
         time: ev.start_time ?? undefined,
         allDay: ev.all_day || Boolean(ev.start_date),
         location: ev.location ?? undefined,
+        taskId: resolvedTaskId,
+        bucket: resolvedTaskId ? IMPORTED_CALENDAR_BUCKET_NAME : undefined,
       });
+
+      if (taskIdKey) {
+        seenTaskIds.add(taskIdKey);
+      }
     });
 
     let cursor = startOfDay(new Date(rangeStartMs));
@@ -843,14 +889,29 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       if (lifeboardEvents.length > 0) {
         const bucket = map[dateStr] ?? (map[dateStr] = []);
         lifeboardEvents.forEach(event => {
+          const taskIdKey = event.taskId ? event.taskId.toString() : undefined;
+          if (taskIdKey && seenTaskIds.has(taskIdKey)) {
+            return;
+          }
           bucket.push(event);
+          if (taskIdKey) {
+            seenTaskIds.add(taskIdKey);
+          }
         });
       }
       cursor = addDays(cursor, 1);
     }
 
     setEventsByDate(map);
-  }, [googleEvents, uploadedEvents, rangeStartMs, rangeEndMs, buildLifeboardEventsForDate, selectedBucketFilters]);
+  }, [
+    googleEvents,
+    uploadedEvents,
+    rangeStartMs,
+    rangeEndMs,
+    buildLifeboardEventsForDate,
+    selectedBucketFilters,
+    allTasks
+  ]);
 
   const getCellSize = () => {
     switch (view) {
@@ -1192,8 +1253,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
-                                const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
-                                const draggableId = isLifeboardTask
+                                const isTaskEvent = Boolean(ev.taskId);
+                                const draggableId = isTaskEvent
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;
 
@@ -1202,17 +1263,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     key={draggableId}
                                     draggableId={draggableId}
                                     index={i}
-                                    isDragDisabled={!isLifeboardTask}
+                                    isDragDisabled={!isTaskEvent}
                                   >
                                     {(dragProvided, dragSnapshot) => (
                                       <div
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
-                                        {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
-                                        role={isLifeboardTask ? 'button' : undefined}
-                                        tabIndex={isLifeboardTask ? 0 : undefined}
+                                        {...(isTaskEvent ? dragProvided.dragHandleProps : {})}
+                                        role={isTaskEvent ? 'button' : undefined}
+                                        tabIndex={isTaskEvent ? 0 : undefined}
                                         onClick={(event) => {
-                                          if (isLifeboardTask && ev.taskId) {
+                                          if (isTaskEvent && ev.taskId) {
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
@@ -1220,7 +1281,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         onKeyDown={(event) => {
-                                          if (!isLifeboardTask || !ev.taskId) return;
+                                          if (!isTaskEvent || !ev.taskId) return;
                                           if (event.key === 'Enter' || event.key === ' ') {
                                             event.preventDefault();
                                             event.stopPropagation();
@@ -1263,7 +1324,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             )}
                                           </div>
                                           <div className="flex items-center gap-1 flex-shrink-0">
-                                            {isLifeboardTask && (
+                                            {isTaskEvent && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -1427,8 +1488,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 const styles = getEventStyle(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
-                                const isLifeboardTask = ev.source === 'lifeboard' && !!ev.taskId;
-                                const draggableId = isLifeboardTask
+                                const isTaskEvent = Boolean(ev.taskId);
+                                const draggableId = isTaskEvent
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;
 
@@ -1437,17 +1498,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     key={draggableId}
                                     draggableId={draggableId}
                                     index={i}
-                                    isDragDisabled={!isLifeboardTask}
+                                    isDragDisabled={!isTaskEvent}
                                   >
                                     {(dragProvided, dragSnapshot) => (
                                       <div 
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
-                                        {...(isLifeboardTask ? dragProvided.dragHandleProps : {})}
-                                        role={isLifeboardTask ? 'button' : undefined}
-                                        tabIndex={isLifeboardTask ? 0 : undefined}
+                                        {...(isTaskEvent ? dragProvided.dragHandleProps : {})}
+                                        role={isTaskEvent ? 'button' : undefined}
+                                        tabIndex={isTaskEvent ? 0 : undefined}
                                         onClick={(event) => {
-                                          if (isLifeboardTask && ev.taskId) {
+                                          if (isTaskEvent && ev.taskId) {
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
@@ -1455,7 +1516,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           }
                                         }}
                                         onKeyDown={(event) => {
-                                          if (!isLifeboardTask || !ev.taskId) return;
+                                          if (!isTaskEvent || !ev.taskId) return;
                                           if (event.key === 'Enter' || event.key === ' ') {
                                             event.preventDefault();
                                             event.stopPropagation();
@@ -1497,7 +1558,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             )}
                                           </div>
                                           <div className="flex items-center gap-0.5 flex-shrink-0">
-                                            {isLifeboardTask && (
+                                            {isTaskEvent && (
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -1888,21 +1949,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             <CalendarFileUpload
               onUploadComplete={async (result) => {
                 if (result.success) {
-                  // Clear the cache for uploaded events to force a refresh
                   try {
-                    // Use a custom event to trigger cache invalidation
                     window.dispatchEvent(new CustomEvent('calendar-upload-complete'));
-
-                    // Force re-fetch of uploaded events by updating the cache key
-                    setTimeout(() => {
-                      window.location.reload(); // Still do a refresh for now to ensure everything updates
-                    }, 1000);
+                    setUploadRefreshIndex((prev) => prev + 1);
+                    try {
+                      refetch();
+                    } catch (refetchError) {
+                      console.error('Failed to refresh tasks after calendar upload:', refetchError);
+                    }
                   } catch (error) {
                     console.error('Error refreshing calendar data:', error);
-                    window.location.reload(); // Fallback to page reload
                   }
+                  setIsUploadModalOpen(false);
                 }
-                setIsUploadModalOpen(false);
               }}
               onClose={() => setIsUploadModalOpen(false)}
             />

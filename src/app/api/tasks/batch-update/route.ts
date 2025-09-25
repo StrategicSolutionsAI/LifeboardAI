@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { syncTaskToCalendarEvent } from '@/lib/calendar-sync'
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,10 +37,24 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id)
-        .select('id')
+        .select('id, content, due_date, hour_slot, duration, repeat_rule')
         .single()
       if (error) {
         console.warn('Supabase batch update error for', taskId, error)
+      }
+      if (!error && data) {
+        try {
+          await syncTaskToCalendarEvent(supabase, user.id, {
+            id: data.id,
+            content: data.content,
+            due_date: data.due_date,
+            hour_slot: data.hour_slot,
+            duration: data.duration,
+            repeat_rule: data.repeat_rule,
+          })
+        } catch (syncError) {
+          console.error('Failed to sync calendar event after task update', { taskId, syncError })
+        }
       }
       results.push({ id: taskId, ok: !error })
     }

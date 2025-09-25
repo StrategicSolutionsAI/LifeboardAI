@@ -21,10 +21,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
 
+    const { error: calendarError } = await supabase
+      .from('calendar_events')
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', user.id)
+
+    if (calendarError) {
+      console.error('Failed to delete associated calendar event', { taskId, calendarError })
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('DELETE /api/tasks/delete error', e)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
-

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { invalidateTaskCaches, invalidateIntegrationCaches } from "@/hooks/use-data-cache";
 
 interface UploadResult {
   success: boolean;
@@ -98,8 +99,11 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
       });
 
       const result = await response.json();
+      console.log('Calendar upload response', response.status, result);
 
       if (response.ok) {
+        invalidateTaskCaches();
+        invalidateIntegrationCaches('calendar');
         const successResult: UploadResult = {
           success: true,
           message: result.message,
