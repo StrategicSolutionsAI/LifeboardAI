@@ -24,7 +24,24 @@ export interface Task {
   created_at?: string
   updated_at?: string
   repeatRule?: RepeatRule
+  source?: 'todoist' | 'supabase' | 'local'
 }
+
+const inferSourceFromId = (id?: string): Task['source'] => {
+  if (!id) return 'supabase'
+  if (/^\d+$/.test(id)) return 'todoist'
+  if (id.startsWith('local-')) return 'local'
+  return 'supabase'
+}
+
+const ensureTaskSource = (task: Task, fallback?: Task['source']): Task => {
+  if (!task) return task
+  const source = task.source ?? fallback ?? inferSourceFromId(task.id)
+  return task.source === source ? task : { ...task, source }
+}
+
+const ensureTasksSource = (tasks: Task[] | null | undefined, fallback?: Task['source']): Task[] =>
+  (tasks || []).map(task => ensureTaskSource(task, fallback))
 
 interface TaskUpdate {
   taskId: string
@@ -59,13 +76,15 @@ export function useTasks(selectedDate?: Date) {
           const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
           if (supa.ok) {
             const json = await supa.json()
-            return Array.isArray(json) ? json : (json.tasks ?? [])
+            const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+            return ensureTasksSource(supabaseTasks as Task[], 'supabase')
           }
           // If Supabase also fails, try localStorage
           if (typeof window !== 'undefined') {
             const raw = window.localStorage.getItem('lifeboard_local_tasks')
             const list: Task[] = raw ? JSON.parse(raw) : []
-            return list.filter(t => !t.completed)
+            const normalized = ensureTasksSource(list, 'local')
+            return normalized.filter(t => !t.completed)
           }
           return []
         }
@@ -79,7 +98,8 @@ export function useTasks(selectedDate?: Date) {
             const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
             if (supa.ok) {
               const json = await supa.json()
-              return Array.isArray(json) ? json : (json.tasks ?? [])
+              const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+              return ensureTasksSource(supabaseTasks as Task[], 'supabase')
             }
             return []
           }
@@ -91,15 +111,17 @@ export function useTasks(selectedDate?: Date) {
         }
         const todoistData = await res.json()
         todoistConnectedRef.current = true
-        const todoistTasks: Task[] = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
-        
+        const todoistRaw: Task[] = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
+        const todoistTasks = ensureTasksSource(todoistRaw, 'todoist')
+
         // When Todoist is connected, also fetch Supabase tasks and merge them
         let supabaseTasks: Task[] = []
         try {
           const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
           if (supa.ok) {
             const json = await supa.json()
-            supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+            const supabaseRaw = Array.isArray(json) ? json : (json.tasks ?? [])
+            supabaseTasks = ensureTasksSource(supabaseRaw as Task[], 'supabase')
           }
         } catch (error) {
           console.warn('Failed to fetch Supabase tasks while connected to Todoist:', error)
@@ -126,14 +148,16 @@ export function useTasks(selectedDate?: Date) {
             const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
             if (supa.ok) {
               const json = await supa.json()
-              return Array.isArray(json) ? json : (json.tasks ?? [])
+              const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+              return ensureTasksSource(supabaseTasks as Task[], 'supabase')
             }
           } catch {}
           try {
             if (typeof window !== 'undefined') {
               const raw = window.localStorage.getItem('lifeboard_local_tasks')
               const list: Task[] = raw ? JSON.parse(raw) : []
-              return list.filter(t => !t.completed)
+              const normalized = ensureTasksSource(list, 'local')
+              return normalized.filter(t => !t.completed)
             }
           } catch {}
           return []
@@ -247,6 +271,7 @@ export function useTasks(selectedDate?: Date) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           repeatRule: repeatRule,
+          source: 'local'
         }
         if (typeof window !== 'undefined') {
           const raw = window.localStorage.getItem('lifeboard_local_tasks')
@@ -286,7 +311,7 @@ export function useTasks(selectedDate?: Date) {
           })
           if (alt.ok) {
             const json = await alt.json()
-            const task = json.task
+            const task = ensureTaskSource(json.task as Task, 'supabase')
             if (dueDate === dateStr) {
               updateDailyOptimistically(current => [...(current || []), task as any])
             }
@@ -356,13 +381,15 @@ export function useTasks(selectedDate?: Date) {
         ...(metadata.repeatRule !== undefined ? { repeatRule: metadata.repeatRule } : {}),
       }
 
+      const todoistTask = ensureTaskSource(enhancedTask as Task, 'todoist')
+
       // Add task to appropriate caches
       if (dueDate === dateStr) {
         console.log('📅 Adding task to daily cache for date:', dateStr);
-        updateDailyOptimistically(current => [...(current || []), enhancedTask as any])
+        updateDailyOptimistically(current => [...(current || []), todoistTask as any])
       }
       console.log('📋 Adding task to all tasks cache');
-      updateAllOptimistically(current => [...(current || []), enhancedTask as any])
+      updateAllOptimistically(current => [...(current || []), todoistTask as any])
       
       // Announce the task update to other components
       if (typeof window !== 'undefined') {
@@ -371,8 +398,8 @@ export function useTasks(selectedDate?: Date) {
         window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
       }
       
-      console.log('✅ createTask returning task:', task);
-      return task
+      console.log('✅ createTask returning task:', todoistTask);
+      return todoistTask
     } catch (error) {
       console.error('💥 createTask error:', error);
       // Network or other errors – try Supabase, then local
@@ -385,7 +412,7 @@ export function useTasks(selectedDate?: Date) {
         })
         if (alt.ok) {
           const json = await alt.json()
-          const task = json.task
+          const task = ensureTaskSource(json.task as Task, 'supabase')
           if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), task as any])
           updateAllOptimistically(current => [...(current || []), task as any])
           // Announce the task update to other components
@@ -473,75 +500,112 @@ export function useTasks(selectedDate?: Date) {
   
   // Optimistic task toggle
   const toggleTaskCompletion = useCallback(async (taskId: string) => {
-    // Find the task
-    const task = allTasks?.find(t => t.id?.toString?.() === taskId?.toString?.()) || 
+    const task = allTasks?.find(t => t.id?.toString?.() === taskId?.toString?.()) ||
                  dailyTasks?.find(t => t.id?.toString?.() === taskId?.toString?.())
-    
+
     if (!task) return
-    
+
+    const source = task.source ?? inferSourceFromId(task.id)
     const newCompleted = !task.completed
-    
-    // Update optimistically
-    const updater = (tasks: Task[] | null) => 
+
+    const updater = (tasks: Task[] | null) =>
       tasks?.map(t => t.id === taskId ? { ...t, completed: newCompleted } : t) || []
-    
-    updateDailyOptimistically(updater)
-    updateAllOptimistically(updater)
-    
-    try {
-      if (todoistConnectedRef.current === false) {
-        // Use Supabase API for completion toggle
-        const endpoint = newCompleted ? '/api/tasks/complete' : '/api/tasks/reopen'
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId })
-        })
-        if (!res.ok) throw new Error('Failed to toggle task (supabase)')
-        return
-      }
-      const endpoint = newCompleted 
-        ? `/api/integrations/todoist/tasks/complete`
-        : `/api/integrations/todoist/tasks/reopen`
-      
-      const res = await fetch(endpoint, { 
+
+    const revertOptimistic = () => {
+      const revertUpdater = (tasks: Task[] | null) =>
+        tasks?.map(t => t.id === taskId ? { ...t, completed: !newCompleted } : t) || []
+      updateDailyOptimistically(revertUpdater)
+      updateAllOptimistically(revertUpdater)
+    }
+
+    const persistLocalToggle = () => {
+      if (typeof window === 'undefined') return
+      try {
+        const raw = window.localStorage.getItem('lifeboard_local_tasks')
+        const list: Task[] = raw ? JSON.parse(raw) : []
+        const normalized = ensureTasksSource(list, 'local')
+        const updated = normalized.map(t =>
+          t.id?.toString?.() === taskId?.toString?.()
+            ? { ...t, completed: newCompleted, updated_at: new Date().toISOString(), source: 'local' as const }
+            : t
+        )
+        window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(updated))
+      } catch {}
+    }
+
+    const toggleViaSupabase = async () => {
+      const endpoint = newCompleted ? '/api/tasks/complete' : '/api/tasks/reopen'
+      const res = await fetch(endpoint, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId })
       })
-      if (!res.ok) throw new Error('Failed to toggle task')
-    } catch (error) {
-      // If server not reachable or not connected, try Supabase; otherwise persist locally
-      const isNetwork = error instanceof TypeError && (error.message.includes('Failed to fetch') || error.message.includes('Network'))
-      if (todoistConnectedRef.current === false || isNetwork) {
-        try {
-          const endpoint = newCompleted ? '/api/tasks/complete' : '/api/tasks/reopen'
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId })
-          })
-          if (res.ok) return
-        } catch {}
-        // Offline local persistence
-        try {
-          if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('lifeboard_local_tasks')
-            const list: Task[] = raw ? JSON.parse(raw) : []
-            const updated = list.map(t => t.id?.toString?.() === taskId?.toString?.() ? { ...t, completed: newCompleted, updated_at: new Date().toISOString() } : t)
-            window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(updated))
-          }
-        } catch {}
+      if (!res.ok) throw new Error('Failed to toggle task (supabase)')
+      if (source === 'local') {
+        persistLocalToggle()
+      }
+    }
+
+    const toggleViaTodoist = async () => {
+      const endpoint = newCompleted
+        ? '/api/integrations/todoist/tasks/complete'
+        : '/api/integrations/todoist/tasks/reopen'
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      })
+
+      if (res.ok) return
+
+      if (res.status === 400 || res.status === 401) {
+        todoistConnectedRef.current = false
+        await toggleViaSupabase()
         return
       }
-      // Otherwise revert on true server error
-      const revertUpdater = (tasks: Task[] | null) => 
-        tasks?.map(t => t.id === taskId ? { ...t, completed: !newCompleted } : t) || []
-      updateDailyOptimistically(revertUpdater)
-      updateAllOptimistically(revertUpdater)
+
+      throw new Error('Failed to toggle task')
+    }
+
+    updateDailyOptimistically(updater)
+    updateAllOptimistically(updater)
+
+    const shouldUseSupabaseFirst = todoistConnectedRef.current === false || source !== 'todoist'
+
+    try {
+      if (shouldUseSupabaseFirst) {
+        await toggleViaSupabase()
+        return
+      }
+
+      await toggleViaTodoist()
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : new Error(String(caught))
+      const isNetwork = error instanceof TypeError && (error.message.includes('Failed to fetch') || error.message.includes('Network'))
+
+      if (!shouldUseSupabaseFirst && (todoistConnectedRef.current === false || isNetwork)) {
+        try {
+          await toggleViaSupabase()
+          return
+        } catch (supabaseError) {
+          if (source === 'local') {
+            persistLocalToggle()
+            return
+          }
+          revertOptimistic()
+          throw supabaseError
+        }
+      }
+
+      if (shouldUseSupabaseFirst && source === 'local') {
+        persistLocalToggle()
+        return
+      }
+
+      revertOptimistic()
       throw error
     }
   }, [allTasks, dailyTasks, updateDailyOptimistically, updateAllOptimistically])
