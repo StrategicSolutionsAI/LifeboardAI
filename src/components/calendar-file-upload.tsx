@@ -319,7 +319,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
             <li>Maximum file size: 5MB</li>
           </ul>
           <p className="mt-3 text-xs">
-            Imported events appear as editable tasks in the "Imported Calendar" bucket and sync with your calendar view.
+            Imported events show up as editable tasks without a bucket so you can organize them later, and they stay in sync with your calendar view.
             Duplicate events will update automatically.
           </p>
         </div>

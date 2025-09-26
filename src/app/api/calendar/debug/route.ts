@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         completed BOOLEAN DEFAULT FALSE,
         due_date DATE,
         hour_slot TEXT,
-        bucket TEXT DEFAULT 'Imported Calendar',
+        bucket TEXT,
         position INTEGER,
         duration INTEGER,
         repeat_rule TEXT,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       description: 'This is a test event created by the debug endpoint',
       start_date: '2025-09-23',
       all_day: true,
-      bucket: 'Imported Calendar',
+      bucket: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };

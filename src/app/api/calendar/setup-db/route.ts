@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         completed BOOLEAN DEFAULT FALSE,
         due_date DATE,
         hour_slot TEXT,
-        bucket TEXT DEFAULT 'Imported Calendar',
+        bucket TEXT,
         position INTEGER,
         duration INTEGER,
         repeat_rule TEXT,

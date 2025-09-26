@@ -4,6 +4,7 @@
 // Features: better visual hierarchy, time ranges, quick actions, and intuitive interactions
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { format } from "date-fns";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { X } from "lucide-react";
 import {
@@ -128,6 +129,57 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     deleteTask,
     createTask,
   } = useTasksContext();
+
+  const activePlannerDate = useMemo(() => {
+    if (plannerDate && plannerDate.trim().length > 0) {
+      return plannerDate.trim();
+    }
+    return format(new Date(), 'yyyy-MM-dd');
+  }, [plannerDate]);
+
+  const shouldShowTaskForDate = useCallback((task: any, dateStr: string): boolean => {
+    if (!task || task.completed) return false;
+    const dueDateStr: string | undefined = task.due?.date ?? task.due_date ?? undefined;
+    if (!dueDateStr) {
+      return true;
+    }
+
+    if (!task.repeatRule || task.repeatRule === 'none') {
+      return dueDateStr === dateStr;
+    }
+
+    const target = new Date(`${dateStr}T00:00:00`);
+    const due = new Date(`${dueDateStr}T00:00:00`);
+    if (target < due) return false;
+
+    const day = target.getDay();
+    const dueDay = due.getDay();
+    const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+
+    switch (task.repeatRule) {
+      case 'daily':
+        return true;
+      case 'weekdays':
+        return day >= 1 && day <= 5;
+      case 'weekly':
+        return diffDays % 7 === 0 && day === dueDay;
+      case 'monthly': {
+        const dueDateNum = due.getDate();
+        const targetDateNum = target.getDate();
+        const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+        if (dueDateNum > daysInTargetMonth) {
+          return targetDateNum === daysInTargetMonth;
+        }
+        return targetDateNum === dueDateNum;
+      }
+      default:
+        return false;
+    }
+  }, []);
+
+  const scopedScheduledTasks = useMemo(() => {
+    return scheduledTasks.filter((task) => shouldShowTaskForDate(task, activePlannerDate));
+  }, [scheduledTasks, shouldShowTaskForDate, activePlannerDate]);
   
   // Local drag state so the component can work standalone
   const [dragging, setDragging] = useState(false);
@@ -221,7 +273,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     console.log('✅ Starting task creation process');
 
     try {
-      const dateStr = plannerDate || new Date().toISOString().split('T')[0];
+      const dateStr = activePlannerDate;
 
       console.log('📅 Creating task with params:', {
         content: newTaskContent.trim(),
@@ -290,7 +342,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     TIME_SLOTS.forEach((slot) => (plan[slot] = []));
     
     // Process only tasks that have been scheduled (have hourSlot)
-    scheduledTasks.forEach((t) => {
+    scopedScheduledTasks.forEach((t) => {
       const slot = t.hourSlot?.replace('hour-', '') || '';
       
       // Validate slot exists in our time slots array
@@ -306,7 +358,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     });
     
     return plan;
-  }, [scheduledTasks]);
+  }, [scopedScheduledTasks]);
 
   // Resize state and handlers
   const [resizingTask, setResizingTask] = useState<{
@@ -496,7 +548,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Schedule task</h3>
             <p className="text-sm text-gray-500 mt-1">
-              {(plannerDate || new Date().toISOString().slice(0, 10))} · {addModalSlot}
+              {activePlannerDate} · {addModalSlot}
             </p>
           </div>
           <button
@@ -702,7 +754,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
                               onTaskOpen(taskId, {
                                 hourSlot: normalizedSlot,
-                                plannerDate: plannerDate ?? null,
+                                plannerDate: activePlannerDate,
                               });
                               return;
                             }
@@ -765,7 +817,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                           const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
                                           onTaskOpen(taskId, {
                                             hourSlot: normalizedSlot,
-                                            plannerDate: plannerDate ?? null,
+                                            plannerDate: activePlannerDate,
                                           });
                                           return;
                                         }
@@ -817,7 +869,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                           const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
                                           onTaskOpen(taskId, {
                                             hourSlot: normalizedSlot,
-                                            plannerDate: plannerDate ?? null,
+                                            plannerDate: activePlannerDate,
                                           });
                                           return;
                                         }

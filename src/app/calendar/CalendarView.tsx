@@ -13,8 +13,12 @@ import type { RepeatOption } from "@/hooks/use-tasks";
 // Load calendar grid on client to avoid SSR issues with date-fns
 const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: false });
 
-function CalendarContent() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+interface CalendarContentInnerProps {
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
+}
+
+function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInnerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
@@ -22,7 +26,7 @@ function CalendarContent() {
 
   const handleDateChange = (newDate: Date) => {
     console.log('📅 Calendar date changed:', newDate);
-    setSelectedDate(newDate);
+    onDateChange(newDate);
   };
 
   // Unified drag and drop handler for sidebar to calendar
@@ -476,12 +480,21 @@ function CalendarContent() {
   );
 }
 
-export default function CalendarView() {
+function CalendarContent() {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
   return (
-    <TasksProvider selectedDate={new Date()}>
-      <CalendarContent />
+    <TasksProvider selectedDate={selectedDate}>
+      <CalendarContentInner
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+      />
     </TasksProvider>
   );
+}
+
+export default function CalendarView() {
+  return <CalendarContent />;
 }
   const hourSlotToISO = (hourSlot: string | undefined | null, dateStr: string): string | undefined => {
     if (!hourSlot) return undefined;

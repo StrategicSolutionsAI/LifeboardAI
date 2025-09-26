@@ -4,7 +4,6 @@ import {
   syncEventsToTasks,
   MissingTasksTableError,
   type CalendarEventRow,
-  IMPORTED_CALENDAR_BUCKET,
 } from '@/lib/calendar-sync';
 
 function normalizeRepeat(rule: unknown): string | null {
@@ -103,7 +102,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
     return NextResponse.json({
       ok: true,
       taskId,
-      bucket: refreshedEvent?.bucket ?? IMPORTED_CALENDAR_BUCKET,
+      bucket: refreshedEvent?.bucket ?? null,
       repeatRule: normalizeRepeat(refreshedEvent?.repeat_rule),
     });
   } catch (error) {

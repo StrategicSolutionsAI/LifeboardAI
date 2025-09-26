@@ -61,6 +61,14 @@ const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
   return undefined;
 };
 
+const sanitizeBucketName = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const UNASSIGNED_BUCKET_LABEL = 'Unassigned';
+
 // Bucket color system for calendar events
 const normalizeBucketId = (name?: string | null) => {
   const trimmed = (name ?? '').trim();
@@ -475,15 +483,28 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const openTaskModal = useCallback((
     task: any | undefined,
     dateStr: string,
-    options: { fallbackTitle?: string; fallbackHourLabel?: string; fallbackTaskId?: string; fallbackRepeat?: RepeatOption | null } = {}
+    options: {
+      fallbackTitle?: string;
+      fallbackHourLabel?: string;
+      fallbackTaskId?: string;
+      fallbackRepeat?: RepeatOption | null;
+      fallbackBucket?: string;
+    } = {}
   ) => {
     const fallbackDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
     const bucketDefault = selectedBucket || availableBuckets[0] || '';
     const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || '';
     const repeatDefault = task ? deriveRepeatOption(task) : (options.fallbackRepeat ?? 'none');
+    const sanitizedTaskBucket = sanitizeBucketName(task?.bucket);
+    const sanitizedFallbackBucket = sanitizeBucketName(options.fallbackBucket);
+    const sanitizedDefaultBucket = sanitizeBucketName(bucketDefault) ?? '';
+    const editingExisting = Boolean(task?.id ?? options.fallbackTaskId);
+    const resolvedBucket = sanitizedTaskBucket
+      ?? sanitizedFallbackBucket
+      ?? (editingExisting ? '' : sanitizedDefaultBucket);
 
     setFormContent(task?.content ?? options.fallbackTitle ?? '');
-    setFormBucket(task?.bucket ?? bucketDefault ?? '');
+    setFormBucket(resolvedBucket);
     setFormTime(hourLabel);
     setFormRepeat(repeatDefault);
     setAddTaskDate(fallbackDate);
@@ -503,6 +524,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackHourLabel: fallbackHour,
       fallbackTaskId: event.taskId,
       fallbackRepeat: event.repeatRule ?? null,
+      fallbackBucket: event.bucket,
     });
   }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
 
@@ -517,7 +539,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         if (!payload?.taskId) return null;
         return {
           taskId: payload.taskId as string,
-          bucket: (payload.bucket as string | undefined) ?? IMPORTED_CALENDAR_BUCKET_NAME,
+          bucket: sanitizeBucketName(payload.bucket),
           repeatRule: normalizeRepeatOption(payload.repeatRule),
         };
       }
@@ -543,7 +565,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       if (!target?.task_id) return null;
       return {
         taskId: target.task_id as string,
-        bucket: (target.bucket as string | undefined) ?? IMPORTED_CALENDAR_BUCKET_NAME,
+        bucket: sanitizeBucketName(target.bucket),
         repeatRule: normalizeRepeatOption(target.repeat_rule),
       };
     } catch (error) {
@@ -560,6 +582,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackHourLabel: fallbackHour,
       fallbackTaskId: taskId,
       fallbackRepeat: task?.repeatRule ?? null,
+      fallbackBucket: task?.bucket,
     });
   }, [currentDate, extractHourLabel, openTaskModal, resolveTaskById]);
 
@@ -578,7 +601,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       const ensured = await ensureTaskForEvent(calendarEvent.eventId);
       if (ensured?.taskId) {
         taskId = ensured.taskId;
-        resolvedBucket = ensured.bucket ?? resolvedBucket ?? IMPORTED_CALENDAR_BUCKET_NAME;
+        resolvedBucket = ensured.bucket ?? resolvedBucket;
         resolvedRepeat = ensured.repeatRule ?? resolvedRepeat;
 
         setEventsByDate((prev) => {
@@ -617,7 +640,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     const hydratedEvent: DayEvent = {
       ...calendarEvent,
       taskId,
-      bucket: resolvedBucket ?? IMPORTED_CALENDAR_BUCKET_NAME,
+      bucket: resolvedBucket ?? undefined,
       repeatRule: resolvedRepeat,
       source: 'lifeboard',
     };
@@ -872,9 +895,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   // Keep default bucket in sync when selectedBucket/availableBuckets change
   useEffect(() => {
-    if (selectedBucket) setFormBucket(selectedBucket);
-    else if (availableBuckets.length > 0) setFormBucket((prev) => prev || availableBuckets[0]);
-  }, [selectedBucket, availableBuckets]);
+    if (!isAddModalOpen) return;
+    if (editTaskId) return;
+    if (selectedBucket) {
+      setFormBucket(selectedBucket);
+      return;
+    }
+    if (availableBuckets.length > 0) {
+      setFormBucket((prev) => prev || availableBuckets[0]);
+    } else {
+      setFormBucket('');
+    }
+  }, [selectedBucket, availableBuckets, isAddModalOpen, editTaskId]);
 
   // Load bucket colors
   useEffect(() => {
@@ -919,6 +951,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, [refetch]);
 
+  // Legacy bucket label retained for older imports
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
 
   // Build events map whenever data sources change
@@ -971,11 +1004,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       if (!matchedTask) {
         const normalizedTitle = (ev.title ?? '').trim().toLowerCase();
         matchedTask = allTasks.find((task: any) => {
-          const isImportedBucket = (task.bucket ?? '') === IMPORTED_CALENDAR_BUCKET_NAME;
           if (resolvedTaskId) {
             return task.id?.toString?.() === resolvedTaskId;
           }
-          if (!isImportedBucket) return false;
+          const bucketName = sanitizeBucketName(task.bucket);
+          const isLegacyImportedBucket = bucketName === IMPORTED_CALENDAR_BUCKET_NAME;
+          const isUnassigned = !bucketName;
+          const isSupabaseTask = task.source === 'supabase';
+          if (!isSupabaseTask) return false;
+          if (!isUnassigned && !isLegacyImportedBucket) return false;
           if ((task.due?.date ?? '') !== dateStr) return false;
           const taskTitle = (task.content ?? '').trim().toLowerCase();
           return taskTitle === normalizedTitle;
@@ -985,9 +1022,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         }
       }
 
-      const resolvedBucket = matchedTask?.bucket
-        ?? ev.bucket
-        ?? (resolvedTaskId ? IMPORTED_CALENDAR_BUCKET_NAME : undefined);
+      const resolvedBucket = sanitizeBucketName(matchedTask?.bucket)
+        ?? sanitizeBucketName(ev.bucket);
       const resolvedRepeatRule = normalizeRepeatOption(matchedTask?.repeatRule ?? ev.repeat_rule);
 
       const bucket = map[dateStr] ?? (map[dateStr] = []);
@@ -1884,6 +1920,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       value={formBucket}
                       onChange={(e) => setFormBucket(e.target.value)}
                     >
+                      <option value="">{UNASSIGNED_BUCKET_LABEL}</option>
                       {availableBuckets.map((b) => (
                         <option key={b} value={b}>{b}</option>
                       ))}
@@ -1940,7 +1977,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           formRepeat
                         );
                         if (task) {
-                          setAddTaskDate(dueDateValue ?? null);
                           if (dueDateValue) {
                             setEventsByDate((prev) => {
                               const next = { ...prev } as Record<string, DayEvent[]>;
@@ -1978,7 +2014,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               return next;
                             });
                           }
-                          setEditTaskId(task.id?.toString?.() || String(task.id));
+                          closeTaskModal();
                         }
                       } else {
                         const updates: any = {

@@ -5,6 +5,7 @@ export type CalendarRepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
 
 const REPEAT_WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR'];
 
+// Legacy bucket label retained for older calendar imports
 export const IMPORTED_CALENDAR_BUCKET = 'Imported Calendar';
 
 export function mapRruleToRepeatRule(rrule?: string | null): CalendarRepeatRule | null {
@@ -151,7 +152,7 @@ export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
   }
 
   const repeatRule = mapRepeatRuleToRrule(task.repeat_rule as CalendarRepeatRule | null);
-const normalizedBucket = task.bucket ?? IMPORTED_CALENDAR_BUCKET;
+  const normalizedBucket = task.bucket ?? null;
   const completed = task.completed ?? false;
   const position = typeof task.position === 'number' ? task.position : null;
 
@@ -240,7 +241,7 @@ export async function syncEventsToTasks(
       ? event.duration
       : calculateDurationMinutes(event.start_time, event.end_time);
     const repeatRule = event.repeat_rule ?? mapRruleToRepeatRule(event.rrule);
-    const bucket = event.bucket ?? IMPORTED_CALENDAR_BUCKET;
+    const bucket = event.bucket ?? null;
     const completed = event.completed ?? false;
     const position = typeof event.position === 'number' ? event.position : null;
     const timestamp = new Date().toISOString();
