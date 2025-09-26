@@ -110,6 +110,9 @@ export interface LifeboardTaskLike {
 
 export interface CalendarEventRow {
   id: string;
+  import_id: string | null;
+  external_id?: string | null;
+  source?: string | null;
   title: string | null;
   content: string | null;
   start_time: string | null;
@@ -282,6 +285,7 @@ export async function syncEventsToTasks(
       const { error: linkError } = await supabase
         .from('calendar_events')
         .update({
+          import_id: event.import_id ?? null,
           task_id: newTaskId,
           title,
           content: taskData?.content ?? title,
@@ -337,6 +341,7 @@ export async function syncEventsToTasks(
     const { error: mirrorError } = await supabase
       .from('calendar_events')
       .update({
+        import_id: event.import_id ?? null,
         title,
         content: taskData?.content ?? title,
         due_date: taskData?.due_date ?? dueDate,

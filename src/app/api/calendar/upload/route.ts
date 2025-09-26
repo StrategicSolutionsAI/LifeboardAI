@@ -152,6 +152,8 @@ function formatDateOnly(icsDate: string): string {
 
 
 export async function POST(request: NextRequest) {
+  let importId: string | null = null;
+  let currentUserId: string | null = null;
   try {
     const supabase = supabaseServer();
 
@@ -160,9 +162,11 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    currentUserId = user.id;
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const rawCalendarName = (formData.get('calendarName') as string | null)?.trim();
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -199,6 +203,33 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    const calendarName = rawCalendarName && rawCalendarName.length > 0
+      ? rawCalendarName
+      : (file.name.replace(/\.(ics|ical)$/i, '') || 'Imported Calendar');
+
+    try {
+      const { data: importRow, error: importError } = await supabase
+        .from('calendar_imports')
+        .insert({
+          user_id: user.id,
+          name: calendarName,
+          file_name: file.name,
+        })
+        .select('id')
+        .single();
+
+      if (importError || !importRow) {
+        throw importError ?? new Error('Missing calendar import record');
+      }
+
+      importId = importRow.id;
+    } catch (importError) {
+      console.error('Failed to create calendar import record', importError);
+      return NextResponse.json({
+        error: 'Failed to prepare calendar import. Please try again.'
+      }, { status: 500 });
+    }
+
     // Store parsed events in the database
     const eventsToInsert = events.reduce<Array<Record<string, any>>>((acc, event) => {
       const start = event.start ?? {};
@@ -220,6 +251,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         external_id: event.uid,
         source: 'uploaded_calendar',
+        import_id: importId,
         title: event.summary,
         content: event.summary,
         description: event.description || null,
@@ -289,6 +321,7 @@ export async function POST(request: NextRequest) {
           .select('external_id, task_id')
           .eq('user_id', user.id)
           .eq('source', 'uploaded_calendar')
+          .eq('import_id', importId)
           .in('external_id', externalIds);
 
         if (existingError) {
@@ -315,10 +348,10 @@ export async function POST(request: NextRequest) {
       const { data: upsertedRows, error: insertError } = await supabase
         .from('calendar_events')
         .upsert(batchWithTaskIds, {
-          onConflict: 'user_id,external_id,source',
+          onConflict: 'user_id,external_id,source,import_id',
           ignoreDuplicates: false
         })
-        .select('id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id');
+        .select('id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id');
 
       let rowsToProcess: CalendarEventRow[] = Array.isArray(upsertedRows) ? upsertedRows as CalendarEventRow[] : [];
 
@@ -330,10 +363,10 @@ export async function POST(request: NextRequest) {
           const { data, error } = await supabase
             .from('calendar_events')
             .upsert(event, {
-              onConflict: 'user_id,external_id,source',
+              onConflict: 'user_id,external_id,source,import_id',
               ignoreDuplicates: false
             })
-            .select('id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id')
+            .select('id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id')
             .single();
 
           if (error) {
@@ -398,6 +431,8 @@ export async function POST(request: NextRequest) {
       tasksCreated,
       tasksUpdated,
       taskSyncErrors: tasksErrored,
+      importId,
+      calendarName,
     };
 
     if (tasksErrored > 0) {
@@ -410,10 +445,34 @@ export async function POST(request: NextRequest) {
         : insertionWarnings.join(' ');
     }
 
+    if (importId) {
+      try {
+        await supabase
+          .from('calendar_imports')
+          .update({
+            event_count: insertedCount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', importId)
+          .eq('user_id', user.id);
+      } catch (updateImportError) {
+        console.error('Failed to update calendar import metadata', updateImportError);
+      }
+    }
+
     return NextResponse.json(responsePayload);
 
   } catch (error) {
     console.error('Calendar upload error:', error);
+    if (importId && currentUserId) {
+      try {
+        const supabase = supabaseServer();
+        await supabase.from('calendar_events').delete().eq('import_id', importId).eq('user_id', currentUserId);
+        await supabase.from('calendar_imports').delete().eq('id', importId).eq('user_id', currentUserId);
+      } catch (cleanupError) {
+        console.error('Failed to clean up partial calendar import', cleanupError);
+      }
+    }
     return NextResponse.json({
       error: 'Failed to process calendar file',
       details: error instanceof Error ? error.message : 'Unknown error'

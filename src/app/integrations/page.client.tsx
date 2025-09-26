@@ -5,12 +5,22 @@ import { SidebarLayout } from '@/components/sidebar-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock } from 'lucide-react'
-import { invalidateIntegrationCaches } from '@/hooks/use-data-cache'
+import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock, Upload, Trash2 } from 'lucide-react'
+import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-data-cache'
 import SectionLoadTimer from '@/components/section-load-timer'
+import { CalendarFileUpload, type UploadResult } from '@/components/calendar-file-upload'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }
 interface Integration { id: string; name: string; description: string; icon: string; status?: IntegrationStatus; authUrl?: string }
+
+interface CalendarImport {
+  id: string;
+  name: string;
+  file_name?: string | null;
+  event_count?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
 const integrations: Integration[] = [
   { id: 'todoist', name: 'Todoist', description: 'Sync your tasks and projects from Todoist', icon: '📝', authUrl: '/api/integrations/todoist/auth' },
@@ -26,6 +36,12 @@ export default function IntegrationsPageClient() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [globalError, setGlobalError] = useState<string | null>(null)
+  const [calendarImports, setCalendarImports] = useState<CalendarImport[]>([])
+  const [calendarLoading, setCalendarLoading] = useState(false)
+  const [calendarError, setCalendarError] = useState<string | null>(null)
+  const [calendarMessage, setCalendarMessage] = useState<string | null>(null)
+  const [showCalendarUpload, setShowCalendarUpload] = useState(false)
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
 
   const fetchIntegrationStatuses = useCallback(async (invalidateCache = false) => {
     setLoading(true)
@@ -51,6 +67,66 @@ export default function IntegrationsPageClient() {
       setLoading(false)
     }
   }, [])
+
+  const fetchCalendarImports = useCallback(async () => {
+    setCalendarLoading(true)
+    setCalendarError(null)
+    try {
+      const response = await fetch('/api/calendar/imports', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      setCalendarImports(Array.isArray(data?.imports) ? data.imports : [])
+    } catch (error) {
+      console.error('Failed to load calendar imports', error)
+      setCalendarError('Unable to load uploaded calendars. Please try again.')
+    } finally {
+      setCalendarLoading(false)
+    }
+  }, [])
+
+  const handleDeleteImport = useCallback(async (importId: string) => {
+    if (!importId) return
+    const confirmed = window.confirm('Delete this uploaded calendar? All imported events and linked tasks will be removed.')
+    if (!confirmed) return
+
+    setDeletingImportId(importId)
+    setCalendarMessage(null)
+    setCalendarError(null)
+
+    try {
+      const response = await fetch('/api/calendar/imports', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      invalidateTaskCaches()
+      invalidateIntegrationCaches('calendar')
+      setCalendarMessage('Calendar deleted successfully.')
+      await fetchCalendarImports()
+    } catch (error) {
+      console.error('Failed to delete calendar import', error)
+      setCalendarError('Failed to delete uploaded calendar. Please try again.')
+    } finally {
+      setDeletingImportId(null)
+    }
+  }, [fetchCalendarImports])
+
+  const handleUploadComplete = useCallback((result: UploadResult) => {
+    if (result.success) {
+      setCalendarMessage(result.message || 'Calendar uploaded successfully.')
+      setCalendarError(null)
+      fetchCalendarImports()
+      setShowCalendarUpload(false)
+    } else {
+      setCalendarError(result.message || 'Failed to upload calendar.')
+    }
+  }, [fetchCalendarImports])
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
@@ -117,7 +193,10 @@ export default function IntegrationsPageClient() {
     } finally { setRefreshing(null) }
   }
 
-  useEffect(() => { fetchIntegrationStatuses() }, [fetchIntegrationStatuses])
+  useEffect(() => {
+    fetchIntegrationStatuses()
+    fetchCalendarImports()
+  }, [fetchIntegrationStatuses, fetchCalendarImports])
 
   const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString); const now = new Date(); const diffMs = now.getTime() - date.getTime(); const diffMins = Math.floor(diffMs / 60000); const diffHours = Math.floor(diffMs / 3600000); const diffDays = Math.floor(diffMs / 86400000);
@@ -167,6 +246,100 @@ export default function IntegrationsPageClient() {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-red-600" /><span className="text-red-800 font-medium">Error</span></div>
             <p className="text-red-700 mt-1">{globalError}</p>
+          </div>
+        )}
+
+        <Card className="mb-6">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg">Uploaded Calendars</CardTitle>
+              <CardDescription className="mt-1">Import ICS files and manage manual calendars alongside your integrations.</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCalendarUpload(prev => !prev)}
+              className="w-full sm:w-auto"
+            >
+              {showCalendarUpload ? (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Close uploader
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload calendar
+                </>
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {calendarMessage && (
+              <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                {calendarMessage}
+              </div>
+            )}
+            {calendarError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {calendarError}
+              </div>
+            )}
+            {calendarLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading uploaded calendars...
+              </div>
+            ) : calendarImports.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No calendars uploaded yet. Upload an .ics file to populate the calendar without connecting an integration.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {calendarImports.map((calendar) => {
+                  const timestamp = calendar.updated_at || calendar.created_at;
+                  const eventCount = typeof calendar.event_count === 'number' ? calendar.event_count : 0;
+                  return (
+                    <div
+                      key={calendar.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{calendar.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {eventCount} event{eventCount === 1 ? '' : 's'}
+                          {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
+                          {calendar.file_name ? ` • ${calendar.file_name}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteImport(calendar.id)}
+                        disabled={deletingImportId === calendar.id}
+                        className="w-full sm:w-auto"
+                      >
+                        {deletingImportId === calendar.id ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Delete
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {showCalendarUpload && (
+          <div className="mb-6">
+            <CalendarFileUpload
+              onUploadComplete={handleUploadComplete}
+              onClose={() => setShowCalendarUpload(false)}
+            />
           </div>
         )}
 

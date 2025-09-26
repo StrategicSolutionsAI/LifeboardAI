@@ -5,7 +5,7 @@ import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { invalidateTaskCaches, invalidateIntegrationCaches } from "@/hooks/use-data-cache";
 
-interface UploadResult {
+export interface UploadResult {
   success: boolean;
   message: string;
   totalEvents?: number;
@@ -15,6 +15,8 @@ interface UploadResult {
   taskSyncErrors?: number;
   warnings?: string;
   error?: string;
+  importId?: string;
+  calendarName?: string;
 }
 
 interface CalendarFileUploadProps {
@@ -27,6 +29,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [calendarName, setCalendarName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
@@ -92,6 +95,10 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+      const trimmedName = calendarName.trim();
+      if (trimmedName.length > 0) {
+        formData.append('calendarName', trimmedName);
+      }
 
       const response = await fetch('/api/calendar/upload', {
         method: 'POST',
@@ -112,10 +119,17 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           tasksCreated: result.tasksCreated,
           tasksUpdated: result.tasksUpdated,
           taskSyncErrors: result.taskSyncErrors,
-          warnings: result.warnings
+          warnings: result.warnings,
+          importId: result.importId,
+          calendarName: result.calendarName ?? trimmedName,
         };
         setUploadResult(successResult);
         onUploadComplete?.(successResult);
+        setCalendarName('');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setSelectedFile(null);
       } else {
         let errorMessage = result.error || 'Upload failed';
         
@@ -149,6 +163,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
   const handleReset = () => {
     setSelectedFile(null);
     setUploadResult(null);
+    setCalendarName('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -179,6 +194,22 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         )}
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Calendar name
+            <input
+              type="text"
+              value={calendarName}
+              onChange={(e) => setCalendarName(e.target.value)}
+              placeholder="e.g., Family Schedule"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+          <p className="text-xs text-gray-500">
+            Give this calendar a label so you can manage it from the Integrations tab.
+          </p>
+        </div>
+
         {/* Upload Area */}
         <div
           onDragOver={handleDragOver}

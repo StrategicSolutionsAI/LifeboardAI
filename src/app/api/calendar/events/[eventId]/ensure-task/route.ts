@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
     const { data: eventRow, error: fetchError } = await supabase
       .from('calendar_events')
       .select(
-        'id, user_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id'
+        'id, user_id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id'
       )
       .eq('id', eventId)
       .eq('user_id', user.id)
@@ -51,6 +51,9 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
 
     const syncPayload: CalendarEventRow = {
       id: eventRow.id,
+      import_id: eventRow.import_id ?? null,
+      external_id: null,
+      source: 'uploaded_calendar',
       title: eventRow.title ?? null,
       content: eventRow.content ?? eventRow.title ?? null,
       start_time: eventRow.start_time ?? null,
