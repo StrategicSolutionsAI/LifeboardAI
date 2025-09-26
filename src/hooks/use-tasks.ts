@@ -505,7 +505,7 @@ export function useTasks(selectedDate?: Date) {
 
     if (!task) return
 
-    const source = task.source ?? inferSourceFromId(task.id)
+    const source = (task.source ?? inferSourceFromId(task.id)) as 'todoist' | 'supabase' | 'local'
     const newCompleted = !task.completed
 
     const updater = (tasks: Task[] | null) =>
@@ -591,7 +591,7 @@ export function useTasks(selectedDate?: Date) {
           await toggleViaSupabase()
           return
         } catch (supabaseError) {
-          if (source === 'local') {
+          if ((source as string) === 'local') {
             persistLocalToggle()
             return
           }
@@ -600,7 +600,7 @@ export function useTasks(selectedDate?: Date) {
         }
       }
 
-      if (shouldUseSupabaseFirst && source === 'local') {
+      if (shouldUseSupabaseFirst && (source as string) === 'local') {
         persistLocalToggle()
         return
       }
