@@ -886,6 +886,38 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   const rows = getMatrix();
 
+  const currentDateKey = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
+
+  const importedDayEvents = useMemo(() => {
+    const dayEvents = eventsByDate[currentDateKey] ?? [];
+    return dayEvents.filter((event) => event.source === 'uploaded');
+  }, [eventsByDate, currentDateKey]);
+
+  const importedTimedEvents = useMemo(() => {
+    return importedDayEvents
+      .filter((event) => Boolean(event.time) && !event.allDay)
+      .map((event) => ({
+        ...event,
+        parsedTime: (() => {
+          if (!event.time) return null;
+          try {
+            return new Date(event.time);
+          } catch {
+            return null;
+          }
+        })(),
+      }))
+      .sort((a, b) => {
+        const timeA = a.parsedTime?.getTime() ?? 0;
+        const timeB = b.parsedTime?.getTime() ?? 0;
+        return timeA - timeB;
+      });
+  }, [importedDayEvents]);
+
+  const importedAllDayEvents = useMemo(() => (
+    importedDayEvents.filter((event) => event.allDay || !event.time)
+  ), [importedDayEvents]);
+
   // Sync propSelectedDate prop with currentDate state
   useEffect(() => {
     if (propSelectedDate && propSelectedDate.getTime() !== currentDate.getTime()) {
@@ -1292,7 +1324,65 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </div>
             </div>
             
-            <div className="p-6">
+            <div className="p-6 space-y-5">
+              {importedDayEvents.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Imported Calendar</p>
+                      <p className="text-sm text-amber-800/80">Events from your uploaded calendar are now visible in Day view.</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                      {importedDayEvents.length} {importedDayEvents.length === 1 ? 'event' : 'events'}
+                    </span>
+                  </div>
+
+                  {importedTimedEvents.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {importedTimedEvents.map((event, idx) => {
+                        const displayTime = event.parsedTime ? format(event.parsedTime, 'h:mm a') : '';
+                        return (
+                          <div
+                            key={`${event.eventId || event.taskId || idx}-timed-${idx}`}
+                            className="flex items-start justify-between gap-3 rounded-lg border border-amber-200/80 bg-white/70 px-3 py-2 shadow-sm"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-amber-900 truncate" title={event.title}>{event.title}</p>
+                              {event.location && (
+                                <p className="mt-0.5 text-xs text-amber-700 truncate" title={event.location}>{event.location}</p>
+                              )}
+                            </div>
+                            {displayTime && (
+                              <span className="flex-shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                {displayTime}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {importedAllDayEvents.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">All-day</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {importedAllDayEvents.map((event, idx) => (
+                          <span
+                            key={`${event.eventId || event.title}-all-day-${idx}`}
+                            className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/70 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm"
+                            title={event.title}
+                          >
+                            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                            <span className="truncate max-w-[160px]">{event.title}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <HourlyPlanner 
                 ref={hourlyPlannerRef}
                 className="max-h-[75vh] overflow-y-auto rounded-xl" 

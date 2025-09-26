@@ -699,6 +699,20 @@ export function useTasks(selectedDate?: Date) {
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr])
   
   // Optimistic task deletion
+  const resolveTaskSource = useCallback((taskId: string): Task['source'] => {
+    const lookup = taskId?.toString?.() ?? ''
+    if (!lookup) return 'supabase'
+
+    const match = (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
+      || (allTasks || []).find(t => t.id?.toString?.() === lookup)
+
+    if (match) {
+      return ensureTaskSource(match).source ?? inferSourceFromId(match.id)
+    }
+
+    return inferSourceFromId(lookup)
+  }, [dailyTasks, allTasks])
+
   const deleteTask = useCallback(async (taskId: string) => {
     // Update optimistically by removing the task
     const updater = (tasks: Task[] | null) => 
@@ -706,39 +720,55 @@ export function useTasks(selectedDate?: Date) {
     
     updateDailyOptimistically(updater)
     updateAllOptimistically(updater)
+
+    const source = resolveTaskSource(taskId)
+
+    const deleteViaSupabase = async () => {
+      const res = await fetch('/api/tasks/delete', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      })
+      if (!res.ok) throw new Error('Failed to delete task (supabase)')
+    }
+
+    const preferSupabase = todoistConnectedRef.current === false || source !== 'todoist'
     
     try {
-      if (todoistConnectedRef.current === false) {
-        const res = await fetch('/api/tasks/delete', {
-          method: 'DELETE',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId })
-        })
-        if (!res.ok) throw new Error('Failed to delete task (supabase)')
+      if (preferSupabase) {
+        await deleteViaSupabase()
         return
       }
+
       const res = await fetch('/api/integrations/todoist/tasks/delete', {
         method: 'DELETE',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId })
       })
-      
-      if (!res.ok) throw new Error('Failed to delete task')
-      
-      
+
+      if (!res.ok) {
+        if (res.status === 400 || res.status === 401) {
+          todoistConnectedRef.current = false
+          await deleteViaSupabase()
+          return
+        }
+
+        if (res.status === 404) {
+          // Task already gone in Todoist; refetch to keep state honest and exit early
+          await Promise.all([refetchDaily(), refetchAll()])
+          return
+        }
+
+        throw new Error('Failed to delete task')
+      }
     } catch (error) {
       // On error, if offline/not connected, try Supabase or keep optimistic
       const isNetwork = error instanceof TypeError && (error.message.includes('Failed to fetch') || error.message.includes('Network'))
-      if (todoistConnectedRef.current === false || isNetwork) {
+      if (preferSupabase || todoistConnectedRef.current === false || isNetwork) {
         try {
-          await fetch('/api/tasks/delete', {
-            method: 'DELETE',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId })
-          })
+          await deleteViaSupabase()
           return
         } catch {}
         return
@@ -748,7 +778,7 @@ export function useTasks(selectedDate?: Date) {
       refetchAll()
       throw error
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll])
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, resolveTaskSource])
   
   // Filter tasks for different views
   const dailyVisibleTasks = useMemo(() =>

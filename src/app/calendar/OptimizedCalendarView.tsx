@@ -44,8 +44,12 @@ function TaskListLoading() {
   );
 }
 
-function CalendarContent() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+interface CalendarContentProps {
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
+}
+
+function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
@@ -54,7 +58,7 @@ function CalendarContent() {
 
   const handleDateChange = (newDate: Date) => {
     console.log('📅 Calendar date changed:', newDate);
-    setSelectedDate(newDate);
+    onDateChange(newDate);
   };
 
   // Unified drag and drop handler for sidebar to calendar
@@ -419,9 +423,11 @@ const hourSlotToISO = (hourSlot: string | undefined | null, dateStr: string): st
 };
 
 export default function OptimizedCalendarView() {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
   return (
-    <TasksProvider selectedDate={new Date()}>
-      <CalendarContent />
+    <TasksProvider selectedDate={selectedDate}>
+      <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
       <CalendarPerformanceMonitor />
     </TasksProvider>
   );
