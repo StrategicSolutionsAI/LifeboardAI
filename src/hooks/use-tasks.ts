@@ -796,7 +796,8 @@ export function useTasks(selectedDate?: Date) {
     const repeatingTimeUpdates = updates
       .map(update => {
         const task = resolveTask(update.taskId)
-        if (!task || !task.repeatRule || task.repeatRule === 'none') return null
+        const taskRule = task?.repeatRule as RepeatOption | undefined
+        if (!task || !taskRule || taskRule === 'none') return null
         if (!touchesScheduledFields(update.updates)) return null
         return { task, original: update }
       })
