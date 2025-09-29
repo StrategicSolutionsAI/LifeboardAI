@@ -785,7 +785,8 @@ export function useTasks(selectedDate?: Date) {
       const candidate = explicit || fromPatch || fromDue
       if (candidate) return candidate
 
-      if (fallbackTask?.repeatRule && fallbackTask.repeatRule !== 'none') {
+      const fallbackRule = fallbackTask?.repeatRule as RepeatOption | undefined
+      if (fallbackRule && fallbackRule !== 'none') {
         return dateStr
       }
 
@@ -950,7 +951,8 @@ export function useTasks(selectedDate?: Date) {
     const task = findTaskById(taskId)
     let decision: OccurrenceDecision = 'all'
 
-    if (task?.repeatRule && task.repeatRule !== 'none') {
+    const taskRepeatRule = task?.repeatRule as RepeatOption | undefined
+    if (taskRepeatRule && taskRepeatRule !== 'none') {
       decision = await promptOccurrenceDecision({
         actionDescription: 'Delete this repeating task',
         taskTitle: task.content
