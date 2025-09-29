@@ -40,6 +40,15 @@ export interface TaskOccurrenceException {
   updatedAt?: string
 }
 
+interface TaskOccurrenceExceptionUpsertInput {
+  taskId: string
+  occurrenceDate: string
+  skip?: boolean
+  overrideHourSlot?: string | null
+  overrideDuration?: number | null
+  overrideBucket?: string | null
+}
+
 const inferSourceFromId = (id?: string): Task['source'] => {
   if (!id) return 'supabase'
   if (/^\d+$/.test(id)) return 'todoist'
@@ -92,14 +101,7 @@ export function useTasks(selectedDate?: Date) {
     refreshOccurrenceExceptions()
   }, [refreshOccurrenceExceptions])
 
-  const upsertOccurrenceException = useCallback(async (input: {
-    taskId: string
-    occurrenceDate: string
-    skip?: boolean
-    overrideHourSlot?: string | null
-    overrideDuration?: number | null
-    overrideBucket?: string | null
-  }) => {
+  const upsertOccurrenceException = useCallback(async (input: TaskOccurrenceExceptionUpsertInput) => {
     const payload: Record<string, any> = {
       taskId: input.taskId,
       occurrenceDate: input.occurrenceDate,
@@ -834,7 +836,7 @@ export function useTasks(selectedDate?: Date) {
     if (decision === 'single' && singleOccurrenceUpdates.length > 0) {
       for (const entry of singleOccurrenceUpdates) {
         const raw = (entry.updates ?? {}) as Record<string, any>
-        const payload: Record<string, any> = {
+        const payload: TaskOccurrenceExceptionUpsertInput = {
           taskId: entry.task.id,
           occurrenceDate: entry.occurrenceDate,
           skip: false
