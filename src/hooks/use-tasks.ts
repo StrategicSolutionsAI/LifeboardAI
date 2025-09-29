@@ -955,6 +955,10 @@ export function useTasks(selectedDate?: Date) {
     const task = findTaskById(taskId)
     let decision: OccurrenceDecision = 'all'
 
+    if (!task) {
+      return
+    }
+
     const taskRepeatRule = task?.repeatRule as RepeatOption | undefined
     if (taskRepeatRule && taskRepeatRule !== 'none') {
       decision = await promptOccurrenceDecision({
@@ -965,7 +969,7 @@ export function useTasks(selectedDate?: Date) {
         return
       }
       if (decision === 'single') {
-        const occurrenceDate = occurrenceDateInput || task?.due?.date || dateStr
+        const occurrenceDate = occurrenceDateInput || task.due?.date || dateStr
         try {
           await upsertOccurrenceException({
             taskId,
