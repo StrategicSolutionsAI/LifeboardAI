@@ -1144,7 +1144,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // Use batchUpdateTasks for optimistic updates
         await batchUpdateTasks([{
           taskId: draggableId,
-          updates: { hourSlot: dstHour, duration: 60 } // Default 60 minutes
+          updates: { hourSlot: dstHour, duration: 60 }, // Default 60 minutes
+          occurrenceDate: selectedDateStr,
         }]);
         
         console.log(`✅ Scheduled task "${moved.content}" to ${dstHour}`);
@@ -1171,7 +1172,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           updates: { 
             hourSlot: dstHour, 
             duration: 60 // Default 60 minutes
-          }
+          },
+          occurrenceDate: selectedDateStr,
         }]);
         
         // Also update the due date
@@ -1201,7 +1203,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // Use batchUpdateTasks for optimistic updates
         await batchUpdateTasks([{
           taskId: draggableId,
-          updates: { hourSlot: dstHour }
+          updates: { hourSlot: dstHour },
+          occurrenceDate: selectedDateStr,
         }]);
         
         console.log(`✅ Successfully moved task from ${srcHour} to ${dstHour}`);

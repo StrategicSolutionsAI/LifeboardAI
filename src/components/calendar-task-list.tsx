@@ -924,7 +924,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       // Daily task → Hour slot: Set the hourSlot to schedule the task
       const dstHour = hourKey(destination.droppableId);
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: todayStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -934,7 +934,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
       // Hour slot → Daily tasks: Remove hourSlot to unschedule
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any } }
+        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: todayStr }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -945,7 +945,7 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
       // Hour slot → Different hour slot: Change hourSlot
       const dstHour = hourKey(destination.droppableId);
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: todayStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });

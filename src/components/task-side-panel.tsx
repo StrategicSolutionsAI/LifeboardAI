@@ -292,6 +292,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
             due: updatedDue as any,
             hourSlot: null as any,
           },
+          occurrenceDate: selectedDateStr,
         },
       ]).catch(error => {
         console.error('Failed to schedule task for today:', error);
@@ -307,6 +308,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
             due: null as any,
             hourSlot: null as any,
           },
+          occurrenceDate: selectedDateStr,
         },
       ]).catch(error => {
         console.error('Failed to move task out of today list:', error);
@@ -319,7 +321,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       // Daily task → Hour slot: Set the hourSlot to schedule the task
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -330,7 +332,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -340,7 +342,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
     if (isHour(source.droppableId) && destinationIs('dailyTasks')) {
       // Hour slot → Daily list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any } }
+        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -350,7 +352,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
     if (isHour(source.droppableId) && (destinationIs('openTasks') || destinationIs('upcomingTasks'))) {
       // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any } }
+        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -361,7 +363,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       // Hour slot → Different hour slot: Update the hourSlot
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });

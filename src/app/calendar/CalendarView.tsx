@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { format, addDays } from "date-fns";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
@@ -23,6 +23,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
   const { batchUpdateTasks, allTasks } = useTasksContext();
+  const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
 
   const handleDateChange = (newDate: Date) => {
     console.log('📅 Calendar date changed:', newDate);
@@ -68,9 +69,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       console.log('📅➡️⏰ Sidebar task → Calendar hour slot:', { draggableId, dstHour });
       
       // Set hourSlot and due date for the selected date
-      const dateStr = `${selectedDate.getFullYear()}-${String(
-        selectedDate.getMonth() + 1
-      ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+      const dateStr = selectedDateStr;
       
       batchUpdateTasks([
         { 
@@ -78,7 +77,8 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
           updates: { 
             hourSlot: dstHour,
             due: { date: dateStr }
-          } 
+          },
+          occurrenceDate: dateStr,
         }
       ]).catch(error => {
         console.error('Failed to schedule task to calendar hour:', error);
@@ -97,7 +97,8 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
           updates: { 
             due: { date: targetDateStr },
             hourSlot: null as any // Remove hour slot when dropping on day area
-          } 
+          },
+          occurrenceDate: targetDateStr,
         }
       ]).catch(error => {
         console.error('Failed to move task to calendar day:', error);
@@ -136,7 +137,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       }
       
       batchUpdateTasks([
-        { taskId: draggableId, updates }
+        { taskId: draggableId, updates, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to move task from hourly slot to sidebar:', error);
       });
@@ -177,7 +178,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
 
       if (targetDate) {
         batchUpdateTasks([
-          { taskId: draggableId, updates: { hourSlot: null as any, due: { date: targetDate } } }
+          { taskId: draggableId, updates: { hourSlot: null as any, due: { date: targetDate } }, occurrenceDate: targetDate }
         ]).catch(error => {
           console.error('Failed to move task from hourly slot to upcoming:', error);
         });
@@ -191,7 +192,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       console.log('⏰➡️⏰ Calendar hour → Calendar hour:', { draggableId, dstHour });
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -227,7 +228,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       console.log('📅➡️📅 Moving Lifeboard task between days:', { taskId, srcDate, destDate, updates });
 
       batchUpdateTasks([
-        { taskId, updates }
+        { taskId, updates, occurrenceDate: destDate }
       ]).catch(error => {
         console.error('Failed to move lifeboard task between days:', error);
       });

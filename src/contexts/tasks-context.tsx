@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useTasks } from "@/hooks/use-tasks";
+import { TasksOccurrencePromptProvider } from "./tasks-occurrence-prompt-context";
 
 interface TasksProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
   selectedDate?: Date;
 }
 
@@ -12,9 +13,17 @@ export const TasksContext = createContext<ReturnType<typeof useTasks> | null>(
   null,
 );
 
-export function TasksProvider({ children, selectedDate }: TasksProviderProps) {
+function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
   const tasks = useTasks(selectedDate);
   return <TasksContext.Provider value={tasks}>{children}</TasksContext.Provider>;
+}
+
+export function TasksProvider({ children, selectedDate }: TasksProviderProps) {
+  return (
+    <TasksOccurrencePromptProvider>
+      <TasksProviderInner selectedDate={selectedDate}>{children}</TasksProviderInner>
+    </TasksOccurrencePromptProvider>
+  );
 }
 
 export function useTasksContext() {

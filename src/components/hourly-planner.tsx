@@ -200,9 +200,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     const isHour = (id: string) => id.startsWith('hour-');
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId; // keep full hour-<slot>
-      batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }]).catch(() => {});
+      batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: activePlannerDate }]).catch(() => {});
     }
-  }, [batchUpdateTasks]);
+  }, [batchUpdateTasks, activePlannerDate]);
 
   // Ref for the scrollable container
   const containerRef = useRef<HTMLDivElement>(null);
@@ -295,6 +295,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
               hourSlot: `hour-${timeSlot}`,
               duration: newTaskDuration,
             },
+            occurrenceDate: dateStr,
           },
         ]);
         console.log('✅ Task updated successfully');
@@ -406,7 +407,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
       // Only update if duration actually changed
       if (currentDuration !== startDuration) {
         // Persist duration and re-assert current hourSlot to avoid accidental moves
-        batchUpdateTasks([{ taskId, updates: { duration: currentDuration, hourSlot: `hour-${hour}` } }]);
+        batchUpdateTasks([{ taskId, updates: { duration: currentDuration, hourSlot: `hour-${hour}` }, occurrenceDate: activePlannerDate }]);
       }
       setResizingTask(null);
       resizeStartRef.current = null;
@@ -438,13 +439,13 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     window.addEventListener("pointerup", endResize);
     window.addEventListener("blur", endResize);
     window.addEventListener("mouseleave", endResize);
-  }, [hourlyPlan, batchUpdateTasks]);
+  }, [hourlyPlan, batchUpdateTasks, activePlannerDate]);
 
   // Remove task from hourly planner
   const removeTaskFromPlanner = async (taskId: string) => {
     try {
       // Use null (not undefined) so server clears metadata
-      await batchUpdateTasks([{ taskId, updates: { hourSlot: null as any } }]);
+      await batchUpdateTasks([{ taskId, updates: { hourSlot: null as any }, occurrenceDate: activePlannerDate }]);
     } catch (error) {
       // Error handling is done in the context
     }
@@ -893,7 +894,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                await deleteTask(t.id);
+                                await deleteTask(t.id, activePlannerDate);
                               }}
                               className="flex-shrink-0 opacity-0 group-hover:opacity-100 
                                 hover:bg-theme-error-100 hover:text-theme-error-600

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, lazy, Suspense } from "react";
+import { useState, lazy, Suspense, useMemo } from "react";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
@@ -54,6 +54,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
   const { batchUpdateTasks, allTasks, loading } = useTasksContext();
+  const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   const loadTime = useComponentLoadTime('CalendarContent');
 
   const handleDateChange = (newDate: Date) => {
@@ -100,7 +101,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       console.log('📅➡️⏰ Sidebar task → Calendar hour slot:', { draggableId, dstHour });
       
       // Set hourSlot and due date for the selected date
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = selectedDateStr;
       
       batchUpdateTasks([
         { 
@@ -108,7 +109,8 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           updates: { 
             hourSlot: dstHour,
             due: { date: dateStr }
-          } 
+          },
+          occurrenceDate: dateStr,
         }
       ]).catch(error => {
         console.error('Failed to schedule task to calendar hour:', error);
@@ -127,7 +129,8 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           updates: { 
             due: { date: targetDateStr },
             hourSlot: null as any // Remove hour slot when dropping on day area
-          } 
+          },
+          occurrenceDate: targetDateStr,
         }
       ]).catch(error => {
         console.error('Failed to move task to calendar day:', error);
@@ -161,7 +164,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       }
       
       batchUpdateTasks([
-        { taskId: draggableId, updates }
+        { taskId: draggableId, updates, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to move task from hourly slot to sidebar:', error);
       });
@@ -202,7 +205,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
       if (targetDate) {
         batchUpdateTasks([
-          { taskId: draggableId, updates: { hourSlot: null as any, due: { date: targetDate } } }
+          { taskId: draggableId, updates: { hourSlot: null as any, due: { date: targetDate } }, occurrenceDate: targetDate }
         ]).catch(error => {
           console.error('Failed to move task from hourly slot to upcoming:', error);
         });
@@ -216,7 +219,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       console.log('⏰➡️⏰ Calendar hour → Calendar hour:', { draggableId, dstHour });
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -252,7 +255,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       console.log('📅➡️📅 Moving Lifeboard task between days:', { taskId, srcDate, destDate, updates });
 
       batchUpdateTasks([
-        { taskId, updates }
+        { taskId, updates, occurrenceDate: destDate }
       ]).catch(error => {
         console.error('Failed to move lifeboard task between days:', error);
       });
@@ -303,7 +306,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
     // Handle moves between sidebar lists
     if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = selectedDateStr;
       
       batchUpdateTasks([
         { taskId: draggableId, updates: { due: { date: dateStr } } }
@@ -314,7 +317,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     }
 
     if (source.droppableId === 'openTasks' && destination.droppableId === 'masterTodayTasks') {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = selectedDateStr;
 
       batchUpdateTasks([
         {
@@ -323,6 +326,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
             due: { date: dateStr },
             hourSlot: null as any,
           },
+          occurrenceDate: dateStr,
         },
       ]).catch((error) => {
         console.error('Failed to move task into Today list:', error);
@@ -347,6 +351,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
             due: null as any,
             hourSlot: null as any,
           },
+          occurrenceDate: selectedDateStr,
         },
       ]).catch((error) => {
         console.error('Failed to move task out of Today list:', error);

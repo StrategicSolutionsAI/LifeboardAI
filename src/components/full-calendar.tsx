@@ -333,7 +333,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [formRepeat, setFormRepeat] = useState<RepeatOption>('none');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
-  const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string } | null>(null);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string; date: string } | null>(null);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
 
@@ -989,7 +989,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   // Build events map whenever data sources change
   useEffect(() => {
     const map: Record<string, DayEvent[]> = {};
-    const seenTaskIds = new Set<string>();
+    const seenTaskInstanceKeys = new Set<string>();
 
     googleEvents.forEach((ev: any) => {
       // Apply bucket filter for Google Calendar events
@@ -1060,7 +1060,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       const bucket = map[dateStr] ?? (map[dateStr] = []);
       const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
-      if (taskIdKey && seenTaskIds.has(taskIdKey)) {
+      const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
+      if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
         return;
       }
 
@@ -1076,8 +1077,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         eventId: ev.id,
       });
 
-      if (taskIdKey) {
-        seenTaskIds.add(taskIdKey);
+      if (seenKey) {
+        seenTaskInstanceKeys.add(seenKey);
       }
     });
 
@@ -1091,12 +1092,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         const bucket = map[dateStr] ?? (map[dateStr] = []);
         lifeboardEvents.forEach(event => {
           const taskIdKey = event.taskId ? event.taskId.toString() : undefined;
-          if (taskIdKey && seenTaskIds.has(taskIdKey)) {
+          const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
+          if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
             return;
           }
           bucket.push(event);
-          if (taskIdKey) {
-            seenTaskIds.add(taskIdKey);
+          if (seenKey) {
+            seenTaskInstanceKeys.add(seenKey);
           }
         });
       }
@@ -1587,7 +1589,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title });
+                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
                                                 title="Delete task"
@@ -1821,7 +1823,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
-                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title });
+                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                 }}
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-0.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
                                                 title="Delete task"
@@ -2116,7 +2118,74 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         updates.hourSlot = formTime ? `hour-${formTime}` : null;
                         updates.due = dueDateValue ? { date: dueDateValue } : null;
                         updates.repeatRule = formRepeat === 'none' ? null : formRepeat;
-                        await batchUpdateTasks([{ taskId: editTaskId, updates }]);
+                        const previousDateKey = selectedModalDate || currentDateKey;
+                        const targetDateKey = dueDateValue || previousDateKey;
+                        const occurrenceKey = targetDateKey;
+
+                        await batchUpdateTasks([{ taskId: editTaskId, updates, occurrenceDate: occurrenceKey }]);
+
+                        setEventsByDate(prev => {
+                          const next = { ...prev } as Record<string, DayEvent[]>;
+                          const oldList = [...(next[previousDateKey] || [])];
+                          let eventEntry: DayEvent | undefined = undefined;
+                          const existingIdx = oldList.findIndex(ev => ev.taskId === editTaskId);
+
+                          if (existingIdx >= 0) {
+                            eventEntry = { ...oldList[existingIdx] };
+                            oldList.splice(existingIdx, 1);
+                            if (oldList.length > 0) {
+                              next[previousDateKey] = oldList;
+                            } else {
+                              delete next[previousDateKey];
+                            }
+                          }
+
+                          if (!eventEntry) {
+                            eventEntry = {
+                              source: 'lifeboard',
+                              title: formContent.trim(),
+                              taskId: editTaskId,
+                              allDay: !formTime,
+                              repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
+                            };
+                          }
+
+                          eventEntry.title = formContent.trim();
+                          eventEntry.repeatRule = formRepeat !== 'none' ? formRepeat : undefined;
+                          if (availableBuckets.length > 0) {
+                            eventEntry.bucket = formBucket || undefined;
+                          }
+
+                          if (hourNum !== undefined && hourNum !== null && !Number.isNaN(hourNum)) {
+                            const base = parseISO(`${targetDateKey}T00:00:00`);
+                            base.setHours(hourNum, 0, 0, 0);
+                            eventEntry.time = base.toISOString();
+                            eventEntry.allDay = false;
+                          } else {
+                            eventEntry.time = undefined;
+                            eventEntry.allDay = true;
+                          }
+
+                          const updatedList = [...(next[targetDateKey] || [])];
+                          const targetIdx = updatedList.findIndex(ev => ev.taskId === editTaskId);
+                          if (targetIdx >= 0) {
+                            updatedList[targetIdx] = eventEntry;
+                          } else {
+                            updatedList.push(eventEntry);
+                          }
+
+                          updatedList.sort((a, b) => {
+                            if (a.time && b.time) return a.time.localeCompare(b.time);
+                            if (a.time) return -1;
+                            if (b.time) return 1;
+                            const titleA = a.title ?? '';
+                            const titleB = b.title ?? '';
+                            return titleA.localeCompare(titleB);
+                          });
+
+                          next[targetDateKey] = updatedList;
+                          return next;
+                        });
                         closeTaskModal();
                       }
                     } finally {
@@ -2174,18 +2243,22 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 className="px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
                 onClick={async () => {
                   try {
-                    await deleteTask(deleteConfirmTask.id);
+                    await deleteTask(deleteConfirmTask.id, deleteConfirmTask.date);
                     setDeleteConfirmTask(null);
                     
                     // Remove from local event state to update UI immediately
                     setEventsByDate(prev => {
-                      const updated = { ...prev };
-                      Object.keys(updated).forEach(dateKey => {
-                        updated[dateKey] = updated[dateKey].filter(ev => ev.taskId !== deleteConfirmTask.id);
-                        if (updated[dateKey].length === 0) {
-                          delete updated[dateKey];
-                        }
-                      });
+                      const updated = { ...prev } as Record<string, DayEvent[]>;
+                      const targetDate = deleteConfirmTask.date;
+                      if (targetDate && updated[targetDate]) {
+                        updated[targetDate] = updated[targetDate].filter(ev => ev.taskId !== deleteConfirmTask.id);
+                        if (updated[targetDate].length === 0) delete updated[targetDate];
+                      } else {
+                        Object.keys(updated).forEach(dateKey => {
+                          updated[dateKey] = updated[dateKey].filter(ev => ev.taskId !== deleteConfirmTask.id);
+                          if (updated[dateKey].length === 0) delete updated[dateKey];
+                        });
+                      }
                       return updated;
                     });
                   } catch (error) {

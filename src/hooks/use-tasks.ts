@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useEffect, useRef } from 'react'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
+import { OccurrenceDecision, useOccurrencePrompt } from '@/contexts/tasks-occurrence-prompt-context'
 import { useDataCache } from './use-data-cache'
 
 export type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly'
@@ -25,6 +26,18 @@ export interface Task {
   updated_at?: string
   repeatRule?: RepeatRule
   source?: 'todoist' | 'supabase' | 'local'
+}
+
+export interface TaskOccurrenceException {
+  id: string
+  taskId: string
+  occurrenceDate: string
+  skip: boolean
+  overrideHourSlot?: string | null
+  overrideDuration?: number | null
+  overrideBucket?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 const inferSourceFromId = (id?: string): Task['source'] => {
@@ -54,6 +67,121 @@ export function useTasks(selectedDate?: Date) {
   const todoistConnectedRef = useRef<boolean | null>(null)
   const lastSeenUpdateRef = useRef<number>(0)
   const sharedFetchRef = useRef<Promise<Task[]> | null>(null)
+  const promptOccurrenceDecision = useOccurrencePrompt()
+  const [occurrenceExceptions, setOccurrenceExceptions] = useState<TaskOccurrenceException[]>([])
+
+  const refreshOccurrenceExceptions = useCallback(async () => {
+    if (typeof window === 'undefined') return
+    try {
+      const res = await fetch('/api/task-occurrence-exceptions', {
+        credentials: 'same-origin'
+      })
+      if (!res.ok) {
+        console.warn('Failed to load task occurrence exceptions', res.status)
+        return
+      }
+      const json = await res.json().catch(() => ({}))
+      const list = Array.isArray(json?.exceptions) ? json.exceptions as TaskOccurrenceException[] : []
+      setOccurrenceExceptions(list)
+    } catch (error) {
+      console.warn('Failed to refresh task occurrence exceptions', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshOccurrenceExceptions()
+  }, [refreshOccurrenceExceptions])
+
+  const upsertOccurrenceException = useCallback(async (input: {
+    taskId: string
+    occurrenceDate: string
+    skip?: boolean
+    overrideHourSlot?: string | null
+    overrideDuration?: number | null
+    overrideBucket?: string | null
+  }) => {
+    const payload: Record<string, any> = {
+      taskId: input.taskId,
+      occurrenceDate: input.occurrenceDate,
+      skip: input.skip ?? false,
+    }
+
+    if ('overrideHourSlot' in input) payload.overrideHourSlot = input.overrideHourSlot
+    if ('overrideDuration' in input) payload.overrideDuration = input.overrideDuration
+    if ('overrideBucket' in input) payload.overrideBucket = input.overrideBucket
+
+    try {
+      const res = await fetch('/api/task-occurrence-exceptions', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => res.statusText)
+        throw new Error(errorText || `Failed to upsert occurrence exception (${res.status})`)
+      }
+      const json = await res.json().catch(() => ({}))
+      const exception = json?.exception as TaskOccurrenceException | undefined
+      if (exception) {
+        setOccurrenceExceptions(prev => {
+          const next = prev.filter(item => !(item.taskId === exception.taskId && item.occurrenceDate === exception.occurrenceDate))
+          next.push(exception)
+          return next
+        })
+      }
+      return exception
+    } catch (error) {
+      console.warn('Failed to upsert occurrence exception', error)
+      throw error
+    }
+  }, [])
+
+  const occurrenceExceptionIndex = useMemo(() => {
+    const map = new Map<string, Map<string, TaskOccurrenceException>>()
+    occurrenceExceptions.forEach(exception => {
+      if (!exception?.taskId || !exception.occurrenceDate) return
+      if (!map.has(exception.taskId)) {
+        map.set(exception.taskId, new Map())
+      }
+      map.get(exception.taskId)!.set(exception.occurrenceDate, exception)
+    })
+    return map
+  }, [occurrenceExceptions])
+
+  const applyOccurrenceAdjustments = useCallback((task: Task, occurrenceDate: string): Task | null => {
+    const perTask = occurrenceExceptionIndex.get(task.id)
+    if (!perTask) return task
+    const exception = perTask.get(occurrenceDate)
+    if (!exception) return task
+    if (exception.skip) return null
+
+    let next: Task = task
+    let mutated = false
+
+    if (exception.overrideHourSlot !== undefined) {
+      if (!exception.overrideHourSlot) {
+        return null
+      }
+      next = mutated ? next : { ...task }
+      next.hourSlot = exception.overrideHourSlot ?? undefined
+      mutated = true
+    }
+
+    if (exception.overrideDuration !== undefined) {
+      next = mutated ? next : { ...task }
+      next.duration = exception.overrideDuration ?? undefined
+      mutated = true
+    }
+
+    if (exception.overrideBucket !== undefined) {
+      next = mutated ? next : { ...task }
+      next.bucket = exception.overrideBucket ?? undefined
+      mutated = true
+    }
+
+    return next
+  }, [occurrenceExceptionIndex])
 
   const dateStr = selectedDate 
     ? format(selectedDate, 'yyyy-MM-dd')
@@ -611,110 +739,243 @@ export function useTasks(selectedDate?: Date) {
   }, [allTasks, dailyTasks, updateDailyOptimistically, updateAllOptimistically])
   
   // Batch update for drag and drop
-  const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task> }[]) => {
-    console.log('🚀 batchUpdateTasks called with:', updates);
+  const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task>; occurrenceDate?: string }[]) => {
+    if (!Array.isArray(updates) || updates.length === 0) return
+    console.log('🚀 batchUpdateTasks called with:', updates)
 
+    const taskCache = new Map<string, Task | undefined>()
     const resolveTask = (id: string): Task | undefined => {
-      const lookup = id.toString();
-      return (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
-        || (allTasks || []).find(t => t.id?.toString?.() === lookup);
-    };
+      const lookup = id.toString()
+      if (!lookup) return undefined
+      if (!taskCache.has(lookup)) {
+        const match = (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
+          || (allTasks || []).find(t => t.id?.toString?.() === lookup)
+        taskCache.set(lookup, match)
+      }
+      return taskCache.get(lookup)
+    }
 
-    const mergeTasks = (current: Task[] | null, { constrainToDate }: { constrainToDate?: boolean } = {}) => {
-      const map = new Map<string, Task>();
-      (current || []).forEach(task => {
-        map.set(task.id?.toString?.() ?? '', task);
-      });
+    const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
+    const touchesScheduledFields = (patch: Partial<Task>) => {
+      const raw = (patch ?? {}) as Record<string, any>
+      return hasOwn(raw, 'hourSlot') || hasOwn(raw, 'duration')
+    }
 
-      updates.forEach(({ taskId, updates: partial }) => {
-        const key = taskId?.toString?.() ?? '';
-        if (!key) return;
-        const original = map.get(key) ?? resolveTask(key);
+    const describeChange = (patch?: Record<string, any>) => {
+      const raw = patch ?? {}
+      const parts: string[] = []
+      if (hasOwn(raw, 'hourSlot')) parts.push('scheduled time')
+      if (hasOwn(raw, 'duration')) parts.push('duration')
+      if (parts.length === 0) return 'Update this repeating task'
+      if (parts.length === 1) return `Update the ${parts[0]} for this repeating task`
+      if (parts.length === 2) return `Update the ${parts[0]} and ${parts[1]} for this repeating task`
+      const last = parts[parts.length - 1]
+      const initial = parts.slice(0, -1).join(', ')
+      return `Update the ${initial}, and ${last} for this repeating task`
+    }
+
+    const resolveOccurrenceDate = (update: { updates: Partial<Task>; occurrenceDate?: string }, fallbackTask?: Task): string => {
+      const raw = (update.updates ?? {}) as Record<string, any>
+      const explicit = typeof update.occurrenceDate === 'string' ? update.occurrenceDate : undefined
+      const fromPatch = typeof raw.occurrenceDate === 'string' ? raw.occurrenceDate : undefined
+      const fromDue = raw.due && typeof raw.due === 'object' && typeof (raw.due as any)?.date === 'string'
+        ? (raw.due as any).date as string
+        : undefined
+
+      const candidate = explicit || fromPatch || fromDue
+      if (candidate) return candidate
+
+      if (fallbackTask?.repeatRule && fallbackTask.repeatRule !== 'none') {
+        return dateStr
+      }
+
+      return fallbackTask?.due?.date ?? dateStr
+    }
+
+    const repeatingTimeUpdates = updates
+      .map(update => {
+        const task = resolveTask(update.taskId)
+        if (!task || !task.repeatRule || task.repeatRule === 'none') return null
+        if (!touchesScheduledFields(update.updates)) return null
+        return { task, original: update }
+      })
+      .filter(Boolean) as { task: Task; original: { taskId: string; updates: Partial<Task>; occurrenceDate?: string } }[]
+
+    let decision: OccurrenceDecision = 'all'
+    if (repeatingTimeUpdates.length > 0) {
+      const firstPatch = repeatingTimeUpdates[0].original.updates as Record<string, any> | undefined
+      decision = await promptOccurrenceDecision({
+        actionDescription: describeChange(firstPatch),
+        taskTitle: repeatingTimeUpdates[0].task.content
+      })
+      if (decision === 'cancel') return
+    }
+
+    const updatesForAll: { taskId: string; updates: Partial<Task> }[] = []
+    const singleOccurrenceUpdates: { task: Task; updates: Partial<Task>; occurrenceDate: string }[] = []
+
+    updates.forEach(update => {
+      const task = resolveTask(update.taskId)
+      if (!task || !task.repeatRule || task.repeatRule === 'none') {
+        updatesForAll.push(update)
+        return
+      }
+      if (decision === 'single' && touchesScheduledFields(update.updates)) {
+        const occurrenceDate = resolveOccurrenceDate(update, task)
+        singleOccurrenceUpdates.push({ task, updates: update.updates, occurrenceDate })
+        return
+      }
+      updatesForAll.push(update)
+    })
+
+    if (decision === 'single' && singleOccurrenceUpdates.length > 0) {
+      for (const entry of singleOccurrenceUpdates) {
+        const raw = (entry.updates ?? {}) as Record<string, any>
+        const payload: Record<string, any> = {
+          taskId: entry.task.id,
+          occurrenceDate: entry.occurrenceDate,
+          skip: false
+        }
+        if (hasOwn(raw, 'hourSlot')) payload.overrideHourSlot = raw.hourSlot ?? null
+        if (hasOwn(raw, 'duration')) payload.overrideDuration = raw.duration ?? null
+        if (hasOwn(raw, 'bucket')) payload.overrideBucket = raw.bucket ?? null
+        try {
+          await upsertOccurrenceException(payload)
+        } catch (error) {
+          if (typeof window !== 'undefined') {
+            window.alert('Failed to update just this occurrence. Please try again.')
+          }
+          return
+        }
+      }
+    }
+
+    if (updatesForAll.length === 0) {
+      return
+    }
+
+    const mergeTasks = (current: Task[] | null, pending: { taskId: string; updates: Partial<Task> }[], { constrainToDate }: { constrainToDate?: boolean } = {}) => {
+      const map = new Map<string, Task>()
+      ;(current || []).forEach(task => {
+        map.set(task.id?.toString?.() ?? '', task)
+      })
+
+      pending.forEach(({ taskId, updates: partial }) => {
+        const key = taskId?.toString?.() ?? ''
+        if (!key) return
+        const original = map.get(key) ?? resolveTask(key)
         const merged: Task = {
           id: original?.id ?? key,
           content: partial.content ?? original?.content ?? '',
           completed: partial.completed ?? original?.completed ?? false,
           ...original,
           ...partial,
-        };
-        map.set(key, merged);
-      });
+        }
+        map.set(key, merged)
+      })
 
-      let next = Array.from(map.values());
+      let next = Array.from(map.values())
       if (constrainToDate) {
-        next = next.filter(task => task.due?.date === dateStr);
+        next = next.filter(task => task.due?.date === dateStr)
       }
-      return next;
-    };
+      return next
+    }
 
-    updateDailyOptimistically(tasks => mergeTasks(tasks, { constrainToDate: true }));
-    updateAllOptimistically(tasks => mergeTasks(tasks));
-    
+    updateDailyOptimistically(tasks => mergeTasks(tasks, updatesForAll, { constrainToDate: true }))
+    updateAllOptimistically(tasks => mergeTasks(tasks, updatesForAll))
+
     // Send batch update to server (soft-fail if API unreachable)
     try {
       if (todoistConnectedRef.current === false) {
-        // Persist via Supabase
         const res = await fetch('/api/tasks/batch-update', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates })
+          body: JSON.stringify({ updates: updatesForAll })
         })
         if (!res.ok) console.warn('Supabase batch update failed')
         return
       }
-      console.log('📡 Sending batch update to API...');
+      console.log('📡 Sending batch update to API...')
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates })
+        body: JSON.stringify({ updates: updatesForAll })
       })
       if (!res.ok) {
-        const errorText = await res.text().catch(() => '');
-        console.warn('❌ Batch update non-OK:', res.status, errorText);
-        // Soft recover: resync caches but do not throw (keep optimistic UI)
-        refetchDaily();
-        refetchAll();
-        return;
+        const errorText = await res.text().catch(() => '')
+        console.warn('❌ Batch update non-OK:', res.status, errorText)
+        refetchDaily()
+        refetchAll()
+        return
       }
-      const result = await res.json().catch(() => null);
-      console.log('✅ Batch update successful:', result);
+      const result = await res.json().catch(() => null)
+      console.log('✅ Batch update successful:', result)
     } catch (error) {
-      console.warn('💥 Batch update network error (continuing with optimistic state):', error);
-      // Try Supabase; if offline, keep optimistic and skip
+      console.warn('💥 Batch update network error (continuing with optimistic state):', error)
       try {
         await fetch('/api/tasks/batch-update', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates })
+          body: JSON.stringify({ updates: updatesForAll })
         })
       } catch {}
-      refetchDaily();
-      refetchAll();
-      // Do not throw to avoid UI crash overlays
-      return;
+      refetchDaily()
+      refetchAll()
+      return
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr])
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr, promptOccurrenceDecision, upsertOccurrenceException])
   
   // Optimistic task deletion
+  const findTaskById = useCallback((taskId: string): Task | undefined => {
+    const lookup = taskId?.toString?.() ?? ''
+    if (!lookup) return undefined
+    return (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
+      || (allTasks || []).find(t => t.id?.toString?.() === lookup)
+  }, [dailyTasks, allTasks])
+
   const resolveTaskSource = useCallback((taskId: string): Task['source'] => {
     const lookup = taskId?.toString?.() ?? ''
     if (!lookup) return 'supabase'
-
-    const match = (dailyTasks || []).find(t => t.id?.toString?.() === lookup)
-      || (allTasks || []).find(t => t.id?.toString?.() === lookup)
-
+    const match = findTaskById(taskId)
     if (match) {
       return ensureTaskSource(match).source ?? inferSourceFromId(match.id)
     }
-
     return inferSourceFromId(lookup)
-  }, [dailyTasks, allTasks])
+  }, [findTaskById])
 
-  const deleteTask = useCallback(async (taskId: string) => {
-    // Update optimistically by removing the task
+  const deleteTask = useCallback(async (taskId: string, occurrenceDateInput?: string) => {
+    const task = findTaskById(taskId)
+    let decision: OccurrenceDecision = 'all'
+
+    if (task?.repeatRule && task.repeatRule !== 'none') {
+      decision = await promptOccurrenceDecision({
+        actionDescription: 'Delete this repeating task',
+        taskTitle: task.content
+      })
+      if (decision === 'cancel') {
+        return
+      }
+      if (decision === 'single') {
+        const occurrenceDate = occurrenceDateInput || task?.due?.date || dateStr
+        try {
+          await upsertOccurrenceException({
+            taskId,
+            occurrenceDate,
+            skip: true
+          })
+        } catch (error) {
+          if (typeof window !== 'undefined') {
+            window.alert('Failed to skip this occurrence. Please try again.')
+          }
+        }
+        return
+      }
+    }
+
+    // Update optimistically by removing the task when deleting the full series
     const updater = (tasks: Task[] | null) => 
       tasks?.filter(t => t.id.toString() !== taskId) || []
     
@@ -778,12 +1039,17 @@ export function useTasks(selectedDate?: Date) {
       refetchAll()
       throw error
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, resolveTaskSource])
+  }, [findTaskById, promptOccurrenceDecision, upsertOccurrenceException, dateStr, updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, resolveTaskSource])
   
   // Filter tasks for different views
   const dailyVisibleTasks = useMemo(() =>
-    (dailyTasks || []).filter(t => !t.completed && !t.hourSlot),
-    [dailyTasks]
+    (dailyTasks || []).filter(t => {
+      if (t.completed || t.hourSlot) return false
+      const perTask = occurrenceExceptionIndex.get(t.id)
+      if (perTask?.get(dateStr)?.skip) return false
+      return true
+    }),
+    [dailyTasks, occurrenceExceptionIndex, dateStr]
   );
 
   const completedTasks = useMemo(() =>
@@ -792,60 +1058,64 @@ export function useTasks(selectedDate?: Date) {
   );
 
   const scheduledTasks = useMemo(() => {
-    const targetDateStr = dateStr;
+    const targetDateStr = dateStr
 
     const occursOnDate = (task: Task, todayStr: string) => {
-      if (!task || task.completed || !task.hourSlot) return false;
-      const dueDateStr = task.due?.date;
+      if (!task || task.completed) return false
+      const dueDateStr = task.due?.date
       if (!dueDateStr) {
-        // Legacy tasks without a due date fallback to displaying whenever selected
-        return true;
+        return true
       }
 
       if (!task.repeatRule) {
-        return dueDateStr === todayStr;
+        return dueDateStr === todayStr
       }
 
-      const target = new Date(`${todayStr}T00:00:00`);
-      const due = new Date(`${dueDateStr}T00:00:00`);
-      if (target < due) return false;
+      const target = new Date(`${todayStr}T00:00:00`)
+      const due = new Date(`${dueDateStr}T00:00:00`)
+      if (target < due) return false
 
-      const day = target.getDay();
-      const dueDay = due.getDay();
-      const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+      const day = target.getDay()
+      const dueDay = due.getDay()
+      const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000))
 
       switch (task.repeatRule) {
         case 'daily':
-          return true;
+          return true
         case 'weekdays':
-          return day >= 1 && day <= 5;
+          return day >= 1 && day <= 5
         case 'weekly':
-          return diffDays % 7 === 0 && day === dueDay;
+          return diffDays % 7 === 0 && day === dueDay
         case 'monthly': {
-          const dueDateNum = due.getDate();
-          const targetDateNum = target.getDate();
-          const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+          const dueDateNum = due.getDate()
+          const targetDateNum = target.getDate()
+          const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
           if (dueDateNum > daysInTargetMonth) {
-            return targetDateNum === daysInTargetMonth;
+            return targetDateNum === daysInTargetMonth
           }
-          return targetDateNum === dueDateNum;
+          return targetDateNum === dueDateNum
         }
         default:
-          return false;
+          return false
       }
-    };
+    }
 
-    const dailyScheduled = (dailyTasks || []).filter(t => occursOnDate(t as Task, targetDateStr));
+    const collectFrom = (source: Task[] | null | undefined, map: Map<string, Task>) => {
+      (source || []).forEach(originalTask => {
+        const task = originalTask as Task
+        if (!occursOnDate(task, targetDateStr)) return
+        const adjusted = applyOccurrenceAdjustments(task, targetDateStr)
+        if (!adjusted || !adjusted.hourSlot) return
+        map.set(adjusted.id, adjusted)
+      })
+    }
 
-    const allScheduled = (allTasks || []).filter(t => occursOnDate(t as Task, targetDateStr));
+    const taskMap = new Map<string, Task>()
+    collectFrom(dailyTasks, taskMap)
+    collectFrom(allTasks, taskMap)
 
-    const taskMap = new Map<string, Task>();
-    [...dailyScheduled, ...allScheduled].forEach(task => {
-      taskMap.set(task.id, task);
-    });
-
-    return Array.from(taskMap.values());
-  }, [dailyTasks, allTasks, dateStr]);
+    return Array.from(taskMap.values())
+  }, [dailyTasks, allTasks, dateStr, applyOccurrenceAdjustments])
 
   // Upcoming tasks: all open tasks with future due dates
   const upcomingTasks = useMemo(() => {

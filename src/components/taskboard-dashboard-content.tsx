@@ -81,6 +81,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
 
   // Date navigation
   const [date, setDate] = useState(selectedDate);
+  const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   
   function handleDateChange(newDate: Date) {
     const d = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate());
@@ -98,8 +99,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
   // Task creation handlers
   const handleAddDailyTask = async () => {
     if (newDailyTask.trim()) {
-      const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`;
-      await createTask(newDailyTask.trim(), dateStr);
+      await createTask(newDailyTask.trim(), selectedDateStr);
       setNewDailyTask('');
     }
   };
@@ -153,7 +153,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
       // Daily task → Hour slot: Set the hourSlot to schedule the task
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -164,7 +164,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
       // Open/Upcoming task → Hour slot: Set the hourSlot to schedule the task  
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });
@@ -174,7 +174,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
     if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
       // Hour slot → Daily list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any } }
+        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -184,7 +184,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
     if (isHour(source.droppableId) && (destination.droppableId === 'openTasks' || destination.droppableId === 'upcomingTasks')) {
       // Hour slot → Open/Upcoming list: Remove hourSlot to unschedule the task
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any } }
+        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to remove task hourSlot:', error);
       });
@@ -195,7 +195,7 @@ export function TaskboardDashboardContent({ selectedDate, onDateChange }: Taskbo
       // Hour slot → Different hour slot: Update the hourSlot
       const dstHour = destination.droppableId; // Keep the full "hour-7AM" format
       batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour } }
+        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
       ]).catch(error => {
         console.error('Failed to update task hourSlot:', error);
       });

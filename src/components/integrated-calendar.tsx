@@ -458,7 +458,8 @@ export default function IntegratedCalendar() {
                   // Only handle hour → hour moves in this simple integrated view
                   if (isHour(source.droppableId) && isHour(destination.droppableId)) {
                     const dstHour = destination.droppableId; // keep full 'hour-7AM'
-                    batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour } }])
+                    const occurrenceDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+                    batchUpdateTasks([{ taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate }])
                       .catch(err => console.error('Failed to update task hourSlot:', err));
                   }
                 }}
