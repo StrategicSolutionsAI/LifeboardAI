@@ -818,7 +818,8 @@ export function useTasks(selectedDate?: Date) {
 
     updates.forEach(update => {
       const task = resolveTask(update.taskId)
-      if (!task || !task.repeatRule || task.repeatRule === 'none') {
+      const taskRule = task?.repeatRule as RepeatOption | undefined
+      if (!task || !taskRule || taskRule === 'none') {
         updatesForAll.push(update)
         return
       }
