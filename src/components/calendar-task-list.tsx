@@ -79,6 +79,46 @@ const getCustomBucketStyles = (bucketName?: string | null, bucketColors?: Record
   return {};
 };
 
+const doesTaskOccurOnDate = (task: any, dateStr: string): boolean => {
+  if (!task || task.completed) return false;
+  const dueDateStr = task.due?.date;
+  if (!dueDateStr) return false;
+
+  const repeatRule = task.repeatRule;
+  if (!repeatRule || repeatRule === 'none') {
+    return dueDateStr === dateStr;
+  }
+
+  const target = new Date(`${dateStr}T00:00:00`);
+  const due = new Date(`${dueDateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime()) || Number.isNaN(due.getTime())) return false;
+  if (target < due) return false;
+
+  const day = target.getDay();
+  const dueDay = due.getDay();
+  const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+
+  switch (repeatRule) {
+    case 'daily':
+      return true;
+    case 'weekdays':
+      return day >= 1 && day <= 5;
+    case 'weekly':
+      return diffDays % 7 === 0 && day === dueDay;
+    case 'monthly': {
+      const dueDateNum = due.getDate();
+      const targetDateNum = target.getDate();
+      const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      if (dueDateNum > daysInTargetMonth) {
+        return targetDateNum === daysInTargetMonth;
+      }
+      return targetDateNum === dueDateNum;
+    }
+    default:
+      return false;
+  }
+};
+
 interface CalendarTaskListProps {
   selectedDate: Date;
   onDateChange?: (date: Date) => void;
@@ -472,7 +512,7 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -617,11 +657,12 @@ export function CalendarTaskList({ availableBuckets = [], selectedBucket, disabl
     }));
   }, []);
 
-  // Today-only list (always use real today, independent of selectedDate)
-  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  // Use the selected calendar date for calendar view, real today for dashboard contexts
+  const referenceDate = useMemo(() => (dashboardView ? new Date() : selectedDate), [dashboardView, selectedDate]);
+  const todayStr = useMemo(() => format(referenceDate, 'yyyy-MM-dd'), [referenceDate]);
   const todayTasks = useMemo(() => {
-    let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && t.due?.date === todayStr);
-    
+    let filtered = allTasks.filter(t => !t.hourSlot && doesTaskOccurOnDate(t, todayStr));
+
     // Only filter by selectedBucket in dashboard view, not in Calendar view
     if (selectedBucket && dashboardView) {
       filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);

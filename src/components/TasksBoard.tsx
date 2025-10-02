@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal, GripVertical } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 export type Bucket = {
@@ -34,6 +34,29 @@ type BucketSummary = {
   dueSoonCount: number;
 };
 
+export type TasksBoardViewMode = "open" | "completed";
+
+export type TasksBoardHandle = {
+  focusBuckets: () => void;
+  scrollToBucket: (bucketId: string) => void;
+};
+
+type TasksBoardFilters = {
+  dueSoonOnly?: boolean;
+};
+
+type TasksBoardProps = {
+  buckets?: Bucket[];
+  tasks?: Task[];
+  onCompleteTask?: (id: string) => void;
+  onUncompleteTask?: (id: string) => void;
+  onAddTask?: (bucketId: string, title: string) => void;
+  onMoveTask?: (taskId: string, newBucketId: string) => void;
+  viewMode?: TasksBoardViewMode;
+  filters?: TasksBoardFilters;
+  loadingTasks?: Set<string>;
+};
+
 function isDateSoon(dueDate?: string | null) {
   if (!dueDate) return false;
   let parsed: Date;
@@ -50,12 +73,11 @@ function isDateSoon(dueDate?: string | null) {
 function groupByBucket(tasks: Task[]) {
   const map: Record<string, BucketSummary> = {};
   for (const task of tasks) {
-    if (task.status !== "open") continue;
     if (!map[task.bucketId]) {
       map[task.bucketId] = { tasks: [], dueSoonCount: 0 };
     }
     map[task.bucketId].tasks.push(task);
-    if (isDateSoon(task.dueDate)) {
+    if (task.status === "open" && isDateSoon(task.dueDate)) {
       map[task.bucketId].dueSoonCount += 1;
     }
   }
@@ -85,18 +107,20 @@ function formatDueDate(due?: string | null) {
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? "accent" as const : "default" as const };
 }
 
-function TaskCard({ 
-  task, 
-  index, 
-  onToggle, 
-  availableBuckets = [], 
-  onBucketChange 
-}: { 
-  task: Task; 
-  index: number; 
+function TaskCard({
+  task,
+  index,
+  onToggle,
+  availableBuckets = [],
+  onBucketChange,
+  isLoading = false
+}: {
+  task: Task;
+  index: number;
   onToggle?: (id: string, checked: boolean) => void;
   availableBuckets?: Bucket[];
   onBucketChange?: (taskId: string, newBucketId: string) => void;
+  isLoading?: boolean;
 }) {
   const [showBucketDropdown, setShowBucketDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -122,57 +146,78 @@ function TaskCard({
   return (
     <Draggable draggableId={task.id} index={index}>
       {(provided, snapshot) => (
-        <div 
+        <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`group relative rounded-2xl border border-border/70 bg-background/70 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-            snapshot.isDragging ? 'rotate-2 shadow-lg scale-105' : ''
-          } ${showBucketDropdown ? 'z-[9998]' : ''}`}
+          className={cn(
+            "group relative rounded-2xl border border-border/70 bg-background/70 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
+            snapshot.isDragging && "rotate-2 shadow-lg scale-105 ring-2 ring-primary/40 bg-background",
+            showBucketDropdown && "z-[9998]"
+          )}
         >
       <div className="flex items-start gap-3">
-        <Checkbox
-          checked={task.status === "done"}
-          onCheckedChange={(value) => {
-            const isChecked = value === true;
-            onToggle?.(task.id, isChecked);
-          }}
-          className="mt-1"
-          aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"} ${task.title}`}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium leading-5 text-foreground line-clamp-2 pr-6">
+        {/* Drag Handle */}
+        <div
+          {...provided.dragHandleProps}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing pt-1"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+
+        {/* Task Content - Click to expand in future */}
+        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => {/* Future: open task detail */}}>
+          <div
+            className={cn(
+              "text-sm font-medium leading-5 line-clamp-2 group-hover:text-primary transition-colors",
+              task.status === "done" ? "text-muted-foreground line-through" : "text-foreground"
+            )}
+            title={task.title.length > 50 ? task.title : undefined}
+          >
             {task.title}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {due && (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium border",
-                  due.tone === "destructive" && "border-destructive/40 text-destructive",
-                  due.tone === "accent" && "border-primary/40 text-primary",
-                  due.tone === "default" && "border-muted text-muted-foreground"
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border",
+                  due.tone === "destructive" && "border-destructive/40 bg-destructive/5 text-destructive",
+                  due.tone === "accent" && "border-primary/40 bg-primary/5 text-primary",
+                  due.tone === "default" && "border-border bg-muted/50 text-muted-foreground"
                 )}
               >
-                <CalendarDays className="h-3.5 w-3.5" />
+                <CalendarDays className="h-3 w-3" />
                 {due.label}
               </span>
             )}
             {!!task.tags?.length && task.tags.map((tag) => (
-              <span key={tag} className="rounded-full border border-muted px-2 py-0.5 text-[11px] uppercase tracking-wide">
+              <span key={tag} className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                 {tag}
               </span>
             ))}
           </div>
         </div>
-        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          {/* Bucket Dropdown */}
+
+        {/* Checkbox moved to right as action */}
+        <Checkbox
+          checked={task.status === "done"}
+          disabled={isLoading}
+          onCheckedChange={(value) => {
+            const isChecked = value === true;
+            onToggle?.(task.id, isChecked);
+          }}
+          className={cn("flex-shrink-0 mt-1", isLoading && "animate-pulse opacity-50")}
+          aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"} ${task.title}`}
+        />
+
+        <div className="flex items-center gap-1">
+          {/* Bucket Dropdown - Always visible for accessibility */}
           <div className="relative" ref={dropdownRef}>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7 text-muted-foreground hover:text-primary" 
-              aria-label="Change bucket"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted"
+              aria-label="Task actions"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowBucketDropdown(!showBucketDropdown);
@@ -183,43 +228,48 @@ function TaskCard({
             </Button>
             
             {showBucketDropdown && (
-              <div 
-                className="absolute top-8 right-0 z-[9999] min-w-[140px] rounded-lg border border-border bg-background shadow-lg"
+              <div
+                className="absolute top-10 right-0 z-[9999] min-w-[180px] rounded-lg border border-border bg-background shadow-xl"
                 onClick={(e) => e.stopPropagation()}
+                role="menu"
+                aria-label="Move task to bucket"
               >
-                <div className="p-1">
-                  <div className="text-xs font-medium text-muted-foreground px-2 py-1 border-b border-border mb-1">
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-muted-foreground px-3 py-2 border-b border-border mb-1">
                     Move to bucket
                   </div>
-                  
+
                   {/* No bucket option */}
                   <button
-                    className="w-full text-left px-2 py-1 text-sm hover:bg-muted rounded text-muted-foreground"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md text-foreground transition-colors flex items-center gap-2"
                     onClick={() => {
                       onBucketChange?.(task.id, '__unassigned');
                       setShowBucketDropdown(false);
                     }}
+                    role="menuitem"
                   >
+                    <span className="w-3 h-3 rounded-full bg-muted-foreground/30" />
                     No bucket
                   </button>
-                  
+
                   {/* Available buckets */}
                   {availableBuckets.map((bucket) => (
                     <button
                       key={bucket.id}
-                      className="w-full text-left px-2 py-1 text-sm hover:bg-muted rounded flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
                       onClick={() => {
                         onBucketChange?.(task.id, bucket.id);
                         setShowBucketDropdown(false);
                       }}
+                      role="menuitem"
                     >
                       <span
-                        className="w-2 h-2 rounded-full"
+                        className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: bucket.color ?? "var(--primary)" }}
                       />
-                      {bucket.name}
+                      <span className="flex-1 text-foreground">{bucket.name}</span>
                       {task.bucketId === bucket.id && (
-                        <span className="ml-auto text-xs text-primary">✓</span>
+                        <span className="text-primary font-semibold">✓</span>
                       )}
                     </button>
                   ))}
@@ -242,6 +292,8 @@ function BucketColumn({
   onToggleTask,
   availableBuckets = [],
   onBucketChange,
+  viewMode,
+  loadingTasks = new Set(),
 }: {
   bucket: Bucket;
   summary: BucketSummary;
@@ -249,11 +301,15 @@ function BucketColumn({
   onToggleTask?: (id: string, checked: boolean) => void;
   availableBuckets?: Bucket[];
   onBucketChange?: (taskId: string, newBucketId: string) => void;
+  viewMode: TasksBoardViewMode;
+  loadingTasks?: Set<string>;
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
   const { tasks, dueSoonCount } = summary;
+  const isCompletedView = viewMode === "completed";
+  const bucketMetricLabel = isCompletedView ? `${tasks.length} done` : `${tasks.length} open`;
 
   const handleSubmit = () => {
     const trimmed = draft.trim();
@@ -269,32 +325,27 @@ function BucketColumn({
 
   return (
     <Card className="relative flex h-full flex-col snap-start border-none bg-card/70 shadow-lg ring-1 ring-black/5">
-      <CardHeader className="sticky top-0 z-10 space-y-3 border-b border-border/60 bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/70">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 truncate">
+      <CardHeader className="sticky top-0 z-10 border-b border-border/60 bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/70 pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span
-              className="mt-1 inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+              className="inline-block h-2 w-2 flex-shrink-0 rounded-full"
               style={{ background: bucket.color ?? "var(--primary)" }}
               aria-hidden
             />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground" title={bucket.name}>
-                {bucket.name}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{tasks.length} open</span>
-                {dueSoonCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
-                    <Clock3 className="h-3.5 w-3.5" />
-                    {dueSoonCount} due soon
-                  </span>
-                )}
-              </div>
-            </div>
+            <p className="truncate text-sm font-semibold text-foreground" title={bucket.name}>
+              {bucket.name}
+            </p>
+            {!isCompletedView && dueSoonCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                <Clock3 className="h-2.5 w-2.5" />
+                {dueSoonCount}
+              </span>
+            )}
           </div>
-          <Badge variant="secondary" className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+          <span className="text-xs text-muted-foreground shrink-0">
             {tasks.length}
-          </Badge>
+          </span>
         </div>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -303,25 +354,51 @@ function BucketColumn({
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}
-              className={`flex-1 space-y-3 ${snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg' : ''}`}
+              className={cn(
+                "flex-1 space-y-3 rounded-lg transition-all relative",
+                snapshot.isDraggingOver && "bg-primary/10 ring-2 ring-primary ring-offset-2",
+                snapshot.draggingFromThisWith && "opacity-50"
+              )}
             >
-              {tasks.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center text-sm text-muted-foreground min-h-[200px]">
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                    <Plus className="h-4 w-4" />
+              {snapshot.isDraggingOver && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                  <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
+                    Drop task in {bucket.name}
                   </div>
-                  <p className="font-medium text-foreground">No tasks yet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Add something you want to tackle next in {bucket.name}.</p>
+                </div>
+              )}
+              {tasks.length === 0 ? (
+                <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center min-h-[200px]">
+                  {isCompletedView ? (
+                    <>
+                      <CheckCircle2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                      <p className="text-base font-medium text-foreground">No completed tasks yet</p>
+                      <p className="mt-2 text-sm text-muted-foreground max-w-xs">
+                        Tasks you check off in {bucket.name} will appear here.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                        <Plus className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-base font-medium text-foreground">Welcome to {bucket.name}</p>
+                      <p className="mt-2 text-sm text-muted-foreground max-w-xs">
+                        Start capturing tasks to stay organized. Add your first task below.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 tasks.map((task, index) => (
-                  <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    index={index} 
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    index={index}
                     onToggle={onToggleTask}
                     availableBuckets={availableBuckets}
                     onBucketChange={onBucketChange}
+                    isLoading={loadingTasks.has(task.id)}
                   />
                 ))
               )}
@@ -366,21 +443,20 @@ function BucketColumn({
   );
 }
 
-export default function TasksBoard({
-  buckets: bucketsProp,
-  tasks: tasksProp,
-  onCompleteTask,
-  onUncompleteTask,
-  onAddTask,
-  onMoveTask,
-}: {
-  buckets?: Bucket[];
-  tasks?: Task[];
-  onCompleteTask?: (id: string) => void;
-  onUncompleteTask?: (id: string) => void;
-  onAddTask?: (bucketId: string, title: string) => void;
-  onMoveTask?: (taskId: string, newBucketId: string) => void;
-}) {
+const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksBoard(
+  {
+    buckets: bucketsProp,
+    tasks: tasksProp,
+    onCompleteTask,
+    onUncompleteTask,
+    onAddTask,
+    onMoveTask,
+    viewMode = "open",
+    filters,
+    loadingTasks = new Set(),
+  },
+  ref
+) {
   const mockBuckets: Bucket[] = [
     { id: "b1", name: "Health", color: "#7C4DFF" },
     { id: "b2", name: "Work", color: "#4F46E5" },
@@ -403,21 +479,50 @@ export default function TasksBoard({
   const buckets = bucketsProp ?? mockBuckets;
   const tasks = tasksProp ?? mockTasks;
   const summaries = useMemo(() => groupByBucket(tasks), [tasks]);
-  const totalDueSoon = useMemo(() => tasks.filter((task) => isDateSoon(task.dueDate)).length, [tasks]);
+  const totalDueSoon = useMemo(
+    () => (viewMode === "open" ? tasks.filter((task) => isDateSoon(task.dueDate)).length : 0),
+    [tasks, viewMode]
+  );
 
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const bucketFilterBarRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeBucket, setActiveBucket] = useState<string | null>(null);
 
-  const handleJump = (bucketId: string) => {
+  const handleJump = React.useCallback((bucketId: string) => {
     setActiveBucket(bucketId);
     const element = columnRefs.current[bucketId];
     if (element) {
       element.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
     }
-  };
+  }, []);
 
-  const totalOpen = tasks.filter((task) => task.status === "open").length;
+  useImperativeHandle(
+    ref,
+    () => ({
+      focusBuckets: () => {
+        setActiveBucket(null);
+        if (bucketFilterBarRef.current) {
+          bucketFilterBarRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          bucketFilterBarRef.current.focus({ preventScroll: true });
+        }
+      },
+      scrollToBucket: (bucketId: string) => {
+        handleJump(bucketId);
+      },
+    }),
+    [handleJump]
+  );
+
+  const primaryLabel = viewMode === "completed" ? "Completed tasks" : "Open tasks";
+  const primaryCount = tasks.length;
+  const primaryBadgeClasses = viewMode === "completed"
+    ? "bg-emerald-100 text-emerald-700"
+    : "bg-primary/10 text-primary";
+
+  const showSecondarySummary = viewMode === "open";
+  const secondaryLabel = filters?.dueSoonOnly ? "Due soon (filtered)" : "Due soon";
+  const secondaryCount = filters?.dueSoonOnly ? tasks.length : totalDueSoon;
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -437,22 +542,46 @@ export default function TasksBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-    <div className="flex h-full w-full flex-col gap-4">
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-xs uppercase tracking-wide text-muted-foreground">
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-[11px] font-semibold">
-            Open Tasks
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary text-[11px] font-semibold normal-case">{totalOpen}</span>
-          </span>
-          <span className="hidden items-center gap-1 text-[11px] font-semibold md:flex">
-            Due soon
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700 text-[11px] font-semibold normal-case">{totalDueSoon}</span>
-          </span>
+    <div className="flex h-full w-full flex-col gap-3">
+      {/* Simplified bucket navigation - smaller and cleaner */}
+      <div className="flex items-center justify-between gap-3">
+        <div
+          ref={bucketFilterBarRef}
+          tabIndex={-1}
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 focus-visible:outline-none"
+          aria-label="Buckets"
+        >
+          {buckets.map((bucket) => (
+            <Button
+              key={bucket.id}
+              variant={activeBucket === bucket.id ? "default" : "ghost"}
+              size="sm"
+              className={cn(
+                "h-7 rounded-lg px-3 text-xs font-medium shrink-0",
+                activeBucket === bucket.id ? "shadow-sm" : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => handleJump(bucket.id)}
+              type="button"
+            >
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ background: bucket.color ?? "var(--primary)" }}
+                />
+                {bucket.name}
+                <span className="ml-1 opacity-60 text-[10px]">
+                  {summaries[bucket.id]?.tasks.length ?? 0}
+                </span>
+              </span>
+            </Button>
+          ))}
         </div>
-        <div className="hidden items-center gap-1 md:flex">
+
+        <div className="hidden items-center gap-0.5 md:flex shrink-0">
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            className="h-7 w-7 p-0"
             type="button"
             onClick={() => {
               if (wrapperRef.current) {
@@ -461,11 +590,12 @@ export default function TasksBoard({
             }}
             aria-label="Scroll left"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size="sm"
+            className="h-7 w-7 p-0"
             type="button"
             onClick={() => {
               if (wrapperRef.current) {
@@ -474,33 +604,8 @@ export default function TasksBoard({
             }}
             aria-label="Scroll right"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
-
-      <div className="-mx-4 overflow-x-auto px-4 pb-1">
-        <div className="flex w-max items-center gap-2 rounded-full bg-muted/40 p-1">
-          {buckets.map((bucket) => (
-            <Button
-              key={bucket.id}
-              variant={activeBucket === bucket.id ? "default" : "ghost"}
-              className={cn(
-                "h-8 rounded-full px-4 text-sm font-medium",
-                activeBucket === bucket.id ? "shadow" : "text-muted-foreground"
-              )}
-              onClick={() => handleJump(bucket.id)}
-              type="button"
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: bucket.color ?? "var(--primary)" }}
-                />
-                {bucket.name}
-              </span>
-            </Button>
-          ))}
         </div>
       </div>
 
@@ -529,6 +634,8 @@ export default function TasksBoard({
                 }}
                 availableBuckets={buckets}
                 onBucketChange={onMoveTask}
+                viewMode={viewMode}
+                loadingTasks={loadingTasks}
               />
             </div>
           ))}
@@ -537,4 +644,6 @@ export default function TasksBoard({
     </div>
     </DragDropContext>
   );
-}
+});
+
+export default TasksBoard;

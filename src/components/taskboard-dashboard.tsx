@@ -114,6 +114,10 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import WidgetSelector from "./widget-selector";
 import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
+import { TasksQuickActions } from "@/components/tasks-quick-actions";
+import { TasksGroupedList } from "@/components/tasks-grouped-list";
+import { TasksDailyProgress } from "@/components/tasks-daily-progress";
+import { EnhancedTasksView } from "@/components/enhanced-tasks-view";
 
 // Dynamic, on-demand heavy widgets and panels
 const NutritionMealTracker = dynamic(
@@ -3583,24 +3587,62 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                 {activeSubTab === 'Tasks' && (
                   <div>
-                    {/* Tasks Header */}
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold">Tasks for {activeBucket}</h2>
-                    </div>
-                    
-                    {/* Tasks Content */}
-                    <TasksProvider selectedDate={new Date()}>
-                      <div className="bg-white rounded-lg border border-gray-200 p-6">
-                        <div className="space-y-6">
-                          <CalendarTaskList 
-                            selectedDate={new Date()}
-                            availableBuckets={buckets}
-                            selectedBucket={activeBucket}
-                            dashboardView={true}
-                          />
+                    {/* Enhanced Empty State */}
+                    {!activeBucket || buckets.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 px-4">
+                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+                          <ListChecks className="h-10 w-10 text-blue-600" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          Organize Your Tasks
+                        </h3>
+                        <p className="text-sm text-gray-500 text-center max-w-md mb-6">
+                          Connect your Todoist account to sync tasks automatically, or start adding tasks manually. 
+                          Keep everything organized by bucket.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button 
+                            onClick={() => window.location.href = '/integrations'}
+                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors flex items-center gap-2"
+                          >
+                            <Zap className="h-5 w-5" />
+                            Connect Todoist
+                          </button>
+                          <button 
+                            onClick={() => setIsEditorOpen(true)}
+                            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                          >
+                            Create a Bucket First
+                          </button>
+                        </div>
+                        
+                        {/* Feature highlights */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12 max-w-3xl">
+                          <div className="text-center p-4">
+                            <Calendar className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-gray-900 mb-1">Due Dates</h4>
+                            <p className="text-xs text-gray-500">Schedule tasks with smart date parsing</p>
+                          </div>
+                          <div className="text-center p-4">
+                            <Flag className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-gray-900 mb-1">Priorities</h4>
+                            <p className="text-xs text-gray-500">Mark critical tasks to focus on what matters</p>
+                          </div>
+                          <div className="text-center p-4">
+                            <Target className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                            <h4 className="font-medium text-gray-900 mb-1">Bucket Tags</h4>
+                            <p className="text-xs text-gray-500">Auto-tag tasks with your current bucket</p>
+                          </div>
                         </div>
                       </div>
-                    </TasksProvider>
+                    ) : (
+                      <TasksProvider selectedDate={new Date()}>
+                        <EnhancedTasksView
+                          activeBucket={activeBucket}
+                          buckets={buckets}
+                        />
+                      </TasksProvider>
+                    )}
                   </div>
                 )}
 

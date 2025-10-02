@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SidebarLayout } from "@/components/sidebar-layout";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
-import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
+import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask, type TasksBoardHandle } from "@/components/TasksBoard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { differenceInCalendarDays, parseISO, isValid } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, Clock, ChevronRight } from "lucide-react";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
+import { cn } from "@/lib/utils";
+import { useToast, ToastProvider } from "@/components/ui/use-toast";
 
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
 
@@ -23,11 +25,16 @@ function normalizeBucketId(name?: string | null) {
 function TasksBoardShell() {
   const { allTasks, toggleTaskCompletion, createTask, batchUpdateTasks } = useTasksContext();
   const { buckets } = useBuckets();
+  const { toast } = useToast();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [quickTask, setQuickTask] = useState("");
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"open" | "completed">("open");
+  const [dueSoonOnly, setDueSoonOnly] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const boardRef = useRef<TasksBoardHandle | null>(null);
+  const quickAddInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!quickBucket && buckets.length > 0) {
@@ -65,9 +72,24 @@ function TasksBoardShell() {
     return diff >= 0 && diff <= 3;
   };
 
+  const filteredOpenTasks = useMemo(() => {
+    if (!dueSoonOnly) return openTasks;
+    return openTasks.filter((t) => isDueSoon(t.due?.date ?? null));
+  }, [openTasks, dueSoonOnly]);
+
+  const tasksForBoard = useMemo(
+    () => (viewMode === "open" ? filteredOpenTasks : completedTasks),
+    [viewMode, filteredOpenTasks, completedTasks]
+  );
+
+  useEffect(() => {
+    if (viewMode === "completed" && dueSoonOnly) {
+      setDueSoonOnly(false);
+    }
+  }, [viewMode, dueSoonOnly]);
+
   const boardTasks: BoardTask[] = useMemo(() => {
-    const tasksToShow = viewMode === "open" ? openTasks : completedTasks;
-    return tasksToShow.map((t) => ({
+    return tasksForBoard.map((t) => ({
       id: t.id.toString(),
       title: t.content,
       bucketId: normalizeBucketId(t.bucket),
@@ -76,7 +98,7 @@ function TasksBoardShell() {
       dueDate: t.due?.date ?? null,
       createdAt: t.created_at ?? null,
     }));
-  }, [openTasks, completedTasks, viewMode]);
+  }, [tasksForBoard]);
 
   const boardBuckets: BoardBucket[] = useMemo(() => {
     const ids: string[] = [];
@@ -95,158 +117,233 @@ function TasksBoardShell() {
   const totalCompleted = completedTasks.length;
   const dueSoonCount = openTasks.filter((t) => isDueSoon(t.due?.date ?? null)).length;
   const bucketCount = boardBuckets.length;
+  const dueSoonCardDisabled = dueSoonCount === 0 && !dueSoonOnly;
+  const dueSoonDescription = dueSoonOnly
+    ? "Filter is limited to upcoming deadlines."
+    : dueSoonCount === 0
+      ? "Nothing due in the next three days."
+      : "Within the next three days.";
+
+  const statCards = [
+    {
+      key: "open",
+      title: "Open tasks",
+      value: totalOpen,
+      description: "Active items across every bucket.",
+    },
+    {
+      key: "dueSoon",
+      title: "Due soon",
+      value: dueSoonCount,
+      description: dueSoonDescription,
+    },
+    {
+      key: "completed",
+      title: "Completed tasks",
+      value: totalCompleted,
+      description: "Tasks you've completed.",
+    },
+    {
+      key: "buckets",
+      title: "Buckets",
+      value: bucketCount,
+      description: "Organize work by focus areas.",
+    },
+  ];
 
   const handleQuickAdd = async () => {
     const trimmed = quickTask.trim();
     if (!trimmed) return;
-    await createTask(trimmed, null, undefined, quickBucket || undefined);
-    setQuickTask("");
-    setQuickAddOpen(false);
+
+    setIsCreatingTask(true);
+    try {
+      await createTask(trimmed, null, undefined, quickBucket || undefined);
+      toast({
+        title: "Task created",
+        description: `"${trimmed}" added to ${quickBucket || "Unsorted"}`,
+      });
+      setQuickTask("");
+      // Keep focus on input for next task
+      quickAddInputRef.current?.focus();
+    } catch (error) {
+      toast({
+        title: "Failed to create task",
+        description: "Please try again.",
+        type: "error",
+      });
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
+
+  const handleToggleTask = async (taskId: string) => {
+    setLoadingTasks(prev => new Set(prev).add(taskId));
+    try {
+      await toggleTaskCompletion(taskId);
+    } catch (error) {
+      toast({
+        title: "Failed to update task",
+        description: "Please try again.",
+        type: "error",
+      });
+    } finally {
+      setLoadingTasks(prev => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }
   };
 
   const handleMoveTask = async (taskId: string, newBucketId: string) => {
     const newBucket = newBucketId === UNASSIGNED_BUCKET_ID ? undefined : newBucketId;
-    await batchUpdateTasks([
-      { taskId, updates: { bucket: newBucket } }
-    ]);
+    setLoadingTasks(prev => new Set(prev).add(taskId));
+    try {
+      await batchUpdateTasks([
+        { taskId, updates: { bucket: newBucket } }
+      ]);
+      toast({
+        title: "Task moved",
+        description: `Task moved to ${newBucket || "Unsorted"}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to move task",
+        description: "Please try again.",
+        type: "error",
+      });
+    } finally {
+      setLoadingTasks(prev => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full flex-col gap-6 px-4 py-6">
-      <header className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
+    <div className="flex h-[calc(100vh-64px)] w-full flex-col gap-4 px-4 py-6">
+      <header className="space-y-4">
+        {/* Simplified Header - Title + Quick Add in one row */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-foreground">Tasks</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Stay ahead by reviewing everything that’s still open across your buckets.
+              {totalOpen} open · {dueSoonCount > 0 && `${dueSoonCount} due soon · `}{totalCompleted} completed
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-              <Button
-                variant={viewMode === "open" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("open")}
-                className="h-8 px-3 text-xs"
-              >
-                Open ({openTasks.length})
-              </Button>
-              <Button
-                variant={viewMode === "completed" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("completed")}
-                className="h-8 px-3 text-xs"
-              >
-                Completed ({completedTasks.length})
-              </Button>
-            </div>
-            
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                setQuickAddOpen((prev) => !prev);
-                if (!quickBucket && buckets.length > 0) {
-                  setQuickBucket(buckets[0]);
+
+          {/* Persistent Quick Add - More compact */}
+          <div className="flex items-center gap-2 rounded-lg border border-input bg-background p-1.5 shadow-sm flex-1 max-w-lg">
+            <Input
+              ref={quickAddInputRef}
+              value={quickTask}
+              onChange={(e) => setQuickTask(e.target.value)}
+              placeholder="Add task..."
+              className="flex-1 border-0 focus-visible:ring-0 h-7 text-sm"
+              disabled={isCreatingTask}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && quickTask.trim()) {
+                  event.preventDefault();
+                  handleQuickAdd();
                 }
               }}
+            />
+            <select
+              value={quickBucket}
+              onChange={(event) => setQuickBucket(event.target.value)}
+              disabled={isCreatingTask}
+              className="h-7 rounded-md border-0 bg-muted/50 px-2 text-xs focus-visible:outline-none"
             >
-              <Plus className="h-4 w-4" />
-              New task
+              <option value="">Unsorted</option>
+              {buckets.map((bucket) => (
+                <option key={bucket} value={bucket}>
+                  {bucket}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              onClick={handleQuickAdd}
+              disabled={!quickTask.trim() || isCreatingTask}
+              className="flex-shrink-0 h-7 px-2"
+            >
+              {isCreatingTask ? "..." : <Plus className="h-4 w-4" />}
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {viewMode === "open" ? "Open tasks" : "Completed tasks"}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">
-              {viewMode === "open" ? totalOpen : totalCompleted}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {viewMode === "open" ? "Active items across every bucket." : "Tasks you've completed."}
-            </p>
-          </Card>
-          <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {viewMode === "open" ? "Due soon" : "Total open"}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">
-              {viewMode === "open" ? dueSoonCount : totalOpen}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {viewMode === "open" ? "Within the next three days." : "Still need to be done."}
-            </p>
-          </Card>
-          <Card className="rounded-2xl border border-border/60 bg-card/80 p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Buckets</p>
-            <p className="mt-2 text-2xl font-semibold">{bucketCount}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Organize work by focus areas.</p>
-          </Card>
-        </div>
+        {/* Simplified Filter Bar - Single compact row */}
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === "open" && !dueSoonOnly ? "default" : "ghost"}
+              size="sm"
+              onClick={() => {
+                setViewMode("open");
+                setDueSoonOnly(false);
+              }}
+              className="h-7 text-xs"
+            >
+              All Open <span className="ml-1.5 opacity-70">{totalOpen}</span>
+            </Button>
+            <Button
+              variant={dueSoonOnly ? "default" : "ghost"}
+              size="sm"
+              onClick={() => {
+                setViewMode("open");
+                setDueSoonOnly(true);
+              }}
+              disabled={dueSoonCount === 0}
+              className="h-7 text-xs gap-1"
+            >
+              <Clock className="h-3 w-3" />
+              Due Soon <span className="ml-1 opacity-70">{dueSoonCount}</span>
+            </Button>
+            <Button
+              variant={viewMode === "completed" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => {
+                setViewMode("completed");
+                setDueSoonOnly(false);
+              }}
+              className="h-7 text-xs"
+            >
+              Completed <span className="ml-1.5 opacity-70">{totalCompleted}</span>
+            </Button>
+          </div>
 
-        {quickAddOpen && (
-          <Card className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
-              <div className="flex-1">
-                <label className="text-xs font-medium uppercase tracking-wide text-primary">Task</label>
-                <Input
-                  value={quickTask}
-                  onChange={(e) => setQuickTask(e.target.value)}
-                  placeholder="Describe what you need to do"
-                  className="mt-1"
-                  autoFocus
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleQuickAdd();
-                    }
-                  }}
-                />
-              </div>
-              <div className="md:w-52">
-                <label className="text-xs font-medium uppercase tracking-wide text-primary">Bucket</label>
-                <select
-                  value={quickBucket}
-                  onChange={(event) => setQuickBucket(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                >
-                  <option value="">Unsorted</option>
-                  {buckets.map((bucket) => (
-                    <option key={bucket} value={bucket}>
-                      {bucket}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 md:pb-0">
-                <Button onClick={handleQuickAdd} type="button" disabled={!quickTask.trim()}>
-                  Add
-                </Button>
-                <Button variant="ghost" type="button" onClick={() => setQuickAddOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setViewMode("open");
+              setDueSoonOnly(false);
+              boardRef.current?.focusBuckets();
+            }}
+            className="h-7 text-xs gap-1"
+          >
+            Jump to bucket
+            <ChevronRight className="h-3 w-3" />
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 min-h-0">
         <TasksBoard
+          ref={boardRef}
           buckets={boardBuckets}
           tasks={boardTasks}
-          onCompleteTask={(id) => toggleTaskCompletion(id)}
-          onUncompleteTask={(id) => toggleTaskCompletion(id)}
+          onCompleteTask={handleToggleTask}
+          onUncompleteTask={handleToggleTask}
           onAddTask={(bucketId, title) => {
             const resolvedBucket = bucketId === UNASSIGNED_BUCKET_ID ? undefined : bucketId;
             void createTask(title, null, undefined, resolvedBucket);
           }}
           onMoveTask={handleMoveTask}
+          viewMode={viewMode}
+          filters={{ dueSoonOnly }}
+          loadingTasks={loadingTasks}
         />
       </div>
     </div>
@@ -255,10 +352,12 @@ function TasksBoardShell() {
 
 export default function TasksPageClient() {
   return (
-    <TasksProvider selectedDate={new Date()}>
-      <SidebarLayout>
-        <TasksBoardShell />
-      </SidebarLayout>
-    </TasksProvider>
+    <ToastProvider>
+      <TasksProvider selectedDate={new Date()}>
+        <SidebarLayout>
+          <TasksBoardShell />
+        </SidebarLayout>
+      </TasksProvider>
+    </ToastProvider>
   );
 }
