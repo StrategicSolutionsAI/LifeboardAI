@@ -172,8 +172,8 @@ const getBucketEventStyles = (bucketName?: string | null, bucketColors?: Record<
 function buildMonthMatrix(currentMonth: Date) {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   const rows: Date[][] = [];
   let day = startDate;
@@ -190,7 +190,7 @@ function buildMonthMatrix(currentMonth: Date) {
 }
 
 function buildWeekMatrix(currentDate: Date) {
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const week: Date[] = [];
   for (let i = 0; i < 7; i++) {
     week.push(addDays(weekStart, i));
@@ -771,8 +771,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         };
       case 'week':
         return {
-          start: startOfWeek(currentDate, { weekStartsOn: 0 }),
-          end: endOfWeek(currentDate, { weekStartsOn: 0 })
+          start: startOfWeek(currentDate, { weekStartsOn: 1 }),
+          end: endOfWeek(currentDate, { weekStartsOn: 1 })
         };
       case 'day':
         return {
@@ -874,8 +874,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       case 'month':
         return format(currentDate, "MMMM yyyy");
       case 'week':
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
         return `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
       case 'day':
         return format(currentDate, "EEEE, MMMM d, yyyy");
@@ -1292,7 +1292,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {/* Week Days Header - only show for month and week views */}
       {(view === 'month' || view === 'week') && (
         <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2 px-3">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => (
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
             <div key={i} className="py-2 font-medium">
               {d}
             </div>
