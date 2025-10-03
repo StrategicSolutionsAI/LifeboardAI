@@ -1119,15 +1119,60 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const getCellSize = () => {
     switch (view) {
       case 'month':
-        return 'aspect-square';
+        return 'min-h-[115px] sm:min-h-[135px]';
       case 'week':
         return 'h-32';
       case 'day':
         return 'min-h-[600px]';
       default:
-        return 'aspect-square';
+        return 'min-h-[115px] sm:min-h-[135px]';
     }
   };
+
+  const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const multiDayMinWidth = view === 'week' ? 'min-w-[640px]' : 'min-w-[600px]';
+
+  const weekdayHeader = (
+    <div className="grid grid-cols-7 gap-x-1 gap-y-1 px-2 sm:px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+      {weekDayLabels.map((label, index) => (
+        <div key={label} className="flex flex-col items-center gap-1 py-1">
+          <span className="hidden text-[11px] text-gray-500 sm:block">{label}</span>
+          <span className="sm:hidden text-[10px] text-gray-500">{label.slice(0, 2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const resolveEventStyles = useCallback(
+    (source: DayEvent['source'], ev?: DayEvent) => {
+      switch (source) {
+        case 'google':
+          return {
+            container: 'border border-blue-100 bg-blue-50/90 text-blue-900 shadow-sm hover:bg-blue-50',
+            time: 'text-blue-500',
+            dot: 'bg-blue-400',
+            badge: 'text-blue-500'
+          };
+        case 'uploaded':
+          return {
+            container: 'border border-purple-100 bg-purple-50/90 text-purple-900 shadow-sm hover:bg-purple-50',
+            time: 'text-purple-500',
+            dot: 'bg-purple-400',
+            badge: 'text-purple-500'
+          };
+        case 'lifeboard':
+          return getBucketEventStyles(ev?.bucket, bucketColors);
+        default:
+          return {
+            container: 'border border-gray-100 bg-gray-50/90 text-gray-900 shadow-sm hover:bg-gray-50',
+            time: 'text-gray-500',
+            dot: 'bg-gray-400',
+            badge: 'text-gray-500'
+          };
+      }
+    },
+    [bucketColors]
+  );
 
   return (
     <div className="w-full max-w-none mx-2 sm:mx-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -1289,17 +1334,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         </div>
       </div>
 
-      {/* Week Days Header - only show for month and week views */}
-      {(view === 'month' || view === 'week') && (
-        <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2 px-3">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
-            <div key={i} className="py-2 font-medium">
-              {d}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Calendar Grid */}
       {view === 'day' ? (
         // Enhanced Day view: Modern HourlyPlanner
@@ -1400,20 +1434,48 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </div>
         </div>
       ) : (
-        // Enhanced Month and Week views with optimized layouts for maximum density
-        <div className="p-2">
-          {view === 'week' ? (
-            // Week view: Clean, professional layout
-            <div className="grid grid-cols-7 gap-1 h-[70vh] min-h-[500px] bg-gray-50 rounded-lg overflow-hidden p-1">
-              {rows.flat().map((day: Date, idx: number) => {
+        <div className="relative -mx-3 sm:mx-0">
+          <div className="overflow-x-auto sm:overflow-visible pb-3 sm:pb-0 snap-x snap-mandatory sm:snap-none">
+            <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 space-y-3 px-2 sm:px-0 snap-center`}>
+              {weekdayHeader}
+              {view === 'week' ? (
+                // Week view: Clean, professional layout
+                <div className="grid grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-2 sm:h-[70vh] sm:min-h-[500px] bg-gray-50 rounded-2xl overflow-hidden p-2 sm:p-3">
+                  {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
                 const isCurrentMonth = true; // Always show as current month in week view
                 const isToday = isSameDay(day, today);
+                const formattedDayLabel = format(day, 'MMMM d, yyyy');
+                const weekdayLabel = format(day, 'EEE');
                 
                 return (
                   <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
                     {(provided, snapshot) => {
+                      const dayOfWeek = day.getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const cellClasses = [
+                            getCellSize(),
+                            'relative group flex h-full flex-col items-start justify-start rounded-2xl border text-sm p-2 sm:p-3.5 transition-all duration-200 shadow-sm cursor-pointer overflow-hidden',
+                        isCurrentMonth
+                          ? (isWeekend
+                            ? 'bg-sky-50 text-gray-900 border-sky-100'
+                            : 'bg-white text-gray-900 border-gray-200/60')
+                          : 'bg-gray-50 text-gray-400 border-gray-100',
+                        isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md' : '',
+                        isToday ? 'ring-2 ring-blue-500 border-blue-200 shadow-md' : '',
+                        snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 shadow-lg' : ''
+                      ].filter(Boolean).join(' ');
+                          const dayNumberClasses = [
+                            'lb-heading-sm sm:text-xl',
+                            isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                          ].join(' ');
+                      const addButtonClasses = [
+                        'lb-day-add absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border border-gray-200/70 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-sm transition',
+                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                        'hover:border-blue-200 hover:text-blue-600',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
+                      ].join(' ');
                       return (
                         <div
                           ref={provided.innerRef}
@@ -1423,43 +1485,28 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             if (target.closest('.lb-day-add')) return;
                             if (dayEvents.length) setSelectedModalDate(dayStr);
                           }}
-                          className={`
-                            relative group h-full cursor-pointer flex flex-col text-sm p-3
-                            transition-all duration-200 hover:shadow-md
-                            ${
-                              isCurrentMonth 
-                                ? "bg-white shadow-sm border border-gray-200/60" 
-                                : "bg-gray-50 text-gray-400 border border-gray-100"
-                            } 
-                            ${
-                              isToday 
-                                ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                                : ""
-                            } 
-                            ${
-                              snapshot.isDraggingOver 
-                                ? "bg-blue-100 ring-2 ring-blue-400 shadow-lg" 
-                                : ""
-                            }
-                            rounded-lg overflow-hidden
-                          `}
+                          className={cellClasses}
                         >
                           {/* Clean Day Header */}
-                          <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
-                            <span className={`font-semibold text-lg ${
-                              isToday ? 'text-blue-600' : 
-                              isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                            }`}>
-                              {format(day, "d")}
-                            </span>
+                          <div className="flex w-full items-start justify-between gap-2 pb-2 border-b border-gray-100">
+                            <div className="flex flex-col leading-none">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                                {weekdayLabel}
+                              </span>
+                              <span className={dayNumberClasses}>
+                                {format(day, "d")}
+                              </span>
+                            </div>
                             {dayEvents.length > 0 && (
-                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
                                 {dayEvents.length}
                               </span>
                             )}
                             {/* Hover add button */}
                             <button
-                              className="lb-day-add hidden group-hover:flex items-center gap-1 absolute top-2 right-2 text-gray-600 hover:text-gray-900 text-xs font-medium px-2 py-1 rounded bg-white/80 hover:bg-white border border-gray-200 shadow-sm"
+                              type="button"
+                              className={addButtonClasses}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setAddTaskDate(dayStr);
@@ -1470,49 +1517,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 setIsSubmitting(false);
                                 if (selectedBucket) setFormBucket(selectedBucket);
                                 else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
+                                else setFormBucket('');
                                 setIsAddModalOpen(true);
                               }}
-                              title="Add task"
+                              title={`Add task on ${formattedDayLabel}`}
+                              aria-label={`Add task on ${formattedDayLabel}`}
                             >
-                              + Add
+                              <Plus className="h-3 w-3" />
+                              <span className="hidden sm:inline">Add</span>
                             </button>
                           </div>
                           
                           {/* Events Container */}
-                          <div className="flex-1 overflow-y-auto space-y-2">
+                          <div className="flex-1 space-y-2 overflow-visible sm:overflow-y-auto">
                             {/* No inline creation here – handled by hover modal */}
                             {dayEvents.length > 0 ? (
                               dayEvents.map((ev: DayEvent, i: number) => {
-                                const getEventStyle = (source: string, ev?: DayEvent) => {
-                                  switch (source) {
-                                    case 'google':
-                                      return {
-                                        container: 'bg-blue-50 border-l-4 border-blue-400 text-blue-900 hover:bg-blue-100',
-                                        time: 'text-blue-600',
-                                        dot: 'bg-blue-400',
-                                        badge: 'text-blue-600'
-                                      };
-                                    case 'uploaded':
-                                      return {
-                                        container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
-                                        time: 'text-purple-600',
-                                        dot: 'bg-purple-400',
-                                        badge: 'text-purple-600'
-                                      };
-                                    case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket, bucketColors);
-                                    default:
-                                      return {
-                                        container: 'bg-gray-50 border-l-4 border-gray-400 text-gray-900 hover:bg-gray-100',
-                                        time: 'text-gray-600',
-                                        dot: 'bg-gray-400',
-                                        badge: 'text-gray-600'
-                                      };
-                                  }
-                                };
-
-                                const styles = getEventStyle(ev.source, ev);
+                                const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                                const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const hasTask = Boolean(ev.taskId);
                                 const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
@@ -1530,7 +1553,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     {(dragProvided, dragSnapshot) => (
                                       <div
                                         ref={dragProvided.innerRef}
-                                          {...dragProvided.draggableProps}
+                                        {...dragProvided.draggableProps}
                                         {...(hasTask ? dragProvided.dragHandleProps : {})}
                                         role={canEditEvent ? 'button' : undefined}
                                         tabIndex={canEditEvent ? 0 : undefined}
@@ -1551,57 +1574,62 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
-                                        className={`group p-2 rounded transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                            className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
                                         style={{
                                           ...dragProvided.draggableProps.style,
-                                          ...(styles.customColor ? {
-                                            backgroundColor: styles.customColor + '20',
-                                            borderLeftColor: styles.customColor,
-                                            borderLeftWidth: '4px'
-                                          } : {})
+                                          ...(styles.customColor
+                                            ? {
+                                                backgroundColor: styles.customColor + '20',
+                                                borderColor: styles.customColor + '55',
+                                                borderLeftColor: styles.customColor,
+                                                borderLeftWidth: '4px'
+                                              }
+                                            : {})
                                         }}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                         data-task-id={ev.taskId}
                                       >
                                         <div className="flex items-start gap-2">
-                                          <div
-                                            className={`w-2 h-2 rounded-full ${styles.dot} flex-shrink-0 mt-1`}
+                                          <span
+                                            className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
                                             style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
                                           />
                                           <div className="flex-1 min-w-0">
-                                            {timeDisplay && (
-                                              <div className={`text-xs font-medium ${styles.time} mb-1`}>
-                                                {timeDisplay}
-                                              </div>
+                                            {timeLabel && (
+                                              <time
+                                                dateTime={ev.time}
+                                                className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                              >
+                                                {timeLabel}
+                                              </time>
                                             )}
-                                            <div className="text-sm font-medium truncate">
+                                            <p className="lb-body-xs text-gray-900 truncate">
                                               {ev.title}
-                                            </div>
+                                            </p>
                                             {repeatLabel && (
-                                              <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">
-                                                <span>↻</span>
+                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                                <span aria-hidden>↻</span>
                                                 <span className="truncate">{repeatLabel}</span>
-                                              </div>
+                                              </span>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                          <div className="flex flex-shrink-0 items-center gap-1">
                                             {hasTask && (
                                               <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
+                                                type="button"
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
                                                   setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                 }}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                                                className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
                                                 title="Delete task"
+                                                aria-label={`Delete ${ev.title}`}
                                               >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
                                               </button>
                                             )}
-                                            <span className={`text-xs ${styles.badge}`}>
-                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : ev.source === 'uploaded' ? 'U' : 'T'}
-                                            </span>
                                           </div>
                                         </div>
                                       </div>
@@ -1637,16 +1665,42 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </div>
           ) : (
             // Month view: Clean grid layout
-            <div className={`grid grid-cols-7 gap-2 bg-gray-50 rounded-lg overflow-hidden p-3`}>
+            <div className="grid auto-rows-[minmax(135px,_1fr)] grid-cols-7 gap-x-1.5 gap-y-2 rounded-2xl border border-gray-100 bg-gray-50/80 p-2 sm:gap-3 sm:p-3">
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
-                const isCurrentMonth = view === 'month' ? isSameMonth(day, currentDate) : true;
+                const isCurrentMonth = isSameMonth(day, currentDate);
                 const isToday = isSameDay(day, today);
-                
+                const formattedDayLabel = format(day, 'MMMM d, yyyy');
+                const mobileDayLabel = format(day, 'EEE');
+
                 return (
                   <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
                     {(provided, snapshot) => {
+                      const dayOfWeek = day.getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const cellClasses = [
+                            getCellSize(),
+                            'relative group flex flex-col items-start justify-start rounded-2xl border text-sm p-2 sm:p-3 transition-all duration-200 shadow-sm cursor-pointer overflow-hidden backdrop-blur-sm',
+                            isCurrentMonth
+                              ? (isWeekend
+                                ? 'bg-blue-50/60 text-gray-900 border-blue-100'
+                                : 'bg-white/90 text-gray-900 border-gray-100')
+                              : 'bg-gray-50 text-gray-400 border-gray-100',
+                        isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md' : '',
+                        isToday ? 'ring-2 ring-blue-500 border-blue-200 shadow-md' : '',
+                        snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 shadow-lg' : ''
+                      ].filter(Boolean).join(' ');
+                      const dayNumberClasses = [
+                        'lb-heading-sm sm:text-xl',
+                        isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      ].join(' ');
+                      const addButtonClasses = [
+                        'lb-day-add absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border border-gray-200/70 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-sm transition',
+                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+                        'hover:border-blue-200 hover:text-blue-600',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
+                      ].join(' ');
                       return (
                         <div
                           ref={provided.innerRef}
@@ -1656,47 +1710,28 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             if (target.closest('.lb-day-add')) return;
                             if (dayEvents.length) setSelectedModalDate(dayStr);
                           }}
-                          className={`
-                            ${getCellSize()} 
-                            relative group cursor-pointer flex flex-col items-start justify-start text-sm p-3
-                            transition-all duration-200 hover:shadow-md
-                            ${
-                              isCurrentMonth 
-                                ? "bg-white shadow-sm border border-gray-200 hover:shadow-md" 
-                                : "bg-gray-100 text-gray-400 border border-gray-200"
-                            } 
-                            ${
-                              isToday 
-                                ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                                : ""
-                            } 
-                            ${
-                              snapshot.isDraggingOver 
-                                ? "bg-blue-100 ring-2 ring-blue-400 shadow-lg" 
-                                : ""
-                            }
-                            rounded-lg
-                          `}
-                          style={{
-                            minHeight: '120px'
-                          }}
+                          className={cellClasses}
                         >
                           {/* Clean Date Header */}
-                          <div className="flex items-center justify-between w-full mb-2">
-                            <span className={`font-semibold text-lg ${
-                              isToday ? 'text-blue-600' : 
-                              isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                            }`}>
-                              {format(day, "d")}
-                            </span>
+                          <div className="flex w-full items-start justify-between gap-2">
+                            <div className="flex flex-col leading-none">
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
+                                {mobileDayLabel}
+                              </span>
+                              <span className={dayNumberClasses}>
+                                {format(day, "d")}
+                              </span>
+                            </div>
                             {dayEvents.length > 0 && (
-                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
                                 {dayEvents.length}
                               </span>
                             )}
                             {/* Hover add button */}
                             <button
-                              className="lb-day-add hidden group-hover:flex items-center gap-1 absolute top-2 right-2 text-gray-600 hover:text-gray-900 text-xs font-medium px-2 py-0.5 rounded bg-white/80 hover:bg-white border border-gray-200 shadow-sm"
+                              type="button"
+                              className={addButtonClasses}
                               onClick={(e) => { 
                                 e.stopPropagation(); 
                                 setAddTaskDate(dayStr);
@@ -1705,49 +1740,27 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 setFormRepeat('none');
                                 setEditTaskId(null);
                                 setIsSubmitting(false);
+                                if (selectedBucket) setFormBucket(selectedBucket);
+                                else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
+                                else setFormBucket('');
                                 setIsAddModalOpen(true);
                               }}
-                              title="Add task"
+                              title={`Add task on ${formattedDayLabel}`}
+                              aria-label={`Add task on ${formattedDayLabel}`}
                             >
-                              + Add
+                              <Plus className="h-3 w-3" />
+                              <span className="hidden sm:inline">Add</span>
                             </button>
                           </div>
                           
                           {/* Clean Event Cards (same as week view) */}
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
-                            <div className="w-full space-y-1">
-                              {dayEvents.slice(0, 3).map((ev: DayEvent, i: number) => {
-                                const getEventStyle = (source: string, ev?: DayEvent) => {
-                                  switch (source) {
-                                    case 'google':
-                                      return {
-                                        container: 'bg-blue-50 border-l-4 border-blue-400 text-blue-900 hover:bg-blue-100',
-                                        time: 'text-blue-600',
-                                        dot: 'bg-blue-400',
-                                        badge: 'text-blue-600'
-                                      };
-                                    case 'uploaded':
-                                      return {
-                                        container: 'bg-purple-50 border-l-4 border-purple-400 text-purple-900 hover:bg-purple-100',
-                                        time: 'text-purple-600',
-                                        dot: 'bg-purple-400',
-                                        badge: 'text-purple-600'
-                                      };
-                                    case 'lifeboard':
-                                      return getBucketEventStyles(ev?.bucket, bucketColors);
-                                    default:
-                                      return {
-                                        container: 'bg-gray-50 border-l-4 border-gray-400 text-gray-900 hover:bg-gray-100',
-                                        time: 'text-gray-600',
-                                        dot: 'bg-gray-400',
-                                        badge: 'text-gray-600'
-                                      };
-                                  }
-                                };
-                                
-                                const styles = getEventStyle(ev.source, ev);
+                            <div className="mt-1 w-full space-y-1">
+                              {dayEvents.slice(0, 4).map((ev: DayEvent, i: number) => {
+                                const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                                const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const hasTask = Boolean(ev.taskId);
                                 const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
@@ -1763,7 +1776,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     isDragDisabled={!hasTask}
                                   >
                                     {(dragProvided, dragSnapshot) => (
-                                      <div 
+                                      <div
                                         ref={dragProvided.innerRef}
                                         {...dragProvided.draggableProps}
                                         {...(hasTask ? dragProvided.dragHandleProps : {})}
@@ -1786,56 +1799,61 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
-                                        className={`group p-1.5 rounded text-xs transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : ''}`}
+                                            className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
                                         style={{
                                           ...dragProvided.draggableProps.style,
-                                          ...(styles.customColor ? {
-                                            backgroundColor: styles.customColor + '20',
-                                            borderLeftColor: styles.customColor,
-                                            borderLeftWidth: '4px'
-                                          } : {})
+                                          ...(styles.customColor
+                                            ? {
+                                                backgroundColor: styles.customColor + '20',
+                                                borderColor: styles.customColor + '55',
+                                                borderLeftColor: styles.customColor,
+                                                borderLeftWidth: '4px'
+                                              }
+                                            : {})
                                         }}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                       >
-                                        <div className="flex items-start gap-1.5">
-                                          <div
-                                            className={`w-1.5 h-1.5 rounded-full ${styles.dot} flex-shrink-0 mt-0.5`}
+                                        <div className="flex items-start gap-2">
+                                          <span
+                                            className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
                                             style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
                                           />
                                           <div className="flex-1 min-w-0">
-                                            {timeDisplay && (
-                                              <div className={`text-[10px] font-medium ${styles.time} mb-0.5`}>
-                                                {timeDisplay.replace(' ', '').toLowerCase()}
-                                              </div>
+                                            {timeLabel && (
+                                              <time
+                                                dateTime={ev.time}
+                                                className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                              >
+                                                {timeLabel}
+                                              </time>
                                             )}
-                                            <div className="text-xs font-medium truncate">
-                                              {ev.title.length > 25 ? ev.title.substring(0, 25) + '...' : ev.title}
-                                            </div>
+                                            <p className="lb-body-xs text-gray-900 truncate">
+                                              {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                            </p>
                                             {repeatLabel && (
-                                              <div className="mt-0.5 inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">
-                                                <span>↻</span>
+                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+                                                <span aria-hidden>↻</span>
                                                 <span className="truncate">{repeatLabel}</span>
-                                              </div>
+                                              </span>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                                          <div className="flex flex-shrink-0 items-center gap-1">
                                             {hasTask && (
                                               <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
+                                                type="button"
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
                                                   setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                 }}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-0.5 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                                                className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
                                                 title="Delete task"
+                                                aria-label={`Delete ${ev.title}`}
                                               >
-                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                 </svg>
                                               </button>
                                             )}
-                                            <span className={`text-[10px] ${styles.badge}`}>
-                                              {ev.source === 'google' ? 'G' : ev.source === 'lifeboard' ? 'L' : ev.source === 'uploaded' ? 'U' : 'T'}
-                                            </span>
                                           </div>
                                         </div>
                                       </div>
@@ -1843,10 +1861,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   </Draggable>
                                 );
                               })}
-                              {dayEvents.length > 3 && (
-                                <div className="text-[10px] text-gray-600 font-medium bg-gray-100 px-1.5 py-1 rounded text-center">
-                                  +{dayEvents.length - 3} more
-                                </div>
+                              {dayEvents.length > 4 && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedModalDate(dayStr);
+                                  }}
+                                  className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1 text-[11px] font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                >
+                                  View {dayEvents.length - 4} more
+                                </button>
                               )}
                             </div>
                           )}
@@ -1856,9 +1881,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     }}
                   </Droppable>
                 );
-              })}
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 

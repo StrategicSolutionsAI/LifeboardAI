@@ -27,6 +27,129 @@ interface ICSEvent {
   rrule?: string;
 }
 
+const timeZoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+type DateTimeComponents = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function getTimeZoneFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cacheKey = timeZone;
+  const cached = timeZoneFormatterCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  timeZoneFormatterCache.set(cacheKey, formatter);
+  return formatter;
+}
+
+function extractDateTimeParts(parts: Intl.DateTimeFormatPart[]): DateTimeComponents | null {
+  const extracted: Partial<DateTimeComponents> = {};
+
+  for (const part of parts) {
+    if (part.type === 'year' || part.type === 'month' || part.type === 'day' || part.type === 'hour' || part.type === 'minute' || part.type === 'second') {
+      const value = Number.parseInt(part.value, 10);
+      if (Number.isNaN(value)) {
+        return null;
+      }
+      (extracted as Record<string, number>)[part.type] = value;
+    }
+  }
+
+  if (
+    extracted.year === undefined ||
+    extracted.month === undefined ||
+    extracted.day === undefined ||
+    extracted.hour === undefined ||
+    extracted.minute === undefined ||
+    extracted.second === undefined
+  ) {
+    return null;
+  }
+
+  return extracted as DateTimeComponents;
+}
+
+function resolveTimeZoneOffset(components: DateTimeComponents, timeZone: string): { instant: number; offsetMinutes: number } | null {
+  let formatter: Intl.DateTimeFormat;
+
+  try {
+    formatter = getTimeZoneFormatter(timeZone);
+  } catch (error) {
+    console.warn('Unable to create formatter for timezone, falling back to naive datetime', { timeZone, error });
+    return null;
+  }
+
+  const targetMs = Date.UTC(
+    components.year,
+    components.month - 1,
+    components.day,
+    components.hour,
+    components.minute,
+    components.second,
+  );
+
+  let instant = targetMs;
+
+  for (let i = 0; i < 6; i++) {
+    const parts = formatter.formatToParts(new Date(instant));
+    const zoned = extractDateTimeParts(parts);
+    if (!zoned) {
+      return null;
+    }
+
+    const zonedMs = Date.UTC(
+      zoned.year,
+      zoned.month - 1,
+      zoned.day,
+      zoned.hour,
+      zoned.minute,
+      zoned.second,
+    );
+
+    const delta = targetMs - zonedMs;
+
+    if (Math.abs(delta) < 1000) {
+      const offsetMinutes = Math.round((targetMs - instant) / 60000);
+      return { instant, offsetMinutes };
+    }
+
+    instant += delta;
+  }
+
+  const offsetMinutes = Math.round((targetMs - instant) / 60000);
+  return { instant, offsetMinutes };
+}
+
+function formatOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absMinutes = Math.abs(offsetMinutes);
+  const hours = Math.floor(absMinutes / 60)
+    .toString()
+    .padStart(2, '0');
+  const minutes = (absMinutes % 60)
+    .toString()
+    .padStart(2, '0');
+  return `${sign}${hours}:${minutes}`;
+}
+
 function parseICSFile(icsContent: string): ICSEvent[] {
   const events: ICSEvent[] = [];
   const lines = icsContent.split(/\r?\n/);
@@ -86,7 +209,7 @@ function parseICSFile(icsContent: string): ICSEvent[] {
             currentEvent.start.date = formatDateOnly(value);
           } else {
             // Timed event
-            currentEvent.start.dateTime = formatDateTime(value);
+            currentEvent.start.dateTime = formatDateTime(value, paramMap.TZID);
             if (paramMap.TZID) {
               currentEvent.start.timeZone = paramMap.TZID;
             }
@@ -99,7 +222,7 @@ function parseICSFile(icsContent: string): ICSEvent[] {
             currentEvent.end.date = formatDateOnly(value);
           } else {
             // Timed event
-            currentEvent.end.dateTime = formatDateTime(value);
+            currentEvent.end.dateTime = formatDateTime(value, paramMap.TZID);
             if (paramMap.TZID) {
               currentEvent.end.timeZone = paramMap.TZID;
             }
@@ -115,7 +238,7 @@ function parseICSFile(icsContent: string): ICSEvent[] {
   return events;
 }
 
-function formatDateTime(raw: string): string {
+export function formatDateTime(raw: string, timeZone?: string): string {
   const normalized = raw.trim();
 
   // Match YYYYMMDDT followed by a variable length time (2-6 digits) with optional Z
@@ -134,9 +257,30 @@ function formatDateTime(raw: string): string {
   const hour = paddedTime.substring(0, 2);
   const minute = paddedTime.substring(2, 4);
   const second = paddedTime.substring(4, 6);
-  const suffix = zFlag ? 'Z' : '';
+  if (zFlag) {
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+  }
 
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}${suffix}`;
+  if (timeZone) {
+    const components: DateTimeComponents = {
+      year: Number.parseInt(year, 10),
+      month: Number.parseInt(month, 10),
+      day: Number.parseInt(day, 10),
+      hour: Number.parseInt(hour, 10),
+      minute: Number.parseInt(minute, 10),
+      second: Number.parseInt(second, 10),
+    };
+
+    if (Object.values(components).every((value) => Number.isFinite(value))) {
+      const resolved = resolveTimeZoneOffset(components, timeZone);
+      if (resolved) {
+        const offset = formatOffset(resolved.offsetMinutes);
+        return `${year}-${month}-${day}T${hour}:${minute}:${second}${offset}`;
+      }
+    }
+  }
+
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
 
 function formatDateOnly(icsDate: string): string {

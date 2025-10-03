@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .lb-heading-sm {
+    font-size: 1.125rem; /* 18px */
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .lb-body-xs {
+    font-size: 0.8125rem; /* 13px */
+    line-height: 1.35;
+    font-weight: 500;
+  }
+}
+
 /* === WORLD-CLASS LANDING PAGE ENHANCEMENTS === */
 /* Advanced Animations and Ultra-Premium Micro-interactions */
 
