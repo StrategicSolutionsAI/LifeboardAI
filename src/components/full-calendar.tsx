@@ -1130,6 +1130,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const [isCompactBreakpoint, setIsCompactBreakpoint] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const update = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsCompactBreakpoint(event.matches);
+    };
+
+    update(mq);
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    }
+    mq.addListener(update);
+    return () => mq.removeListener(update);
+  }, []);
+
+  const maxVisibleEvents = isCompactBreakpoint ? 2 : 4;
   const multiDayMinWidth = view === 'week' ? 'min-w-[640px]' : 'min-w-[600px]';
 
   const weekdayHeader = (
@@ -1529,10 +1548,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           </div>
                           
                           {/* Events Container */}
-                          <div className="flex-1 space-y-2 overflow-visible sm:overflow-y-auto">
+                          <div className="flex-1 space-y-1 overflow-visible sm:overflow-y-auto">
                             {/* No inline creation here – handled by hover modal */}
                             {dayEvents.length > 0 ? (
-                              dayEvents.map((ev: DayEvent, i: number) => {
+                              dayEvents.slice(0, maxVisibleEvents).map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
@@ -1574,7 +1593,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
-                                            className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
+                                        className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-1.5 py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
                                         style={{
                                           ...dragProvided.draggableProps.style,
                                           ...(styles.customColor
@@ -1607,7 +1626,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               {ev.title}
                                             </p>
                                             {repeatLabel && (
-                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
                                                 <span aria-hidden>↻</span>
                                                 <span className="truncate">{repeatLabel}</span>
                                               </span>
@@ -1757,7 +1776,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
                             <div className="mt-1 w-full space-y-1">
-                              {dayEvents.slice(0, 4).map((ev: DayEvent, i: number) => {
+                              {dayEvents.slice(0, maxVisibleEvents).map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
@@ -1831,7 +1850,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                               {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
                                             </p>
                                             {repeatLabel && (
-                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold text-emerald-600">
                                                 <span aria-hidden>↻</span>
                                                 <span className="truncate">{repeatLabel}</span>
                                               </span>
@@ -1861,7 +1880,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   </Draggable>
                                 );
                               })}
-                              {dayEvents.length > 4 && (
+                              {dayEvents.length > maxVisibleEvents && (
                                 <button
                                   type="button"
                                   onClick={(event) => {
@@ -1870,7 +1889,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   }}
                                   className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1 text-[11px] font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                 >
-                                  View {dayEvents.length - 4} more
+                                  View {dayEvents.length - maxVisibleEvents} more
                                 </button>
                               )}
                             </div>

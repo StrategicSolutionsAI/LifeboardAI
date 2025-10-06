@@ -238,7 +238,7 @@ function parseICSFile(icsContent: string): ICSEvent[] {
   return events;
 }
 
-export function formatDateTime(raw: string, timeZone?: string): string {
+function formatDateTime(raw: string, timeZone?: string): string {
   const normalized = raw.trim();
 
   // Match YYYYMMDDT followed by a variable length time (2-6 digits) with optional Z
