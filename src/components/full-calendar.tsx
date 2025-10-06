@@ -1121,7 +1121,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       case 'month':
         return 'min-h-[115px] sm:min-h-[135px]';
       case 'week':
-        return 'h-32';
+        return 'min-h-[160px] sm:h-32';
       case 'day':
         return 'min-h-[600px]';
       default:
@@ -1148,11 +1148,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return () => mq.removeListener(update);
   }, []);
 
-  const maxVisibleEvents = isCompactBreakpoint ? 2 : 4;
-  const multiDayMinWidth = view === 'week' ? 'min-w-[640px]' : 'min-w-[600px]';
+  const maxVisibleEvents = isCompactBreakpoint ? 3 : 4;
+  const multiDayMinWidth = isCompactBreakpoint
+    ? 'w-full'
+    : view === 'week'
+      ? 'min-w-[640px]'
+      : 'min-w-[600px]';
 
   const weekdayHeader = (
-    <div className="grid grid-cols-7 gap-x-1 gap-y-1 px-2 sm:px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+    <div className="hidden sm:grid grid-cols-7 gap-x-1 gap-y-1 px-2 sm:px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
       {weekDayLabels.map((label, index) => (
         <div key={label} className="flex flex-col items-center gap-1 py-1">
           <span className="hidden text-[11px] text-gray-500 sm:block">{label}</span>
@@ -1196,159 +1200,168 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   return (
     <div className="w-full max-w-none mx-2 sm:mx-4 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       {/* Clean Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 bg-gray-50/50 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={prevPeriod}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            aria-label="Previous period"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          
-          <button
-            onClick={() => {
-              handleDateChange(new Date());
-            }}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          >
-            Today
-          </button>
-          
-          <button
-            onClick={nextPeriod}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            aria-label="Next period"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="ml-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            title="Upload calendar file"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">Upload</span>
-          </button>
-        </div>
-        
-        <div className="flex items-center gap-2 sm:space-x-3">
-          <h2 className="font-semibold text-base sm:text-lg text-gray-900">
-            {getHeaderTitle()}
-          </h2>
-
-          {/* Multi-Select Bucket Filter */}
-          {(availableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0) && (
-            <div className="relative flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Filter:</label>
-              <div className="relative bucket-filter-dropdown">
-                <button
-                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                  className="text-xs border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center gap-1 min-w-[120px] text-left"
-                >
-                  <span className="truncate flex-1">{getFilterDisplayText()}</span>
-                  <svg
-                    className={`w-3 h-3 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {isFilterDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-50 min-w-[160px]">
-                    <div className="py-1">
-                      {/* All Categories Option */}
-                      <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedBucketFilters.includes('all')}
-                          onChange={() => toggleBucketFilter('all')}
-                          className="w-3 h-3 text-blue-600 rounded mr-2"
-                        />
-                        <span className="text-xs">All Categories</span>
-                      </label>
-
-                      {/* Bucket Options */}
-                      {availableBuckets.map((bucket) => (
-                        <label key={bucket} className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedBucketFilters.includes(bucket)}
-                            onChange={() => toggleBucketFilter(bucket)}
-                            className="w-3 h-3 text-blue-600 rounded mr-2"
-                          />
-                          <span className="text-xs">{bucket}</span>
-                        </label>
-                      ))}
-
-                      {/* Unassigned Option */}
-                      {availableBuckets.length > 0 && (
-                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedBucketFilters.includes('unassigned')}
-                            onChange={() => toggleBucketFilter('unassigned')}
-                            className="w-3 h-3 text-blue-600 rounded mr-2"
-                          />
-                          <span className="text-xs">Unassigned</span>
-                        </label>
-                      )}
-
-                      {/* Google Calendar Option */}
-                      {googleEvents.length > 0 && (
-                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedBucketFilters.includes('google')}
-                            onChange={() => toggleBucketFilter('google')}
-                            className="w-3 h-3 text-blue-600 rounded mr-2"
-                          />
-                          <span className="text-xs">Google Calendar</span>
-                        </label>
-                      )}
-
-                      {/* Uploaded Calendar Option */}
-                      {uploadedEvents.length > 0 && (
-                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedBucketFilters.includes('uploaded')}
-                            onChange={() => toggleBucketFilter('uploaded')}
-                            className="w-3 h-3 text-blue-600 rounded mr-2"
-                          />
-                          <span className="text-xs">Uploaded Calendar</span>
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Clean View Selector */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 overflow-x-auto">
-            {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
+      <div className="px-3 sm:px-4 py-3 bg-gray-50/50 border-b border-gray-100">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+            <div className="flex items-center gap-2">
               <button
-                key={viewOption}
-                onClick={() => handleViewChange(viewOption)}
-                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors duration-200 ${
-                  view === viewOption
-                    ? 'bg-white shadow-sm text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+                onClick={prevPeriod}
+                className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-95"
+                aria-label="Previous period"
               >
-                {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-            ))}
+
+              <button
+                onClick={nextPeriod}
+                className="p-2.5 sm:p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-95"
+                aria-label="Next period"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                handleDateChange(new Date());
+              }}
+              className="flex-1 min-w-[140px] px-4 py-2 sm:flex-none sm:min-w-0 sm:px-3 sm:py-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-95"
+            >
+              Today
+            </button>
+
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex flex-1 min-w-[140px] items-center justify-center gap-2 px-3 py-1.5 sm:flex-none sm:min-w-0 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 active:scale-95"
+              title="Upload calendar file"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="sm:inline">Upload</span>
+            </button>
+          </div>
+
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 sm:justify-end">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
+                {view === 'day' ? 'Daily focus' : view === 'week' ? 'Weekly overview' : 'Monthly planner'}
+              </span>
+              <h2 className="font-semibold text-lg text-gray-900 text-left">
+                {getHeaderTitle()}
+              </h2>
+            </div>
+
+            {/* Multi-Select Bucket Filter */}
+            {(availableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0) && (
+              <div className="flex items-center gap-2">
+                <span className="hidden text-xs font-medium text-gray-600 whitespace-nowrap sm:block">Filter:</span>
+                <div className="relative bucket-filter-dropdown flex-1 sm:flex-none">
+                  <button
+                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                    className="text-xs border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center gap-1 min-w-[120px] text-left w-full"
+                  >
+                    <span className="truncate flex-1 text-gray-700">{getFilterDisplayText()}</span>
+                    <svg
+                      className={`w-3 h-3 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {isFilterDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-50 min-w-[160px]">
+                      <div className="py-1">
+                        {/* All Categories Option */}
+                        <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedBucketFilters.includes('all')}
+                            onChange={() => toggleBucketFilter('all')}
+                            className="w-3 h-3 text-blue-600 rounded mr-2"
+                          />
+                          <span className="text-xs">All Categories</span>
+                        </label>
+
+                        {/* Bucket Options */}
+                        {availableBuckets.map((bucket) => (
+                          <label key={bucket} className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedBucketFilters.includes(bucket)}
+                              onChange={() => toggleBucketFilter(bucket)}
+                              className="w-3 h-3 text-blue-600 rounded mr-2"
+                            />
+                            <span className="text-xs">{bucket}</span>
+                          </label>
+                        ))}
+
+                        {/* Unassigned Option */}
+                        {availableBuckets.length > 0 && (
+                          <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedBucketFilters.includes('unassigned')}
+                              onChange={() => toggleBucketFilter('unassigned')}
+                              className="w-3 h-3 text-blue-600 rounded mr-2"
+                            />
+                            <span className="text-xs">Unassigned</span>
+                          </label>
+                        )}
+
+                        {/* Google Calendar Option */}
+                        {googleEvents.length > 0 && (
+                          <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedBucketFilters.includes('google')}
+                              onChange={() => toggleBucketFilter('google')}
+                              className="w-3 h-3 text-blue-600 rounded mr-2"
+                            />
+                            <span className="text-xs">Google Calendar</span>
+                          </label>
+                        )}
+
+                        {/* Uploaded Calendar Option */}
+                        {uploadedEvents.length > 0 && (
+                          <label className="flex items-center px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedBucketFilters.includes('uploaded')}
+                              onChange={() => toggleBucketFilter('uploaded')}
+                              className="w-3 h-3 text-blue-600 rounded mr-2"
+                            />
+                            <span className="text-xs">Uploaded Calendar</span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Clean View Selector */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200 overflow-x-auto w-full sm:w-auto">
+              {(['day', 'week', 'month'] as CalendarView[]).map((viewOption) => (
+                <button
+                  key={viewOption}
+                  onClick={() => handleViewChange(viewOption)}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors duration-200 text-center ${
+                    view === viewOption
+                      ? 'bg-white shadow-sm text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  {viewOption.charAt(0).toUpperCase() + viewOption.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1358,7 +1371,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         // Enhanced Day view: Modern HourlyPlanner
         <div className="w-full">
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
-            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+            <div className="px-4 py-4 sm:px-6 sm:py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -1371,7 +1384,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 <button
                   type="button"
                   onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
-                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  className="flex w-full sm:w-auto items-center justify-center gap-2 self-start rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 active:scale-95"
                 >
                   <Plus size={16} />
                   <span>Add task</span>
@@ -1379,7 +1392,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </div>
             </div>
             
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               {importedDayEvents.length > 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -1459,7 +1472,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               {weekdayHeader}
               {view === 'week' ? (
                 // Week view: Clean, professional layout
-                <div className="grid grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-2 sm:h-[70vh] sm:min-h-[500px] bg-gray-50 rounded-2xl overflow-hidden p-2 sm:p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-7 gap-y-3 sm:gap-y-2 sm:gap-x-1.5 bg-gray-50 rounded-2xl overflow-hidden p-2 sm:p-3 sm:h-[70vh] sm:min-h-[500px]">
                   {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
@@ -1482,7 +1495,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             : 'bg-white text-gray-900 border-gray-200/60')
                           : 'bg-gray-50 text-gray-400 border-gray-100',
                         isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md' : '',
-                        isToday ? 'ring-2 ring-blue-500 border-blue-200 shadow-md' : '',
+                        isToday ? 'ring-2 ring-blue-500 border-blue-300 shadow-lg bg-blue-50/80' : '',
                         snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 shadow-lg' : ''
                       ].filter(Boolean).join(' ');
                           const dayNumberClasses = [
@@ -1491,8 +1504,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           ].join(' ');
                       const addButtonClasses = [
                         'lb-day-add absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border border-gray-200/70 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-sm transition',
-                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-                        'hover:border-blue-200 hover:text-blue-600',
+                        // Always visible on mobile, hover on desktop
+                        'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
+                        'hover:border-blue-200 hover:text-blue-600 active:scale-95',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
                       return (
@@ -1593,7 +1607,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
-                                        className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-1.5 py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
+                                        className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-2 sm:px-1.5 sm:py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
                                         style={{
                                           ...dragProvided.draggableProps.style,
                                           ...(styles.customColor
@@ -1622,11 +1636,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                                 {timeLabel}
                                               </time>
                                             )}
-                                            <p className="lb-body-xs text-gray-900 truncate">
-                                              {ev.title}
-                                            </p>
+                                            <div className="flex items-center gap-1">
+                                              <p className="lb-body-xs text-gray-900 truncate flex-1">
+                                                {ev.title}
+                                              </p>
+                                              {repeatLabel && (
+                                                <span className="sm:hidden flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                  <span className="text-[10px]">↻</span>
+                                                </span>
+                                              )}
+                                            </div>
                                             {repeatLabel && (
-                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                              <span className="mt-1 hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
                                                 <span aria-hidden>↻</span>
                                                 <span className="truncate">{repeatLabel}</span>
                                               </span>
@@ -1706,18 +1727,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 ? 'bg-blue-50/60 text-gray-900 border-blue-100'
                                 : 'bg-white/90 text-gray-900 border-gray-100')
                               : 'bg-gray-50 text-gray-400 border-gray-100',
-                        isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md' : '',
-                        isToday ? 'ring-2 ring-blue-500 border-blue-200 shadow-md' : '',
+                        isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md active:scale-[0.99] active:shadow-sm' : '',
+                        isToday ? 'ring-2 ring-blue-500 border-blue-300 shadow-lg bg-blue-50/80' : '',
                         snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400 shadow-lg' : ''
                       ].filter(Boolean).join(' ');
                       const dayNumberClasses = [
-                        'lb-heading-sm sm:text-xl',
+                        'text-lg sm:text-xl font-bold',
                         isToday ? 'text-blue-600' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
                       ].join(' ');
                       const addButtonClasses = [
                         'lb-day-add absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border border-gray-200/70 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-sm transition',
-                        'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-                        'hover:border-blue-200 hover:text-blue-600',
+                        // Always visible on mobile, hover on desktop
+                        'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
+                        'hover:border-blue-200 hover:text-blue-600 active:scale-95',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
                       return (
@@ -1732,9 +1754,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           className={cellClasses}
                         >
                           {/* Clean Date Header */}
-                          <div className="flex w-full items-start justify-between gap-2">
+                          <div className="flex w-full items-start justify-between gap-1 sm:gap-2">
                             <div className="flex flex-col leading-none">
-                              <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
+                              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
                                 {mobileDayLabel}
                               </span>
                               <span className={dayNumberClasses}>
@@ -1742,7 +1764,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               </span>
                             </div>
                             {dayEvents.length > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                              <span className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
                                 <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
                                 {dayEvents.length}
                               </span>
@@ -1775,7 +1797,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* Clean Event Cards (same as week view) */}
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
-                            <div className="mt-1 w-full space-y-1">
+                            <div className="mt-1 w-full space-y-0.5 sm:space-y-1">
                               {dayEvents.slice(0, maxVisibleEvents).map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
@@ -1818,7 +1840,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             await openCalendarEvent(ev, dayStr);
                                           }
                                         }}
-                                            className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
+                                            className={`group relative w-full rounded-lg sm:rounded-xl border border-transparent bg-white/95 px-1.5 py-1.5 sm:px-2 sm:py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow-sm sm:shadow hover:shadow-md'}`}
                                         style={{
                                           ...dragProvided.draggableProps.style,
                                           ...(styles.customColor
@@ -1826,13 +1848,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                                 backgroundColor: styles.customColor + '20',
                                                 borderColor: styles.customColor + '55',
                                                 borderLeftColor: styles.customColor,
-                                                borderLeftWidth: '4px'
+                                                // Thinner border on mobile for more space
+                                                borderLeftWidth: window.innerWidth < 640 ? '3px' : '4px'
                                               }
                                             : {})
                                         }}
                                         title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
                                       >
-                                        <div className="flex items-start gap-2">
+                                        {/* Desktop: Original layout with dot, time above title */}
+                                        <div className="hidden sm:flex items-start gap-2">
                                           <span
                                             className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
                                             style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
@@ -1846,9 +1870,16 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                                 {timeLabel}
                                               </time>
                                             )}
-                                            <p className="lb-body-xs text-gray-900 truncate">
-                                              {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
-                                            </p>
+                                            <div className="flex items-center gap-1">
+                                              <p className="lb-body-xs text-gray-900 truncate flex-1">
+                                                {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                              </p>
+                                              {repeatLabel && (
+                                                <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                  <span className="text-[10px]">↻</span>
+                                                </span>
+                                              )}
+                                            </div>
                                             {repeatLabel && (
                                               <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold text-emerald-600">
                                                 <span aria-hidden>↻</span>
@@ -1875,6 +1906,28 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             )}
                                           </div>
                                         </div>
+
+                                        {/* Mobile: Compact layout with inline time, 2-line text wrap, no dot */}
+                                        <div className="sm:hidden flex flex-col gap-0.5">
+                                          <div className="flex items-baseline gap-1.5">
+                                            {timeLabel && (
+                                              <time
+                                                dateTime={ev.time}
+                                                className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide ${styles.time}`}
+                                              >
+                                                {timeLabel}
+                                              </time>
+                                            )}
+                                            {repeatLabel && (
+                                              <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                <span className="text-[9px]">↻</span>
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-[11px] leading-snug font-medium text-gray-900 line-clamp-2">
+                                            {ev.title}
+                                          </p>
+                                        </div>
                                       </div>
                                     )}
                                   </Draggable>
@@ -1887,9 +1940,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     event.stopPropagation();
                                     setSelectedModalDate(dayStr);
                                   }}
-                                  className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1 text-[11px] font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                  className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1.5 sm:py-1 text-[11px] font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                 >
-                                  View {dayEvents.length - maxVisibleEvents} more
+                                  +{dayEvents.length - maxVisibleEvents} more
                                 </button>
                               )}
                             </div>
