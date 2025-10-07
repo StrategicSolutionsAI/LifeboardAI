@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 import './globals.css'
 import PerfObserver from '@/components/perf-observer'
@@ -27,6 +28,7 @@ export default function RootLayout({
         <ThemeProvider>
           <PerfObserver />
           {children}
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>
