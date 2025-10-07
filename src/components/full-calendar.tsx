@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import {
   addMonths,
   subMonths,
@@ -21,7 +23,8 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Sparkles, Heart, Coffee, Sun, BookOpen, Dumbbell, Sticker } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
@@ -29,6 +32,7 @@ import { useDataCache } from "@/hooks/use-data-cache";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { CalendarFileUpload } from "@/components/calendar-file-upload";
+import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/hooks/use-calendar-stickers";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -51,6 +55,74 @@ const getRepeatLabel = (value?: RepeatOption | null) => {
   if (!value || value === 'none') return null;
   return REPEAT_LABELS[value];
 };
+
+interface StickerOption {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  backgroundClass: string;
+  textClass: string;
+  ringClass: string;
+}
+
+const STICKER_OPTIONS: StickerOption[] = [
+  {
+    id: 'celebrate',
+    label: 'Celebrate',
+    icon: Sparkles,
+    backgroundClass: 'bg-pink-50',
+    textClass: 'text-pink-500',
+    ringClass: 'ring-pink-200/70',
+  },
+  {
+    id: 'self-care',
+    label: 'Self-care',
+    icon: Heart,
+    backgroundClass: 'bg-rose-50',
+    textClass: 'text-rose-500',
+    ringClass: 'ring-rose-200/70',
+  },
+  {
+    id: 'coffee-break',
+    label: 'Coffee',
+    icon: Coffee,
+    backgroundClass: 'bg-amber-50',
+    textClass: 'text-amber-600',
+    ringClass: 'ring-amber-200/70',
+  },
+  {
+    id: 'sunshine',
+    label: 'Sunshine',
+    icon: Sun,
+    backgroundClass: 'bg-yellow-50',
+    textClass: 'text-yellow-500',
+    ringClass: 'ring-yellow-200/70',
+  },
+  {
+    id: 'focus',
+    label: 'Focus',
+    icon: BookOpen,
+    backgroundClass: 'bg-indigo-50',
+    textClass: 'text-indigo-500',
+    ringClass: 'ring-indigo-200/70',
+  },
+  {
+    id: 'movement',
+    label: 'Movement',
+    icon: Dumbbell,
+    backgroundClass: 'bg-emerald-50',
+    textClass: 'text-emerald-600',
+    ringClass: 'ring-emerald-200/70',
+  },
+];
+
+const STICKER_LOOKUP: Record<string, StickerOption> = STICKER_OPTIONS.reduce((acc, option) => {
+  acc[option.id] = option;
+  return acc;
+}, {} as Record<string, StickerOption>);
+
+const STICKER_PALETTE_WIDTH = 208;
+const STICKER_PALETTE_HEIGHT = 236;
 
 const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
   if (!value) return undefined;
@@ -230,6 +302,38 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [selectedBucketFilters, setSelectedBucketFilters] = useState<string[]>(['all']);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const { stickersByDate, addStickerToDate, removeStickerFromDate, clearStickersForDate } = useCalendarStickers();
+  const [activeStickerDay, setActiveStickerDay] = useState<string | null>(null);
+  const [selectedStickerDate, setSelectedStickerDate] = useState<string | null>(null); // For date selection in header sticker mode
+  const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
+  const stickerTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [stickerPalettePosition, setStickerPalettePosition] = useState<{ top: number; left: number } | null>(null);
+
+  const computeStickerPalettePosition = useCallback((target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : STICKER_PALETTE_WIDTH;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : STICKER_PALETTE_HEIGHT;
+
+    const preferredLeft = rect.left + rect.width / 2 - STICKER_PALETTE_WIDTH / 2;
+    const clampedLeft = Math.min(
+      Math.max(preferredLeft, 12),
+      viewportWidth - STICKER_PALETTE_WIDTH - 12
+    );
+
+    const preferredTop = rect.bottom + 8;
+    const clampedTop = Math.min(
+      Math.max(preferredTop, 12),
+      viewportHeight - STICKER_PALETTE_HEIGHT - 12
+    );
+
+    return { top: clampedTop, left: clampedLeft };
+  }, []);
+
+  const repositionStickerPalette = useCallback(() => {
+    const trigger = stickerTriggerRef.current;
+    if (!trigger) return;
+    setStickerPalettePosition(computeStickerPalettePosition(trigger));
+  }, [computeStickerPalettePosition]);
 
   // Helper function to toggle bucket filter selection
   const toggleBucketFilter = useCallback((filter: string) => {
@@ -278,6 +382,373 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, [isFilterDropdownOpen]);
 
+  useEffect(() => {
+    if (!activeStickerDay) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (stickerPaletteRef.current?.contains(target)) return;
+      if (stickerTriggerRef.current?.contains(target)) return;
+      setActiveStickerDay(null);
+    };
+
+    document.addEventListener('mousedown', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [activeStickerDay]);
+
+  useEffect(() => {
+    if (!activeStickerDay) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActiveStickerDay(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeStickerDay]);
+
+  useEffect(() => {
+    if (!activeStickerDay) {
+      stickerPaletteRef.current = null;
+      stickerTriggerRef.current = null;
+      setStickerPalettePosition(null);
+    }
+  }, [activeStickerDay]);
+
+  useEffect(() => {
+    if (!activeStickerDay) return;
+    repositionStickerPalette();
+
+    if (typeof window === 'undefined') return;
+
+    const handleWindowChange = () => repositionStickerPalette();
+    window.addEventListener('resize', handleWindowChange);
+    window.addEventListener('scroll', handleWindowChange, true);
+    return () => {
+      window.removeEventListener('resize', handleWindowChange);
+      window.removeEventListener('scroll', handleWindowChange, true);
+    };
+  }, [activeStickerDay, repositionStickerPalette]);
+
+  // Component to display stickers on a date (without add button)
+  const StickerDisplay = ({ dayStr, className }: { dayStr: string; className?: string }) => {
+    const dayStickers = stickersByDate[dayStr] ?? [];
+    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300/40';
+
+    if (dayStickers.length === 0) return null;
+
+    return (
+      <div className={className ?? ''}>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {dayStickers.map((stickerId) => {
+            const option = STICKER_LOOKUP[stickerId];
+            if (!option) return null;
+            const Icon = option.icon;
+            return (
+              <button
+                key={`${dayStr}-${stickerId}`}
+                type="button"
+                title={`Remove ${option.label} sticker`}
+                aria-label={`Remove ${option.label} sticker`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeStickerFromDate(dayStr, stickerId);
+                }}
+                className={`${stickerButtonCommon} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Component for add sticker button only (no sticker display) - for headers
+  const StickerAddButton = ({ dayStr, className, showDatePicker = false }: { dayStr: string; className?: string; showDatePicker?: boolean }) => {
+    const targetDate = showDatePicker && selectedStickerDate ? selectedStickerDate : dayStr;
+    const dayStickers = stickersByDate[targetDate] ?? [];
+    const isOpen = activeStickerDay === dayStr;
+    const reachedLimit = dayStickers.length >= MAX_STICKERS_PER_DAY;
+
+    return (
+      <div className={className ?? ''}>
+        <button
+          type="button"
+          ref={dayStr === activeStickerDay ? stickerTriggerRef : undefined}
+          onClick={(event) => {
+            event.stopPropagation();
+            const target = event.currentTarget as HTMLButtonElement;
+
+            if (activeStickerDay === dayStr) {
+              setActiveStickerDay(null);
+              setSelectedStickerDate(null);
+              return;
+            }
+
+            stickerTriggerRef.current = target;
+            setStickerPalettePosition(computeStickerPalettePosition(target));
+            setActiveStickerDay(dayStr);
+            if (showDatePicker) {
+              setSelectedStickerDate(dayStr);
+            }
+          }}
+          className={[
+            'inline-flex items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-300/40',
+            reachedLimit
+              ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
+              : 'border-gray-300 hover:border-blue-300 hover:text-blue-600'
+          ].join(' ')}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          aria-label={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
+          title={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
+        >
+          <Sticker className="h-3.5 w-3.5" />
+          <span className="ml-1">Sticker</span>
+        </button>
+
+        {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
+          <div
+            ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
+            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-gray-200 bg-white/95 p-2 shadow-xl ring-1 ring-gray-100 backdrop-blur-sm"
+            style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <span>Choose sticker</span>
+              <button
+                type="button"
+                className="text-gray-400 transition hover:text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-300/40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveStickerDay(null);
+                  setSelectedStickerDate(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {showDatePicker && (
+              <div className="mb-3">
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  Select Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedStickerDate || dayStr}
+                  onChange={(e) => setSelectedStickerDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  onClick={(event) => event.stopPropagation()}
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2">
+              {STICKER_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const isSelected = dayStickers.includes(option.id);
+                const disabled = !isSelected && reachedLimit;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-gray-50 text-gray-500 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300/40 ${
+                      isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
+                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (isSelected) {
+                        removeStickerFromDate(targetDate, option.id);
+                      } else if (!disabled) {
+                        addStickerToDate(targetDate, option.id);
+                      }
+                    }}
+                    aria-pressed={isSelected}
+                    aria-label={isSelected ? `Remove ${option.label}` : `Add ${option.label}`}
+                    disabled={disabled && !isSelected}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[10px] font-medium">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-2 space-y-1 text-[10px] text-gray-400">
+              <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
+              <p>Tap a sticker again to remove it.</p>
+            </div>
+
+            {dayStickers.length > 0 && (
+              <button
+                type="button"
+                className="mt-2 w-full rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-300/40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  clearStickersForDate(targetDate);
+                  setActiveStickerDay(null);
+                  setSelectedStickerDate(null);
+                }}
+              >
+                Clear stickers
+              </button>
+            )}
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
+
+  const StickerRow = ({ dayStr, className }: { dayStr: string; className?: string }) => {
+    const dayStickers = stickersByDate[dayStr] ?? [];
+    const isOpen = activeStickerDay === dayStr;
+    const reachedLimit = dayStickers.length >= MAX_STICKERS_PER_DAY;
+
+    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300/40';
+
+    return (
+      <div className={className ?? ''}>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <button
+            type="button"
+            ref={dayStr === activeStickerDay ? stickerTriggerRef : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              const target = event.currentTarget as HTMLButtonElement;
+
+              if (activeStickerDay === dayStr) {
+                setActiveStickerDay(null);
+                return;
+              }
+
+              stickerTriggerRef.current = target;
+              setStickerPalettePosition(computeStickerPalettePosition(target));
+              setActiveStickerDay(dayStr);
+            }}
+            className={[
+              'order-first inline-flex w-full items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-gray-600 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-300/40 sm:order-none sm:w-auto sm:px-3',
+              reachedLimit
+                ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
+                : 'border-gray-300 hover:border-blue-300 hover:text-blue-600'
+            ].join(' ')}
+            aria-haspopup="dialog"
+            aria-expanded={isOpen}
+            aria-label={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
+            title={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
+          >
+            <Sticker className="h-3.5 w-3.5" />
+            <span className="ml-1">Sticker</span>
+          </button>
+
+          {dayStickers.map((stickerId) => {
+            const option = STICKER_LOOKUP[stickerId];
+            if (!option) return null;
+            const Icon = option.icon;
+            return (
+              <button
+                key={`${dayStr}-${stickerId}`}
+                type="button"
+                title={`Remove ${option.label} sticker`}
+                aria-label={`Remove ${option.label} sticker`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeStickerFromDate(dayStr, stickerId);
+                }}
+                className={`${stickerButtonCommon} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            );
+          })}
+        </div>
+
+        {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
+          <div
+            ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
+            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-gray-200 bg-white/95 p-2 shadow-xl ring-1 ring-gray-100 backdrop-blur-sm"
+            style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <span>Choose sticker</span>
+              <button
+                type="button"
+                className="text-gray-400 transition hover:text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-300/40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveStickerDay(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {STICKER_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const isSelected = dayStickers.includes(option.id);
+                const disabled = !isSelected && reachedLimit;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-gray-50 text-gray-500 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300/40 ${
+                      isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
+                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (isSelected) {
+                        removeStickerFromDate(dayStr, option.id);
+                      } else if (!disabled) {
+                        addStickerToDate(dayStr, option.id);
+                      }
+                    }}
+                    aria-pressed={isSelected}
+                    aria-label={isSelected ? `Remove ${option.label}` : `Add ${option.label}`}
+                    disabled={disabled && !isSelected}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="text-[10px] font-medium">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-2 space-y-1 text-[10px] text-gray-400">
+              <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
+              <p>Tap a sticker again to remove it.</p>
+            </div>
+
+            {dayStickers.length > 0 && (
+              <button
+                type="button"
+                className="mt-2 w-full rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-500 transition hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-300/40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  clearStickersForDate(dayStr);
+                  setActiveStickerDay(null);
+                }}
+              >
+                Clear stickers
+              </button>
+            )}
+          </div>,
+          document.body
+        )}
+      </div>
+    );
+  };
+
   // Initialize current date from localStorage or prop or default to today
   const [currentDate, setCurrentDate] = useState(() => {
     if (propSelectedDate) return propSelectedDate;
@@ -323,6 +794,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
   const today = new Date();
+  const currentDateKey = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
   // Hover-add modal state
   const [addTaskDate, setAddTaskDate] = useState<string | null>(null);
@@ -336,6 +808,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string; date: string } | null>(null);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveStickerDay(null);
+  }, [view, currentDateKey]);
 
   // Get tasks from context
   const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask, refetch } = useTasksContext();
@@ -885,9 +1361,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   };
 
   const rows = getMatrix();
-
-  const currentDateKey = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
-
   const importedDayEvents = useMemo(() => {
     const dayEvents = eventsByDate[currentDateKey] ?? [];
     return dayEvents.filter((event) => event.source === 'uploaded');
@@ -1121,7 +1594,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       case 'month':
         return 'min-h-[115px] sm:min-h-[135px]';
       case 'week':
-        return 'min-h-[160px] sm:h-32';
+        return 'min-h-[200px] sm:min-h-[360px]';
       case 'day':
         return 'min-h-[600px]';
       default:
@@ -1149,14 +1622,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, []);
 
   const maxVisibleEvents = isCompactBreakpoint ? 3 : 4;
+  const getEventsForDisplay = useCallback((dayEvents: DayEvent[]) => {
+    if (view === 'week') {
+      return [...dayEvents].sort((a, b) => {
+        if (a.allDay && !b.allDay) return -1;
+        if (!a.allDay && b.allDay) return 1;
+
+        if (a.time && b.time) {
+          const timeA = new Date(a.time).getTime();
+          const timeB = new Date(b.time).getTime();
+          if (timeA !== timeB) return timeA - timeB;
+        }
+
+        if (a.time && !b.time) return -1;
+        if (!a.time && b.time) return 1;
+
+        return (a.title ?? '').localeCompare(b.title ?? '');
+      });
+    }
+
+    return dayEvents.slice(0, maxVisibleEvents);
+  }, [view, maxVisibleEvents]);
   const multiDayMinWidth = isCompactBreakpoint
     ? 'w-full'
     : view === 'week'
-      ? 'min-w-[640px]'
+      ? 'w-full'
       : 'min-w-[600px]';
 
   const weekdayHeader = (
-    <div className="hidden sm:grid grid-cols-7 gap-x-1 gap-y-1 px-2 sm:px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+    <div className="hidden sm:grid grid-cols-7 gap-x-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400 pb-2">
       {weekDayLabels.map((label, index) => (
         <div key={label} className="flex flex-col items-center gap-1 py-1">
           <span className="hidden text-[11px] text-gray-500 sm:block">{label}</span>
@@ -1249,9 +1743,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
                 {view === 'day' ? 'Daily focus' : view === 'week' ? 'Weekly overview' : 'Monthly planner'}
               </span>
-              <h2 className="font-semibold text-lg text-gray-900 text-left">
-                {getHeaderTitle()}
-              </h2>
+              <div className="flex flex-col gap-2">
+                <h2 className="font-semibold text-lg text-gray-900 text-left">
+                  {getHeaderTitle()}
+                </h2>
+                {view !== 'day' && (
+                  <StickerAddButton dayStr={currentDateKey} className="flex justify-start" showDatePicker={true} />
+                )}
+              </div>
             </div>
 
             {/* Multi-Select Bucket Filter */}
@@ -1380,6 +1879,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   <p className="text-sm text-gray-600 mt-2 font-medium">
                     Plan your day with precision scheduling
                   </p>
+                  <StickerRow dayStr={currentDateKey} className="mt-3 flex justify-start" />
                 </div>
                 <button
                   type="button"
@@ -1468,12 +1968,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       ) : (
         <div className="relative -mx-3 sm:mx-0">
           <div className="overflow-x-auto sm:overflow-visible pb-3 sm:pb-0 snap-x snap-mandatory sm:snap-none">
-            <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 space-y-3 px-2 sm:px-0 snap-center`}>
-              {weekdayHeader}
+            <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 px-2 sm:px-0 snap-center`}>
               {view === 'week' ? (
                 // Week view: Clean, professional layout
-                <div className="grid grid-cols-1 sm:grid-cols-7 gap-y-3 sm:gap-y-2 sm:gap-x-1.5 bg-gray-50 rounded-2xl overflow-hidden p-2 sm:p-3 sm:h-[70vh] sm:min-h-[500px]">
-                  {rows.flat().map((day: Date, idx: number) => {
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden p-2 sm:p-4 sm:min-h-[520px]">
+                  {weekdayHeader}
+                  <div className="grid grid-cols-1 sm:grid-cols-7 gap-y-3 sm:gap-y-2 sm:gap-x-1.5">
+                    {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
                 const isCurrentMonth = true; // Always show as current month in week view
@@ -1509,6 +2010,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         'hover:border-blue-200 hover:text-blue-600 active:scale-95',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
+                      const visibleEvents = getEventsForDisplay(dayEvents).slice(0, maxVisibleEvents);
                       return (
                         <div
                           ref={provided.innerRef}
@@ -1521,21 +2023,26 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           className={cellClasses}
                         >
                           {/* Clean Day Header */}
-                          <div className="flex w-full items-start justify-between gap-2 pb-2 border-b border-gray-100">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                                {weekdayLabel}
-                              </span>
-                              <span className={dayNumberClasses}>
-                                {format(day, "d")}
-                              </span>
+                          <div className="relative w-full pb-2 border-b border-gray-100 pr-2">
+                            <div className="flex items-start justify-between gap-2 pr-12">
+                              <div className="flex flex-col leading-none">
+                                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                                  {weekdayLabel}
+                                </span>
+                                <span className={dayNumberClasses}>
+                                  {format(day, "d")}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {dayEvents.length > 0 && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                                    {dayEvents.length}
+                                  </span>
+                                )}
+                                <StickerDisplay dayStr={dayStr} className="mt-1 flex justify-end" />
+                              </div>
                             </div>
-                            {dayEvents.length > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-2 py-0.5 text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                                {dayEvents.length}
-                              </span>
-                            )}
                             {/* Hover add button */}
                             <button
                               type="button"
@@ -1564,8 +2071,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* Events Container */}
                           <div className="flex-1 space-y-1 overflow-visible sm:overflow-y-auto">
                             {/* No inline creation here – handled by hover modal */}
-                            {dayEvents.length > 0 ? (
-                              dayEvents.slice(0, maxVisibleEvents).map((ev: DayEvent, i: number) => {
+                            {visibleEvents.length > 0 ? (
+                              visibleEvents.map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
@@ -1583,114 +2090,118 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     index={i}
                                     isDragDisabled={!hasTask}
                                   >
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                        role={canEditEvent ? 'button' : undefined}
-                                        tabIndex={canEditEvent ? 0 : undefined}
-                                        onClick={async (event) => {
-                                          if (!canEditEvent) return;
-                                          event.stopPropagation();
-                                          const target = event.currentTarget as HTMLElement | null;
-                                          if (target && typeof target.blur === 'function') target.blur();
-                                          await openCalendarEvent(ev, dayStr);
-                                        }}
-                                        onKeyDown={async (event) => {
-                                          if (!canEditEvent) return;
-                                          if (event.key === 'Enter' || event.key === ' ') {
-                                            event.preventDefault();
+                                    {(dragProvided, dragSnapshot) => {
+                                      const showMinimalEvent = isCompactBreakpoint;
+                                      const baseDragStyle = dragProvided.draggableProps.style ?? {};
+                                      const eventContainerClasses = showMinimalEvent
+                                        ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
+                                        : `group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-2 sm:px-1.5 sm:py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`;
+                                      const eventContainerStyle = showMinimalEvent
+                                        ? baseDragStyle
+                                        : {
+                                            ...baseDragStyle,
+                                            ...(styles.customColor
+                                              ? {
+                                                  backgroundColor: styles.customColor + '20',
+                                                  borderColor: styles.customColor + '55',
+                                                  borderLeftColor: styles.customColor,
+                                                  borderLeftWidth: '4px'
+                                                }
+                                              : {})
+                                          };
+
+                                      return (
+                                        <div
+                                          ref={dragProvided.innerRef}
+                                          {...dragProvided.draggableProps}
+                                          {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                          role={canEditEvent ? 'button' : undefined}
+                                          tabIndex={canEditEvent ? 0 : undefined}
+                                          onClick={async (event) => {
+                                            if (!canEditEvent) return;
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
                                             await openCalendarEvent(ev, dayStr);
-                                          }
-                                        }}
-                                        className={`group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-2 sm:px-1.5 sm:py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`}
-                                        style={{
-                                          ...dragProvided.draggableProps.style,
-                                          ...(styles.customColor
-                                            ? {
-                                                backgroundColor: styles.customColor + '20',
-                                                borderColor: styles.customColor + '55',
-                                                borderLeftColor: styles.customColor,
-                                                borderLeftWidth: '4px'
-                                              }
-                                            : {})
-                                        }}
-                                        title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
-                                        data-task-id={ev.taskId}
-                                      >
-                                        <div className="flex items-start gap-2">
-                                          <span
-                                            className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
-                                            style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                          />
-                                          <div className="flex-1 min-w-0">
-                                            {timeLabel && (
-                                              <time
-                                                dateTime={ev.time}
-                                                className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
-                                              >
-                                                {timeLabel}
-                                              </time>
-                                            )}
-                                            <div className="flex items-center gap-1">
-                                              <p className="lb-body-xs text-gray-900 truncate flex-1">
-                                                {ev.title}
-                                              </p>
-                                              {repeatLabel && (
-                                                <span className="sm:hidden flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                  <span className="text-[10px]">↻</span>
-                                                </span>
-                                              )}
+                                          }}
+                                          onKeyDown={async (event) => {
+                                            if (!canEditEvent) return;
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              const target = event.currentTarget as HTMLElement | null;
+                                              if (target && typeof target.blur === 'function') target.blur();
+                                              await openCalendarEvent(ev, dayStr);
+                                            }
+                                          }}
+                                          className={eventContainerClasses}
+                                          style={eventContainerStyle as CSSProperties}
+                                          title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                          data-task-id={ev.taskId}
+                                        >
+                                          {showMinimalEvent ? (
+                                            <p className="truncate font-medium text-gray-900">
+                                              {ev.title}
+                                            </p>
+                                          ) : (
+                                            <div className="flex items-start gap-2">
+                                              <span
+                                                className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
+                                                style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                              />
+                                              <div className="flex-1 min-w-0">
+                                                {timeLabel && (
+                                                  <time
+                                                    dateTime={ev.time}
+                                                    className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                                  >
+                                                    {timeLabel}
+                                                  </time>
+                                                )}
+                                                <div className="flex items-center gap-1">
+                                                  <p className="lb-body-xs text-gray-900 truncate flex-1">
+                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                  </p>
+                                                  {repeatLabel && (
+                                                    <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                      <span className="text-[10px]">↻</span>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {repeatLabel && (
+                                                  <span className="mt-1 hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                                    <span aria-hidden>↻</span>
+                                                    <span className="truncate">{repeatLabel}</span>
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex flex-shrink-0 items-center gap-1">
+                                                {!showMinimalEvent && hasTask && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
+                                                    }}
+                                                    className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
+                                                    title="Delete task"
+                                                    aria-label={`Delete ${ev.title}`}
+                                                  >
+                                                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                  </button>
+                                                )}
+                                              </div>
                                             </div>
-                                            {repeatLabel && (
-                                              <span className="mt-1 hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
-                                                <span aria-hidden>↻</span>
-                                                <span className="truncate">{repeatLabel}</span>
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="flex flex-shrink-0 items-center gap-1">
-                                            {hasTask && (
-                                              <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                  event.stopPropagation();
-                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
-                                                }}
-                                                className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
-                                                title="Delete task"
-                                                aria-label={`Delete ${ev.title}`}
-                                              >
-                                                <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                              </button>
-                                            )}
-                                          </div>
+                                          )}
                                         </div>
-                                      </div>
-                                    )}
+                                      );
+                                    }}
                                   </Draggable>
                                 );
                               })
-                            ) : (
-                              // Beautiful empty state for days without events
-                              <div className="flex-1 flex items-center justify-center text-gray-400">
-                                <div className="text-center py-8">
-                                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 mx-auto mb-4 flex items-center justify-center shadow-inner">
-                                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                  </div>
-                                  <p className="text-sm font-semibold text-gray-500 mb-1">Free Day</p>
-                                  <p className="text-xs text-gray-400">No events scheduled</p>
-                                </div>
-                              </div>
-                            )}
+                            ) : null}
                             
                             {/* Scroll padding */}
                             <div className="h-4"></div>
@@ -1702,10 +2213,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   </Droppable>
                 );
               })}
-            </div>
-          ) : (
-            // Month view: Clean grid layout
-            <div className="grid auto-rows-[minmax(135px,_1fr)] grid-cols-7 gap-x-1.5 gap-y-2 rounded-2xl border border-gray-100 bg-gray-50/80 p-2 sm:gap-3 sm:p-3">
+                  </div>
+                </div>
+              ) : (
+                // Month view: Clean grid layout
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-2 sm:p-3">
+                  {weekdayHeader}
+                  <div className="grid auto-rows-[minmax(135px,_1fr)] grid-cols-7 gap-x-1.5 gap-y-2 sm:gap-3">
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
@@ -1754,21 +2268,26 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           className={cellClasses}
                         >
                           {/* Clean Date Header */}
-                          <div className="flex w-full items-start justify-between gap-1 sm:gap-2">
-                            <div className="flex flex-col leading-none">
-                              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
-                                {mobileDayLabel}
-                              </span>
-                              <span className={dayNumberClasses}>
-                                {format(day, "d")}
-                              </span>
+                          <div className="relative w-full pr-1">
+                            <div className="flex w-full items-start justify-between gap-1 sm:gap-2 pr-12">
+                              <div className="flex flex-col leading-none">
+                                <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:hidden">
+                                  {mobileDayLabel}
+                                </span>
+                                <span className={dayNumberClasses}>
+                                  {format(day, "d")}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                {dayEvents.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                                    {dayEvents.length}
+                                  </span>
+                                )}
+                                <StickerDisplay dayStr={dayStr} className="mt-1 flex justify-end" />
+                              </div>
                             </div>
-                            {dayEvents.length > 0 && (
-                              <span className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full border border-gray-200 bg-gray-100/80 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-gray-600 shadow-inner transition group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                                {dayEvents.length}
-                              </span>
-                            )}
                             {/* Hover add button */}
                             <button
                               type="button"
@@ -1816,120 +2335,113 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     index={i}
                                     isDragDisabled={!hasTask}
                                   >
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                        role={canEditEvent ? 'button' : undefined}
-                                        tabIndex={canEditEvent ? 0 : undefined}
-                                        onClick={async (event) => {
-                                          if (!canEditEvent) return;
-                                          event.stopPropagation();
-                                          const target = event.currentTarget as HTMLElement | null;
-                                          if (target && typeof target.blur === 'function') target.blur();
-                                          await openCalendarEvent(ev, dayStr);
-                                        }}
-                                        onKeyDown={async (event) => {
-                                          if (!canEditEvent) return;
-                                          if (event.key === 'Enter' || event.key === ' ') {
-                                            event.preventDefault();
+                                    {(dragProvided, dragSnapshot) => {
+                                      const showMinimalEvent = isCompactBreakpoint;
+                                      const baseDragStyle = dragProvided.draggableProps.style ?? {};
+                                      const eventContainerClasses = showMinimalEvent
+                                        ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
+                                        : `group relative w-full rounded-lg sm:rounded-xl border border-transparent bg-white/95 px-1.5 py-1.5 sm:px-2 sm:py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow-sm sm:shadow hover:shadow-md'}`;
+                                      const eventContainerStyle = showMinimalEvent
+                                        ? baseDragStyle
+                                        : {
+                                            ...baseDragStyle,
+                                            ...(styles.customColor
+                                              ? {
+                                                  backgroundColor: styles.customColor + '20',
+                                                  borderColor: styles.customColor + '55',
+                                                  borderLeftColor: styles.customColor,
+                                                  borderLeftWidth: '4px'
+                                                }
+                                              : {})
+                                          };
+
+                                      return (
+                                        <div
+                                          ref={dragProvided.innerRef}
+                                          {...dragProvided.draggableProps}
+                                          {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                          role={canEditEvent ? 'button' : undefined}
+                                          tabIndex={canEditEvent ? 0 : undefined}
+                                          onClick={async (event) => {
+                                            if (!canEditEvent) return;
                                             event.stopPropagation();
                                             const target = event.currentTarget as HTMLElement | null;
                                             if (target && typeof target.blur === 'function') target.blur();
                                             await openCalendarEvent(ev, dayStr);
-                                          }
-                                        }}
-                                            className={`group relative w-full rounded-lg sm:rounded-xl border border-transparent bg-white/95 px-1.5 py-1.5 sm:px-2 sm:py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow-sm sm:shadow hover:shadow-md'}`}
-                                        style={{
-                                          ...dragProvided.draggableProps.style,
-                                          ...(styles.customColor
-                                            ? {
-                                                backgroundColor: styles.customColor + '20',
-                                                borderColor: styles.customColor + '55',
-                                                borderLeftColor: styles.customColor,
-                                                // Thinner border on mobile for more space
-                                                borderLeftWidth: window.innerWidth < 640 ? '3px' : '4px'
-                                              }
-                                            : {})
-                                        }}
-                                        title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
-                                      >
-                                        {/* Desktop: Original layout with dot, time above title */}
-                                        <div className="hidden sm:flex items-start gap-2">
-                                          <span
-                                            className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
-                                            style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                          />
-                                          <div className="flex-1 min-w-0">
-                                            {timeLabel && (
-                                              <time
-                                                dateTime={ev.time}
-                                                className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
-                                              >
-                                                {timeLabel}
-                                              </time>
-                                            )}
-                                            <div className="flex items-center gap-1">
-                                              <p className="lb-body-xs text-gray-900 truncate flex-1">
-                                                {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
-                                              </p>
-                                              {repeatLabel && (
-                                                <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                  <span className="text-[10px]">↻</span>
-                                                </span>
-                                              )}
+                                          }}
+                                          onKeyDown={async (event) => {
+                                            if (!canEditEvent) return;
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                              event.preventDefault();
+                                              event.stopPropagation();
+                                              const target = event.currentTarget as HTMLElement | null;
+                                              if (target && typeof target.blur === 'function') target.blur();
+                                              await openCalendarEvent(ev, dayStr);
+                                            }
+                                          }}
+                                          className={eventContainerClasses}
+                                          style={eventContainerStyle as CSSProperties}
+                                          title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                        >
+                                          {showMinimalEvent ? (
+                                            <p className="truncate font-medium text-gray-900">
+                                              {ev.title}
+                                            </p>
+                                          ) : (
+                                            <div className="flex items-start gap-2">
+                                              <span
+                                                className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
+                                                style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                              />
+                                              <div className="flex-1 min-w-0">
+                                                {timeLabel && (
+                                                  <time
+                                                    dateTime={ev.time}
+                                                    className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                                  >
+                                                    {timeLabel}
+                                                  </time>
+                                                )}
+                                                <div className="flex items-center gap-1">
+                                                  <p className="lb-body-xs text-gray-900 truncate flex-1">
+                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                  </p>
+                                                  {repeatLabel && (
+                                                    <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                      <span className="text-[10px]">↻</span>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {repeatLabel && (
+                                                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold text-emerald-600">
+                                                    <span aria-hidden>↻</span>
+                                                    <span className="truncate">{repeatLabel}</span>
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex flex-shrink-0 items-center gap-1">
+                                                {!showMinimalEvent && hasTask && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
+                                                    }}
+                                                    className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
+                                                    title="Delete task"
+                                                    aria-label={`Delete ${ev.title}`}
+                                                  >
+                                                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                  </button>
+                                                )}
+                                              </div>
                                             </div>
-                                            {repeatLabel && (
-                                              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold text-emerald-600">
-                                                <span aria-hidden>↻</span>
-                                                <span className="truncate">{repeatLabel}</span>
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="flex flex-shrink-0 items-center gap-1">
-                                            {hasTask && (
-                                              <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                  event.stopPropagation();
-                                                  setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
-                                                }}
-                                                className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
-                                                title="Delete task"
-                                                aria-label={`Delete ${ev.title}`}
-                                              >
-                                                <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                              </button>
-                                            )}
-                                          </div>
+                                          )}
                                         </div>
-
-                                        {/* Mobile: Compact layout with inline time, 2-line text wrap, no dot */}
-                                        <div className="sm:hidden flex flex-col gap-0.5">
-                                          <div className="flex items-baseline gap-1.5">
-                                            {timeLabel && (
-                                              <time
-                                                dateTime={ev.time}
-                                                className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide ${styles.time}`}
-                                              >
-                                                {timeLabel}
-                                              </time>
-                                            )}
-                                            {repeatLabel && (
-                                              <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                <span className="text-[9px]">↻</span>
-                                              </span>
-                                            )}
-                                          </div>
-                                          <p className="text-[11px] leading-snug font-medium text-gray-900 line-clamp-2">
-                                            {ev.title}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    )}
+                                      );
+                                    }}
                                   </Draggable>
                                 );
                               })}
@@ -1953,7 +2465,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     }}
                   </Droppable>
                 );
-                  })}
+              })}
+                  </div>
                 </div>
               )}
             </div>
