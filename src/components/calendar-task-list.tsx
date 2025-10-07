@@ -255,8 +255,8 @@ function EnhancedTaskCard({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           style={provided.draggableProps.style}
-          className={`group relative ${priorityStyles.bg} ${priorityStyles.border} border-l-4 border-y border-r rounded-xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-            isExpanded ? 'shadow-md scale-[1.01]' : ''
+          className={`group relative ${priorityStyles.bg} rounded-2xl border-0 transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 ${
+            isExpanded ? 'shadow-md' : ''
           } cursor-grab active:cursor-grabbing`}
         >
           {/* Premium Task Row */}
@@ -300,13 +300,13 @@ function EnhancedTaskCard({
                   <div className="flex items-center gap-2 mt-2">
                     {task.bucket && (
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getBucketColorClasses(task.bucket, bucketColors)}`}
+                        className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-black/5 text-gray-700"
                         style={getCustomBucketStyles(task.bucket, bucketColors)}
                       >
                         {task.bucket}
                       </span>
                     )}
-                    
+
                     {task.priority && (
                       <div className="flex items-center gap-1">
                         <Star size={12} className={`transition-colors duration-200 ${priorityStyles.icon} fill-current`} />
@@ -320,10 +320,10 @@ function EnhancedTaskCard({
                 
                 <div className="flex flex-col items-end gap-2 text-right">
                   {dueDateInfo && (
-                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      dueDateInfo.urgent 
-                        ? 'bg-red-100 text-red-700 border border-red-200' 
-                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium ${
+                      dueDateInfo.urgent
+                        ? 'bg-red-50 text-red-700'
+                        : 'bg-gray-50 text-gray-600'
                     }`}>
                       {dueDateInfo.urgent && <AlertCircle size={11} />}
                       <span>{dueDateInfo.text}</span>

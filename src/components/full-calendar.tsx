@@ -1992,7 +1992,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             'relative group flex h-full flex-col items-start justify-start rounded-2xl border text-sm p-2 sm:p-3.5 transition-all duration-200 shadow-sm cursor-pointer overflow-hidden',
                         isCurrentMonth
                           ? (isWeekend
-                            ? 'bg-sky-50 text-gray-900 border-sky-100'
+                            ? 'bg-gray-50/50 text-gray-900 border-gray-200/40'
                             : 'bg-white text-gray-900 border-gray-200/60')
                           : 'bg-gray-50 text-gray-400 border-gray-100',
                         isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md' : '',
@@ -2095,19 +2095,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                       const baseDragStyle = dragProvided.draggableProps.style ?? {};
                                       const eventContainerClasses = showMinimalEvent
                                         ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
-                                        : `group relative w-full rounded-xl border border-transparent bg-white/95 px-2 py-2 sm:px-1.5 sm:py-1.25 text-left text-[11px] sm:text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow hover:shadow-md'}`;
+                                        : `group relative w-full rounded-2xl border-0 overflow-hidden backdrop-blur-sm px-3 py-2.5 text-left transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-[0.99] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg scale-[1.01]' : 'shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5'}`;
                                       const eventContainerStyle = showMinimalEvent
                                         ? baseDragStyle
                                         : {
                                             ...baseDragStyle,
-                                            ...(styles.customColor
-                                              ? {
-                                                  backgroundColor: styles.customColor + '20',
-                                                  borderColor: styles.customColor + '55',
-                                                  borderLeftColor: styles.customColor,
-                                                  borderLeftWidth: '4px'
-                                                }
-                                              : {})
+                                            backgroundColor: styles.customColor ? styles.customColor + '12' : '#f5f5f5',
+                                            border: 'none'
                                           };
 
                                       return (
@@ -2145,37 +2139,36 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             </p>
                                           ) : (
                                             <div className="flex items-start gap-2">
-                                              <span
-                                                className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
-                                                style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                              />
-                                              <div className="flex-1 min-w-0">
+                                              <div className="flex-1 min-w-0 space-y-0.5">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span
+                                                    className="inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                                                    style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                                  />
+                                                  <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                  </p>
+                                                </div>
                                                 {timeLabel && (
                                                   <time
                                                     dateTime={ev.time}
-                                                    className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                                    className="block text-[11px] font-medium tracking-wide leading-tight text-gray-500"
                                                   >
                                                     {timeLabel}
                                                   </time>
                                                 )}
-                                                <div className="flex items-center gap-1">
-                                                  <p className="lb-body-xs text-gray-900 truncate flex-1">
-                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                {ev.duration && (
+                                                  <p className="text-[11px] text-gray-400 font-normal">
+                                                    {ev.duration} min
                                                   </p>
-                                                  {repeatLabel && (
-                                                    <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                      <span className="text-[10px]">↻</span>
-                                                    </span>
-                                                  )}
-                                                </div>
+                                                )}
                                                 {repeatLabel && (
-                                                  <span className="mt-1 hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[10px] font-semibold text-emerald-600">
-                                                    <span aria-hidden>↻</span>
-                                                    <span className="truncate">{repeatLabel}</span>
+                                                  <span className="text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                    <span className="text-xs">↻</span>
                                                   </span>
                                                 )}
                                               </div>
-                                              <div className="flex flex-shrink-0 items-center gap-1">
+                                              <div className="flex flex-shrink-0 items-start gap-1">
                                                 {!showMinimalEvent && hasTask && (
                                                   <button
                                                     type="button"
@@ -2183,12 +2176,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                                       event.stopPropagation();
                                                       setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                     }}
-                                                    className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
+                                                    className="rounded-lg p-0.5 text-gray-400 opacity-0 transition-all duration-150 hover:bg-black/5 hover:text-red-500 group-hover:opacity-100"
                                                     title="Delete task"
                                                     aria-label={`Delete ${ev.title}`}
                                                   >
-                                                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
                                                   </button>
                                                 )}
@@ -2238,7 +2231,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             'relative group flex flex-col items-start justify-start rounded-2xl border text-sm p-2 sm:p-3 transition-all duration-200 shadow-sm cursor-pointer overflow-hidden backdrop-blur-sm',
                             isCurrentMonth
                               ? (isWeekend
-                                ? 'bg-blue-50/60 text-gray-900 border-blue-100'
+                                ? 'bg-gray-50/50 text-gray-900 border-gray-200/40'
                                 : 'bg-white/90 text-gray-900 border-gray-100')
                               : 'bg-gray-50 text-gray-400 border-gray-100',
                         isCurrentMonth ? 'hover:-translate-y-[1px] hover:shadow-md active:scale-[0.99] active:shadow-sm' : '',
@@ -2340,19 +2333,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                       const baseDragStyle = dragProvided.draggableProps.style ?? {};
                                       const eventContainerClasses = showMinimalEvent
                                         ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
-                                        : `group relative w-full rounded-lg sm:rounded-xl border border-transparent bg-white/95 px-1.5 py-1.5 sm:px-2 sm:py-1.5 text-left text-xs transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-[0.98] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg ring-2 ring-emerald-300' : 'shadow-sm sm:shadow hover:shadow-md'}`;
+                                        : `group relative w-full rounded-2xl border-0 overflow-hidden backdrop-blur-sm px-2.5 py-2 text-left transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-[0.99] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg scale-[1.01]' : 'shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5'}`;
                                       const eventContainerStyle = showMinimalEvent
                                         ? baseDragStyle
                                         : {
                                             ...baseDragStyle,
-                                            ...(styles.customColor
-                                              ? {
-                                                  backgroundColor: styles.customColor + '20',
-                                                  borderColor: styles.customColor + '55',
-                                                  borderLeftColor: styles.customColor,
-                                                  borderLeftWidth: '4px'
-                                                }
-                                              : {})
+                                            backgroundColor: styles.customColor ? styles.customColor + '12' : '#f5f5f5',
+                                            border: 'none'
                                           };
 
                                       return (
@@ -2389,37 +2376,36 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                             </p>
                                           ) : (
                                             <div className="flex items-start gap-2">
-                                              <span
-                                                className={`mt-0.5 inline-flex h-1.5 w-1.5 flex-shrink-0 items-center justify-center rounded-full ${styles.dot}`}
-                                                style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                              />
-                                              <div className="flex-1 min-w-0">
+                                              <div className="flex-1 min-w-0 space-y-0.5">
+                                                <div className="flex items-center gap-1.5">
+                                                  <span
+                                                    className="inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                                                    style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                                  />
+                                                  <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                  </p>
+                                                </div>
                                                 {timeLabel && (
                                                   <time
                                                     dateTime={ev.time}
-                                                    className={`block text-[11px] font-semibold uppercase tracking-wide leading-tight ${styles.time}`}
+                                                    className="block text-[11px] font-medium tracking-wide leading-tight text-gray-500"
                                                   >
                                                     {timeLabel}
                                                   </time>
                                                 )}
-                                                <div className="flex items-center gap-1">
-                                                  <p className="lb-body-xs text-gray-900 truncate flex-1">
-                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                {ev.duration && (
+                                                  <p className="text-[11px] text-gray-400 font-normal">
+                                                    {ev.duration} min
                                                   </p>
-                                                  {repeatLabel && (
-                                                    <span className="flex-shrink-0 text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                      <span className="text-[10px]">↻</span>
-                                                    </span>
-                                                  )}
-                                                </div>
+                                                )}
                                                 {repeatLabel && (
-                                                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1 py-0.5 text-[9px] font-semibold text-emerald-600">
-                                                    <span aria-hidden>↻</span>
-                                                    <span className="truncate">{repeatLabel}</span>
+                                                  <span className="text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                    <span className="text-xs">↻</span>
                                                   </span>
                                                 )}
                                               </div>
-                                              <div className="flex flex-shrink-0 items-center gap-1">
+                                              <div className="flex flex-shrink-0 items-start gap-1">
                                                 {!showMinimalEvent && hasTask && (
                                                   <button
                                                     type="button"
@@ -2427,12 +2413,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                                       event.stopPropagation();
                                                       setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
                                                     }}
-                                                    className="rounded p-0.5 text-red-600 opacity-0 transition-opacity duration-200 hover:bg-red-100 hover:text-red-700 group-hover:opacity-100"
+                                                    className="rounded-lg p-0.5 text-gray-400 opacity-0 transition-all duration-150 hover:bg-black/5 hover:text-red-500 group-hover:opacity-100"
                                                     title="Delete task"
                                                     aria-label={`Delete ${ev.title}`}
                                                   >
-                                                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
                                                   </button>
                                                 )}
@@ -2524,25 +2510,30 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   }
                 };
                 
+                const modalBgColor = ev.source === 'lifeboard' && typeof getDotColor(ev.source, ev) === 'string' && getDotColor(ev.source, ev).startsWith('#')
+                  ? getDotColor(ev.source, ev) + '12'
+                  : '#f5f5f5';
+
                 return (
-                  <div key={idx} className="flex items-start gap-2">
-                    <span
-                      className={`mt-1 w-2 h-2 rounded-full ${getDotColor(ev.source, ev)}`}
-                      style={ev.source === 'lifeboard' && typeof getDotColor(ev.source, ev) === 'string' && getDotColor(ev.source, ev).startsWith('#') ?
-                        { backgroundColor: getDotColor(ev.source, ev) } : {}
-                      }
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800">{ev.title}</p>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs">
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 p-4 rounded-2xl transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5"
+                    style={{
+                      backgroundColor: modalBgColor,
+                      border: 'none'
+                    }}
+                  >
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium text-gray-900 leading-snug">{ev.title}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                        <span className="inline-flex items-center px-2 py-0.5 bg-white/60 rounded-lg font-medium">
                           {getSourceLabel(ev.source)}
                         </span>
                         {ev.time && (
-                          <span>
+                          <span className="font-medium">
                             {ev.allDay ? 'All day' : format(new Date(ev.time), 'h:mm a')}
                             {ev.duration && ev.source === 'lifeboard' && (
-                              <span className="ml-1">({ev.duration}min)</span>
+                              <span className="ml-1 text-gray-400">• {ev.duration} min</span>
                             )}
                           </span>
                         )}
