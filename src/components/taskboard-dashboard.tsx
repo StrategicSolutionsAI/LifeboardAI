@@ -87,6 +87,9 @@ import {
   LayoutDashboard,
   Settings as SettingsIcon,
   ListChecks,
+  Pencil,
+  Check,
+  GripVertical,
 } from "lucide-react";
 import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -373,6 +376,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
+  const [editingBucketName, setEditingBucketName] = useState<string | null>(null);
+  const [editingBucketNewName, setEditingBucketNewName] = useState("");
+  const [draggedBucketIndex, setDraggedBucketIndex] = useState<number | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
@@ -1783,6 +1789,137 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     } catch (err) {
       console.error('Failed to save bucket color to Supabase:', err);
     }
+  };
+
+  // Start editing a bucket name
+  const handleStartEditBucket = (bucket: string) => {
+    setEditingBucketName(bucket);
+    setEditingBucketNewName(bucket);
+  };
+
+  // Save the edited bucket name
+  const handleSaveEditBucket = async () => {
+    if (!editingBucketName || !editingBucketNewName.trim()) {
+      setEditingBucketName(null);
+      setEditingBucketNewName("");
+      return;
+    }
+
+    const newName = editingBucketNewName.trim();
+    if (newName === editingBucketName) {
+      setEditingBucketName(null);
+      setEditingBucketNewName("");
+      return;
+    }
+
+    // Check if name already exists
+    if (buckets.includes(newName)) {
+      alert('A tab with this name already exists');
+      return;
+    }
+
+    // Update buckets array
+    const updated = buckets.map(b => b === editingBucketName ? newName : b);
+    setBuckets(updated);
+
+    // Update active bucket if needed
+    if (activeBucket === editingBucketName) {
+      setActiveBucket(newName);
+    }
+
+    // Update bucket colors with new name
+    const oldColor = bucketColors[editingBucketName];
+    const updatedColors = { ...bucketColors };
+    if (oldColor) {
+      delete updatedColors[editingBucketName];
+      updatedColors[newName] = oldColor;
+      setBucketColors(updatedColors);
+    }
+
+    // Update localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets', JSON.stringify(updated));
+      localStorage.setItem('bucket_colors', JSON.stringify(updatedColors));
+      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+      window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+    }
+
+    // Update widgets for this bucket
+    if (widgetsByBucket[editingBucketName]) {
+      const bucketWidgets = widgetsByBucket[editingBucketName];
+      const updatedWidgetsByBucket = { ...widgetsByBucket };
+      delete updatedWidgetsByBucket[editingBucketName];
+      updatedWidgetsByBucket[newName] = bucketWidgets;
+      setWidgetsByBucket(updatedWidgetsByBucket);
+    }
+
+    // Save to Supabase
+    try {
+      const prefs = await getUserPreferencesClient();
+      if (prefs) {
+        await saveUserPreferences({
+          ...prefs,
+          life_buckets: updated,
+          bucket_colors: updatedColors,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save bucket rename to Supabase:', err);
+    }
+
+    setEditingBucketName(null);
+    setEditingBucketNewName("");
+  };
+
+  // Cancel editing
+  const handleCancelEditBucket = () => {
+    setEditingBucketName(null);
+    setEditingBucketNewName("");
+  };
+
+  // Handle bucket tab drag start
+  const handleBucketDragStart = (index: number) => {
+    setDraggedBucketIndex(index);
+  };
+
+  // Handle bucket tab drag over
+  const handleBucketDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedBucketIndex === null || draggedBucketIndex === index) return;
+
+    const newBuckets = [...buckets];
+    const draggedBucket = newBuckets[draggedBucketIndex];
+    newBuckets.splice(draggedBucketIndex, 1);
+    newBuckets.splice(index, 0, draggedBucket);
+
+    setBuckets(newBuckets);
+    setDraggedBucketIndex(index);
+  };
+
+  // Handle bucket tab drag end
+  const handleBucketDragEnd = async () => {
+    if (draggedBucketIndex === null) return;
+
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets', JSON.stringify(buckets));
+      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+    }
+
+    // Save to Supabase
+    try {
+      const prefs = await getUserPreferencesClient();
+      if (prefs) {
+        await saveUserPreferences({
+          ...prefs,
+          life_buckets: buckets,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save bucket order to Supabase:', err);
+    }
+
+    setDraggedBucketIndex(null);
   };
 
   async function loadWidgets() {
@@ -3544,53 +3681,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                 {activeSubTab === 'Tasks' && (
                   <div>
-                    {/* Enhanced Empty State */}
-                    {!activeBucket || buckets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 px-4">
-                        <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-6">
-                          <ListChecks className="h-10 w-10 text-blue-600" />
+                    {buckets.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-gray-300 rounded-2xl bg-white/80">
+                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                          <ListChecks className="h-8 w-8 text-blue-600" />
                         </div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                          Organize Your Tasks
+                          Set up your first bucket
                         </h3>
-                        <p className="text-sm text-gray-500 text-center max-w-md mb-6">
-                          Connect your Todoist account to sync tasks automatically, or start adding tasks manually. 
-                          Keep everything organized by bucket.
+                        <p className="text-sm text-gray-500 max-w-md mb-6">
+                          Buckets help you organise widgets and tasks together. Create one to unlock the full dashboard experience.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <button 
-                            onClick={() => window.location.href = '/integrations'}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors flex items-center gap-2"
-                          >
-                            <Zap className="h-5 w-5" />
-                            Connect Todoist
-                          </button>
-                          <button 
-                            onClick={() => setIsEditorOpen(true)}
-                            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                          >
-                            Create a Bucket First
-                          </button>
-                        </div>
-                        
-                        {/* Feature highlights */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12 max-w-3xl">
-                          <div className="text-center p-4">
-                            <Calendar className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                            <h4 className="font-medium text-gray-900 mb-1">Due Dates</h4>
-                            <p className="text-xs text-gray-500">Schedule tasks with smart date parsing</p>
-                          </div>
-                          <div className="text-center p-4">
-                            <Flag className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                            <h4 className="font-medium text-gray-900 mb-1">Priorities</h4>
-                            <p className="text-xs text-gray-500">Mark critical tasks to focus on what matters</p>
-                          </div>
-                          <div className="text-center p-4">
-                            <Target className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                            <h4 className="font-medium text-gray-900 mb-1">Bucket Tags</h4>
-                            <p className="text-xs text-gray-500">Auto-tag tasks with your current bucket</p>
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => setIsEditorOpen(true)}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                        >
+                          Create Bucket
+                        </button>
                       </div>
                     ) : (
                       <TasksProvider selectedDate={new Date()}>
@@ -3877,24 +3984,76 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-2">Existing tabs</div>
                 <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 overflow-hidden">
-                  {buckets.map((b) => (
-                    <li key={b} className="px-3 py-3 bg-white">
+                  {buckets.map((b, index) => (
+                    <li
+                      key={b}
+                      className={`px-3 py-3 bg-white ${draggedBucketIndex === index ? 'opacity-50' : ''}`}
+                      draggable={editingBucketName !== b}
+                      onDragStart={() => handleBucketDragStart(index)}
+                      onDragOver={(e) => handleBucketDragOver(e, index)}
+                      onDragEnd={handleBucketDragEnd}
+                    >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {editingBucketName !== b && (
+                            <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
+                          )}
                           <span
-                            className="inline-block w-4 h-4 rounded-full border border-gray-200"
+                            className="inline-block w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
                             style={{ backgroundColor: getBucketColor(b) }}
                             aria-hidden
                           />
-                          <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
+                          {editingBucketName === b ? (
+                            <input
+                              type="text"
+                              value={editingBucketNewName}
+                              onChange={(e) => setEditingBucketNewName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEditBucket();
+                                if (e.key === 'Escape') handleCancelEditBucket();
+                              }}
+                              className="flex-1 text-sm border border-blue-500 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleRemoveBucket(b)}
-                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                          >
-                            Remove
-                          </button>
+                          {editingBucketName === b ? (
+                            <>
+                              <button
+                                onClick={handleSaveEditBucket}
+                                className="text-xs p-1.5 rounded-md border border-green-200 text-green-600 hover:bg-green-50"
+                                title="Save"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={handleCancelEditBucket}
+                                className="text-xs p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+                                title="Cancel"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleStartEditBucket(b)}
+                                className="text-xs p-1.5 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                title="Edit name"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveBucket(b)}
+                                className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                       {/* Custom color picker only (auto-assigned initially) */}
