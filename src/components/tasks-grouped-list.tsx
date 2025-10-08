@@ -9,7 +9,7 @@ interface Task {
   content: string;
   due?: { date?: string } | null;
   priority?: string | number;
-  completed?: boolean;
+  completed: boolean;
 }
 
 interface TasksGroupedListProps {
