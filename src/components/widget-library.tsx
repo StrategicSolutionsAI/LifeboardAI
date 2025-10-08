@@ -629,11 +629,9 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
   // For now, we'll use a simple approach: let the user choose which category to view
   // and provide recommendations based on the current bucket
-  console.log('Current bucket:', bucket);
-  
+
   // Get all distinct categories from widgetTemplates
   const allCategories = Array.from(new Set(widgetTemplates.map(w => w.category)));
-  console.log('Available categories:', allCategories);
   
   // Initial recommended category based on bucket name
   const getRecommendedCategory = (bucketName: string): string => {
@@ -686,10 +684,10 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           setConnectedIntegrations(prev => [...prev, 'fitbit']);
         }
         // Google Fit
-        const gfResponse = await fetch('/api/integrations/status?provider=googlefit');
+        const gfResponse = await fetch('/api/integrations/status?provider=google-fit');
         const gfData = await gfResponse.json();
         if (gfData.connected) {
-          setConnectedIntegrations(prev => [...prev, 'googlefit']);
+          setConnectedIntegrations(prev => [...prev, 'google-fit']);
         }
       } catch (error) {
         console.error('Error checking integrations:', error);
@@ -719,7 +717,6 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
   useEffect(() => {
     const recommendedCategory = getRecommendedCategory(bucket);
     setSelectedCategory(recommendedCategory);
-    console.log(`Bucket changed to: ${bucket}, recommending category: ${recommendedCategory}`);
   }, [bucket]);
   
   // Filter widgets by search term and selected category
@@ -734,9 +731,6 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
     
     return matchesSearch && matchesCategory;
   });
-  
-  console.log('Selected category:', selectedCategory, 'matches:', filteredWidgets.length);
-
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 mt-6">

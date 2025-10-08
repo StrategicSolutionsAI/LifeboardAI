@@ -338,15 +338,8 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
         const needsNameUpdate = widget.name !== template.name;
         const needsColorUpdate = (widget.color || '') !== template.color;
         const needsIconUpdate = widget.icon !== template.icon;
-        
+
         if (needsNameUpdate || needsColorUpdate || needsIconUpdate) {
-          console.log(`Migrating widget ${widget.id} in bucket ${bucketName}:`, {
-            oldName: widget.name,
-            newName: template.name,
-            oldColor: widget.color,
-            newColor: template.color
-          });
-          
           // Update widget with template data
           migratedWidgets[bucketName][index] = {
             ...widget,
@@ -359,10 +352,6 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
       }
     });
   });
-  
-  if (hasChanges) {
-    console.log('Widget migration completed with changes');
-  }
   
   return migratedWidgets;
 }
@@ -476,14 +465,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     return `rgb(${newR}, ${newG}, ${newB})`
   }
-
-  // Debug logging for bucket state
-  useEffect(() => {
-    console.log('🔍 DEBUG - Current buckets state:', buckets);
-    console.log('🔍 DEBUG - Active bucket:', activeBucket);
-    console.log('🔍 DEBUG - User:', user?.id);
-    console.log('🔍 DEBUG - Is loading:', isLoading);
-  }, [buckets, activeBucket, user, isLoading]);
 
   // Listen for bucket color changes
   useEffect(() => {
@@ -927,6 +908,99 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         })());
       }
 
+      const needGoogleFit = Object.values(widgetsByBucketRef.current)
+        .flat()
+        .some((w) => ["water", "steps"].includes(w.id) && w.dataSource === "googlefit");
+
+      if (needGoogleFit) {
+        refreshPromises.push((async () => {
+          try {
+            const res = await fetch(`/api/integrations/googlefit/metrics?cb=${Date.now()}`);
+            if (!res.ok) {
+              console.error('Failed to fetch Google Fit metrics');
+              return;
+            }
+
+            const data = await res.json();
+            const obj: Record<string, number> = {
+              water: data.water || 0,
+              steps: data.steps || 0,
+            };
+
+            setGoogleFitData(obj);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('googlefit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
+            }
+
+            // Update progress for each Google Fit widget
+            try {
+              const todayStr = todayStrGlobal;
+              const googleFitWidgets = Object.values(widgetsByBucketRef.current)
+                .flat()
+                .filter((w) => w.dataSource === "googlefit" && ["water", "steps"].includes(w.id));
+
+              if (!googleFitWidgets.length) return;
+
+              const updatedProgress: Record<string, ProgressEntry> = {
+                ...progressByWidgetRef.current,
+              };
+
+              googleFitWidgets.forEach((w) => {
+                const val = w.id === "water" ? obj.water : obj.steps;
+                const existing = updatedProgress[w.instanceId] ?? {
+                  value: 0,
+                  date: todayStr,
+                  streak: 0,
+                  lastCompleted: "",
+                };
+
+                if (existing.date !== todayStr) {
+                  existing.value = 0;
+                }
+                existing.value = val;
+                updatedProgress[w.instanceId] = existing;
+              });
+
+              setProgressByWidget(updatedProgress);
+
+              if (typeof window !== "undefined") {
+                try {
+                  localStorage.setItem("widget_progress", JSON.stringify(updatedProgress));
+                } catch (e) {
+                  console.error("Failed to persist widget progress", e);
+                }
+              }
+
+              const { data: { user: currentUser } } = await supabase.auth.getUser();
+              if (currentUser) {
+                const rows = googleFitWidgets.map((w) => ({
+                  user_id: currentUser.id,
+                  widget_instance_id: w.instanceId,
+                  date: todayStr,
+                  value: w.id === "water" ? obj.water : obj.steps,
+                }));
+
+                if (rows.length) {
+                  await supabase.from("widget_progress_history").upsert(rows, {
+                    onConflict: "user_id,widget_instance_id,date",
+                  });
+                }
+              }
+
+              try {
+                await saveWidgets(widgetsByBucketRef.current, updatedProgress);
+              } catch (e) {
+                console.error("Failed to save Google Fit widget progress to preferences", e);
+              }
+            } catch (errGoogleFitProgress) {
+              console.error("Failed to update Google Fit widget progress", errGoogleFitProgress);
+            }
+          } catch (err) {
+            console.error('Error refreshing Google Fit metrics', err);
+          }
+        })());
+      }
+
       await Promise.all(refreshPromises);
     } catch (err) {
       console.error("Manual refresh failed", err);
@@ -1099,26 +1173,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   const handleDragEnd = async (result: DropResult) => {
-    console.log('🚀 DRAG EVENT DETECTED! handleDragEnd called');
-    console.log('🎯 Drag end triggered:', {
-      source: result.source,
-      destination: result.destination,
-      draggableId: result.draggableId
-    });
-    
     if (!result.destination) {
-      console.log('❌ No destination, drag cancelled');
       return;
     }
-    
+
     const { source, destination, draggableId } = result;
-    
+
     // If dropped in the same list and at same index, do nothing
     if (
       source.droppableId === destination.droppableId &&
       source.index === destination.index
     ) {
-      console.log('↩️ Same position, no action needed');
       return;
     }
 
@@ -1133,16 +1198,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // update tasks through the batch update API instead of local state
     
     if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
-      console.log('📅 Daily task ➜ Hour slot detected');
       // Daily ➜ Hour slot - schedule the task
       const moved = todoistTasks[source.index];
       if (!moved) {
-        console.log('❌ No task found at source index');
         return;
       }
 
       const dstHour = hourKey(destination.droppableId);
-      console.log(`🕰️ Scheduling task "${moved.content}" to ${dstHour}`);
       
       try {
         // Use batchUpdateTasks for optimistic updates
@@ -1152,7 +1214,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           occurrenceDate: selectedDateStr,
         }]);
         
-        console.log(`✅ Scheduled task "${moved.content}" to ${dstHour}`);
       } catch (error) {
         console.error('Failed to schedule task:', error);
       }
@@ -1183,7 +1244,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // Also update the due date
         await updateTaskDueDate(draggableId, selectedDateStr);
         
-        console.log(`✅ Scheduled task "${moved.content}" from open list to ${dstHour}`);
       } catch (error) {
         console.error('Failed to schedule task from open list:', error);
       }
@@ -1192,16 +1252,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     // Handle hour-to-hour moves (moving tasks between time slots)
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-      console.log('🕐 Hour ➜ Hour slot detected');
       const srcHour = hourKey(source.droppableId);
       const dstHour = hourKey(destination.droppableId);
       
       if (srcHour === dstHour) {
-        console.log('↩️ Same hour slot, no action needed');
         return;
       }
       
-      console.log(`🔄 Moving task from ${srcHour} to ${dstHour}`);
       
       try {
         // Use batchUpdateTasks for optimistic updates
@@ -1211,7 +1268,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           occurrenceDate: selectedDateStr,
         }]);
         
-        console.log(`✅ Successfully moved task from ${srcHour} to ${dstHour}`);
       } catch (error) {
         console.error('Failed to move task between hours:', error);
       }
@@ -1326,7 +1382,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const upcomingDroppableIds = ['next7Days', 'next2Weeks', 'later', 'noDueDate'];
     
     if (upcomingDroppableIds.includes(source.droppableId) || upcomingDroppableIds.includes(destination.droppableId)) {
-      console.log('🔄 Upcoming task drag detected');
       
       // Get the task being moved
       let movedTask: any = null;
@@ -1348,7 +1403,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
       
       if (!movedTask) {
-        console.log('❌ No task found in source group');
         return;
       }
       
@@ -1377,7 +1431,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
       
       // Update the task's due date
-      console.log(`📅 Updating task "${movedTask.content}" due date to: ${newDueDate}`);
       
       // Optimistically update the state
       setAllTodoistTasks((prev) => {
@@ -1406,7 +1459,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       
       // Update the server
       await updateTaskDueDate(draggableId, newDueDate);
-      console.log(`✅ Successfully moved task to ${destination.droppableId}`);
     }
 
     // Optionally you can refresh from server, but keeping as-is to avoid flicker
@@ -1430,15 +1482,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Load progress from localStorage or Supabase once on mount / user change
   useEffect(() => {
     async function loadProgress() {
-      console.log('Loading progress...');
       let loaded = false;
       if (typeof window !== 'undefined') {
         const raw = localStorage.getItem('widget_progress');
-        console.log('Raw localStorage progress:', raw);
         if (raw) {
           try {
             const parsed = JSON.parse(raw);
-            console.log('Parsed localStorage progress:', parsed);
             setProgressByWidget(parsed);
             loaded = true;
           } catch (e) {
@@ -1450,9 +1499,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       if (!loaded && user) {
         try {
           const prefs = await getUserPreferencesClient();
-          console.log('User preferences:', prefs);
           if (prefs?.progress_by_widget) {
-            console.log('Loading progress from Supabase:', prefs.progress_by_widget);
             setProgressByWidget(prefs.progress_by_widget as Record<string, ProgressEntry>);
             loaded = true;
           }
@@ -1462,7 +1509,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
       
       if (!loaded) {
-        console.log('No progress found in localStorage or Supabase');
       }
     }
 
@@ -1473,8 +1519,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const todayStrGlobal = new Date().toISOString().slice(0,10);
 
   const incrementProgress = async (w: WidgetInstance) => {
-    console.log('incrementProgress called for widget:', w.instanceId);
-    console.log('Current progressByWidget:', progressByWidget);
     
     setProgressByWidget(prev => {
       const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
@@ -1511,7 +1555,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
       
       const newProgress = { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
-      console.log('New progress state:', newProgress);
       return newProgress;
     });
 
@@ -1536,12 +1579,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // Always fetch the current user from Supabase to avoid race conditions
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (!currentUser) {
-      console.log('User not logged in (supabase session missing), skipping save.');
       return;
     }
-    console.log('*** SAVING WIDGETS ***');
-    console.log('User:', currentUser.id);
-    console.log('Widgets to save:', JSON.stringify(widgetsToSave, null, 2));
 
     // Save to localStorage immediately (no async needed)
     if (typeof window !== 'undefined') {
@@ -1550,29 +1589,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         savedAt: new Date().toISOString()
       };
       localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-      console.log('Auto-saved to localStorage at:', dataToSave.savedAt);
-      console.log('Total buckets:', Object.keys(widgetsToSave).length);
       Object.entries(widgetsToSave).forEach(([bucket, widgets]) => {
-        console.log(`  Bucket "${bucket}": ${widgets.length} widgets`);
       });
       
       // Verify save by reading back
       const savedData = localStorage.getItem('widgets_by_bucket');
       const verified = JSON.parse(savedData!);
-      console.log('Verified save - savedAt:', verified.savedAt);
     }
     
     // Save to Supabase
     try {
       const prefs = await getUserPreferencesClient();
-      console.log('Current preferences before save:', prefs);
       if (prefs) {
         const savedPrefs = await saveUserPreferences({
           ...prefs,
           widgets_by_bucket: widgetsToSave,
           progress_by_widget: progressToSave || progressByWidgetRef.current, // Include current progress
         });
-        console.log('Widgets saved to Supabase successfully:', savedPrefs);
       }
     } catch (err) {
       console.error('Failed to save widgets to preferences', err);
@@ -1585,8 +1618,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       // Always use the latest state from the ref
       const latestWidgets = widgetsByBucketRef.current;
       const latestProgress = progressByWidgetRef.current;
-      console.log('Debounced save executing with widgets:', latestWidgets);
-      console.log('Debounced save executing with progress:', latestProgress);
       saveWidgets(latestWidgets, latestProgress);
     }, 2000)
   ).current;
@@ -1595,7 +1626,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (isSigningOut) return; // Prevent double-clicks
     setIsSigningOut(true);
 
-    console.log('Client: Signing out via API...');
     try {
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
@@ -1756,9 +1786,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   async function loadWidgets() {
-    console.log('*** LOADING WIDGETS ***');
-    console.log('Current user:', user?.id);
-    console.log('Current buckets:', buckets);
     
     setIsWidgetLoadComplete(false);
     
@@ -1769,32 +1796,25 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('widgets_by_bucket');
-        console.log('Raw localStorage data:', stored);
         
         if (stored) {
           const parsed = JSON.parse(stored);
           
           // Handle both old format (direct widgets) and new format (with metadata)
           if (parsed.widgets && parsed.savedAt) {
-            console.log('Found new format data, saved at:', parsed.savedAt);
             localWidgets = parsed.widgets;
           } else {
-            console.log('Found old format data');
             localWidgets = parsed;
           }
           
-          console.log('Found widgets in localStorage:', localWidgets);
-          console.log('Widget keys:', Object.keys(localWidgets));
           
           // Count widgets per bucket
           Object.entries(localWidgets).forEach(([bucket, widgets]) => {
-            console.log(`Bucket "${bucket}" has ${(widgets as any[]).length} widgets`);
           });
           
           setWidgetsByBucket(localWidgets);
           loadedFromLocal = true;
         } else {
-          console.log('No widgets found in localStorage');
         }
       } catch(e) {
         console.error('Failed to parse stored widgets', e);
@@ -1804,20 +1824,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // Always try to load from Supabase (source of truth)
     try {
       const prefs = await getUserPreferencesClient();
-      console.log('User preferences from Supabase:', prefs);
       
       if (prefs?.widgets_by_bucket && Object.keys(prefs.widgets_by_bucket).length > 0) {
-        console.log('Loading widgets from Supabase:', prefs.widgets_by_bucket);
-        console.log('Current buckets available:', buckets);
         
         const supabaseWidgetsStr = JSON.stringify(prefs.widgets_by_bucket);
         const localWidgetsStr = JSON.stringify(localWidgets);
         const dataIsDifferent = supabaseWidgetsStr !== localWidgetsStr;
         
-        console.log('Data is different:', dataIsDifferent);
         
         if (dataIsDifferent) {
-          console.log('Supabase widgets differ from localStorage, updating state...');
           
           // Migrate existing widgets to match current templates
           const migratedWidgets = migrateWidgetsToTemplates(prefs.widgets_by_bucket);
@@ -1828,7 +1843,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           setBuckets(prev => {
             const merged = Array.from(new Set([...prev, ...widgetBuckets]));
             if (merged.length !== prev.length) {
-              console.log('Adding buckets from widgets to bucket list:', merged);
               // Persist merged buckets to localStorage
               if (typeof window !== 'undefined') {
                 localStorage.setItem('life_buckets', JSON.stringify(merged));
@@ -1844,13 +1858,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           
           if (typeof window !== 'undefined') {
             localStorage.setItem('widgets_by_bucket', supabaseWidgetsStr);
-            console.log('Updated localStorage with Supabase data');
           }
         } else {
-          console.log('Supabase and localStorage widgets are the same');
         }
       } else if (loadedFromLocal && Object.keys(localWidgets).length > 0) {
-        console.log('No widgets in Supabase but found in localStorage, saving to Supabase...');
         
         // Migrate local widgets before saving to Supabase
         const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
@@ -1863,12 +1874,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           });
         }
       } else {
-        console.log('No widgets found in either Supabase or localStorage');
       }
     } catch (err) {
       console.error('Failed to load widgets from preferences', err);
     } finally {
-      console.log('Widget load complete');
       setIsWidgetLoadComplete(true);
     }
   }
@@ -1876,14 +1885,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Auth state change listener
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user }, error }) => {
-      console.log('Client auth check:', { user: user?.id, error });
       setUser(user);
       // Mark auth as initialized after the initial getUser resolves
       setAuthInitialized(true);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change:', event, { user: session?.user?.id });
       setUser(session?.user ?? null);
       // Ensure we mark initialized when we receive any auth event
       setAuthInitialized(true);
@@ -1900,12 +1907,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!authInitialized) return;
 
     if (user) {
-      console.log('User detected, loading dashboard data...');
       loadBuckets({ fetchFromSupabase: true });
       loadWidgets();
       ensureUserOnboarded();
     } else {
-      console.log('No authenticated user yet; loading dashboard state from local cache');
       loadBuckets({ fetchFromSupabase: false });
     }
   }, [user, authInitialized]);
@@ -1913,12 +1918,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Save widgets whenever they change
   useEffect(() => {
     if (!isWidgetLoadComplete || !user) {
-      console.log('Skipping save - load not complete or no user', { isWidgetLoadComplete, user: !!user });
       return; // Don't save on initial load or if logged out
     }
     
-    console.log('Widget save effect triggered');
-    console.log('Current widgets:', JSON.stringify(widgetsByBucket, null, 2));
     
     // Save to localStorage immediately
     if (typeof window !== 'undefined') {
@@ -1927,16 +1929,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         savedAt: new Date().toISOString()
       };
       localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-      console.log('Auto-saved to localStorage at:', dataToSave.savedAt);
-      console.log('Total buckets:', Object.keys(widgetsByBucket).length);
       Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
-        console.log(`  Bucket "${bucket}": ${widgets.length} widgets`);
       });
       
       // Verify save by reading back
       const savedData = localStorage.getItem('widgets_by_bucket');
       const verified = JSON.parse(savedData!);
-      console.log('Verified save - savedAt:', verified.savedAt);
     }
     
     // Debounce the Supabase save
@@ -1946,17 +1944,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Save progress whenever it changes
   useEffect(() => {
     if (!isWidgetLoadComplete || !user) {
-      console.log('Skipping progress save - load not complete or no user', { isWidgetLoadComplete, user: !!user });
       return; // Avoid saving before initial load or when logged out
     }
 
-    console.log('Progress save effect triggered');
 
     // Persist to localStorage immediately for fast reloads
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('widget_progress', JSON.stringify(progressByWidget));
-        console.log('Progress auto-saved to localStorage');
       } catch (e) {
         console.error('Failed to persist widget progress', e);
       }
@@ -1968,11 +1963,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   async function loadBuckets(options?: { fetchFromSupabase?: boolean }) {
     const shouldFetchFromSupabase = options?.fetchFromSupabase ?? true;
-    console.log('[Buckets] loadBuckets start', {
-      bucketsState: buckets,
-      activeBucketState: activeBucket,
-      shouldFetchFromSupabase,
-    });
     let loadedFromLocal = false;
     let localBuckets: string[] = [];
     let localBucketColors: Record<string, string> | null = null;
@@ -1981,7 +1971,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         const stored = localStorage.getItem('life_buckets');
         if (stored) {
           const parsed: string[] = JSON.parse(stored);
-          console.log('[Buckets] Parsed localStorage value', parsed);
           if (Array.isArray(parsed) && parsed.length) {
             localBuckets = parsed;
             setBuckets(parsed);
@@ -2010,24 +1999,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     try {
       if (!shouldFetchFromSupabase) {
-        console.log('[Buckets] Skipping Supabase fetch (no authenticated user yet)');
         return;
       }
 
-      console.log('[Buckets] Attempting to load from Supabase');
       const prefs = await getUserPreferencesClient();
-      console.log('[Buckets] Supabase preferences response', {
-        lifeBuckets: prefs?.life_buckets,
-        bucketColors: prefs?.bucket_colors,
-      });
       if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
         // If we already loaded buckets from localStorage, prefer them to avoid flicker
         if (!loadedFromLocal) {
-          console.log('[Buckets] Loading buckets from Supabase');
           setBuckets(prefs.life_buckets);
           const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
           const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
-          console.log('[Buckets] Setting active bucket to', initialActive);
           setActiveBucket(initialActive);
         }
         // Apply colors from Supabase only if non-empty to avoid wiping out locally cached colors
@@ -2062,7 +2043,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }
       } else {
         if (loadedFromLocal && localBuckets.length) {
-          console.log('No buckets found on server, preserving locally cached buckets');
           if (prefs) {
             const mergedColors = {
               ...(prefs.bucket_colors || {}),
@@ -2076,7 +2056,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           }
         } else {
           // If no buckets found anywhere, set default buckets
-          console.log('No buckets found locally or on server, setting defaults');
           const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
           setBuckets(defaultBuckets);
           // Assign default colors for defaults if none exist
@@ -2113,12 +2092,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
       setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
     } finally {
-      console.log('[Buckets] loadBuckets finished', {
-        bucketsAfter: buckets,
-        localBuckets,
-        activeBucketAfter: activeBucket,
-        loadedFromLocal,
-      });
       setBucketsInitialized(true);
     }
   }
@@ -2139,7 +2112,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       // If user has buckets but onboarded flag is false, fix it
       const prefs = await getUserPreferencesClient();
       if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
-        console.log('User has preferences but onboarded=false, fixing...');
         await supabase
           .from('profiles')
           .update({ onboarded: true })
@@ -2198,7 +2170,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Clean up debug widgets from all buckets
   const cleanupDebugWidgets = async () => {
-    console.log('Cleaning up debug widgets...');
     const cleaned: Record<string, WidgetInstance[]> = {};
     
     Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
@@ -2207,7 +2178,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     
     setWidgetsByBucket(cleaned);
     await saveWidgets(cleaned);
-    console.log('Debug widgets cleaned up');
   };
 
   // Filter out debug widgets when displaying
@@ -2281,10 +2251,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   const handleAddDailyTask = async () => {
     const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-    console.log('🔄 Creating daily task:', newDailyTask, 'for date:', selectedDateStr);
     try {
       await contextCreateTask(newDailyTask, selectedDateStr);
-      console.log('✅ Daily task created successfully');
       setNewDailyTask('');
     } catch (error) {
       console.error('❌ Failed to create daily task:', error);
@@ -2292,10 +2260,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   const handleAddOpenTask = async () => {
-    console.log('🔄 Creating open task:', newOpenTask);
     try {
       await contextCreateTask(newOpenTask, null);
-      console.log('✅ Open task created successfully');
       setNewOpenTask('');
     } catch (error) {
       console.error('❌ Failed to create open task:', error);
@@ -2506,7 +2472,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         const prefs = await getUserPreferencesClient();
         if (prefs) {
           await saveUserPreferences({ ...prefs, hourly_plan: JSON.parse(localStorage.getItem(localStorageKey) || '{}') });
-          console.log('✅ Hourly plan synced to Supabase');
         }
       } catch (sbErr) {
         console.warn('Could not save hourly plan to Supabase (schema may need updating):', sbErr);
@@ -2529,7 +2494,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           if (prefs && prefs.hourly_plan) {
             savedPlan = prefs.hourly_plan[dateKey];
             if (savedPlan) {
-              console.log('✅ Loaded hourly plan from Supabase for', dateKey);
             }
           }
         } catch (supabaseError) {
@@ -2546,7 +2510,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             savedPlan = localPlans[dateKey];
             
             if (savedPlan) {
-              console.log('✅ Loaded hourly plan from localStorage for', dateKey);
             }
           }
         }
@@ -2565,7 +2528,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             obj[h] = [];
           });
           setHourlyPlan(obj);
-          console.log('No saved hourly plan found for', dateKey);
         }
       } catch (error) {
         console.error('Failed to load hourly plan:', error);
@@ -2967,15 +2929,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('Deleting widget:', w.instanceId);
                               // Use callback pattern to ensure we're working with the latest state
                               setWidgetsByBucket(prevWidgets => {
                                 const updatedWidgets = { ...prevWidgets };
                                 updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
                                 
-                                console.log('Widget deleted from bucket:', activeBucket);
-                                console.log('Remaining widgets in bucket:', updatedWidgets[activeBucket]?.length || 0);
-                                console.log('Full updated state:', JSON.stringify(updatedWidgets, null, 2));
                                 
                                 // Also update the ref immediately
                                 widgetsByBucketRef.current = updatedWidgets;
@@ -2987,7 +2945,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     savedAt: new Date().toISOString()
                                   };
                                   localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                                  console.log('Deletion saved to localStorage at:', dataToSave.savedAt);
                                 }
                                 
                                 return updatedWidgets;

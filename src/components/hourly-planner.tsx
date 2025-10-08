@@ -30,6 +30,7 @@ interface PlannerItem {
 // Constants – 7 AM → 9 PM with 15-minute intervals
 // -----------------------------------------------------------------------------
 const HOUR_HEIGHT = 64; // px that represents one hour
+const SLOT_HEIGHT = Math.max(HOUR_HEIGHT / 4, 18); // ensures 15-minute targets stay reachable
 const TIME_SLOTS = Array.from({ length: 15 * 4 }, (_, i) => {
   const totalMinutes = (7 * 60) + (i * 15); // Start at 7 AM (420 minutes), increment by 15
   const hours = Math.floor(totalMinutes / 60);
@@ -185,6 +186,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   const [dragging, setDragging] = useState(false);
   const effectiveDragging = isDragging || dragging;
   const suppressDragUntilRef = useRef<number>(0);
+  const [draggingOverSlot, setDraggingOverSlot] = useState<string | null>(null);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setDragging(false);
@@ -262,32 +264,19 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   // Handle creating a new task at a specific time slot
   const handleCreateTaskAtTime = async () => {
     const timeSlot = addModalSlot;
-    console.log('🚀 handleCreateTaskAtTime called:', { timeSlot, content: newTaskContent.trim(), isCreatingTask });
 
     if (!timeSlot || !newTaskContent.trim() || isCreatingTask) {
-      console.log('❌ Early return:', { hasTimeSlot: !!timeSlot, hasContent: !!newTaskContent.trim(), isCreatingTask });
       return;
     }
 
     setIsCreatingTask(true);
-    console.log('✅ Starting task creation process');
 
     try {
       const dateStr = activePlannerDate;
 
-      console.log('📅 Creating task with params:', {
-        content: newTaskContent.trim(),
-        date: dateStr,
-        timeSlot,
-        bucket: taskBucket,
-        duration: newTaskDuration,
-      });
-
       const newTask = await createTask(newTaskContent.trim(), dateStr, undefined, taskBucket);
-      console.log('📝 CreateTask response:', newTask);
 
       if (newTask) {
-        console.log('🎯 Updating task with hourSlot:', `hour-${timeSlot}`);
         await batchUpdateTasks([
           {
             taskId: newTask.id,
@@ -298,19 +287,16 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             occurrenceDate: dateStr,
           },
         ]);
-        console.log('✅ Task updated successfully');
       }
 
       setNewTaskContent("");
       setNewTaskDuration(60);
       setAddModalSlot(null);
-      console.log('🔄 Reset form state');
     } catch (error) {
-      console.error('💥 Failed to create task:', error);
+      console.error('Failed to create task:', error);
       // Don't reset state on error so user can retry
     } finally {
       setIsCreatingTask(false);
-      console.log('🏁 Task creation process finished');
     }
   };
 
@@ -375,16 +361,13 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   } | null>(null);
 
   const startResize = useCallback((e: React.MouseEvent, hour: string, taskId: string) => {
-    console.log('🎛️ Starting resize:', { hour, taskId });
     e.stopPropagation();
     e.preventDefault();
 
     const task = hourlyPlan[hour].find((t) => t.id === taskId);
     if (!task) {
-      console.log('❌ Task not found for resize:', { hour, taskId, availableTasks: hourlyPlan[hour] });
       return;
     }
-    console.log('✅ Task found, starting resize:', { taskId, task });
     const startDuration = task?.duration ?? 60;
     let currentDuration = startDuration;
     
@@ -440,6 +423,20 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     window.addEventListener("blur", endResize);
     window.addEventListener("mouseleave", endResize);
   }, [hourlyPlan, batchUpdateTasks, activePlannerDate]);
+
+  useEffect(() => {
+    if (!effectiveDragging) {
+      setDraggingOverSlot(null);
+    }
+  }, [effectiveDragging]);
+
+  const handleSlotHover = useCallback((slot: string, isActive: boolean) => {
+    if (!effectiveDragging) return;
+    setDraggingOverSlot(prev => {
+      if (isActive) return slot;
+      return prev === slot ? null : prev;
+    });
+  }, [effectiveDragging]);
 
   // Remove task from hourly planner
   const removeTaskFromPlanner = async (taskId: string) => {
@@ -684,6 +681,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                 } ${index === 0 ? 'border-t-0' : ''} ${
                   snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : isCurrentSlot ? 'bg-indigo-50/70 border-indigo-100' : ''
                 }`}
+                style={{ minHeight: SLOT_HEIGHT }}
+                onMouseEnter={() => handleSlotHover(timeSlot, true)}
+                onMouseLeave={() => handleSlotHover(timeSlot, false)}
               >
                 {/* Enhanced time label with better typography - only show for main hours */}
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
@@ -712,7 +712,22 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className="flex-1 relative overflow-visible min-h-[15px]"
+                  style={{ minHeight: SLOT_HEIGHT }}
                 >
+                  {effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) && (
+                    <>
+                      <div
+                        className="pointer-events-none absolute inset-0 rounded-lg border border-indigo-300/70 bg-indigo-50/60"
+                        style={{ zIndex: 0 }}
+                      />
+                      <div
+                        className="pointer-events-none absolute right-0 top-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-500"
+                        style={{ zIndex: 0 }}
+                      >
+                        {timeSlot}
+                      </div>
+                    </>
+                  )}
                   {hourlyPlan[timeSlot].map((t, index) => {
                     const taskCount = hourlyPlan[timeSlot].length;
                     // Better spacing calculation for multiple tasks
@@ -773,9 +788,33 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                             ${isDraggingNow ? 'shadow-lg rotate-1 scale-105 border-indigo-500 cursor-grabbing' : ''}
                             ${resizingTask?.taskId === t.id ? 'ring-2 ring-indigo-200' : ''}
                           `}
-                          {...prov.dragHandleProps}
                         >
-                          <div className="flex items-start gap-3 w-full h-full min-h-[32px]">
+                          <div
+                            className="flex items-start gap-3 w-full h-full min-h-[32px]"
+                            {...(() => {
+                              const handleProps = prov.dragHandleProps ?? {};
+                              const { onMouseDown, onTouchStart, ...rest } = handleProps as any;
+                              return {
+                                ...rest,
+                                onMouseDown: (event: React.MouseEvent<any, MouseEvent>) => {
+                                  if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    return;
+                                  }
+                                  onMouseDown?.(event);
+                                },
+                                onTouchStart: (event: React.TouchEvent<any>) => {
+                                  if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    return;
+                                  }
+                                  onTouchStart?.(event);
+                                },
+                              };
+                            })()}
+                          >
                             {/* Enhanced status indicator with brand colors */}
                             <div className="flex-shrink-0 mt-1">
                               <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full ring-2 ring-indigo-200" />
@@ -807,6 +846,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                       onBlur={handleSaveEdit}
                                       autoFocus
                                       className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 w-full focus:outline-none focus:border-indigo-500"
+                                      data-no-drag="true"
                                     />
                                   ) : (
                                     <div 
@@ -859,6 +899,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                       onBlur={handleSaveEdit}
                                       autoFocus
                                       className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-indigo-500"
+                                      data-no-drag="true"
                                     />
                                   ) : (
                                     <div 
@@ -901,6 +942,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                 rounded-md p-1.5 transition-all duration-200
                                 focus:opacity-100 focus:ring-2 focus:ring-theme-error-200"
                               title="Delete task permanently"
+                              data-no-drag="true"
                             >
                               <X size={14} />
                             </button>
@@ -916,9 +958,15 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                   rounded-full transition-all duration-200
                                   opacity-60 group-hover:opacity-100 hover:scale-110
                                   flex items-center justify-center shadow-sm"
+                                data-no-drag="true"
                               >
                                 <div className="w-3 h-0.5 bg-indigo-600 rounded-full" />
                               </div>
+                            </div>
+                          )}
+                          {isResizing && (
+                            <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white shadow-lg">
+                              Ends {endTime}
                             </div>
                           )}
                         </li>

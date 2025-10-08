@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     const { error: upsertError } = await supabase.from('user_integrations').upsert(
       {
         user_id: effectiveUserId,
-        provider: 'googlefit',
+        provider: 'google-fit',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         token_data: tokenData,

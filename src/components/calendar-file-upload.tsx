@@ -106,7 +106,6 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
       });
 
       const result = await response.json();
-      console.log('Calendar upload response', response.status, result);
 
       if (response.ok) {
         invalidateTaskCaches();

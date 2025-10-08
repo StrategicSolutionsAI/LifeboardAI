@@ -15,12 +15,8 @@ export default function SettingsPageClient() {
 
   useEffect(() => {
     const loadUserPreferences = async () => {
-      console.log('Loading user preferences...')
       const prefs = await getUserPreferencesClient()
-      console.log('User preferences loaded:', prefs)
       if (prefs) {
-        console.log('Life buckets:', prefs.life_buckets)
-        console.log('Bucket colors:', prefs.bucket_colors)
         setUserPreferences(prefs)
         setBucketColors(prefs.bucket_colors || {})
       }
@@ -131,7 +127,6 @@ export default function SettingsPageClient() {
           window.dispatchEvent(new CustomEvent('bucketColorsChanged'))
         }
       } catch (error) {
-        console.log('Could not save to database, using localStorage fallback:', error)
       }
     }
   }

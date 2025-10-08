@@ -226,22 +226,18 @@ export function ChatBar() {
     
     // Log volume for debugging (less frequently)
     if (Math.random() < 0.1) { // Only log 10% of the time to reduce spam
-      console.log('🔊 Audio level:', Math.round(rms), 'threshold:', threshold)
     }
     
     if (rms < threshold) {
       // Start silence timer if not already started
       if (!silenceTimeoutRef.current) {
-        console.log('🤫 Starting silence timer...')
         silenceTimeoutRef.current = setTimeout(() => {
-          console.log('🔇 Silence detected, stopping recording...')
           stopRecording()
         }, 1000) // 1 second of silence for snappier flow
       }
     } else {
       // Clear silence timer if sound detected
       if (silenceTimeoutRef.current) {
-        console.log('🔊 Sound detected, clearing silence timer')
         clearTimeout(silenceTimeoutRef.current)
         silenceTimeoutRef.current = null
       }
@@ -257,7 +253,6 @@ export function ChatBar() {
   async function startBargeMonitor() {
     try {
       if (bargeStreamRef.current) return
-      console.log('🎧 Starting barge-in monitor...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
       })
@@ -285,7 +280,6 @@ export function ChatBar() {
           aboveCount++
           if (!bargeHotRef.current && aboveCount >= framesNeeded) {
             bargeHotRef.current = true
-            console.log('🛑 Barge-in detected — stopping TTS and starting recording')
             cancelTTS()
             stopBargeMonitor()
             if (!isRecording) startRecording()
@@ -333,7 +327,6 @@ export function ChatBar() {
       // If we're speaking, stop so you can barge in
       cancelTTS()
       
-      console.log('🎙️ Starting recording...')
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           deviceId: micDeviceId ? { exact: micDeviceId } : undefined,
@@ -343,7 +336,6 @@ export function ChatBar() {
         } 
       })
 
-      console.log('✅ Microphone access granted')
       setHasRequestedDeviceAccess(true)
       enumerateAudioDevices(false)
 
@@ -375,13 +367,11 @@ export function ChatBar() {
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data)
-          console.log('📊 Audio data chunk received:', event.data.size, 'bytes')
         }
       }
       
       recorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: (recorder as any).mimeType || chosenType || 'audio/webm' })
-        console.log('🎵 Audio recorded, size:', audioBlob.size, 'bytes')
         
         // Clean up audio analysis
         if (volumeCheckRef.current) {
@@ -412,7 +402,6 @@ export function ChatBar() {
       // Start silence detection
       detectSilence()
       
-      console.log('🔴 Recording started successfully')
     } catch (error: any) {
       console.error('❌ Error accessing microphone:', error)
       setMessages(prev => [...prev, { 
@@ -423,7 +412,6 @@ export function ChatBar() {
   }
 
   function stopRecording() {
-    console.log('🛑 Stopping recording...')
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
@@ -441,11 +429,9 @@ export function ChatBar() {
   }
 
   function toggleVoiceMode() {
-    console.log('🔄 Toggling voice mode. Current state:', { isVoiceMode, isRecording, isProcessing, isSpeaking })
     
     if (isVoiceMode) {
       // Exit voice mode
-      console.log('🔇 Exiting voice mode')
       // Reset Realtime state guards
       rtTextBufferRef.current = ''
       rtLastTranscriptRef.current = ''
@@ -466,7 +452,6 @@ export function ChatBar() {
       }
     } else {
       // Enter voice mode
-      console.log('🎙️ Entering voice mode')
       // Reset guards for a clean session
       rtTextBufferRef.current = ''
       rtLastTranscriptRef.current = ''
@@ -514,20 +499,16 @@ export function ChatBar() {
       pc.onconnectionstatechange = () => {
         const s = pc.connectionState
         setRtConnState(s)
-        console.log('Realtime connectionState:', s)
       }
       pc.oniceconnectionstatechange = () => {
         const s = pc.iceConnectionState
         setRtIceState(s)
-        console.log('Realtime iceConnectionState:', s)
       }
       pc.onicegatheringstatechange = () => {
         const s = pc.iceGatheringState
         setRtGatheringState(s)
-        console.log('Realtime iceGatheringState:', s)
       }
       pc.onicecandidate = (e) => {
-        if (!e.candidate) console.log('Realtime ICE gathering complete')
       }
 
       // 4) Attach local mic track
@@ -592,14 +573,12 @@ export function ChatBar() {
             const t = frame?.type
             try {
               if (typeof t === 'string' && (/^response\./.test(t) || /^input_/.test(t))) {
-                console.log('📨 Realtime frame:', t)
               }
             } catch {}
             // Capture user speech transcript if available and try immediate parse
             if (t === 'input_audio_transcription.completed' && typeof frame.transcript === 'string') {
               const transcript: string = String(frame.transcript || '')
               rtLastTranscriptRef.current = transcript
-              try { console.log('📝 Realtime transcript:', transcript) } catch {}
               // Opportunistic immediate creation from transcript (so we aren't dependent on model text frames)
               try {
                 if (!rtCreateLockRef.current) {
@@ -639,7 +618,6 @@ export function ChatBar() {
                     content = cleanAssistantContent(content)
                     if (content) {
                       rtCreateLockRef.current = true
-                      console.log('🧭 Realtime transcript creating task', { content, due_date, hour_slot, bucket })
                       const res = await fetch('/api/integrations/todoist/tasks', {
                         method: 'POST',
                         credentials: 'same-origin',
@@ -669,7 +647,6 @@ export function ChatBar() {
             if (t === 'response.audio_transcript.done') {
               const aText = (rtAudioTranscriptRef.current || '').trim()
               rtAudioTranscriptRef.current = ''
-              try { if (aText) console.log('🗣️ Assistant audio transcript:', aText) } catch {}
               if (aText && !rtCreateLockRef.current) {
                 try {
                   // 0) Try to salvage a JSON command printed in speech text
@@ -678,7 +655,6 @@ export function ChatBar() {
                     try {
                       const cmd = JSON.parse(jsonCmdMatch[0]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
                       if (cmd && cmd.action === 'create_task' && cmd.content) {
-                        console.log('🧠 Realtime audio JSON command extracted', cmd)
                         const res = await fetch('/api/integrations/todoist/tasks', {
                           method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ content: cmd.content, due_date: cmd.due_date || null, hour_slot: typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined, bucket: cmd.bucket || undefined })
@@ -745,7 +721,6 @@ export function ChatBar() {
                       .trim()
                     content = cleanAssistantContent(content)
                     if (content && content.length > 2) {
-                      console.log('🧭 Realtime assistant transcript creating task', { content, due_date, hour_slot, bucket })
                       const res = await fetch('/api/integrations/todoist/tasks', {
                         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ content, due_date, hour_slot, bucket })
@@ -814,7 +789,6 @@ export function ChatBar() {
                       try {
                         const cmd2 = JSON.parse(jsonCmdMatch[0]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
                         if (cmd2 && cmd2.action === 'create_task' && cmd2.content) {
-                          console.log('🧠 Realtime JSON command extracted', cmd2)
                           const res = await fetch('/api/integrations/todoist/tasks', {
                             method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ content: cmd2.content, due_date: cmd2.due_date || null, hour_slot: typeof cmd2.hour_slot === 'number' ? cmd2.hour_slot : undefined, bucket: cmd2.bucket || undefined })
@@ -835,7 +809,6 @@ export function ChatBar() {
                     const sourceAssistant = text
                     const sourceUser = rtLastTranscriptRef.current || ''
                     const candidate = triggers.test(sourceUser) ? sourceUser : (triggers.test(sourceAssistant) ? sourceAssistant : '')
-                    try { console.log('🧩 Realtime candidate text:', candidate || '(none)') } catch {}
                     // Also accept if there is a quoted content even without triggers
                     const quotedAny = (candidate.match(/[“\"']([^”\"']+)[”\"']/) || [])[1]
                     if (triggers.test(candidate) || quotedAny) {
@@ -875,7 +848,6 @@ export function ChatBar() {
                         .replace(/\s+/g, ' ')
                         .trim()
                       if (content) {
-                        console.log('🧭 Realtime fallback creating task', { content, due_date, hour_slot, bucket })
                         const res = await fetch('/api/integrations/todoist/tasks', {
                           method: 'POST',
                           credentials: 'same-origin',
@@ -923,7 +895,6 @@ export function ChatBar() {
       const answerSDP = await resp.text()
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSDP })
 
-      console.log('✅ Realtime voice session established')
     } catch (e) {
       setIsRealtimeActive(false)
       stopRealtime()
@@ -970,7 +941,6 @@ export function ChatBar() {
 
   async function handleVoiceMessage(audioBlob: Blob) {
     try {
-      console.log('🔄 Processing voice message...')
       
       // Always send to server for transcription (works across browsers)
       const formData = new FormData()
@@ -984,7 +954,6 @@ export function ChatBar() {
       }]
       setMessages(newMessages)
 
-      console.log('📤 Sending audio to API...')
       // Include TTS preferences for server TTS
       formData.append('voice', ttsVoice)
       formData.append('speed', String(ttsRate))
@@ -998,7 +967,6 @@ export function ChatBar() {
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
 
-      console.log('📥 API response status:', res.status)
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
@@ -1010,7 +978,6 @@ export function ChatBar() {
       }
 
       const data = await res.json()
-      console.log('✅ API response received:', { hasReply: !!data.reply, hasAudio: !!data.audioUrl })
 
       const assistantMessage: Message = { 
         role: "assistant" as const, 
@@ -1026,7 +993,6 @@ export function ChatBar() {
 
       // Auto-play OpenAI TTS audio if available and handle continuous conversation
       // Play audio response (server TTS or browser TTS fallback)
-      console.log('🔊 Playing audio response...')
       if (data.audioUrl) {
         setIsSpeaking(true)
         const audio = new Audio(data.audioUrl)

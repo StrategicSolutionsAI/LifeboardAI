@@ -26,23 +26,19 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
   const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
 
   const handleDateChange = (newDate: Date) => {
-    console.log('📅 Calendar date changed:', newDate);
     onDateChange(newDate);
   };
 
   // Unified drag and drop handler for sidebar to calendar
   const handleDragEnd = (result: DropResult) => {
-    console.log('🎯 CalendarView handleDragEnd called:', result);
     
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
-      console.log('❌ Drag ignored - resize operation active');
       setIsDragging(false);
       return;
     }
     setIsDragging(false);
     if (!result.destination) {
-      console.log('❌ No destination in drag result');
       return;
     }
 
@@ -53,7 +49,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     const isCalendarDay = (id: string) => id.startsWith('calendar-day-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
-    console.log('🎯 Unified drag operation:', { source: source.droppableId, destination: destination.droppableId, draggableId });
 
     // Helper to check if source is from sidebar
     const isFromSidebar = (sourceId: string) => {
@@ -66,7 +61,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     // Handle drag from sidebar to calendar hour slots
     if (isFromSidebar(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId; // Keep full 'hour-<time>' format
-      console.log('📅➡️⏰ Sidebar task → Calendar hour slot:', { draggableId, dstHour });
       
       // Set hourSlot and due date for the selected date
       const dateStr = selectedDateStr;
@@ -89,7 +83,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     // Handle drag from sidebar to calendar day (non-hour areas)
     if (isFromSidebar(source.droppableId) && isCalendarDay(destination.droppableId)) {
       const targetDateStr = destination.droppableId.replace('calendar-day-', '');
-      console.log('📅➡️📅 Sidebar task → Calendar day:', { draggableId, targetDateStr });
       
       batchUpdateTasks([
         { 
@@ -108,13 +101,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
 
     // Handle moves from hourly slots back to sidebar task lists
     if (isHour(source.droppableId) && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
-      console.log('⏰➡️📋 Calendar hour → Sidebar:', { 
-        draggableId, 
-        from: source.droppableId, 
-        to: destination.droppableId, 
-        targetIndex: destination.index 
-      });
-      
       // Determine what updates to make based on destination
       let updates: any = { hourSlot: null }; // Always remove hour slot
       
@@ -147,7 +133,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     // Handle moves from hourly slots to upcoming task sections
     if (isHour(source.droppableId) && destination.droppableId.startsWith('upcoming-')) {
       const groupKey = destination.droppableId.replace('upcoming-', '');
-      console.log('⏰➡️📋 Calendar hour → Upcoming section:', { draggableId, groupKey });
       
       let targetDate: string | undefined = undefined;
       const today = new Date();
@@ -189,7 +174,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     // Handle moves between hour slots in calendar
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId;
-      console.log('⏰➡️⏰ Calendar hour → Calendar hour:', { draggableId, dstHour });
       
       batchUpdateTasks([
         { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: selectedDateStr }
@@ -204,12 +188,10 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       const srcDate = source.droppableId.replace('calendar-day-', '');
       const destDate = destination.droppableId.replace('calendar-day-', '');
       if (srcDate === destDate) {
-        console.log('📅➡️📅 Task dropped on same day – no action needed');
         return;
       }
 
       if (!draggableId.startsWith('lifeboard::')) {
-        console.log('📅➡️📅 Dragged item is not a Lifeboard task, ignoring');
         return;
       }
 
@@ -225,7 +207,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
         updates.hourSlot = null;
       }
 
-      console.log('📅➡️📅 Moving Lifeboard task between days:', { taskId, srcDate, destDate, updates });
 
       batchUpdateTasks([
         { taskId, updates, occurrenceDate: destDate }
@@ -251,7 +232,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
 
     // Handle reordering within the same list
     if (source.droppableId === destination.droppableId && source.index !== destination.index) {
-      console.log('🔄 Reordering within same list:', { list: source.droppableId, from: source.index, to: destination.index });
       
       // For openTasks, we need to get the current task list and calculate new positions
       if (source.droppableId === 'openTasks') {
@@ -323,7 +303,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
         today.getMonth() + 1
       ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       
-      console.log('📋➡️📅 Open task → Master List Today:', { draggableId, todayStr });
       
       batchUpdateTasks([
         { taskId: draggableId, updates: { due: { date: todayStr } } }
@@ -334,7 +313,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     }
 
     if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
-      console.log('📅➡️📋 Master List Today → Open task:', { draggableId });
       
       batchUpdateTasks([
         { taskId: draggableId, updates: { due: undefined } }
@@ -347,7 +325,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     // Handle moves from upcoming task sections to other lists
     if (source.droppableId.startsWith('upcoming-')) {
       if (destination.droppableId === 'openTasks') {
-        console.log('📋➡️📋 Upcoming task → Open tasks:', { draggableId });
         
         batchUpdateTasks([
           { taskId: draggableId, updates: { due: undefined } }
@@ -362,7 +339,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
           selectedDate.getMonth() + 1
         ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
         
-        console.log('📋➡️📅 Upcoming task → Daily tasks:', { draggableId, dateStr });
         
         batchUpdateTasks([
           { taskId: draggableId, updates: { due: { date: dateStr } } }
@@ -378,7 +354,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
           today.getMonth() + 1
         ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
         
-        console.log('📋➡️📅 Upcoming task → Master List Today:', { draggableId, todayStr });
         
         batchUpdateTasks([
           { taskId: draggableId, updates: { due: { date: todayStr } } }
@@ -425,7 +400,6 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       }
 
       if (targetDate) {
-        console.log(`📋➡️📋 Task → Upcoming ${groupKey}:`, { draggableId, targetDate });
         
         batchUpdateTasks([
           { taskId: draggableId, updates: { due: { date: targetDate } } }
@@ -436,13 +410,11 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       }
     }
 
-    console.log('Unhandled drag operation:', result);
   };
 
   return (
     <DragDropContext 
       onDragStart={(initial) => {
-        console.log('🚀 CalendarView onDragStart:', initial);
         setIsDragging(true);
       }} 
       onDragEnd={handleDragEnd}

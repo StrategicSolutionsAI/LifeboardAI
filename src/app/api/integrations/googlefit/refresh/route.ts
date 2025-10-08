@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     .from('user_integrations')
     .select('id, access_token, refresh_token, token_data, updated_at')
     .eq('user_id', user.id)
-    .eq('provider', 'googlefit')
+    .eq('provider', 'google-fit')
     .maybeSingle()
 
   if (integrationError || !integration?.access_token) {

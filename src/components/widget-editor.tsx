@@ -64,7 +64,7 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
         setIsFitbitConnected(fitbitData.connected);
 
         // Google Fit
-        const gfRes = await fetch('/api/integrations/status?provider=googlefit');
+        const gfRes = await fetch('/api/integrations/status?provider=google-fit');
         const gfData = await gfRes.json();
         setIsGoogleFitConnected(gfData.connected);
 
