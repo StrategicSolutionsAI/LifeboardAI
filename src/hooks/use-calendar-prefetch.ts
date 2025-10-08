@@ -47,7 +47,6 @@ export function useCalendarPrefetch() {
           })
         ]);
         
-        console.log(`✅ Prefetched data for ${dateStr}`);
       } catch (error) {
         // Remove from cache on error so it can be retried
         prefetchCache.current.delete(cacheKey);
@@ -159,8 +158,6 @@ export function useCalendarPrefetch() {
     
     // Clear cache
     prefetchCache.current.clear();
-    
-    console.log('🧹 Cleared prefetch cache');
   }, []);
   
   return {

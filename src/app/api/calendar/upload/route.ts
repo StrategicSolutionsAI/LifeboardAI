@@ -442,8 +442,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`Processing ${events.length} events for user ${user.id}`);
-
     // Insert events in batches to avoid timeout
     const batchSize = 50;
     let insertedCount = 0;
@@ -564,7 +562,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      console.log(`Processed batch ${Math.floor(i / batchSize) + 1}, events so far: ${insertedCount}`);
     }
 
     const responsePayload: Record<string, unknown> = {

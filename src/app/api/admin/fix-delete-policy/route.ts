@@ -11,8 +11,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    console.log('[FIX-DELETE-POLICY] Adding missing DELETE policy for user_integrations table')
-
     // Add the missing DELETE policy
     const { error } = await supabase.rpc('exec_sql', {
       sql: `
@@ -44,8 +42,6 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
     }
-
-    console.log('[FIX-DELETE-POLICY] Successfully added DELETE policy')
 
     return NextResponse.json({ 
       success: true, 

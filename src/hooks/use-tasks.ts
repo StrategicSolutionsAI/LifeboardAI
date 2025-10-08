@@ -361,11 +361,8 @@ export function useTasks(selectedDate?: Date) {
     bucket?: string,
     repeat: RepeatOption = 'none'
   ) => {
-    console.log('🔧 createTask hook called:', { content, dueDate, hourSlot, bucket, repeat });
-    
     const trimmed = content.trim()
     if (!trimmed) {
-      console.log('❌ createTask: Empty content, returning early');
       return;
     }
     const repeatRule = repeat !== 'none' ? repeat : undefined
@@ -417,15 +414,12 @@ export function useTasks(selectedDate?: Date) {
     }
 
     try {
-      console.log('📡 Making API request to create task...');
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule }),
       })
-      
-      console.log('📡 API response status:', res.status, res.statusText);
       
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
@@ -472,7 +466,6 @@ export function useTasks(selectedDate?: Date) {
       }
       
       const responseData = await res.json();
-      console.log('📦 API response data:', responseData);
       const { task } = responseData;
 
       // Parse and normalize metadata so UI shows bucket/duration immediately
@@ -515,10 +508,8 @@ export function useTasks(selectedDate?: Date) {
 
       // Add task to appropriate caches
       if (dueDate === dateStr) {
-        console.log('📅 Adding task to daily cache for date:', dateStr);
         updateDailyOptimistically(current => [...(current || []), todoistTask as any])
       }
-      console.log('📋 Adding task to all tasks cache');
       updateAllOptimistically(current => [...(current || []), todoistTask as any])
       
       // Announce the task update to other components
@@ -528,7 +519,6 @@ export function useTasks(selectedDate?: Date) {
         window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
       }
       
-      console.log('✅ createTask returning task:', todoistTask);
       return todoistTask
     } catch (error) {
       console.error('💥 createTask error:', error);
@@ -743,7 +733,6 @@ export function useTasks(selectedDate?: Date) {
   // Batch update for drag and drop
   const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task>; occurrenceDate?: string }[]) => {
     if (!Array.isArray(updates) || updates.length === 0) return
-    console.log('🚀 batchUpdateTasks called with:', updates)
 
     const taskCache = new Map<string, Task | undefined>()
     const resolveTask = (id: string): Task | undefined => {
@@ -901,7 +890,6 @@ export function useTasks(selectedDate?: Date) {
         if (!res.ok) console.warn('Supabase batch update failed')
         return
       }
-      console.log('📡 Sending batch update to API...')
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
         credentials: 'same-origin',
@@ -916,7 +904,6 @@ export function useTasks(selectedDate?: Date) {
         return
       }
       const result = await res.json().catch(() => null)
-      console.log('✅ Batch update successful:', result)
     } catch (error) {
       console.warn('💥 Batch update network error (continuing with optimistic state):', error)
       try {

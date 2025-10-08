@@ -47,7 +47,6 @@ async function createTodoistTaskDirect(req: NextRequest, payload: { content: str
       return { ok: false, reason: 'upstream_error' as const, status: resp.status }
     }
     const task = await resp.json()
-    console.log('Todoist direct create ok', { id: task?.id, due: task?.due?.date })
     return { ok: true as const, task }
   } catch (e) {
     console.error('Todoist direct create exception', e)
@@ -275,7 +274,6 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
       try {
         const cmd = JSON.parse(cmdMatch[1]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
         if (cmd.action === 'create_task' && cmd.content) {
-          console.log('CHAT: create_task command detected', { contentPreview: cmd.content.slice(0, 120), due_date: cmd.due_date, hour_slot: cmd.hour_slot, bucket: cmd.bucket })
           // Fallback: if no due_date provided, infer from the latest user message (today/tomorrow). Also fix obviously stale years.
           let dueDate = cmd.due_date && /^\d{4}-\d{2}-\d{2}$/.test(cmd.due_date) ? cmd.due_date : null
           try {
@@ -305,10 +303,8 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
           const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
           if (direct.ok) {
             created = (direct as any).task
-            console.log('CHAT: direct create succeeded', { id: created?.id })
           } else {
             const viaApi = await createTodoistTaskViaApi(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
-            console.log('CHAT: direct create failed; via API status', { ok: viaApi.ok })
             if (viaApi.ok) {
               created = (viaApi as any).task
             } else {
@@ -336,16 +332,13 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
       const parsed = parseTaskFromText(lastUserText)
       if (parsed) {
         try {
-          console.log('CHAT: parsed natural create', parsed)
           // Try Todoist, then Supabase fallback
           const direct2 = await createTodoistTaskDirect(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
           if (direct2.ok) {
             createdTask = (direct2 as any).task
-            console.log('CHAT: parsed direct create ok', { id: (createdTask as any)?.id })
             reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
           } else {
             const viaApi = await createTodoistTaskViaApi(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
-            console.log('CHAT: parsed direct failed; via API ok?', viaApi.ok)
             if (viaApi.ok) {
               createdTask = (viaApi as any).task
               reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`

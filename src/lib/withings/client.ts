@@ -117,9 +117,6 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
 
   const data = await response.json()
   
-  // Debug logging to see what measurements we're getting
-  console.log('Withings API response:', JSON.stringify(data, null, 2))
-  
   // Handle Withings API error responses
   if (data.status !== 0) {
     if (data.status === 401) {
@@ -136,13 +133,6 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
   }
 
   const groups = data.body.measuregrps
-  console.log(`Found ${groups.length} measurement groups`)
-  
-  // Log each measurement group with its date
-  groups.forEach((group: any, index: number) => {
-    const date = new Date(group.date * 1000)
-    console.log(`Group ${index}: Date ${date.toISOString()}, Measures:`, group.measures)
-  })
 
   // Sort groups by date to ensure we get the most recent (groups may not be pre-sorted)
   const sortedGroups = groups.sort((a: any, b: any) => a.date - b.date)
@@ -150,7 +140,6 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
   // Take the last group (most recent)
   const latestGroup = sortedGroups[sortedGroups.length - 1]
   const latestDate = new Date(latestGroup.date * 1000)
-  console.log(`Using latest group from: ${latestDate.toISOString()}`)
   
   // Find the weight measurement (type 1) in the latest group
   const weightMeasure = latestGroup.measures.find((m: any) => m.type === 1)
@@ -160,7 +149,6 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
 
   // Convert from Withings format (value * 10^unit) to kg
   const weightKg = weightMeasure.value * Math.pow(10, weightMeasure.unit)
-  console.log(`Calculated weight: ${weightKg} kg`)
   
   return weightKg
 } 

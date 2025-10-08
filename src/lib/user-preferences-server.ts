@@ -28,8 +28,6 @@ export async function getUserPreferencesServer() {
     
     if (error && error.code === 'PGRST116') {
       // No rows found, create initial preferences
-      console.log('No preferences found, creating initial record...');
-      
       const initialPrefs = {
         user_id: user.id,
         life_buckets: [],
@@ -55,7 +53,6 @@ export async function getUserPreferencesServer() {
         } as UserPreferences;
       }
       
-      console.log('Created initial preferences record');
       return newData as UserPreferences;
     }
     

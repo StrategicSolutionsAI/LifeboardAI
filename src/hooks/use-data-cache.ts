@@ -60,7 +60,6 @@ export function invalidateIntegrationCaches(integrationId?: string) {
   })
   keysToDelete.forEach(key => globalCache.delete(key))
   keysToDelete.forEach(key => globalPendingRequests.delete(key))
-  console.log(`🗑️ Invalidated ${keysToDelete.length} cache entries${integrationId ? ` for ${integrationId}` : ''}`)
 }
 
 // Invalidate all caches (nuclear option)
@@ -68,7 +67,6 @@ export function invalidateAllCaches() {
   const count = globalCache.size
   globalCache.clear()
   globalPendingRequests.clear()
-  console.log(`🗑️ Cleared all ${count} cache entries`)
 }
 
 export function useDataCache<T>(

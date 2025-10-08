@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Setting up calendar_events table...');
 
     // Create a test record to trigger table creation via Supabase's schema inference
     const testEvent = {

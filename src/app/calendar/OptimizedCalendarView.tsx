@@ -373,7 +373,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           }`}
         >
           <Suspense fallback={<TaskListLoading />}>
-            <CalendarTaskList 
+            <CalendarTaskList
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
               availableBuckets={buckets}
@@ -381,6 +381,12 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
               isDragging={isDragging}
               disableInternalDragDrop={true}
               onCollapsedChange={setIsSidebarCollapsed}
+              onTaskClick={(taskId, dateStr) => {
+                // Dispatch custom event to notify the calendar to open the task modal
+                window.dispatchEvent(new CustomEvent('lifeboard:task-click', {
+                  detail: { taskId, dateStr }
+                }));
+              }}
             />
           </Suspense>
         </div>

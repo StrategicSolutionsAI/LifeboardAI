@@ -305,7 +305,6 @@ export async function POST(req: NextRequest) {
               }
             }
           } catch {}
-          console.log('VOICE: create_task command detected', { contentPreview: cmd.content.slice(0,120), due_date: dueDate, hour_slot: cmd.hour_slot, bucket: cmd.bucket })
           // Try Todoist; then internal API; then Supabase fallback
           const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
           if (direct.ok) {
@@ -313,7 +312,6 @@ export async function POST(req: NextRequest) {
             reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
           } else {
             const viaApi = await createTodoistTaskViaApi(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
-            console.log('VOICE: direct create failed; viaApi ok?', viaApi.ok)
             if (viaApi.ok) {
               createdTask = (viaApi as any).task
               reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
@@ -337,14 +335,12 @@ export async function POST(req: NextRequest) {
       const parsed = parseTaskFromText(transcript)
       if (parsed) {
         try {
-          console.log('VOICE: parsed natural create', parsed)
           const direct2 = await createTodoistTaskDirect(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
           if (direct2.ok) {
             createdTask = (direct2 as any).task
             reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
           } else {
             const viaApi = await createTodoistTaskViaApi(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
-            console.log('VOICE: parsed direct failed; viaApi ok?', viaApi.ok)
             if (viaApi.ok) {
               createdTask = (viaApi as any).task
               reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`

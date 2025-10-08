@@ -32,15 +32,12 @@ export async function POST(request: NextRequest) {
       .eq('provider', provider)
       .maybeSingle()
 
-    console.log(`[DISCONNECT] Checking integration for user ${user.id}, provider ${provider}:`, existingIntegration)
-
     if (checkError) {
       console.error('Error checking existing integration:', checkError)
       return NextResponse.json({ error: 'Error checking integration' }, { status: 500 })
     }
 
     if (!existingIntegration) {
-      console.log(`[DISCONNECT] No integration found for user ${user.id}, provider ${provider}`)
       return NextResponse.json({ success: true, message: `${provider} was not connected` })
     }
 
@@ -64,8 +61,6 @@ export async function POST(request: NextRequest) {
       .eq('provider', provider)
       .select()
 
-    console.log(`[DISCONNECT] Delete result for user ${user.id}, provider ${provider}:`, { deleteData, deleteError })
-
     if (deleteError) {
       console.error('Failed to disconnect integration:', deleteError)
       return NextResponse.json({ error: 'Failed to disconnect integration' }, { status: 500 })
@@ -78,8 +73,6 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('provider', provider)
       .maybeSingle()
-
-    console.log(`[DISCONNECT] Verification check for user ${user.id}, provider ${provider}:`, { verifyData, verifyError })
 
     return NextResponse.json({ 
       success: true, 

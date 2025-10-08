@@ -276,7 +276,6 @@ export function useNutritionTracker() {
   // Listen for external data updates (e.g., when panel closes)
   useEffect(() => {
     const handleDataUpdate = () => {
-      console.log('🔄 Nutrition data updated - refetching caches')
       // Force refetch instead of just invalidating
       mealsCache.refetch()
       goalsCache.refetch()

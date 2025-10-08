@@ -46,7 +46,6 @@ export async function GET(request: NextRequest) {
       
       // If the table doesn't exist, return empty data instead of error
       if (error.message?.includes('relation "weight_measurements" does not exist')) {
-        console.log('Weight measurements table does not exist, returning empty data')
         return NextResponse.json({
           measurements: [],
           stats: {

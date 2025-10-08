@@ -7,8 +7,6 @@ export async function POST(request: Request) {
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   try {
-    console.log('API: Signing out user...');
-    
     // Sign out the user
     const { error } = await supabase.auth.signOut();
     
@@ -17,7 +15,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 });
     }
 
-    console.log('API: User signed out successfully');
     return NextResponse.json({ message: 'Logout successful' }, { status: 200 });
     
   } catch (error) {

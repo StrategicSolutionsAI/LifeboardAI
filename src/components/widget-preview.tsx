@@ -78,10 +78,6 @@ export function WidgetPreview({
   // used directly as components. Treat any truthy value as a valid icon component.
   const SafeIcon = Icon as any;
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log('⧗ preview icon debug\tid:', widget.id, '\ticon prop:', widget.icon, '\tresolved:', Icon?.name ?? 'null');
-  }
-
   return (
     <div 
       className={`w-48 rounded-lg border bg-white p-3 shadow-sm ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}

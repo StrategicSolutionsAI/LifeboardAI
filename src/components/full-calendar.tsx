@@ -1206,6 +1206,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return () => window.removeEventListener('lifeboard:calendar-task-moved', handler as EventListener);
   }, []);
 
+  // Listen for task clicks from the sidebar to open the edit modal
+  useEffect(() => {
+    const handler = (event: CustomEvent) => {
+      const { taskId, dateStr } = event.detail;
+      // Open the task editor with the date context
+      void openTaskEditorById(taskId, { plannerDate: dateStr });
+    };
+
+    window.addEventListener('lifeboard:task-click', handler as EventListener);
+    return () => window.removeEventListener('lifeboard:task-click', handler as EventListener);
+  }, [openTaskEditorById]);
+
   const nextPeriod = () => {
     const newDate = (() => {
       switch (view) {
@@ -1621,7 +1633,44 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return () => mq.removeListener(update);
   }, []);
 
-  const maxVisibleEvents = isCompactBreakpoint ? 3 : 4;
+  // Calculate dynamic max visible events based on event complexity
+  const getMaxVisibleEvents = useCallback((dayEvents: DayEvent[]) => {
+    // Base limits for complex events
+    const baseLimit = isCompactBreakpoint ? 3 : 4;
+
+    // For week view or if no events, use base limit
+    if (view === 'week' || dayEvents.length === 0) {
+      return baseLimit;
+    }
+
+    // Calculate how "heavy" the events are (how much space they take)
+    // Events with time and/or duration take more space
+    const hasTimeInfo = dayEvents.some(ev => ev.time || ev.duration);
+    const avgComplexity = dayEvents.slice(0, 10).reduce((sum, ev) => {
+      let complexity = 1; // Base line for title
+      if (ev.time) complexity += 0.3; // Time takes space
+      if (ev.duration) complexity += 0.2; // Duration takes space
+      if (ev.repeatRule) complexity += 0.1; // Repeat icon takes small space
+      return sum + complexity;
+    }, 0) / Math.min(dayEvents.length, 10);
+
+    // Adjust limits based on event complexity to maximize space usage
+    if (avgComplexity <= 1.15 && !hasTimeInfo) {
+      // Events are very simple (just titles) - can show many more
+      // Month view day cells can typically fit 10-12 minimal events
+      return isCompactBreakpoint ? 8 : 12;
+    } else if (avgComplexity <= 1.25) {
+      // Events have minimal detail - can show several more
+      return isCompactBreakpoint ? 6 : 9;
+    } else if (avgComplexity <= 1.4) {
+      // Events have moderate detail - can show a few more
+      return isCompactBreakpoint ? 5 : 6;
+    }
+
+    // Events are complex with full details, use base limit
+    return baseLimit;
+  }, [view, isCompactBreakpoint]);
+
   const getEventsForDisplay = useCallback((dayEvents: DayEvent[]) => {
     if (view === 'week') {
       return [...dayEvents].sort((a, b) => {
@@ -1641,8 +1690,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       });
     }
 
+    const maxVisibleEvents = getMaxVisibleEvents(dayEvents);
     return dayEvents.slice(0, maxVisibleEvents);
-  }, [view, maxVisibleEvents]);
+  }, [view, getMaxVisibleEvents]);
   const multiDayMinWidth = isCompactBreakpoint
     ? 'w-full'
     : view === 'week'
@@ -2010,7 +2060,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         'hover:border-blue-200 hover:text-blue-600 active:scale-95',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
-                      const visibleEvents = getEventsForDisplay(dayEvents).slice(0, maxVisibleEvents);
+                      const visibleEvents = getEventsForDisplay(dayEvents);
                       return (
                         <div
                           ref={provided.innerRef}
@@ -2310,7 +2360,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
                             <div className="mt-1 w-full space-y-0.5 sm:space-y-1">
-                              {dayEvents.slice(0, maxVisibleEvents).map((ev: DayEvent, i: number) => {
+                              {getEventsForDisplay(dayEvents).map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
@@ -2431,18 +2481,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   </Draggable>
                                 );
                               })}
-                              {dayEvents.length > maxVisibleEvents && (
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setSelectedModalDate(dayStr);
-                                  }}
-                                  className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1.5 sm:py-1 text-[11px] font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                                >
-                                  +{dayEvents.length - maxVisibleEvents} more
-                                </button>
-                              )}
+                              {(() => {
+                                const maxVisible = getMaxVisibleEvents(dayEvents);
+                                return dayEvents.length > maxVisible && (
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setSelectedModalDate(dayStr);
+                                    }}
+                                    className="w-full rounded-lg border border-dashed border-blue-200 bg-blue-50/70 px-2 py-1.5 sm:py-1 text-[11px] font-semibold text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                  >
+                                    +{dayEvents.length - maxVisible} more
+                                  </button>
+                                );
+                              })()}
                             </div>
                           )}
                           {provided.placeholder}

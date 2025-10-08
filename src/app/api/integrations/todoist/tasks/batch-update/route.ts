@@ -163,23 +163,18 @@ export async function POST(request: NextRequest) {
         // Handle null values by removing them from metadata  
         if (update.updates.hourSlot === null) {
           delete newMeta.hourSlot;
-          console.log(`Removing hourSlot from task ${update.taskId}`);
         }
         if (update.updates.duration === null) {
           delete newMeta.duration;
-          console.log(`Removing duration from task ${update.taskId}`);
         }
         if (update.updates.bucket === null) {
           delete newMeta.bucket;
-          console.log(`Removing bucket from task ${update.taskId}`);
         }
         if (update.updates.position === null) {
           delete newMeta.position;
-          console.log(`Removing position from task ${update.taskId}`);
         }
         if (removeRepeatRule) {
           delete newMeta.repeatRule;
-          console.log(`Removing repeat rule from task ${update.taskId}`);
         }
 
         const metaKeys = Object.keys(newMeta).filter(key => newMeta[key] !== undefined);
@@ -234,7 +229,6 @@ export async function POST(request: NextRequest) {
 
         if (updateRes.ok) {
           const updatedTask = await updateRes.json();
-          console.log(`Successfully updated task ${update.taskId}`);
           anySuccess = true;
           results.push({ 
             taskId: update.taskId, 

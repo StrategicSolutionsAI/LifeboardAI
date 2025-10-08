@@ -23,6 +23,9 @@ export function RefinedWidgetShowcase() {
     isRetryable: true
   }
 
+  const noop = () => {}
+  const noopMetric = (_metricId: string) => {}
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -100,7 +103,7 @@ export function RefinedWidgetShowcase() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   <NutritionSummaryWidget 
-                    onClick={() => console.log('Nutrition clicked')}
+                    onClick={noop}
                   />
                   <WithingsWeightWidget 
                     showControls={false}
@@ -109,13 +112,13 @@ export function RefinedWidgetShowcase() {
                     startingWeight={155}
                   />
                   <RefinedMedicationWidget 
-                    onClick={() => console.log('Medication clicked')}
+                    onClick={noop}
                     compact
                   />
                   {/* Health metrics in grid */}
                   <RefinedHealthMetrics 
                     compact
-                    onMetricClick={(id) => console.log(`Metric ${id} clicked`)}
+                    onMetricClick={noopMetric}
                   />
                 </div>
               </CardContent>
@@ -137,7 +140,7 @@ export function RefinedWidgetShowcase() {
                 </CardHeader>
                 <CardContent>
                   <NutritionSummaryWidget 
-                    onClick={() => console.log('Nutrition expanded')}
+                    onClick={noop}
                   />
                 </CardContent>
               </Card>
@@ -174,7 +177,7 @@ export function RefinedWidgetShowcase() {
                 </CardHeader>
                 <CardContent>
                   <RefinedMedicationWidget 
-                    onClick={() => console.log('Medication expanded')}
+                    onClick={noop}
                   />
                 </CardContent>
               </Card>
@@ -238,7 +241,7 @@ export function RefinedWidgetShowcase() {
                       <>
                         <RefinedWidgetError 
                           error={sampleError}
-                          onRetry={() => console.log('Retrying...')}
+                          onRetry={noop}
                           onDismiss={() => setShowError(false)}
                         />
                         <RefinedWidgetError 
@@ -247,7 +250,7 @@ export function RefinedWidgetShowcase() {
                         />
                         <RefinedWidgetError 
                           error={{...sampleError, type: 'api', title: 'Server Error'}}
-                          onRetry={() => console.log('Retrying API...')}
+                          onRetry={noop}
                         />
                       </>
                     ) : showEmpty ? (
@@ -258,7 +261,7 @@ export function RefinedWidgetShowcase() {
                           iconColor="green"
                           message="No meals logged today"
                           actionLabel="Add Meal"
-                          onAction={() => console.log('Add meal')}
+                          onAction={noop}
                         />
                         <RefinedWidgetEmpty 
                           title="Weight"
@@ -266,7 +269,7 @@ export function RefinedWidgetShowcase() {
                           iconColor="violet"
                           message="Connect your scale to start tracking"
                           actionLabel="Connect Device"
-                          onAction={() => console.log('Connect device')}
+                          onAction={noop}
                         />
                         <RefinedWidgetEmpty 
                           title="Medications"
@@ -274,7 +277,7 @@ export function RefinedWidgetShowcase() {
                           iconColor="indigo"
                           message="No medications added yet"
                           actionLabel="Add Medication"
-                          onAction={() => console.log('Add medication')}
+                          onAction={noop}
                         />
                       </>
                     ) : (
@@ -304,7 +307,7 @@ export function RefinedWidgetShowcase() {
               </CardHeader>
               <CardContent>
                 <RefinedHealthMetrics 
-                  onMetricClick={(id) => console.log(`Expanded ${id} metric`)}
+                  onMetricClick={noopMetric}
                 />
               </CardContent>
             </Card>

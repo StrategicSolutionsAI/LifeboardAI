@@ -12,9 +12,6 @@ export default function PerfObserver() {
 
     // Helper to send a breadcrumb for quick visibility in Sentry
     const log = (name: string, data: Record<string, unknown>) => {
-      // Console for local dev visibility
-      // eslint-disable-next-line no-console
-      console.log("⚡ Perf:", name, { page, ...data });
       Sentry.addBreadcrumb({
         category: "performance",
         message: `${name} (${page})`,
@@ -79,4 +76,3 @@ export default function PerfObserver() {
 
   return null;
 }
-

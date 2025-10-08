@@ -46,7 +46,6 @@ export default function TestWithingsPage() {
                 try {
                   const response = await fetch('/api/integrations/withings/metrics')
                   const data = await response.json()
-                  console.log('API Response:', data)
                   alert(response.ok ? `Success: ${JSON.stringify(data)}` : `Error: ${data.error}`)
                 } catch (error) {
                   console.error('API Error:', error)

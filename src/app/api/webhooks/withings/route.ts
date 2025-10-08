@@ -18,8 +18,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Not a weight measurement' }, { status: 200 })
     }
 
-    console.log('Withings webhook received:', { userid, appli, startdate, enddate })
-
     // Find the user with this Withings user ID
     const supabase = supabaseServer()
     const { data: integration, error: integrationError } = await supabase
@@ -57,7 +55,6 @@ export async function POST(request: NextRequest) {
 
       // Invalidate cache to force refresh on next request
       // This will be picked up by the useWithingsWeight hook
-      console.log('New weight data received:', { weightKg, userId: integration.user_id })
 
       return NextResponse.json({ 
         message: 'Weight data processed successfully',

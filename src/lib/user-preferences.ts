@@ -36,8 +36,6 @@ export async function getUserPreferencesClient() {
     
     if (error && error.code === 'PGRST116') {
       // No rows found, create initial preferences
-      console.log('No preferences found, creating initial record...');
-      
       const initialPrefs = {
         user_id: user.id,
         life_buckets: [],
@@ -67,7 +65,6 @@ export async function getUserPreferencesClient() {
         };
       }
       
-      console.log('Created initial preferences record');
       return newData;
     }
     
@@ -112,8 +109,6 @@ export async function getUserPreferencesClient() {
  */
 export async function saveUserPreferences(preferences: UserPreferences) {
   try {
-    console.log('Saving user preferences to Supabase:', JSON.stringify(preferences));
-    
     // Ensure widgets_by_bucket exists and is properly formatted before saving
     const safePreferences = {
       ...preferences,
@@ -130,9 +125,6 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       return false;
     }
     
-    // Log the actual data being saved
-    console.log('Safe preferences being saved:', safePreferences);
-    
     const { error } = await supabase
       .from('user_preferences')
       .upsert(
@@ -145,7 +137,6 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       return false;
     }
     
-    console.log('✅ Successfully saved user preferences to Supabase');
     return true;
   } catch (err) {
     console.error('Exception saving user preferences:', err);

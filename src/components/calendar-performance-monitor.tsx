@@ -163,9 +163,6 @@ export function useComponentLoadTime(componentName: string) {
         setLoadTime(duration);
         
         // Log to console in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`📊 ${componentName} loaded in ${duration}ms`);
-        }
       });
     });
   }, [componentName]);

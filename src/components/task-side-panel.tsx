@@ -246,11 +246,6 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
 
   // Unified drag and drop handler
   function handleDragEnd(result: DropResult) {
-    console.log('📦 drag end', {
-      source: result.source?.droppableId,
-      destination: result.destination?.droppableId,
-      draggableId: result.draggableId,
-    });
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       setIsDragging(false);

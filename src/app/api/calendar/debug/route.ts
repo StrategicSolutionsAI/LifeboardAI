@@ -11,8 +11,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', authError }, { status: 401 });
     }
 
-    console.log('Debug: User authenticated:', user.id);
-
     // Test basic Supabase connection
     const { data: testData, error: testError } = await supabase
       .from('lifeboard_tasks')
@@ -28,8 +26,6 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('Debug: Supabase connection successful');
-
     // Check if calendar_events table exists
     const { data: tableData, error: tableError } = await supabase
       .from('calendar_events')
@@ -44,7 +40,6 @@ export async function GET(request: NextRequest) {
       tableErrorDetails = tableError;
       console.error('Debug: calendar_events table check failed:', tableError);
     } else {
-      console.log('Debug: calendar_events table exists');
     }
 
     return NextResponse.json({
@@ -126,7 +121,6 @@ export async function POST(request: NextRequest) {
     `;
 
     // For now, let's skip the complex table creation and just try to create the table directly
-    console.log('Attempting to create calendar_events table...');
 
     // Test inserting a sample event
     const sampleEvent = {

@@ -357,7 +357,6 @@ export async function POST(request: NextRequest) {
     }
 
     const task = await todoistRes.json();
-    console.log('Todoist create task ok', { id: task?.id, due: task?.due?.date })
     invalidateTodoistTaskCache(user.id)
     return NextResponse.json({ task });
   } catch (err) {

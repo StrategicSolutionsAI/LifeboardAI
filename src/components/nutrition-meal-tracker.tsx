@@ -356,7 +356,6 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
       await updateFavoriteFood(selectedFood.food.food_id, selectedFood.food.food_name, selectedServing)
 
       // Emit event to update other nutrition components immediately
-      console.log('🍎 Food added - dispatching nutritionDataUpdated event')
       window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
 
       // Reset form

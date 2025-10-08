@@ -9,10 +9,6 @@ export async function GET(request: NextRequest) {
   const from = requestUrl.searchParams.get('from') // login | signup
   const error = requestUrl.searchParams.get('error')
   
-  console.log('AuthCallback → URL:', requestUrl.toString())
-  console.log('AuthCallback → Code:', code ? 'present' : 'missing')
-  console.log('AuthCallback → From:', from)
-  console.log('AuthCallback → Error param:', error)
   
   // Handle OAuth errors from Google
   if (error) {
@@ -50,14 +46,12 @@ export async function GET(request: NextRequest) {
   )
 
   if (code) {
-    console.log('AuthCallback → Exchanging code for session...')
     const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       console.error('AuthCallback → exchangeCodeForSession error', error)
       console.error('Error details:', JSON.stringify(error, null, 2))
       return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url))
     }
-    console.log('AuthCallback → Session exchanged successfully, user:', sessionData?.user?.email)
   }
 
   // Ensure the session cookie is present and then look up the user
@@ -69,8 +63,6 @@ export async function GET(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const { data: { user } } = await supabase.auth.getUser()
 
-  console.log('AuthCallback → Session found:', !!session)
-  console.log('AuthCallback → User found:', !!user, user?.email)
 
   if (!user) {
     console.error('AuthCallback → No user found after code exchange')
@@ -116,9 +108,6 @@ export async function GET(request: NextRequest) {
       expires: cookie.expires,
     })
   }
-
-  console.log('AuthCallback → Redirecting to:', destination)
-  console.log('AuthCallback → Cookies set:', response.cookies.getAll().map(c => c.name))
 
   return redirectResponse
 }

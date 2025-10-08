@@ -128,6 +128,7 @@ interface CalendarTaskListProps {
   disableInternalDragDrop?: boolean;
   dashboardView?: boolean; // Simplified view for dashboard usage
   onCollapsedChange?: (collapsed: boolean) => void;
+  onTaskClick?: (taskId: string, dateStr: string) => void; // Callback when a task is clicked
 }
 
 // Enhanced task card component with priority-based styling and progressive disclosure
@@ -144,6 +145,7 @@ interface EnhancedTaskCardProps {
   onRescheduleSelect?: (taskId: string, newDate: string | null) => void | Promise<void>;
   onRescheduleCancel?: () => void;
   bucketColors?: Record<string, string>;
+  onTaskClick?: (taskId: string, dateStr: string) => void;
 }
 
 function EnhancedTaskCard({
@@ -159,6 +161,7 @@ function EnhancedTaskCard({
   onRescheduleSelect,
   onRescheduleCancel,
   bucketColors = {},
+  onTaskClick,
 }: EnhancedTaskCardProps) {
   const getPriorityStyles = (priority?: string | number) => {
     const priorityStr = priority?.toString().toLowerCase();
@@ -283,10 +286,10 @@ function EnhancedTaskCard({
                 )}
               </div>
             </label>
-            
-            <div 
-              className="flex-1 min-w-0 cursor-pointer" 
-              onClick={() => onExpand(task.id.toString())}
+
+            <div
+              className="flex-1 min-w-0 cursor-pointer"
+              onClick={() => onTaskClick?.(task.id.toString(), task.due?.date || '')}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -512,7 +515,7 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange, onTaskClick }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
@@ -764,27 +767,23 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   // Listen for reorder events from parent DragDropContext
   React.useEffect(() => {
     const handleReorderOpenTasks = (event: CustomEvent) => {
-      const { source, destination, draggableId } = event.detail;
-      console.log('📨 Received reorder event for openTasks:', { source: source.index, destination: destination.index });
-      
+      const { source, destination } = event.detail;
+
       // Set reordering flag to prevent sync interference
       setIsReordering(true);
       
       const list = [...openTasksToShow];
       const [moved] = list.splice(source.index, 1);
       list.splice(destination.index, 0, moved);
-      console.log('📝 New task order:', list.map((t, idx) => `${idx}: ${t.content}`));
       
       // Update local state immediately for instant UI feedback
       setOpenTasksLocal(list);
       
       // Persist as positions for all visible tasks
       const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
-      console.log('💾 Sending position updates:', updates);
       
       batchUpdateTasks(updates)
         .then(() => {
-          console.log('✅ Position updates successful');
           // Clear reordering flag after successful API call
           setTimeout(() => setIsReordering(false), 1000);
         })
@@ -797,19 +796,16 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
     const handleReorderDailyTasks = (event: CustomEvent) => {
       const { source, destination } = event.detail;
-      console.log('📨 Received reorder event for dailyTasks:', { source: source.index, destination: destination.index });
-      
+
       const list = [...todayTasksOrdered];
       const [moved] = list.splice(source.index, 1);
       list.splice(destination.index, 0, moved);
-      console.log('📝 New daily task order:', list.map((t, idx) => `${idx}: ${t.content}`));
       
       // Force immediate re-render by updating the localStorage and triggering a state change
       if (typeof window !== 'undefined') {
         const newOrder = list.map(t => t.id.toString());
         try { 
           window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); 
-          console.log('💾 Saved daily task order to localStorage');
           
           // Trigger a custom event to force re-render of today tasks
           window.dispatchEvent(new CustomEvent('todayTasksReordered'));
@@ -819,19 +815,16 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
     const handleReorderMasterTodayTasks = (event: CustomEvent) => {
       const { source, destination } = event.detail;
-      console.log('📨 Received reorder event for masterTodayTasks:', { source: source.index, destination: destination.index });
-      
+
       const list = [...todayTasksOrdered];
       const [moved] = list.splice(source.index, 1);
       list.splice(destination.index, 0, moved);
-      console.log('📝 New master today task order:', list.map((t, idx) => `${idx}: ${t.content}`));
       
       // Force immediate re-render by updating the localStorage and triggering a state change
       if (typeof window !== 'undefined') {
         const newOrder = list.map(t => t.id.toString());
         try { 
           window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder)); 
-          console.log('💾 Saved master today task order to localStorage');
           
           // Trigger a custom event to force re-render of today tasks
           window.dispatchEvent(new CustomEvent('todayTasksReordered'));
@@ -839,17 +832,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
       }
     };
 
-    const handleReorderUpcomingTasks = (event: CustomEvent) => {
-      const { source, destination, draggableId } = event.detail;
-      console.log('📨 Received reorder event for upcomingTasks:', { source: source.droppableId, destination: destination.droppableId, draggableId });
-      
-      // For now, we'll just log this - the upcoming tasks don't have persistent ordering like today tasks
-      // The UI should handle this automatically through the task groups reorganization
-      console.log('📝 Upcoming task reorder - handled by automatic regrouping');
+    const handleReorderUpcomingTasks = () => {
+      // Upcoming tasks don't have persistent ordering like today tasks.
+      // The UI handles regrouping so no additional action is required here.
     };
 
     const handleTodayTasksReordered = () => {
-      console.log('🔄 Forcing today tasks re-render');
       setTodayTasksRenderKey(prev => prev + 1);
     };
 
@@ -1070,12 +1058,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
   // Dashboard view: Simple task list without groupings
   if (dashboardView) {
-    console.log('🎯 Dashboard view activated', { 
-      dashboardView, 
-      selectedBucket, 
-      dashboardTasksCount: dashboardTasks.length,
-      allTasksCount: allTasks.length 
-    });
     return (
       <div className="space-y-3">
         {loading && dashboardTasks.length === 0 ? (
@@ -1109,8 +1091,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     className="sr-only"
                   />
                   <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
-                    task.completed 
-                      ? 'bg-indigo-600 border-indigo-600' 
+                    task.completed
+                      ? 'bg-indigo-600 border-indigo-600'
                       : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
                   }`}>
                     {task.completed && (
@@ -1120,7 +1102,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     )}
                   </div>
                 </label>
-                <div className="flex-1 min-w-0">
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => onTaskClick?.(task.id.toString(), task.due?.date || todayStr)}
+                >
                   <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
                     task.completed ? 'line-through text-gray-400' : 'text-gray-900'
                   }`}>
@@ -1172,8 +1157,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
       </div>
     );
   }
-
-  // console.log('🎯 Regular view rendering', { dashboardView, selectedBucket });
 
   return (
     <div className="w-[420px] bg-white/95 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
@@ -1306,8 +1289,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                       className="sr-only"
                                     />
                                     <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
-                                      t.completed 
-                                        ? 'bg-indigo-600 border-indigo-600' 
+                                      t.completed
+                                        ? 'bg-indigo-600 border-indigo-600'
                                         : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
                                     }`}>
                                       {t.completed && (
@@ -1317,7 +1300,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                       )}
                                     </div>
                                   </label>
-                                  <div className="flex-1 min-w-0">
+                                  <div
+                                    className="flex-1 min-w-0 cursor-pointer"
+                                    onClick={() => onTaskClick?.(t.id.toString(), todayStr)}
+                                  >
                                     <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
                                       t.completed ? 'line-through text-gray-400' : 'text-gray-900'
                                     }`}>
@@ -1523,6 +1509,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                 onRescheduleSelect={handleRescheduleSelect}
                                 onRescheduleCancel={handleRescheduleCancel}
                                 bucketColors={bucketColors}
+                                onTaskClick={onTaskClick}
                               />
                             ))}
                             {provided.placeholder}
@@ -1694,8 +1681,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                     className="sr-only"
                                   />
                                   <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
-                                    t.completed 
-                                      ? 'bg-indigo-600 border-indigo-600' 
+                                    t.completed
+                                      ? 'bg-indigo-600 border-indigo-600'
                                       : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
                                   }`}>
                                     {t.completed && (
@@ -1705,7 +1692,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                     )}
                                   </div>
                                 </label>
-                                <div className="flex-1 min-w-0">
+                                <div
+                                  className="flex-1 min-w-0 cursor-pointer"
+                                  onClick={() => onTaskClick?.(t.id.toString(), todayStr)}
+                                >
                                   <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${
                                     t.completed ? 'line-through text-gray-400' : 'text-gray-900'
                                   }`}>
@@ -1805,8 +1795,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                   className="sr-only"
                                 />
                                 <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
-                                  t.completed 
-                                    ? 'bg-indigo-600 border-indigo-600' 
+                                  t.completed
+                                    ? 'bg-indigo-600 border-indigo-600'
                                     : 'border-gray-300 hover:border-indigo-400 group-hover:border-indigo-500'
                                 }`}>
                                   {t.completed && (
@@ -1816,7 +1806,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                   )}
                                 </div>
                               </label>
-                              <div className="flex-1 min-w-0">
+                              <div
+                                className="flex-1 min-w-0 cursor-pointer"
+                                onClick={() => onTaskClick?.(t.id.toString(), t.due?.date || todayStr)}
+                              >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1 min-w-0">
                                     <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${

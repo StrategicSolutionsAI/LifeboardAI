@@ -67,9 +67,6 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
       metadata: { ...metadata, ...additionalMetadata }
     }
 
-    // Log performance metric
-    console.log(`Operation ${operationName} completed in ${duration.toFixed(2)}ms`)
-    
     // Track in Sentry
     Sentry.addBreadcrumb({
       message: `Operation completed: ${operationName}`,
