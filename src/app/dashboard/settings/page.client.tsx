@@ -144,20 +144,6 @@ export default function SettingsPageClient() {
         </div>
 
         <div className="space-y-8">
-          {/* Debug Section - Remove after testing */}
-          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-            <h3 className="font-medium text-yellow-800 mb-2">Debug Info</h3>
-            <div className="text-sm text-yellow-700 space-y-1">
-              <p>Mounted: {mounted.toString()}</p>
-              <p>User Preferences: {userPreferences ? 'Loaded' : 'Not loaded'}</p>
-              <p>Life Buckets: {userPreferences?.life_buckets?.length || 0}</p>
-              <p>Bucket Colors: {Object.keys(bucketColors).length}</p>
-              {userPreferences?.life_buckets && (
-                <p>Buckets: {userPreferences.life_buckets.join(', ')}</p>
-              )}
-            </div>
-          </div>
-
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
             <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
             <div className="space-y-4">
