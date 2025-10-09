@@ -35,28 +35,62 @@ export async function runGPT5Pro(options: GPT5Options): Promise<string> {
   } = options;
 
   try {
+    console.log('🔧 Getting Replicate client...');
     const replicate = getReplicate();
-    const output = await replicate.run(
-      "openai/gpt-5-pro" as any,
-      {
-        input: {
-          messages,
-          temperature,
-          max_tokens,
-          top_p,
-        },
-      }
-    );
+    console.log('🔧 Replicate client initialized');
+    console.log('🔧 Creating GPT-5 Pro prediction...');
+    
+    // Create prediction and get stream URL
+    const prediction = await replicate.predictions.create({
+      model: "openai/gpt-5-pro",
+      input: {
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        max_completion_tokens: max_tokens,
+        verbosity: "medium",
+      },
+      stream: true,
+    } as any);
 
-    // Replicate returns output as an array of strings for streaming models
-    // or a single string for non-streaming
-    if (Array.isArray(output)) {
-      return output.join('');
+    console.log('🔧 Prediction created:', prediction.id);
+    
+    // Wait for prediction to complete and get output
+    let finalPrediction = prediction;
+    while (finalPrediction.status !== 'succeeded' && finalPrediction.status !== 'failed' && finalPrediction.status !== 'canceled') {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      finalPrediction = await replicate.predictions.get(prediction.id);
+      console.log('🔧 Status:', finalPrediction.status);
     }
     
-    return String(output || '');
+    if (finalPrediction.status === 'failed') {
+      throw new Error(`GPT-5 Pro failed: ${finalPrediction.error}`);
+    }
+    
+    // Get the output - GPT-5 Pro returns array of strings
+    const output = finalPrediction.output;
+    console.log('🔧 Output type:', typeof output, 'Is array:', Array.isArray(output));
+    console.log('🔧 Raw output:', JSON.stringify(output));
+    
+    let fullResponse = '';
+    if (Array.isArray(output)) {
+      fullResponse = output.filter(s => s && s.trim()).join('');
+    } else if (typeof output === 'string') {
+      fullResponse = output;
+    } else if (output && typeof output === 'object') {
+      fullResponse = JSON.stringify(output);
+    }
+
+    console.log('✅ Streaming completed, response length:', fullResponse.length);
+    console.log('🔧 Response preview:', fullResponse.substring(0, 100));
+    
+    if (!fullResponse || fullResponse.trim().length === 0) {
+      throw new Error('GPT-5 Pro returned empty response - check Replicate account access');
+    }
+    
+    return fullResponse.trim();
   } catch (error) {
-    console.error('Error running GPT-5 Pro:', error);
+    console.error('❌ Error in runGPT5Pro:', error);
+    console.error('Error name:', error instanceof Error ? error.name : 'unknown');
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
     throw error;
   }
 }

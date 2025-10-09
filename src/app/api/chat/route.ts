@@ -219,22 +219,28 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
     try {
       console.log('🤖 Attempting GPT-5 Pro via Replicate...')
       console.log('Message count:', gpt5Messages.length)
+      console.log('Replicate token present:', !!process.env.REPLICATE_API_TOKEN)
+      
+      const startTime = Date.now()
       reply = await runGPT5Pro({
         messages: gpt5Messages,
         max_tokens: 1024,
         temperature: 0.7,
       })
-      console.log('✅ GPT-5 Pro response received:', reply.substring(0, 100))
+      const elapsed = Date.now() - startTime
+      console.log(`✅ GPT-5 Pro response received in ${elapsed}ms:`, reply.substring(0, 100))
     } catch (error) {
       console.error('❌ GPT-5 Pro error:', error)
       console.error('Error details:', error instanceof Error ? error.message : String(error))
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('Error type:', typeof error)
+      console.error('Error keys:', error ? Object.keys(error) : 'null')
       
-      // Return a helpful error message instead of trying OpenAI (which is out of quota)
+      // Use a simpler fallback message since OpenAI is out of quota
       return NextResponse.json({ 
-        error: 'GPT-5 Pro is currently unavailable. Please check your Replicate API token and try again.',
-        details: error instanceof Error ? error.message : String(error)
-      }, { status: 500 })
+        reply: "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment.",
+        audioUrl: undefined,
+        createdTask: null
+      }, { status: 200 })
     }
 
     // Detect and execute a task creation command if present

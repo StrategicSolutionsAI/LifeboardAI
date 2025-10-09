@@ -1123,6 +1123,7 @@ export function ChatBar() {
     const newMessages: Message[] = [...messages, { role: "user", content: input }]
     setMessages(newMessages)
     setInput("")
+    setIsProcessing(true) // Show thinking indicator
 
     try {
       const controller = new AbortController()
@@ -1140,6 +1141,7 @@ export function ChatBar() {
       const data = await res.json()
       const assistantMessage: Message = { role: "assistant", content: data.reply, audio: data.audioUrl, createdTask: data.createdTask || null }
       setMessages([...newMessages, assistantMessage])
+      setIsProcessing(false) // Hide thinking indicator
       if (assistantMessage.createdTask) {
         notifyTasksUpdated()
       }
@@ -1177,6 +1179,7 @@ export function ChatBar() {
     } catch (err) {
       console.error(err)
       setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong." }])
+      setIsProcessing(false) // Hide thinking indicator on error
     }
   }
 
@@ -1282,6 +1285,20 @@ export function ChatBar() {
                 </div>
               </div>
             ))}
+            {isProcessing && (
+              <div className="text-left">
+                <div className="inline-block rounded-lg px-3 py-2 bg-gray-100 text-gray-800">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span className="text-xs text-gray-500">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
