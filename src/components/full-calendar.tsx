@@ -26,23 +26,17 @@ import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Upload, Sparkles, Heart, Coffee, Sun, BookOpen, Dumbbell, Sticker } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
+import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption } from "@/hooks/use-tasks";
+import type { RepeatOption, Task } from "@/hooks/use-tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { CalendarFileUpload } from "@/components/calendar-file-upload";
 import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/hooks/use-calendar-stickers";
+import { sanitizeBucketName, isoToHourLabel } from "@/lib/task-form-utils";
 
 type CalendarView = 'month' | 'week' | 'day';
-
-const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
-  { value: 'none', label: 'Do not repeat' },
-  { value: 'daily', label: 'Every day' },
-  { value: 'weekdays', label: 'Weekdays' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'monthly', label: 'Every month' },
-];
 
 const REPEAT_LABELS: Record<Exclude<RepeatOption, 'none'>, string> = {
   daily: 'Every day',
@@ -132,14 +126,6 @@ const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
   }
   return undefined;
 };
-
-const sanitizeBucketName = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-};
-
-const UNASSIGNED_BUCKET_LABEL = 'Unassigned';
 
 // Bucket color system for calendar events
 const normalizeBucketId = (name?: string | null) => {
@@ -811,20 +797,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const today = new Date();
   const currentDateKey = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
-  // Hover-add modal state
-  const [addTaskDate, setAddTaskDate] = useState<string | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [formContent, setFormContent] = useState<string>("");
-  const [formBucket, setFormBucket] = useState<string>(selectedBucket || (availableBuckets[0] || ""));
-  const [formTime, setFormTime] = useState<string>(""); // '' = no time
-  const [formEndDate, setFormEndDate] = useState<string | null>(null);
-  const [formEndTime, setFormEndTime] = useState<string>("");
-  const [formAllDay, setFormAllDay] = useState<boolean>(true);
-  const [formRepeat, setFormRepeat] = useState<RepeatOption>('none');
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string; date: string } | null>(null);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
+  const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
 
   useEffect(() => {
@@ -832,7 +807,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, [view, currentDateKey]);
 
   // Get tasks from context
-  const { allTasks, scheduledTasks, batchUpdateTasks, createTask, deleteTask, refetch } = useTasksContext();
+  const { allTasks, scheduledTasks, deleteTask, refetch, getTaskForOccurrence } = useTasksContext();
   
   // Use calendar sync hook
   const resolveTaskById = useCallback((taskId?: string | null) => {
@@ -863,7 +838,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return trimmed.length > 10 ? trimmed.slice(0, 10) : trimmed;
   }, []);
 
-  const shouldIncludeTaskOnDate = useCallback((task: any, dateStr: string): boolean => {
+  const shouldIncludeTaskOnDate = useCallback((task: Task, dateStr: string): boolean => {
     if (!task || task.completed) return false;
     const normalizedStart = normalizeDateString(task.startDate ?? task.due?.date);
     if (!normalizedStart) return false;
@@ -872,7 +847,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     const endDateStr = normalizedEnd;
     if (!startDateStr) return false;
 
-    if (!task.repeatRule || task.repeatRule === 'none') {
+    if (!task.repeatRule) {
       const targetDate = normalizeDateString(dateStr);
       if (!targetDate) return false;
       return targetDate >= startDateStr && targetDate <= endDateStr;
@@ -910,140 +885,61 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const buildLifeboardEventsForDate = useCallback((dateStr: string): DayEvent[] => {
     const events: DayEvent[] = [];
 
-    allTasks.forEach((task: any) => {
+    allTasks.forEach((task: Task) => {
       if (!shouldIncludeTaskOnDate(task, dateStr)) return;
+
+      const adjustedTask = getTaskForOccurrence(task, dateStr);
+      if (!adjustedTask) return;
 
       // Apply bucket filter - multi-select logic
       if (!selectedBucketFilters.includes('all')) {
-        const taskBucket = task.bucket || 'unassigned';
+        const taskBucket = adjustedTask.bucket || 'unassigned';
         if (!selectedBucketFilters.includes(taskBucket)) return;
       }
 
-      const repeatRule = task.repeatRule && task.repeatRule !== 'none' ? (task.repeatRule as RepeatOption) : undefined;
-      const startDateStr = task.startDate ?? task.due?.date;
-      const endDateStr = task.endDate ?? startDateStr;
+      const repeatRule = adjustedTask.repeatRule ? (adjustedTask.repeatRule as RepeatOption) : undefined;
+      const startDateStr = adjustedTask.startDate ?? adjustedTask.due?.date;
+      const endDateStr = adjustedTask.endDate ?? startDateStr;
       const isRangeStart = dateStr === startDateStr;
       const isRangeEnd = dateStr === endDateStr;
-      const eventAllDay = task.allDay ?? (!task.hourSlot && !task.endHourSlot);
+      const eventAllDay = adjustedTask.allDay ?? (!adjustedTask.hourSlot && !adjustedTask.endHourSlot);
 
       const baseEvent: DayEvent = {
         source: 'lifeboard',
-        title: task.content,
+        title: adjustedTask.content,
         allDay: eventAllDay,
-        taskId: task.id,
+        taskId: adjustedTask.id,
         repeatRule,
-        bucket: task.bucket,
+        bucket: adjustedTask.bucket,
         startDate: startDateStr ?? undefined,
         endDate: endDateStr ?? undefined,
         isRangeStart,
         isRangeEnd,
       };
 
-      if (!eventAllDay && task.hourSlot && isRangeStart) {
-        baseEvent.time = hourSlotToISO(task.hourSlot, dateStr);
-        baseEvent.duration = task.duration || 60;
+      if (!eventAllDay && adjustedTask.hourSlot && isRangeStart) {
+        baseEvent.time = hourSlotToISO(adjustedTask.hourSlot, dateStr);
+        baseEvent.duration = adjustedTask.duration || 60;
       } else if (!eventAllDay && !isRangeStart) {
         baseEvent.time = undefined;
         baseEvent.duration = undefined;
-      } else if (task.duration) {
-        baseEvent.duration = task.duration;
+      } else if (adjustedTask.duration) {
+        baseEvent.duration = adjustedTask.duration;
       }
 
       events.push(baseEvent);
     });
 
     return events;
-  }, [allTasks, hourSlotToISO, shouldIncludeTaskOnDate, selectedBucketFilters]);
-
-  const extractHourLabel = useCallback((hourSlot?: string | null) => {
-    if (!hourSlot) return '';
-    return hourSlot.replace(/^hour-/, '');
-  }, []);
-
-  const isoToHourLabel = useCallback((iso?: string | null) => {
-    if (!iso) return '';
-    try {
-      return format(new Date(iso), 'h a').replace(' ', '');
-    } catch (error) {
-      console.error('Failed to parse ISO time for label', error);
-      return '';
-    }
-  }, []);
-
-  const deriveRepeatOption = useCallback((task: any): RepeatOption => {
-    if (!task) return 'none';
-    if (task.repeatRule) return task.repeatRule as RepeatOption;
-    if (task.due?.is_recurring && typeof task.due?.string === 'string') {
-      const normalized = task.due.string.trim().toLowerCase().replace(/\s+starting\s+.+$/, '');
-      switch (normalized) {
-        case 'every day':
-        case 'daily':
-          return 'daily';
-        case 'every week':
-        case 'weekly':
-          return 'weekly';
-        case 'every weekday':
-        case 'weekdays':
-        case 'every workday':
-          return 'weekdays';
-        case 'every month':
-        case 'monthly':
-          return 'monthly';
-      }
-    }
-    return 'none';
-  }, []);
-
-  const openTaskModal = useCallback((
-    task: any | undefined,
-    dateStr: string,
-    options: {
-      fallbackTitle?: string;
-      fallbackHourLabel?: string;
-      fallbackTaskId?: string;
-      fallbackRepeat?: RepeatOption | null;
-      fallbackBucket?: string;
-      fallbackEndDate?: string;
-      fallbackEndHourLabel?: string;
-      fallbackAllDay?: boolean;
-    } = {}
-  ) => {
-    const fallbackDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
-    const fallbackEndDate = options.fallbackEndDate
-      ?? task?.endDate
-      ?? fallbackDate;
-    const bucketDefault = selectedBucket || availableBuckets[0] || '';
-    const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || '';
-    const endHourLabel = extractHourLabel(task?.endHourSlot) || extractHourLabel(options.fallbackEndHourLabel) || '';
-    const repeatDefault = task ? deriveRepeatOption(task) : (options.fallbackRepeat ?? 'none');
-    const sanitizedTaskBucket = sanitizeBucketName(task?.bucket);
-    const sanitizedFallbackBucket = sanitizeBucketName(options.fallbackBucket);
-    const sanitizedDefaultBucket = sanitizeBucketName(bucketDefault) ?? '';
-    const editingExisting = Boolean(task?.id ?? options.fallbackTaskId);
-    const resolvedBucket = sanitizedTaskBucket
-      ?? sanitizedFallbackBucket
-      ?? (editingExisting ? '' : sanitizedDefaultBucket);
-
-    setFormContent(task?.content ?? options.fallbackTitle ?? '');
-    setFormBucket(resolvedBucket);
-    setFormTime(hourLabel);
-    setFormEndTime(endHourLabel);
-    setFormAllDay(task?.allDay ?? options.fallbackAllDay ?? (!hourLabel && !endHourLabel));
-    setFormRepeat(repeatDefault);
-    setAddTaskDate(fallbackDate);
-    setFormEndDate(fallbackEndDate);
-    setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
-    setSelectedModalDate(null);
-    setIsSubmitting(false);
-    setIsAddModalOpen(true);
-  }, [availableBuckets, currentDate, deriveRepeatOption, extractHourLabel, selectedBucket]);
+  }, [allTasks, getTaskForOccurrence, hourSlotToISO, shouldIncludeTaskOnDate, selectedBucketFilters]);
 
   const openTaskEditor = useCallback((event: DayEvent, dateStr: string) => {
     if (!event.taskId) return;
     const task = resolveTaskById(event.taskId);
     const targetDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
     const fallbackHour = isoToHourLabel(event.time);
-    openTaskModal(task, targetDate, {
+    setSelectedModalDate(null);
+    taskEditorRef.current?.openWithTask(task, targetDate, {
       fallbackTitle: event.title,
       fallbackHourLabel: fallbackHour,
       fallbackTaskId: event.taskId,
@@ -1053,7 +949,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackEndHourLabel: event.isRangeEnd ? fallbackHour : undefined,
       fallbackAllDay: event.allDay,
     });
-  }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
+  }, [currentDate, resolveTaskById]);
 
   const ensureTaskForEvent = useCallback(async (eventId: string) => {
     try {
@@ -1102,16 +998,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, []);
 
   const openTaskEditorById = useCallback((taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => {
-    const task = resolveTaskById(taskId);
-    const fallbackHour = extractHourLabel(metadata?.hourSlot);
-    const dateStr = metadata?.plannerDate || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
-    openTaskModal(task, dateStr, {
-      fallbackHourLabel: fallbackHour,
-      fallbackTaskId: taskId,
-      fallbackRepeat: task?.repeatRule ?? null,
-      fallbackBucket: task?.bucket,
-    });
-  }, [currentDate, extractHourLabel, openTaskModal, resolveTaskById]);
+    setSelectedModalDate(null);
+    taskEditorRef.current?.openByTaskId(taskId, metadata);
+  }, []);
+
+  const taskEditorDefaultDate = useCallback(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
 
   const openCalendarEvent = useCallback(async (calendarEvent: DayEvent, dateStr: string) => {
     if (calendarEvent.source !== 'lifeboard' && calendarEvent.source !== 'uploaded') {
@@ -1174,22 +1065,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
     openTaskEditor(hydratedEvent, dateStr);
   }, [ensureTaskForEvent, setEventsByDate, setUploadRefreshIndex, refetch, openTaskEditor]);
-
-  const closeTaskModal = useCallback(() => {
-    setIsAddModalOpen(false);
-    setEditTaskId(null);
-    setIsSubmitting(false);
-    setFormContent('');
-    setFormTime('');
-    setFormEndTime('');
-    setFormRepeat('none');
-    setAddTaskDate(null);
-    setFormEndDate(null);
-    setFormAllDay(true);
-    if (selectedBucket) setFormBucket(selectedBucket);
-    else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
-    else setFormBucket('');
-  }, [availableBuckets, selectedBucket]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -1464,21 +1339,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
   }, [propSelectedDate, currentDate]);
 
-  // Keep default bucket in sync when selectedBucket/availableBuckets change
-  useEffect(() => {
-    if (!isAddModalOpen) return;
-    if (editTaskId) return;
-    if (selectedBucket) {
-      setFormBucket(selectedBucket);
-      return;
-    }
-    if (availableBuckets.length > 0) {
-      setFormBucket((prev) => prev || availableBuckets[0]);
-    } else {
-      setFormBucket('');
-    }
-  }, [selectedBucket, availableBuckets, isAddModalOpen, editTaskId]);
-
   // Load bucket colors
   useEffect(() => {
     const loadBucketColors = async () => {
@@ -1540,18 +1400,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   // Legacy bucket label retained for older imports
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
-
-  useEffect(() => {
-    if (!addTaskDate) {
-      return;
-    }
-    setFormEndDate((prev) => {
-      if (!prev || prev < addTaskDate) {
-        return addTaskDate;
-      }
-      return prev;
-    });
-  }, [addTaskDate]);
 
   // Build events map whenever data sources change
   useEffect(() => {
@@ -2200,16 +2048,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               className={addButtonClasses}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setAddTaskDate(dayStr);
-                                setFormContent("");
-                                setFormTime("");
-                                setFormRepeat('none');
-                                setEditTaskId(null);
-                                setIsSubmitting(false);
-                                if (selectedBucket) setFormBucket(selectedBucket);
-                                else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
-                                else setFormBucket('');
-                                setIsAddModalOpen(true);
+                                setSelectedModalDate(null);
+                                taskEditorRef.current?.openNew(dayStr);
                               }}
                               title={`Add task on ${formattedDayLabel}`}
                               aria-label={`Add task on ${formattedDayLabel}`}
@@ -2438,16 +2278,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               className={addButtonClasses}
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                setAddTaskDate(dayStr);
-                                setFormContent("");
-                                setFormTime("");
-                                setFormRepeat('none');
-                                setEditTaskId(null);
-                                setIsSubmitting(false);
-                                if (selectedBucket) setFormBucket(selectedBucket);
-                                else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
-                                else setFormBucket('');
-                                setIsAddModalOpen(true);
+                                setSelectedModalDate(null);
+                                taskEditorRef.current?.openNew(dayStr);
                               }}
                               title={`Add task on ${formattedDayLabel}`}
                               aria-label={`Add task on ${formattedDayLabel}`}
@@ -2704,241 +2536,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         </div>
       )}
 
-      {/* Add/Edit Task Modal */}
-      {isAddModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={closeTaskModal}
-        >
-          <div
-            className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">{editTaskId ? 'Edit Task' : 'Add Task'}</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {addTaskDate ? format(parseISO(addTaskDate), 'EEEE, MMMM d, yyyy') : 'No date selected'}
-                </p>
-              </div>
-              <button className="text-gray-400 hover:text-gray-600" onClick={closeTaskModal}>&times;</button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Task</label>
-                <input
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="What do you want to do?"
-                  value={formContent}
-                  onChange={(e) => setFormContent(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Starts</label>
-                  <input
-                    type="date"
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value={addTaskDate ?? ''}
-                    onChange={(e) => setAddTaskDate(e.target.value || null)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Start time</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                    value={formTime}
-                    onChange={(e) => setFormTime(e.target.value)}
-                    disabled={formAllDay}
-                  >
-                    <option value="">No time</option>
-                    {['7AM','8AM','9AM','10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM'].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Ends</label>
-                  <input
-                    type="date"
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value={formEndDate ?? addTaskDate ?? ''}
-                    min={addTaskDate ?? undefined}
-                    onChange={(e) => setFormEndDate(e.target.value || null)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">End time</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                    value={formEndTime}
-                    onChange={(e) => setFormEndTime(e.target.value)}
-                    disabled={formAllDay}
-                  >
-                    <option value="">No time</option>
-                    {['8AM','9AM','10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM','10PM'].map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label className="inline-flex items-center text-xs text-gray-600 select-none">
-                  <input
-                    type="checkbox"
-                    className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={formAllDay}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormAllDay(checked);
-                      if (checked) {
-                        setFormTime('');
-                        setFormEndTime('');
-                      }
-                    }}
-                  />
-                  All day
-                </label>
-              </div>
-
-              <div className={`grid gap-3 ${availableBuckets.length > 0 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
-                {availableBuckets.length > 0 && (
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Category</label>
-                    <select
-                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
-                      value={formBucket}
-                      onChange={(e) => setFormBucket(e.target.value)}
-                    >
-                      <option value="">{UNASSIGNED_BUCKET_LABEL}</option>
-                      {availableBuckets.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Repeat</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
-                    value={formRepeat}
-                    onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
-                  >
-                    {REPEAT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  onClick={closeTaskModal}
-                >
-                  Close
-                </button>
-                <button
-                  className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                  disabled={!formContent.trim() || isSubmitting}
-                  onClick={async () => {
-                    try {
-                      setIsSubmitting(true);
-                      const toHourNumber = (label: string): number | undefined => {
-                        if (!label) return undefined;
-                        const m = label.match(/^(\d{1,2})(AM|PM)$/);
-                        if (!m) return undefined;
-                        let hh = parseInt(m[1], 10);
-                        const ampm = m[2];
-                        if (ampm === 'PM' && hh !== 12) hh += 12;
-                        if (ampm === 'AM' && hh === 12) hh = 0;
-                        return hh;
-                      };
-
-                      const hourNum = toHourNumber(formTime);
-                      const endHourNum = toHourNumber(formEndTime);
-                      const rawStartDate = addTaskDate && addTaskDate.trim() ? addTaskDate : null;
-                      const resolvedStartDate = rawStartDate ?? currentDateKey;
-                      const rawEndDate = formEndDate && formEndDate.trim() ? formEndDate : null;
-                      let resolvedEndDate = rawEndDate ?? resolvedStartDate;
-                      if (resolvedStartDate && resolvedEndDate && resolvedEndDate < resolvedStartDate) {
-                        resolvedEndDate = resolvedStartDate;
-                      }
-                      const isAllDayEvent = formAllDay;
-                      const bucketValue = availableBuckets.length > 0 ? (formBucket || undefined) : undefined;
-
-                      if (!editTaskId) {
-                        const task = await createTask(
-                          formContent.trim(),
-                          resolvedStartDate,
-                          isAllDayEvent ? null : hourNum,
-                          bucketValue,
-                          formRepeat,
-                          {
-                            endDate: resolvedEndDate,
-                            endHourSlot: isAllDayEvent ? null : endHourNum,
-                            allDay: isAllDayEvent,
-                          }
-                        );
-                        if (task) {
-                          // Close modal immediately for better UX
-                          closeTaskModal();
-                          // Refetch in background to ensure calendar updates
-                          try {
-                            await refetch();
-                          } catch (error) {
-                            console.error('Failed to refresh tasks after creation', error);
-                          }
-                        }
-                      } else {
-                        const updates: any = {
-                          content: formContent.trim(),
-                          startDate: resolvedStartDate,
-                          endDate: resolvedEndDate,
-                          allDay: isAllDayEvent,
-                        };
-                        if (bucketValue !== undefined) {
-                          updates.bucket = bucketValue || null;
-                        }
-                        updates.hourSlot = isAllDayEvent ? null : (formTime ? `hour-${formTime}` : null);
-                        updates.endHourSlot = isAllDayEvent ? null : (formEndTime ? `hour-${formEndTime}` : null);
-                        updates.due = resolvedStartDate ? { date: resolvedStartDate } : null;
-                        updates.repeatRule = formRepeat === 'none' ? null : formRepeat;
-
-                        await batchUpdateTasks([{
-                          taskId: editTaskId,
-                          updates,
-                          occurrenceDate: resolvedStartDate,
-                        }]);
-
-                        // Close modal immediately for better UX
-                        closeTaskModal();
-                        
-                        // Refetch in background to ensure calendar updates
-                        try {
-                          await refetch();
-                        } catch (error) {
-                          console.error('Failed to refresh tasks after update', error);
-                        }
-                      }
-                    } finally {
-                      setIsSubmitting(false);
-                    }
-                  }}
-                >
-                  {editTaskId ? (isSubmitting ? 'Saving…' : 'Save changes') : (isSubmitting ? 'Creating…' : 'Create task')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <TaskEditorModal
+        ref={taskEditorRef}
+        availableBuckets={availableBuckets}
+        selectedBucket={selectedBucket}
+        getDefaultDate={taskEditorDefaultDate}
+      />
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmTask && (

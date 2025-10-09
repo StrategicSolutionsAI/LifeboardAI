@@ -5,10 +5,11 @@ import { SidebarLayout } from "@/components/sidebar-layout";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask, type TasksBoardHandle } from "@/components/TasksBoard";
+import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { differenceInCalendarDays, parseISO, isValid } from "date-fns";
+import { differenceInCalendarDays, parseISO, isValid, format } from "date-fns";
 import { Plus, Clock, ChevronRight } from "lucide-react";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
@@ -35,6 +36,7 @@ function TasksBoardShell() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const boardRef = useRef<TasksBoardHandle | null>(null);
   const quickAddInputRef = useRef<HTMLInputElement>(null);
+  const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
 
   useEffect(() => {
     if (!quickBucket && buckets.length > 0) {
@@ -344,8 +346,17 @@ function TasksBoardShell() {
           viewMode={viewMode}
           filters={{ dueSoonOnly }}
           loadingTasks={loadingTasks}
+          onTaskOpen={(taskId) => {
+            taskEditorRef.current?.openByTaskId(taskId);
+          }}
         />
       </div>
+      <TaskEditorModal
+        ref={taskEditorRef}
+        availableBuckets={buckets}
+        selectedBucket={quickBucket || null}
+        getDefaultDate={() => format(new Date(), "yyyy-MM-dd")}
+      />
     </div>
   );
 }

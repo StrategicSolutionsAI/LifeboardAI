@@ -55,6 +55,7 @@ type TasksBoardProps = {
   viewMode?: TasksBoardViewMode;
   filters?: TasksBoardFilters;
   loadingTasks?: Set<string>;
+  onTaskOpen?: (taskId: string) => void;
 };
 
 function isDateSoon(dueDate?: string | null) {
@@ -113,7 +114,8 @@ function TaskCard({
   onToggle,
   availableBuckets = [],
   onBucketChange,
-  isLoading = false
+  isLoading = false,
+  onOpen,
 }: {
   task: Task;
   index: number;
@@ -121,6 +123,7 @@ function TaskCard({
   availableBuckets?: Bucket[];
   onBucketChange?: (taskId: string, newBucketId: string) => void;
   isLoading?: boolean;
+  onOpen?: (taskId: string) => void;
 }) {
   const [showBucketDropdown, setShowBucketDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -166,7 +169,10 @@ function TaskCard({
         </div>
 
         {/* Task Content - Click to expand in future */}
-        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => {/* Future: open task detail */}}>
+        <div
+          className="min-w-0 flex-1 cursor-pointer"
+          onClick={() => { onOpen?.(task.id); }}
+        >
           <div
             className={cn(
               "text-sm font-medium leading-5 line-clamp-2 group-hover:text-primary transition-colors",
@@ -294,6 +300,7 @@ function BucketColumn({
   onBucketChange,
   viewMode,
   loadingTasks = new Set(),
+  onTaskOpen,
 }: {
   bucket: Bucket;
   summary: BucketSummary;
@@ -303,6 +310,7 @@ function BucketColumn({
   onBucketChange?: (taskId: string, newBucketId: string) => void;
   viewMode: TasksBoardViewMode;
   loadingTasks?: Set<string>;
+  onTaskOpen?: (taskId: string) => void;
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -399,6 +407,7 @@ function BucketColumn({
                     availableBuckets={availableBuckets}
                     onBucketChange={onBucketChange}
                     isLoading={loadingTasks.has(task.id)}
+                    onOpen={onTaskOpen}
                   />
                 ))
               )}
@@ -451,6 +460,7 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
     onUncompleteTask,
     onAddTask,
     onMoveTask,
+    onTaskOpen,
     viewMode = "open",
     filters,
     loadingTasks = new Set(),
@@ -636,6 +646,7 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
                 onBucketChange={onMoveTask}
                 viewMode={viewMode}
                 loadingTasks={loadingTasks}
+                onTaskOpen={onTaskOpen}
               />
             </div>
           ))}

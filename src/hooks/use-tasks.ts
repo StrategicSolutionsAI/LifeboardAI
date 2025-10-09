@@ -189,6 +189,12 @@ export function useTasks(selectedDate?: Date) {
     return next
   }, [occurrenceExceptionIndex])
 
+  const getTaskForOccurrence = useCallback(
+    (task: Task, occurrenceDate: string): Task | null =>
+      applyOccurrenceAdjustments(task, occurrenceDate),
+    [applyOccurrenceAdjustments]
+  )
+
   const dateStr = selectedDate 
     ? format(selectedDate, 'yyyy-MM-dd')
     : format(new Date(), 'yyyy-MM-dd')
@@ -1205,6 +1211,7 @@ export function useTasks(selectedDate?: Date) {
     scheduledTasks,    // Tasks that should appear in hourly planner (has hourSlot)
     upcomingTasks,     // Tasks with future due dates
     completedTasks,    // All completed tasks
+    getTaskForOccurrence,
     loading: dailyLoading || allLoading,
     error: dailyError || allError,
     createTask,
