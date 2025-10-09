@@ -382,6 +382,7 @@ export async function POST(request: NextRequest) {
       const startTime = start.dateTime || null;
       const startDate = start.date || (startTime ? startTime.slice(0, 10) : null);
       const hourSlot = startTime ? isoToHourSlot(startTime) : null;
+      const endHourSlot = end.dateTime ? isoToHourSlot(end.dateTime) : null;
       const durationMinutes = calculateDurationMinutes(startTime, end.dateTime || null);
       const normalizedRepeatRule = mapRruleToRepeatRule(event.rrule);
       const timestamp = new Date().toISOString();
@@ -405,11 +406,12 @@ export async function POST(request: NextRequest) {
         end_date: end.date || null,
         timezone: start.timeZone || null,
         location: event.location || null,
-        all_day: Boolean(start.date),
+        all_day: Boolean(start.date) && !startTime,
         rrule: event.rrule || null,
         repeat_rule: normalizedRepeatRule ?? null,
         due_date: startDate,
         hour_slot: hourSlot,
+        end_hour_slot: endHourSlot,
         bucket: null,
         duration: durationMinutes ?? null,
         completed: false,
@@ -493,7 +495,7 @@ export async function POST(request: NextRequest) {
           onConflict: 'user_id,external_id,source,import_id',
           ignoreDuplicates: false
         })
-        .select('id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id');
+        .select('id, import_id, title, content, start_time, start_date, end_time, end_date, end_hour_slot, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id');
 
       let rowsToProcess: CalendarEventRow[] = Array.isArray(upsertedRows) ? upsertedRows as CalendarEventRow[] : [];
 
@@ -508,7 +510,7 @@ export async function POST(request: NextRequest) {
               onConflict: 'user_id,external_id,source,import_id',
               ignoreDuplicates: false
             })
-            .select('id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id')
+            .select('id, import_id, title, content, start_time, start_date, end_time, end_date, end_hour_slot, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id')
             .single();
 
           if (error) {

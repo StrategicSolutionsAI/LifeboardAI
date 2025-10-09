@@ -108,7 +108,17 @@ const sortTasksByPosition = (tasks: any[]) => {
 };
 
 const enhanceTodoistTask = (task: any) => {
-  let metadata: { duration?: number; hourSlot?: string; bucket?: string; position?: number; repeatRule?: RepeatRule } = {};
+  let metadata: {
+    duration?: number;
+    hourSlot?: string;
+    endHourSlot?: string;
+    bucket?: string;
+    position?: number;
+    repeatRule?: RepeatRule;
+    startDate?: string;
+    endDate?: string;
+    allDay?: boolean;
+  } = {};
   let cleanContent = task.content;
 
   if (task.description) {
@@ -145,9 +155,13 @@ const enhanceTodoistTask = (task: any) => {
     content: cleanContent,
     duration: metadata.duration,
     hourSlot: metadata.hourSlot,
+    endHourSlot: metadata.endHourSlot,
     bucket: metadata.bucket,
     position: metadata.position,
     repeatRule: metadata.repeatRule ?? (task.due?.is_recurring ? normalizeRepeatRule(task.due?.string) : undefined),
+    startDate: metadata.startDate ?? task.due?.date ?? task.due?.datetime?.slice(0, 10),
+    endDate: metadata.endDate ?? metadata.startDate ?? task.due?.date ?? task.due?.datetime?.slice(0, 10),
+    allDay: metadata.allDay ?? (!metadata.hourSlot && !metadata.endHourSlot),
   };
 };
 
@@ -267,10 +281,29 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { content, dueDate, due_date, hour_slot, bucket, repeat_rule, repeatRule } = await request.json();
+    const {
+      content,
+      dueDate,
+      due_date,
+      hour_slot,
+      hourSlot,
+      end_hour_slot,
+      endHourSlot,
+      start_date,
+      startDate,
+      end_date,
+      endDate,
+      all_day,
+      allDay,
+      bucket,
+      repeat_rule,
+      repeatRule
+    } = await request.json();
     let actualDueDate: string | null = (dueDate || due_date) || null; // Support both formats
     const requestedRepeat = typeof repeat_rule === 'string' ? repeat_rule : (typeof repeatRule === 'string' ? repeatRule : undefined);
     const repeatRuleNormalized = normalizeRepeatRule(requestedRepeat);
+    const normalizedStartDate = (startDate ?? start_date) || actualDueDate;
+    const normalizedEndDate = (endDate ?? end_date) || normalizedStartDate;
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content required' }, { status: 400 });
@@ -298,7 +331,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    const metadata: { hourSlot?: string; bucket?: string; repeatRule?: RepeatRule } = {};
+    const normalizeHourValue = (value: unknown): string | undefined => {
+      if (typeof value === 'number') {
+        const h = Math.max(0, Math.min(23, value))
+        const display = (() => {
+          if (h === 0) return '12AM'
+          if (h < 12) return `${h}AM`
+          if (h === 12) return '12PM'
+          return `${h - 12}PM`
+        })()
+        return `hour-${display}`
+      }
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const trimmed = value.trim()
+        return trimmed.startsWith('hour-') ? trimmed : `hour-${trimmed}`
+      }
+      return undefined
+    }
+
+    const metadata: {
+      hourSlot?: string;
+      endHourSlot?: string;
+      bucket?: string;
+      repeatRule?: RepeatRule;
+      startDate?: string;
+      endDate?: string;
+      allDay?: boolean;
+    } = {};
+
+    const normalizedHourSlot = normalizeHourValue(hour_slot ?? hourSlot);
+    if (normalizedHourSlot) {
+      metadata.hourSlot = normalizedHourSlot;
+    }
+    const normalizedEndHourSlot = normalizeHourValue(end_hour_slot ?? endHourSlot);
+    if (normalizedEndHourSlot) {
+      metadata.endHourSlot = normalizedEndHourSlot;
+    }
+    if (bucket) metadata.bucket = bucket;
+    if (repeatRuleNormalized) metadata.repeatRule = repeatRuleNormalized;
+    if (normalizedStartDate) metadata.startDate = normalizedStartDate;
+    if (normalizedEndDate) metadata.endDate = normalizedEndDate;
+    const allDayValue = typeof allDay === 'boolean' ? allDay : (typeof all_day === 'boolean' ? all_day : undefined);
+    if (allDayValue !== undefined) metadata.allDay = allDayValue;
+
     if (typeof hour_slot === 'number') {
       const h = Math.max(0, Math.min(23, hour_slot))
       const display = (() => {
@@ -309,8 +384,6 @@ export async function POST(request: NextRequest) {
       })()
       metadata.hourSlot = `hour-${display}`
     }
-    if (bucket) metadata.bucket = bucket;
-    if (repeatRuleNormalized) metadata.repeatRule = repeatRuleNormalized;
     
     // Normalize obviously stale years (e.g., model emitted 2023). If the
     // provided due date is in a past year, bump to the current year while
@@ -337,8 +410,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Store metadata in description field instead of content
-    if (Object.keys(metadata).length > 0) {
-      body['description'] = `[LIFEBOARD_META]${JSON.stringify(metadata)}[/LIFEBOARD_META]`;
+    const metaEntries = Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null);
+    if (metaEntries.length > 0) {
+      body['description'] = `[LIFEBOARD_META]${JSON.stringify(Object.fromEntries(metaEntries))}[/LIFEBOARD_META]`;
     }
 
     const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {

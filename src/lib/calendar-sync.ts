@@ -100,12 +100,16 @@ export interface LifeboardTaskLike {
   id: string;
   content?: string | null;
   due_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   hour_slot?: string | null;
+  end_hour_slot?: string | null;
   duration?: number | null;
   repeat_rule?: string | null;
   bucket?: string | null;
   completed?: boolean | null;
   position?: number | null;
+  all_day?: boolean | null;
 }
 
 export interface CalendarEventRow {
@@ -119,6 +123,7 @@ export interface CalendarEventRow {
   start_date: string | null;
   end_time: string | null;
   end_date: string | null;
+  end_hour_slot?: string | null;
   all_day: boolean | null;
   rrule: string | null;
   repeat_rule: string | null;
@@ -134,23 +139,35 @@ export interface CalendarEventRow {
 export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
   if (!task?.id) return null;
 
-  const startDate = task.due_date ?? null;
-  const startTime = hourSlotToIso(startDate, task.hour_slot ?? null);
+  const startDate = task.start_date ?? task.due_date ?? null;
+  let endDate = task.end_date ?? startDate ?? null;
+  const rawStartTime = hourSlotToIso(startDate, task.hour_slot ?? null);
+  const rawEndTime = hourSlotToIso(endDate, task.end_hour_slot ?? null);
   const durationMinutes = typeof task.duration === 'number' ? task.duration : null;
+  let startTime = rawStartTime;
+  let endTime = rawEndTime;
 
-  let endDate: string | null = null;
-  let endTime: string | null = null;
+  const allDay =
+    task.all_day ??
+    (!rawStartTime && !rawEndTime && !task.hour_slot && !task.end_hour_slot);
 
-  if (startTime && durationMinutes && durationMinutes > 0) {
-    const endDateObj = addMinutes(new Date(startTime), durationMinutes);
-    const yyyy = endDateObj.getFullYear().toString().padStart(4, '0');
-    const mm = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
-    const dd = endDateObj.getDate().toString().padStart(2, '0');
-    const hh = endDateObj.getHours().toString().padStart(2, '0');
-    const min = endDateObj.getMinutes().toString().padStart(2, '0');
-    endDate = `${yyyy}-${mm}-${dd}`;
-    endTime = `${endDate}T${hh}:${min}:00`;
-  } else if (startDate) {
+  if (allDay) {
+    startTime = null;
+    endTime = null;
+  } else {
+    if (!endTime && startTime && durationMinutes && durationMinutes > 0) {
+      const endDateObj = addMinutes(new Date(startTime), durationMinutes);
+      const yyyy = endDateObj.getFullYear().toString().padStart(4, '0');
+      const mm = (endDateObj.getMonth() + 1).toString().padStart(2, '0');
+      const dd = endDateObj.getDate().toString().padStart(2, '0');
+      const hh = endDateObj.getHours().toString().padStart(2, '0');
+      const min = endDateObj.getMinutes().toString().padStart(2, '0');
+      endDate = `${yyyy}-${mm}-${dd}`;
+      endTime = `${endDate}T${hh}:${min}:00`;
+    }
+  }
+
+  if (!endDate && startDate) {
     endDate = startDate;
   }
 
@@ -166,7 +183,8 @@ export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
     start_time: startTime,
     end_date: endDate,
     end_time: endTime,
-    all_day: startTime ? false : true,
+    end_hour_slot: task.end_hour_slot ?? null,
+    all_day,
     rrule: repeatRule,
     repeat_rule: task.repeat_rule ?? null,
     due_date: startDate,
@@ -238,8 +256,11 @@ export async function syncEventsToTasks(
     const title = rawTitle.trim();
     if (!title) continue;
 
-    const dueDate = event.due_date ?? event.start_date ?? (event.start_time ? event.start_time.slice(0, 10) : null);
+    const startDate = event.start_date ?? event.due_date ?? (event.start_time ? event.start_time.slice(0, 10) : null);
+    const endDate = event.end_date ?? (event.end_time ? event.end_time.slice(0, 10) : startDate);
+    const dueDate = startDate;
     const hourSlot = event.hour_slot ?? isoToHourSlot(event.start_time);
+    const endHourSlot = event.end_hour_slot ?? isoToHourSlot(event.end_time);
     const duration = typeof event.duration === 'number'
       ? event.duration
       : calculateDurationMinutes(event.start_time, event.end_time);
@@ -247,22 +268,27 @@ export async function syncEventsToTasks(
     const bucket = event.bucket ?? null;
     const completed = event.completed ?? false;
     const position = typeof event.position === 'number' ? event.position : null;
+    const allDay = event.all_day ?? (!event.start_time && !event.end_time && !hourSlot && !endHourSlot);
     const timestamp = new Date().toISOString();
 
     if (!event.task_id) {
       const { data: taskData, error: taskError } = await supabase
-        .from('lifeboard_tasks')
-        .insert([{
-          user_id: userId,
-          content: title,
-          completed,
-          due_date: dueDate,
-          hour_slot: hourSlot ?? null,
-          bucket,
-          duration: duration ?? null,
-          repeat_rule: repeatRule ?? null,
-          position,
-        }])
+      .from('lifeboard_tasks')
+      .insert([{
+        user_id: userId,
+        content: title,
+        completed,
+        due_date: dueDate,
+        start_date: startDate,
+        end_date: endDate,
+        hour_slot: hourSlot ?? null,
+        end_hour_slot: endHourSlot ?? null,
+        bucket,
+        duration: duration ?? null,
+        repeat_rule: repeatRule ?? null,
+        all_day: allDay,
+        position,
+      }])
         .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
         .single();
 
@@ -290,11 +316,15 @@ export async function syncEventsToTasks(
           title,
           content: taskData?.content ?? title,
           due_date: taskData?.due_date ?? dueDate,
+          start_date: taskData?.start_date ?? startDate,
+          end_date: taskData?.end_date ?? endDate,
           hour_slot: taskData?.hour_slot ?? hourSlot ?? null,
+          end_hour_slot: taskData?.end_hour_slot ?? endHourSlot ?? null,
           bucket: taskData?.bucket ?? bucket,
           duration: taskData?.duration ?? (typeof duration === 'number' ? duration : null),
           repeat_rule: taskData?.repeat_rule ?? repeatRule ?? null,
           completed: taskData?.completed ?? false,
+          all_day: taskData?.all_day ?? allDay,
           position: taskData?.position ?? position,
           updated_at: timestamp,
         })
@@ -320,9 +350,13 @@ export async function syncEventsToTasks(
       .update({
         content: title,
         due_date: dueDate,
+        start_date: startDate,
+        end_date: endDate,
         hour_slot: hourSlot ?? null,
+        end_hour_slot: endHourSlot ?? null,
         duration: duration ?? null,
         repeat_rule: repeatRule ?? null,
+        all_day: allDay,
       })
       .eq('id', event.task_id)
       .eq('user_id', userId)
@@ -345,11 +379,15 @@ export async function syncEventsToTasks(
         title,
         content: taskData?.content ?? title,
         due_date: taskData?.due_date ?? dueDate,
+        start_date: taskData?.start_date ?? startDate,
+        end_date: taskData?.end_date ?? endDate,
         hour_slot: taskData?.hour_slot ?? hourSlot ?? null,
+        end_hour_slot: taskData?.end_hour_slot ?? endHourSlot ?? null,
         bucket: taskData?.bucket ?? bucket,
         duration: taskData?.duration ?? (typeof duration === 'number' ? duration : null),
         repeat_rule: taskData?.repeat_rule ?? repeatRule ?? null,
         completed: taskData?.completed ?? completed,
+        all_day: taskData?.all_day ?? allDay,
         position: taskData?.position ?? position,
         updated_at: timestamp,
       })

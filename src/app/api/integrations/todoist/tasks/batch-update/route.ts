@@ -72,6 +72,10 @@ interface TaskUpdate {
     content?: string;
     duration?: number;
     hourSlot?: string;
+    endHourSlot?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    allDay?: boolean;
     bucket?: string | null;
     due?: { date: string };
     position?: number;
@@ -149,6 +153,10 @@ export async function POST(request: NextRequest) {
           ...existingMeta,
           ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
           ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
+          ...(update.updates.endHourSlot !== undefined && { endHourSlot: update.updates.endHourSlot }),
+          ...(update.updates.startDate !== undefined && { startDate: update.updates.startDate }),
+          ...(update.updates.endDate !== undefined && { endDate: update.updates.endDate }),
+          ...(update.updates.allDay !== undefined && { allDay: update.updates.allDay }),
           ...(update.updates.bucket !== undefined && { bucket: update.updates.bucket }),
           ...(update.updates.position !== undefined && { position: update.updates.position }),
         };
@@ -164,6 +172,9 @@ export async function POST(request: NextRequest) {
         if (update.updates.hourSlot === null) {
           delete newMeta.hourSlot;
         }
+        if (update.updates.endHourSlot === null) {
+          delete newMeta.endHourSlot;
+        }
         if (update.updates.duration === null) {
           delete newMeta.duration;
         }
@@ -173,11 +184,20 @@ export async function POST(request: NextRequest) {
         if (update.updates.position === null) {
           delete newMeta.position;
         }
+        if (update.updates.startDate === null) {
+          delete newMeta.startDate;
+        }
+        if (update.updates.endDate === null) {
+          delete newMeta.endDate;
+        }
+        if (update.updates.allDay === null) {
+          delete newMeta.allDay;
+        }
         if (removeRepeatRule) {
           delete newMeta.repeatRule;
         }
 
-        const metaKeys = Object.keys(newMeta).filter(key => newMeta[key] !== undefined);
+        const metaKeys = Object.keys(newMeta).filter(key => newMeta[key] !== undefined)
         const baseDescription = currentTask.description?.replace(/\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]/g, '').trim() || '';
         const newDescription = metaKeys.length > 0
           ? `${baseDescription}${baseDescription ? '\n' : ''}[LIFEBOARD_META]${JSON.stringify(newMeta)}[/LIFEBOARD_META]`

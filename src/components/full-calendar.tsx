@@ -274,7 +274,22 @@ function buildDayMatrix(currentDate: Date) {
   return [[currentDate]];
 }
 
-interface DayEvent { source: 'google' | 'todoist' | 'lifeboard' | 'uploaded'; title: string; time?: string; allDay?: boolean; taskId?: string; duration?: number; repeatRule?: RepeatOption; bucket?: string; location?: string; eventId?: string; }
+interface DayEvent {
+  source: 'google' | 'todoist' | 'lifeboard' | 'uploaded';
+  title: string;
+  time?: string;
+  allDay?: boolean;
+  taskId?: string;
+  duration?: number;
+  repeatRule?: RepeatOption;
+  bucket?: string;
+  location?: string;
+  eventId?: string;
+  startDate?: string;
+  endDate?: string;
+  isRangeStart?: boolean;
+  isRangeEnd?: boolean;
+}
 
 interface CalendarTaskMovedDetail {
   taskId: string;
@@ -802,6 +817,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [formContent, setFormContent] = useState<string>("");
   const [formBucket, setFormBucket] = useState<string>(selectedBucket || (availableBuckets[0] || ""));
   const [formTime, setFormTime] = useState<string>(""); // '' = no time
+  const [formEndDate, setFormEndDate] = useState<string | null>(null);
+  const [formEndTime, setFormEndTime] = useState<string>("");
+  const [formAllDay, setFormAllDay] = useState<boolean>(true);
   const [formRepeat, setFormRepeat] = useState<RepeatOption>('none');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -838,17 +856,30 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return base.toISOString();
   }, []);
 
+  const normalizeDateString = useCallback((value?: string | null) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed.length > 10 ? trimmed.slice(0, 10) : trimmed;
+  }, []);
+
   const shouldIncludeTaskOnDate = useCallback((task: any, dateStr: string): boolean => {
     if (!task || task.completed) return false;
-    const dueDateStr = task.due?.date;
-    if (!dueDateStr) return false;
+    const normalizedStart = normalizeDateString(task.startDate ?? task.due?.date);
+    if (!normalizedStart) return false;
+    const normalizedEnd = normalizeDateString(task.endDate) ?? normalizedStart;
+    const startDateStr = normalizedStart;
+    const endDateStr = normalizedEnd;
+    if (!startDateStr) return false;
 
     if (!task.repeatRule || task.repeatRule === 'none') {
-      return dueDateStr === dateStr;
+      const targetDate = normalizeDateString(dateStr);
+      if (!targetDate) return false;
+      return targetDate >= startDateStr && targetDate <= endDateStr;
     }
 
     const target = new Date(`${dateStr}T00:00:00`);
-    const due = new Date(`${dueDateStr}T00:00:00`);
+    const due = new Date(`${startDateStr}T00:00:00`);
     if (target < due) return false;
 
     const day = target.getDay();
@@ -874,7 +905,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       default:
         return false;
     }
-  }, []);
+  }, [normalizeDateString]);
 
   const buildLifeboardEventsForDate = useCallback((dateStr: string): DayEvent[] => {
     const events: DayEvent[] = [];
@@ -889,29 +920,36 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       }
 
       const repeatRule = task.repeatRule && task.repeatRule !== 'none' ? (task.repeatRule as RepeatOption) : undefined;
+      const startDateStr = task.startDate ?? task.due?.date;
+      const endDateStr = task.endDate ?? startDateStr;
+      const isRangeStart = dateStr === startDateStr;
+      const isRangeEnd = dateStr === endDateStr;
+      const eventAllDay = task.allDay ?? (!task.hourSlot && !task.endHourSlot);
 
-      if (task.hourSlot) {
-        const isoTime = hourSlotToISO(task.hourSlot, dateStr);
-        events.push({
-          source: 'lifeboard',
-          title: task.content,
-          time: isoTime,
-          allDay: false,
-          taskId: task.id,
-          duration: task.duration || 60,
-          repeatRule,
-          bucket: task.bucket,
-        });
-      } else {
-        events.push({
-          source: 'lifeboard',
-          title: task.content,
-          allDay: true,
-          taskId: task.id,
-          repeatRule,
-          bucket: task.bucket,
-        });
+      const baseEvent: DayEvent = {
+        source: 'lifeboard',
+        title: task.content,
+        allDay: eventAllDay,
+        taskId: task.id,
+        repeatRule,
+        bucket: task.bucket,
+        startDate: startDateStr ?? undefined,
+        endDate: endDateStr ?? undefined,
+        isRangeStart,
+        isRangeEnd,
+      };
+
+      if (!eventAllDay && task.hourSlot && isRangeStart) {
+        baseEvent.time = hourSlotToISO(task.hourSlot, dateStr);
+        baseEvent.duration = task.duration || 60;
+      } else if (!eventAllDay && !isRangeStart) {
+        baseEvent.time = undefined;
+        baseEvent.duration = undefined;
+      } else if (task.duration) {
+        baseEvent.duration = task.duration;
       }
+
+      events.push(baseEvent);
     });
 
     return events;
@@ -965,11 +1003,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackTaskId?: string;
       fallbackRepeat?: RepeatOption | null;
       fallbackBucket?: string;
+      fallbackEndDate?: string;
+      fallbackEndHourLabel?: string;
+      fallbackAllDay?: boolean;
     } = {}
   ) => {
     const fallbackDate = dateStr || task?.due?.date || format(currentDate, 'yyyy-MM-dd');
+    const fallbackEndDate = options.fallbackEndDate
+      ?? task?.endDate
+      ?? fallbackDate;
     const bucketDefault = selectedBucket || availableBuckets[0] || '';
     const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || '';
+    const endHourLabel = extractHourLabel(task?.endHourSlot) || extractHourLabel(options.fallbackEndHourLabel) || '';
     const repeatDefault = task ? deriveRepeatOption(task) : (options.fallbackRepeat ?? 'none');
     const sanitizedTaskBucket = sanitizeBucketName(task?.bucket);
     const sanitizedFallbackBucket = sanitizeBucketName(options.fallbackBucket);
@@ -982,8 +1027,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     setFormContent(task?.content ?? options.fallbackTitle ?? '');
     setFormBucket(resolvedBucket);
     setFormTime(hourLabel);
+    setFormEndTime(endHourLabel);
+    setFormAllDay(task?.allDay ?? options.fallbackAllDay ?? (!hourLabel && !endHourLabel));
     setFormRepeat(repeatDefault);
     setAddTaskDate(fallbackDate);
+    setFormEndDate(fallbackEndDate);
     setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
     setSelectedModalDate(null);
     setIsSubmitting(false);
@@ -1001,6 +1049,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       fallbackTaskId: event.taskId,
       fallbackRepeat: event.repeatRule ?? null,
       fallbackBucket: event.bucket,
+      fallbackEndDate: event.endDate ?? event.startDate ?? targetDate,
+      fallbackEndHourLabel: event.isRangeEnd ? fallbackHour : undefined,
+      fallbackAllDay: event.allDay,
     });
   }, [currentDate, isoToHourLabel, openTaskModal, resolveTaskById]);
 
@@ -1130,8 +1181,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     setIsSubmitting(false);
     setFormContent('');
     setFormTime('');
+    setFormEndTime('');
     setFormRepeat('none');
     setAddTaskDate(null);
+    setFormEndDate(null);
+    setFormAllDay(true);
     if (selectedBucket) setFormBucket(selectedBucket);
     else if (availableBuckets.length > 0) setFormBucket(availableBuckets[0]);
     else setFormBucket('');
@@ -1471,6 +1525,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   // Legacy bucket label retained for older imports
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
 
+  useEffect(() => {
+    if (!addTaskDate) {
+      return;
+    }
+    setFormEndDate((prev) => {
+      if (!prev || prev < addTaskDate) {
+        return addTaskDate;
+      }
+      return prev;
+    });
+  }, [addTaskDate]);
+
   // Build events map whenever data sources change
   useEffect(() => {
     const map: Record<string, DayEvent[]> = {};
@@ -1501,13 +1567,16 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         return; // Skip uploaded events when specific buckets are selected (unless 'uploaded' is included)
       }
 
-      // Determine the date for this event
-      const dateStr = ev.start_date || (ev.start_time ? ev.start_time.slice(0, 10) : undefined);
-      if (!dateStr) return;
+      const startDateStr = ev.start_date || (ev.start_time ? ev.start_time.slice(0, 10) : undefined);
+      if (!startDateStr) return;
+      const endDateStr = ev.end_date || startDateStr;
 
-      // Check if the event falls within our date range
-      const eventDate = new Date(dateStr);
-      if (eventDate < new Date(rangeStartMs) || eventDate > new Date(rangeEndMs)) {
+      const rangeStart = startOfDay(new Date(rangeStartMs));
+      const rangeEnd = startOfDay(new Date(rangeEndMs));
+      const startDateObj = startOfDay(new Date(`${startDateStr}T00:00:00`));
+      const endDateObj = startOfDay(new Date(`${endDateStr}T00:00:00`));
+
+      if (endDateObj < rangeStart || startDateObj > rangeEnd) {
         return;
       }
 
@@ -1542,28 +1611,44 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       const resolvedBucket = sanitizeBucketName(matchedTask?.bucket)
         ?? sanitizeBucketName(ev.bucket);
       const resolvedRepeatRule = normalizeRepeatOption(matchedTask?.repeatRule ?? ev.repeat_rule);
+      const eventAllDay = ev.all_day || (!ev.start_time && !ev.hour_slot && !ev.end_hour_slot);
 
-      const bucket = map[dateStr] ?? (map[dateStr] = []);
-      const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
-      const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
-      if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
-        return;
-      }
+      let cursor = startDateObj;
+      while (cursor.getTime() <= endDateObj.getTime()) {
+        if (cursor.getTime() >= rangeStart.getTime() && cursor.getTime() <= rangeEnd.getTime()) {
+          const dayKey = format(cursor, 'yyyy-MM-dd');
+          const bucket = map[dayKey] ?? (map[dayKey] = []);
+          const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
+          const seenKey = taskIdKey ? `${taskIdKey}-${dayKey}` : undefined;
+          if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
+            cursor = addDays(cursor, 1);
+            continue;
+          }
 
-      bucket.push({
-        source: resolvedTaskId ? 'lifeboard' : 'uploaded',
-        title: ev.title ?? 'Uploaded Event',
-        time: ev.start_time ?? undefined,
-        allDay: ev.all_day || Boolean(ev.start_date),
-        location: ev.location ?? undefined,
-        taskId: resolvedTaskId,
-        bucket: resolvedBucket,
-        repeatRule: resolvedRepeatRule,
-        eventId: ev.id,
-      });
+          const isRangeStart = dayKey === startDateStr;
+          const isRangeEnd = dayKey === endDateStr;
 
-      if (seenKey) {
-        seenTaskInstanceKeys.add(seenKey);
+          bucket.push({
+            source: resolvedTaskId ? 'lifeboard' : 'uploaded',
+            title: ev.title ?? 'Uploaded Event',
+            time: !eventAllDay && isRangeStart ? ev.start_time ?? undefined : undefined,
+            allDay: eventAllDay || (!isRangeStart && !isRangeEnd),
+            location: ev.location ?? undefined,
+            taskId: resolvedTaskId,
+            bucket: resolvedBucket,
+            repeatRule: resolvedRepeatRule,
+            eventId: ev.id,
+            startDate: startDateStr,
+            endDate: endDateStr,
+            isRangeStart,
+            isRangeEnd,
+          });
+
+          if (seenKey) {
+            seenTaskInstanceKeys.add(seenKey);
+          }
+        }
+        cursor = addDays(cursor, 1);
       }
     });
 
@@ -2636,7 +2721,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Date</label>
+                  <label className="block text-xs text-gray-600 mb-1">Starts</label>
                   <input
                     type="date"
                     className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -2645,11 +2730,12 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Time (optional)</label>
+                  <label className="block text-xs text-gray-600 mb-1">Start time</label>
                   <select
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
                     value={formTime}
                     onChange={(e) => setFormTime(e.target.value)}
+                    disabled={formAllDay}
                   >
                     <option value="">No time</option>
                     {['7AM','8AM','9AM','10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM'].map(t => (
@@ -2657,6 +2743,52 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Ends</label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={formEndDate ?? addTaskDate ?? ''}
+                    min={addTaskDate ?? undefined}
+                    onChange={(e) => setFormEndDate(e.target.value || null)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">End time</label>
+                  <select
+                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                    value={formEndTime}
+                    onChange={(e) => setFormEndTime(e.target.value)}
+                    disabled={formAllDay}
+                  >
+                    <option value="">No time</option>
+                    {['8AM','9AM','10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM','10PM'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center text-xs text-gray-600 select-none">
+                  <input
+                    type="checkbox"
+                    className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={formAllDay}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormAllDay(checked);
+                      if (checked) {
+                        setFormTime('');
+                        setFormEndTime('');
+                      }
+                    }}
+                  />
+                  All day
+                </label>
               </div>
 
               <div className={`grid gap-3 ${availableBuckets.length > 0 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
@@ -2714,134 +2846,65 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       };
 
                       const hourNum = toHourNumber(formTime);
-                      const dueDateValue = addTaskDate && addTaskDate.trim() ? addTaskDate : null;
+                      const endHourNum = toHourNumber(formEndTime);
+                      const rawStartDate = addTaskDate && addTaskDate.trim() ? addTaskDate : null;
+                      const resolvedStartDate = rawStartDate ?? currentDateKey;
+                      const rawEndDate = formEndDate && formEndDate.trim() ? formEndDate : null;
+                      let resolvedEndDate = rawEndDate ?? resolvedStartDate;
+                      if (resolvedStartDate && resolvedEndDate && resolvedEndDate < resolvedStartDate) {
+                        resolvedEndDate = resolvedStartDate;
+                      }
+                      const isAllDayEvent = formAllDay;
+                      const bucketValue = availableBuckets.length > 0 ? (formBucket || undefined) : undefined;
 
                       if (!editTaskId) {
                         const task = await createTask(
                           formContent.trim(),
-                          dueDateValue,
-                          hourNum,
-                          availableBuckets.length > 0 ? (formBucket || undefined) : undefined,
-                          formRepeat
+                          resolvedStartDate,
+                          isAllDayEvent ? null : hourNum,
+                          bucketValue,
+                          formRepeat,
+                          {
+                            endDate: resolvedEndDate,
+                            endHourSlot: isAllDayEvent ? null : endHourNum,
+                            allDay: isAllDayEvent,
+                          }
                         );
                         if (task) {
-                          if (dueDateValue) {
-                            setEventsByDate((prev) => {
-                              const next = { ...prev } as Record<string, DayEvent[]>;
-                              const list = [...(next[dueDateValue] || [])];
-                              if (hourNum === undefined) {
-                                list.unshift({
-                                  source: 'lifeboard',
-                                  title: task.content || formContent.trim(),
-                                  allDay: true,
-                                  taskId: task.id,
-                                  repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
-                                });
-                              } else {
-                                const base = parseISO(dueDateValue + 'T00:00:00');
-                                base.setHours(hourNum, 0, 0, 0);
-                                list.unshift({
-                                  source: 'lifeboard',
-                                  title: task.content || formContent.trim(),
-                                  time: base.toISOString(),
-                                  allDay: false,
-                                  taskId: task.id,
-                                  duration: 60,
-                                  repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
-                                });
-                              }
-                              list.sort((a, b) => {
-                                if (a.time && b.time) return a.time.localeCompare(b.time);
-                                if (a.time) return -1;
-                                if (b.time) return 1;
-                                const titleA = a.title ?? '';
-                                const titleB = b.title ?? '';
-                                return titleA.localeCompare(titleB);
-                              });
-                              next[dueDateValue] = list;
-                              return next;
-                            });
+                          try {
+                            await refetch();
+                          } catch (error) {
+                            console.error('Failed to refresh tasks after creation', error);
                           }
                           closeTaskModal();
                         }
                       } else {
                         const updates: any = {
                           content: formContent.trim(),
+                          startDate: resolvedStartDate,
+                          endDate: resolvedEndDate,
+                          allDay: isAllDayEvent,
                         };
-                        if (availableBuckets.length > 0) {
-                          updates.bucket = formBucket || null;
+                        if (bucketValue !== undefined) {
+                          updates.bucket = bucketValue || null;
                         }
-                        updates.hourSlot = formTime ? `hour-${formTime}` : null;
-                        updates.due = dueDateValue ? { date: dueDateValue } : null;
+                        updates.hourSlot = isAllDayEvent ? null : (formTime ? `hour-${formTime}` : null);
+                        updates.endHourSlot = isAllDayEvent ? null : (formEndTime ? `hour-${formEndTime}` : null);
+                        updates.due = resolvedStartDate ? { date: resolvedStartDate } : null;
                         updates.repeatRule = formRepeat === 'none' ? null : formRepeat;
-                        const previousDateKey = selectedModalDate || currentDateKey;
-                        const targetDateKey = dueDateValue || previousDateKey;
-                        const occurrenceKey = targetDateKey;
 
-                        await batchUpdateTasks([{ taskId: editTaskId, updates, occurrenceDate: occurrenceKey }]);
+                        await batchUpdateTasks([{
+                          taskId: editTaskId,
+                          updates,
+                          occurrenceDate: resolvedStartDate,
+                        }]);
 
-                        setEventsByDate(prev => {
-                          const next = { ...prev } as Record<string, DayEvent[]>;
-                          const oldList = [...(next[previousDateKey] || [])];
-                          let eventEntry: DayEvent | undefined = undefined;
-                          const existingIdx = oldList.findIndex(ev => ev.taskId === editTaskId);
+                        try {
+                          await refetch();
+                        } catch (error) {
+                          console.error('Failed to refresh tasks after update', error);
+                        }
 
-                          if (existingIdx >= 0) {
-                            eventEntry = { ...oldList[existingIdx] };
-                            oldList.splice(existingIdx, 1);
-                            if (oldList.length > 0) {
-                              next[previousDateKey] = oldList;
-                            } else {
-                              delete next[previousDateKey];
-                            }
-                          }
-
-                          if (!eventEntry) {
-                            eventEntry = {
-                              source: 'lifeboard',
-                              title: formContent.trim(),
-                              taskId: editTaskId,
-                              allDay: !formTime,
-                              repeatRule: formRepeat !== 'none' ? formRepeat : undefined,
-                            };
-                          }
-
-                          eventEntry.title = formContent.trim();
-                          eventEntry.repeatRule = formRepeat !== 'none' ? formRepeat : undefined;
-                          if (availableBuckets.length > 0) {
-                            eventEntry.bucket = formBucket || undefined;
-                          }
-
-                          if (hourNum !== undefined && hourNum !== null && !Number.isNaN(hourNum)) {
-                            const base = parseISO(`${targetDateKey}T00:00:00`);
-                            base.setHours(hourNum, 0, 0, 0);
-                            eventEntry.time = base.toISOString();
-                            eventEntry.allDay = false;
-                          } else {
-                            eventEntry.time = undefined;
-                            eventEntry.allDay = true;
-                          }
-
-                          const updatedList = [...(next[targetDateKey] || [])];
-                          const targetIdx = updatedList.findIndex(ev => ev.taskId === editTaskId);
-                          if (targetIdx >= 0) {
-                            updatedList[targetIdx] = eventEntry;
-                          } else {
-                            updatedList.push(eventEntry);
-                          }
-
-                          updatedList.sort((a, b) => {
-                            if (a.time && b.time) return a.time.localeCompare(b.time);
-                            if (a.time) return -1;
-                            if (b.time) return 1;
-                            const titleA = a.title ?? '';
-                            const titleB = b.title ?? '';
-                            return titleA.localeCompare(titleB);
-                          });
-
-                          next[targetDateKey] = updatedList;
-                          return next;
-                        });
                         closeTaskModal();
                       }
                     } finally {

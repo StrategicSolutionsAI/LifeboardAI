@@ -18,13 +18,17 @@ export interface Task {
   content: string
   completed: boolean
   due?: TaskDue | null
+  startDate?: string | null
+  endDate?: string | null
   duration?: number
   hourSlot?: string
+  endHourSlot?: string | null
   bucket?: string
   position?: number
   created_at?: string
   updated_at?: string
   repeatRule?: RepeatRule
+  allDay?: boolean
   source?: 'todoist' | 'supabase' | 'local'
 }
 
@@ -357,16 +361,44 @@ export function useTasks(selectedDate?: Date) {
   const createTask = useCallback(async (
     content: string,
     dueDate: string | null,
-    hourSlot?: number,
+    hourSlot?: number | string | null,
     bucket?: string,
-    repeat: RepeatOption = 'none'
+    repeat: RepeatOption = 'none',
+    options?: {
+      endDate?: string | null
+      endHourSlot?: number | string | null
+      allDay?: boolean | null
+    }
   ) => {
     const trimmed = content.trim()
     if (!trimmed) {
       return;
     }
     const repeatRule = repeat !== 'none' ? repeat : undefined
-    
+    const { endDate: explicitEndDate, endHourSlot, allDay } = options ?? {}
+
+    const normalizeHourSlot = (value?: number | string | null): string | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        const hh = Math.max(0, Math.min(23, value))
+        if (hh === 0) return 'hour-12AM'
+        if (hh < 12) return `hour-${hh}AM`
+        if (hh === 12) return 'hour-12PM'
+        return `hour-${hh - 12}PM`
+      }
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const trimmedValue = value.trim()
+        return trimmedValue.startsWith('hour-') ? trimmedValue : `hour-${trimmedValue}`
+      }
+      return undefined
+    }
+
+    const normalizedHourSlot = normalizeHourSlot(hourSlot)
+    const normalizedEndHourSlot = normalizeHourSlot(endHourSlot)
+    const resolvedEndDate = explicitEndDate ?? dueDate
+    const resolvedAllDay = typeof allDay === 'boolean'
+      ? allDay
+      : !normalizedHourSlot && !normalizedEndHourSlot
+
     // Helper: create local task and persist to localStorage
     const createLocalTask = (): any => {
       try {
@@ -379,25 +411,21 @@ export function useTasks(selectedDate?: Date) {
           });
         };
         const id = generateUUID()
-        const toHourSlot = (h?: number) => {
-          if (typeof h !== 'number') return undefined
-          const hh = Math.max(0, Math.min(23, h))
-          if (hh === 0) return 'hour-12AM'
-          if (hh < 12) return `hour-${hh}AM`
-          if (hh === 12) return 'hour-12PM'
-          return `hour-${hh - 12}PM`
-        }
         const task: Task = {
           id,
           content: trimmed,
           completed: false,
           due: dueDate ? { date: dueDate } : undefined,
-          hourSlot: toHourSlot(hourSlot),
+          startDate: dueDate ?? undefined,
+          endDate: resolvedEndDate ?? undefined,
+          hourSlot: normalizedHourSlot,
+          endHourSlot: normalizedEndHourSlot,
           bucket: bucket || undefined,
           position: undefined,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           repeatRule: repeatRule,
+          allDay: resolvedAllDay,
           source: 'local'
         }
         if (typeof window !== 'undefined') {
@@ -418,7 +446,17 @@ export function useTasks(selectedDate?: Date) {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule }),
+        body: JSON.stringify({
+          content,
+          due_date: dueDate,
+          start_date: dueDate,
+          end_date: resolvedEndDate,
+          hour_slot: normalizedHourSlot,
+          end_hour_slot: normalizedEndHourSlot,
+          bucket,
+          repeat_rule: repeatRule,
+          all_day: resolvedAllDay
+        }),
       })
       
       if (!res.ok) {
@@ -431,7 +469,16 @@ export function useTasks(selectedDate?: Date) {
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule })
+            body: JSON.stringify({
+              content,
+              start_date: dueDate,
+              end_date: resolvedEndDate,
+              hourSlot: normalizedHourSlot,
+              endHourSlot: normalizedEndHourSlot,
+              bucket,
+              repeat_rule: repeatRule,
+              allDay: resolvedAllDay
+            })
           })
           if (alt.ok) {
             const json = await alt.json()
@@ -469,7 +516,16 @@ export function useTasks(selectedDate?: Date) {
       const { task } = responseData;
 
       // Parse and normalize metadata so UI shows bucket/duration immediately
-      let metadata: { duration?: number; hourSlot?: string; bucket?: string; repeatRule?: RepeatRule } = {}
+      let metadata: {
+        duration?: number
+        hourSlot?: string
+        bucket?: string
+        repeatRule?: RepeatRule
+        startDate?: string | null
+        endDate?: string | null
+        endHourSlot?: string | null
+        allDay?: boolean
+      } = {}
       let cleanContent: string = task.content
 
       try {
@@ -502,6 +558,10 @@ export function useTasks(selectedDate?: Date) {
         ...(metadata.hourSlot !== undefined ? { hourSlot: metadata.hourSlot } : {}),
         ...(metadata.bucket !== undefined ? { bucket: metadata.bucket } : {}),
         ...(metadata.repeatRule !== undefined ? { repeatRule: metadata.repeatRule } : {}),
+        ...(metadata.startDate !== undefined ? { startDate: metadata.startDate } : {}),
+        ...(metadata.endDate !== undefined ? { endDate: metadata.endDate } : {}),
+        ...(metadata.endHourSlot !== undefined ? { endHourSlot: metadata.endHourSlot } : {}),
+        ...(metadata.allDay !== undefined ? { allDay: metadata.allDay } : {}),
       }
 
       const todoistTask = ensureTaskSource(enhancedTask as Task, 'todoist')
@@ -749,13 +809,20 @@ export function useTasks(selectedDate?: Date) {
     const hasOwn = (obj: Record<string, any>, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
     const touchesScheduledFields = (patch: Partial<Task>) => {
       const raw = (patch ?? {}) as Record<string, any>
-      return hasOwn(raw, 'hourSlot') || hasOwn(raw, 'duration')
+      return hasOwn(raw, 'hourSlot') ||
+        hasOwn(raw, 'endHourSlot') ||
+        hasOwn(raw, 'startDate') ||
+        hasOwn(raw, 'endDate') ||
+        hasOwn(raw, 'duration') ||
+        hasOwn(raw, 'allDay')
     }
 
     const describeChange = (patch?: Record<string, any>) => {
       const raw = patch ?? {}
       const parts: string[] = []
-      if (hasOwn(raw, 'hourSlot')) parts.push('scheduled time')
+      if (hasOwn(raw, 'startDate') || hasOwn(raw, 'endDate')) parts.push('dates')
+      if (hasOwn(raw, 'hourSlot') || hasOwn(raw, 'endHourSlot')) parts.push('scheduled time')
+      if (hasOwn(raw, 'allDay')) parts.push('all-day status')
       if (hasOwn(raw, 'duration')) parts.push('duration')
       if (parts.length === 0) return 'Update this repeating task'
       if (parts.length === 1) return `Update the ${parts[0]} for this repeating task`
@@ -772,8 +839,9 @@ export function useTasks(selectedDate?: Date) {
       const fromDue = raw.due && typeof raw.due === 'object' && typeof (raw.due as any)?.date === 'string'
         ? (raw.due as any).date as string
         : undefined
+      const fromStartDate = typeof raw.startDate === 'string' ? raw.startDate : undefined
 
-      const candidate = explicit || fromPatch || fromDue
+      const candidate = explicit || fromPatch || fromDue || fromStartDate
       if (candidate) return candidate
 
       const fallbackRule = fallbackTask?.repeatRule as RepeatOption | undefined
@@ -781,7 +849,7 @@ export function useTasks(selectedDate?: Date) {
         return dateStr
       }
 
-      return fallbackTask?.due?.date ?? dateStr
+      return fallbackTask?.startDate ?? fallbackTask?.due?.date ?? dateStr
     }
 
     const repeatingTimeUpdates = updates

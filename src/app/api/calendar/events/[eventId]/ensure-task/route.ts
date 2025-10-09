@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
     const { data: eventRow, error: fetchError } = await supabase
       .from('calendar_events')
       .select(
-        'id, user_id, import_id, title, content, start_time, start_date, end_time, end_date, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id'
+        'id, user_id, import_id, title, content, start_time, start_date, end_time, end_date, end_hour_slot, all_day, rrule, repeat_rule, due_date, hour_slot, bucket, duration, completed, position, task_id'
       )
       .eq('id', eventId)
       .eq('user_id', user.id)
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       start_date: eventRow.start_date ?? null,
       end_time: eventRow.end_time ?? null,
       end_date: eventRow.end_date ?? null,
+      end_hour_slot: eventRow.end_hour_slot ?? null,
       all_day: eventRow.all_day ?? null,
       rrule: eventRow.rrule ?? null,
       repeat_rule: eventRow.repeat_rule ?? null,
