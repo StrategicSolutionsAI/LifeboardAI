@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { runGPT5Pro } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 
@@ -207,17 +208,34 @@ if (prefs) {
     const lifeboardInstruction = `You are embedded in Lifeboard. Today's date is ${todayIso}. If the user asks to add/create a task (e.g., "add a task to call John tomorrow at 3pm in Work"), include ONE command block in addition to your normal reply, exactly in this format on a single line: [LIFEBOARD_CMD]{"action":"create_task","content":"<task text>","due_date":"YYYY-MM-DD","hour_slot":<0-23 optional>,"bucket":"<optional bucket name>"}[/LIFEBOARD_CMD].
 Normalize natural dates to the user's local timezone and ALWAYS use year ${currentYear} for due_date unless the user explicitly says a different year. If a time is given, convert it to an integer hour_slot from 0 (12am) to 23 (11pm). If no date is specified but they say "today" or similar, use today's date. If a bucket/category is clearly implied (e.g., "Work", "Personal"), include it in bucket. Do not include the word TASK in content. Keep your normal reply natural and separate from the command block.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: lifeboardInstruction },
-        ...openaiMessages,
-      ],
-      max_tokens: 1024,
-      temperature: 0.7,
-    })
+    // Use GPT-5 Pro via Replicate
+    const gpt5Messages = [
+      { role: 'system' as const, content: lifeboardInstruction },
+      ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
+      ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
+    ]
 
-    let reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+    let reply: string
+    try {
+      console.log('🤖 Attempting GPT-5 Pro via Replicate...')
+      console.log('Message count:', gpt5Messages.length)
+      reply = await runGPT5Pro({
+        messages: gpt5Messages,
+        max_tokens: 1024,
+        temperature: 0.7,
+      })
+      console.log('✅ GPT-5 Pro response received:', reply.substring(0, 100))
+    } catch (error) {
+      console.error('❌ GPT-5 Pro error:', error)
+      console.error('Error details:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      
+      // Return a helpful error message instead of trying OpenAI (which is out of quota)
+      return NextResponse.json({ 
+        error: 'GPT-5 Pro is currently unavailable. Please check your Replicate API token and try again.',
+        details: error instanceof Error ? error.message : String(error)
+      }, { status: 500 })
+    }
 
     // Detect and execute a task creation command if present
     // Allow command blocks that span multiple lines

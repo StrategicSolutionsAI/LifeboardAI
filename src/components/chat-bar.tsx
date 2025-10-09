@@ -1126,7 +1126,7 @@ export function ChatBar() {
 
     try {
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 20000)
+      const timer = setTimeout(() => controller.abort(), 90000) // Increased to 90s for GPT-5 Pro (cold starts can be slow)
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
