@@ -184,7 +184,7 @@ export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
     end_date: endDate,
     end_time: endTime,
     end_hour_slot: task.end_hour_slot ?? null,
-    all_day,
+    all_day: allDay,
     rrule: repeatRule,
     repeat_rule: task.repeat_rule ?? null,
     due_date: startDate,
@@ -289,7 +289,7 @@ export async function syncEventsToTasks(
         all_day: allDay,
         position,
       }])
-        .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
+        .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day')
         .single();
 
       if (taskError) {
@@ -360,7 +360,7 @@ export async function syncEventsToTasks(
       })
       .eq('id', event.task_id)
       .eq('user_id', userId)
-      .select('id, content, due_date, hour_slot, duration, repeat_rule, bucket, completed, position')
+      .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day')
       .single();
 
     if (updateError) {

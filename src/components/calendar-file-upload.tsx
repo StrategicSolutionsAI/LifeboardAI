@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { invalidateTaskCaches, invalidateIntegrationCaches } from "@/hooks/use-data-cache";
+import { useBuckets } from "@/hooks/use-buckets";
 
 export interface UploadResult {
   success: boolean;
@@ -17,6 +18,7 @@ export interface UploadResult {
   error?: string;
   importId?: string;
   calendarName?: string;
+  bucket?: string | null;
 }
 
 interface CalendarFileUploadProps {
@@ -30,7 +32,16 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [calendarName, setCalendarName] = useState('');
+  const { buckets, activeBucket } = useBuckets();
+  const [selectedBucket, setSelectedBucket] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const userBucketChoiceRef = useRef(false);
+
+  useEffect(() => {
+    if (activeBucket && !userBucketChoiceRef.current) {
+      setSelectedBucket(activeBucket);
+    }
+  }, [activeBucket]);
 
   const validateFile = (file: File): string | null => {
     if (!file.name.endsWith('.ics') && !file.name.endsWith('.ical')) {
@@ -99,6 +110,9 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
       if (trimmedName.length > 0) {
         formData.append('calendarName', trimmedName);
       }
+      if (selectedBucket) {
+        formData.append('bucket', selectedBucket);
+      }
 
       const response = await fetch('/api/calendar/upload', {
         method: 'POST',
@@ -121,6 +135,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           warnings: result.warnings,
           importId: result.importId,
           calendarName: result.calendarName ?? trimmedName,
+          bucket: typeof result.bucket !== 'undefined' ? result.bucket : (selectedBucket || null),
         };
         setUploadResult(successResult);
         onUploadComplete?.(successResult);
@@ -163,6 +178,8 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
     setSelectedFile(null);
     setUploadResult(null);
     setCalendarName('');
+    userBucketChoiceRef.current = false;
+    setSelectedBucket(activeBucket ?? '');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -206,6 +223,30 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           </label>
           <p className="text-xs text-gray-500">
             Give this calendar a label so you can manage it from the Integrations tab.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Bucket
+            <select
+              value={selectedBucket}
+              onChange={(e) => {
+                userBucketChoiceRef.current = true;
+                setSelectedBucket(e.target.value);
+              }}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white"
+            >
+              <option value="">Don&apos;t assign a bucket</option>
+              {buckets.map((bucket) => (
+                <option key={bucket} value={bucket}>
+                  {bucket}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-xs text-gray-500">
+            Imported events will be tagged with this bucket so they appear with the right color coding.
           </p>
         </div>
 
@@ -308,6 +349,11 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
                 )}
                 {uploadResult.success && uploadResult.warnings && (
                   <p className="text-sm mt-1 text-yellow-700">{uploadResult.warnings}</p>
+                )}
+                {uploadResult.success && uploadResult.bucket && (
+                  <p className="text-sm mt-1 text-gray-700">
+                    Tagged imported events with the {uploadResult.bucket} bucket.
+                  </p>
                 )}
               </div>
             </div>

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('calendar_imports')
-      .select('id, name, file_name, event_count, created_at, updated_at')
+      .select('id, name, file_name, event_count, created_at, updated_at, default_bucket')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -128,6 +128,111 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     console.error('DELETE /api/calendar/imports error', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = supabaseServer();
+    const body = await request.json().catch(() => ({}));
+    const importId = typeof body.importId === 'string' ? body.importId : null;
+    const rawBucket = typeof body.bucket === 'string' ? body.bucket.trim() : null;
+    const normalizedBucket = rawBucket && rawBucket.length > 0 ? rawBucket : null;
+
+    if (!importId) {
+      return NextResponse.json({ error: 'importId required' }, { status: 400 });
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: importRow, error: fetchImportError } = await supabase
+      .from('calendar_imports')
+      .select('id')
+      .eq('id', importId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchImportError) {
+      console.error('Failed to look up calendar import for update', fetchImportError);
+      return NextResponse.json({ error: 'Failed to load calendar import' }, { status: 500 });
+    }
+
+    if (!importRow) {
+      return NextResponse.json({ error: 'Calendar import not found' }, { status: 404 });
+    }
+
+    const { data: eventRows, error: eventsError } = await supabase
+      .from('calendar_events')
+      .select('id, task_id')
+      .eq('user_id', user.id)
+      .eq('import_id', importId);
+
+    if (eventsError) {
+      console.error('Failed to load calendar events while updating bucket', eventsError);
+      return NextResponse.json({ error: 'Failed to load calendar events' }, { status: 500 });
+    }
+
+    const timestamp = new Date().toISOString();
+
+    const { error: updateImportError } = await supabase
+      .from('calendar_imports')
+      .update({
+        default_bucket: normalizedBucket,
+        updated_at: timestamp,
+      })
+      .eq('id', importId)
+      .eq('user_id', user.id);
+
+    if (updateImportError) {
+      console.error('Failed to update calendar import record with bucket', updateImportError);
+      return NextResponse.json({ error: 'Failed to update calendar import' }, { status: 500 });
+    }
+
+    const { error: updateEventsError } = await supabase
+      .from('calendar_events')
+      .update({
+        bucket: normalizedBucket,
+        updated_at: timestamp,
+      })
+      .eq('user_id', user.id)
+      .eq('import_id', importId);
+
+    if (updateEventsError) {
+      console.error('Failed to update calendar events bucket', updateEventsError);
+      return NextResponse.json({ error: 'Failed to update calendar events' }, { status: 500 });
+    }
+
+    const taskIds = (eventRows ?? [])
+      .map((row) => row?.task_id)
+      .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+    if (taskIds.length > 0) {
+      const { error: updateTasksError } = await supabase
+        .from('lifeboard_tasks')
+        .update({
+          bucket: normalizedBucket,
+          updated_at: timestamp,
+        })
+        .eq('user_id', user.id)
+        .in('id', taskIds);
+
+      if (updateTasksError) {
+        console.error('Failed to update tasks bucket after calendar import change', updateTasksError);
+        return NextResponse.json({ error: 'Failed to update linked tasks' }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ ok: true, bucket: normalizedBucket });
+  } catch (error) {
+    console.error('PATCH /api/calendar/imports error', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -1599,7 +1599,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           const isSupabaseTask = task.source === 'supabase';
           if (!isSupabaseTask) return false;
           if (!isUnassigned && !isLegacyImportedBucket) return false;
-          if ((task.due?.date ?? '') !== dateStr) return false;
+          if ((task.due?.date ?? '') !== startDateStr) return false;
           const taskTitle = (task.content ?? '').trim().toLowerCase();
           return taskTitle === normalizedTitle;
         });

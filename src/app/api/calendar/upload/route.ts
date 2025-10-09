@@ -311,6 +311,8 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const rawCalendarName = (formData.get('calendarName') as string | null)?.trim();
+    const rawBucket = (formData.get('bucket') as string | null)?.trim();
+    const selectedBucket = rawBucket && rawBucket.length > 0 ? rawBucket : null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -358,6 +360,7 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           name: calendarName,
           file_name: file.name,
+          default_bucket: selectedBucket,
         })
         .select('id')
         .single();
@@ -412,7 +415,7 @@ export async function POST(request: NextRequest) {
         due_date: startDate,
         hour_slot: hourSlot,
         end_hour_slot: endHourSlot,
-        bucket: null,
+        bucket: selectedBucket,
         duration: durationMinutes ?? null,
         completed: false,
         position: null,
@@ -577,6 +580,10 @@ export async function POST(request: NextRequest) {
       importId,
       calendarName,
     };
+
+    if (selectedBucket) {
+      responsePayload.bucket = selectedBucket;
+    }
 
     if (tasksErrored > 0) {
       responsePayload.warnings = 'Some events were saved but could not be converted into tasks. Check server logs for details.';

@@ -9,6 +9,7 @@ import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Cl
 import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-data-cache'
 import SectionLoadTimer from '@/components/section-load-timer'
 import { CalendarFileUpload, type UploadResult } from '@/components/calendar-file-upload'
+import { useBuckets } from '@/hooks/use-buckets'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }
 interface Integration { id: string; name: string; description: string; icon: string; status?: IntegrationStatus; authUrl?: string }
@@ -20,6 +21,7 @@ interface CalendarImport {
   event_count?: number | null;
   created_at?: string;
   updated_at?: string;
+  default_bucket?: string | null;
 }
 
 const integrations: Integration[] = [
@@ -42,6 +44,9 @@ export default function IntegrationsPageClient() {
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null)
   const [showCalendarUpload, setShowCalendarUpload] = useState(false)
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
+  const [updatingBucketId, setUpdatingBucketId] = useState<string | null>(null)
+  const [bucketSelections, setBucketSelections] = useState<Record<string, string>>({})
+  const { buckets } = useBuckets()
 
   const fetchIntegrationStatuses = useCallback(async (invalidateCache = false) => {
     setLoading(true)
@@ -75,7 +80,13 @@ export default function IntegrationsPageClient() {
       const response = await fetch('/api/calendar/imports', { cache: 'no-store' })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
-      setCalendarImports(Array.isArray(data?.imports) ? data.imports : [])
+      const imports = Array.isArray(data?.imports) ? data.imports : []
+      setCalendarImports(imports)
+      const nextSelections: Record<string, string> = {}
+      imports.forEach((importRow: CalendarImport) => {
+        nextSelections[importRow.id] = importRow.default_bucket ?? ''
+      })
+      setBucketSelections(nextSelections)
     } catch (error) {
       console.error('Failed to load calendar imports', error)
       setCalendarError('Unable to load uploaded calendars. Please try again.')
@@ -125,6 +136,42 @@ export default function IntegrationsPageClient() {
       setShowCalendarUpload(false)
     } else {
       setCalendarError(result.message || 'Failed to upload calendar.')
+    }
+  }, [fetchCalendarImports])
+
+  const handleUpdateImportBucket = useCallback(async (importId: string, bucketValue: string) => {
+    if (!importId) return
+    setUpdatingBucketId(importId)
+    setCalendarMessage(null)
+    setCalendarError(null)
+    try {
+      const response = await fetch('/api/calendar/imports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId, bucket: bucketValue }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`)
+      }
+
+      invalidateTaskCaches()
+      invalidateIntegrationCaches('calendar')
+      const normalized = (payload?.bucket ?? bucketValue) as string | null
+
+      setCalendarMessage(
+        normalized && normalized.length > 0
+          ? `Retagged events with the ${normalized} bucket.`
+          : 'Removed bucket from imported events.'
+      )
+
+      await fetchCalendarImports()
+    } catch (error) {
+      console.error('Failed to update calendar import bucket', error)
+      setCalendarError('Failed to update bucket for imported events. Please try again.')
+    } finally {
+      setUpdatingBucketId(null)
     }
   }, [fetchCalendarImports])
 
@@ -299,33 +346,78 @@ export default function IntegrationsPageClient() {
                 {calendarImports.map((calendar) => {
                   const timestamp = calendar.updated_at || calendar.created_at;
                   const eventCount = typeof calendar.event_count === 'number' ? calendar.event_count : 0;
+                  const currentBucket = bucketSelections[calendar.id] ?? '';
+                  const isUpdatingBucket = updatingBucketId === calendar.id;
+                  const bucketOptions = Array.from(
+                    new Set([
+                      ...(Array.isArray(buckets) ? buckets : []),
+                      ...(currentBucket && (!Array.isArray(buckets) || !buckets.includes(currentBucket)) ? [currentBucket] : []),
+                    ])
+                  );
                   return (
                     <div
                       key={calendar.id}
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
                     >
-                      <div>
+                      <div className="flex-1">
                         <p className="text-sm font-semibold text-gray-900">{calendar.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {eventCount} event{eventCount === 1 ? '' : 's'}
                           {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
                           {calendar.file_name ? ` • ${calendar.file_name}` : ''}
+                          {' '}
+                          {currentBucket
+                            ? `• Bucket: ${currentBucket}`
+                            : '• Bucket: Unassigned'}
                         </p>
                       </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteImport(calendar.id)}
-                        disabled={deletingImportId === calendar.id}
-                        className="w-full sm:w-auto"
-                      >
-                        {deletingImportId === calendar.id ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4 mr-2" />
-                        )}
-                        Delete
-                      </Button>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`calendar-bucket-${calendar.id}`} className="text-xs font-medium text-gray-600">
+                            Bucket
+                          </label>
+                          <div className="relative">
+                            <select
+                              id={`calendar-bucket-${calendar.id}`}
+                              value={currentBucket}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                setBucketSelections((prev) => ({
+                                  ...prev,
+                                  [calendar.id]: nextValue,
+                                }));
+                                void handleUpdateImportBucket(calendar.id, nextValue);
+                              }}
+                              disabled={isUpdatingBucket || deletingImportId === calendar.id}
+                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[140px]"
+                            >
+                              <option value="">Unassigned</option>
+                              {bucketOptions.map((bucketOption) => (
+                                <option key={bucketOption} value={bucketOption}>
+                                  {bucketOption}
+                                </option>
+                              ))}
+                            </select>
+                            {isUpdatingBucket && (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground absolute right-[-18px] top-1/2 -translate-y-1/2" />
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteImport(calendar.id)}
+                          disabled={deletingImportId === calendar.id || isUpdatingBucket}
+                          className="w-full sm:w-auto"
+                        >
+                          {deletingImportId === calendar.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 mr-2" />
+                          )}
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   )
                 })}

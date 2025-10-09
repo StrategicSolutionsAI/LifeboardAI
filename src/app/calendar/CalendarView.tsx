@@ -321,7 +321,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: { date: dateStr }, startDate: dateStr, endDate: dateStr, hourSlot: null, endHourSlot: null, allDay: true } }
+        { taskId: draggableId, updates: { due: { date: dateStr }, startDate: dateStr, endDate: dateStr, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
       ]).catch(error => {
         console.error('Failed to update task due date:', error);
       });
@@ -330,7 +330,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
 
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: null, endHourSlot: null, allDay: true } }
+        { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });
@@ -347,7 +347,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: { date: todayStr }, startDate: todayStr, endDate: todayStr, hourSlot: null, endHourSlot: null, allDay: true } }
+        { taskId: draggableId, updates: { due: { date: todayStr }, startDate: todayStr, endDate: todayStr, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
       ]).catch(error => {
         console.error('Failed to update task due date:', error);
       });
@@ -357,7 +357,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
     if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
       
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: null, endHourSlot: null, allDay: true } }
+        { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });
@@ -369,7 +369,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       if (destination.droppableId === 'openTasks') {
         
         batchUpdateTasks([
-          { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: null, endHourSlot: null, allDay: true } }
+          { taskId: draggableId, updates: { due: undefined, startDate: null, endDate: null, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
         ]).catch(error => {
           console.error('Failed to remove task due date:', error);
         });
@@ -383,7 +383,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
         
         
         batchUpdateTasks([
-          { taskId: draggableId, updates: { due: { date: dateStr }, startDate: dateStr, endDate: dateStr, hourSlot: null, endHourSlot: null, allDay: true } }
+          { taskId: draggableId, updates: { due: { date: dateStr }, startDate: dateStr, endDate: dateStr, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
         ]).catch(error => {
           console.error('Failed to update task due date:', error);
         });
@@ -398,7 +398,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
         
         
         batchUpdateTasks([
-          { taskId: draggableId, updates: { due: { date: todayStr }, startDate: todayStr, endDate: todayStr, hourSlot: null, endHourSlot: null, allDay: true } }
+          { taskId: draggableId, updates: { due: { date: todayStr }, startDate: todayStr, endDate: todayStr, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
         ]).catch(error => {
           console.error('Failed to update task due date:', error);
         });
@@ -444,7 +444,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       if (targetDate) {
         
         batchUpdateTasks([
-          { taskId: draggableId, updates: { due: { date: targetDate }, startDate: targetDate, endDate: targetDate, hourSlot: null, endHourSlot: null, allDay: true } }
+          { taskId: draggableId, updates: { due: { date: targetDate }, startDate: targetDate, endDate: targetDate, hourSlot: undefined, endHourSlot: undefined, allDay: true } }
         ]).catch(error => {
           console.error('Failed to update task due date:', error);
         });
