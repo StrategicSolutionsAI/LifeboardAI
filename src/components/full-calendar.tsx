@@ -1522,6 +1522,22 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, [refetch]);
 
+  // Listen for task updates from other components
+  useEffect(() => {
+    const handleTasksUpdated = () => {
+      try {
+        refetch();
+      } catch (error) {
+        console.error('Failed to refetch tasks after update:', error);
+      }
+    };
+
+    window.addEventListener('lifeboard:tasks-updated', handleTasksUpdated);
+    return () => {
+      window.removeEventListener('lifeboard:tasks-updated', handleTasksUpdated);
+    };
+  }, [refetch]);
+
   // Legacy bucket label retained for older imports
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
 
@@ -2871,12 +2887,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           }
                         );
                         if (task) {
+                          // Close modal immediately for better UX
+                          closeTaskModal();
+                          // Refetch in background to ensure calendar updates
                           try {
                             await refetch();
                           } catch (error) {
                             console.error('Failed to refresh tasks after creation', error);
                           }
-                          closeTaskModal();
                         }
                       } else {
                         const updates: any = {
@@ -2899,13 +2917,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           occurrenceDate: resolvedStartDate,
                         }]);
 
+                        // Close modal immediately for better UX
+                        closeTaskModal();
+                        
+                        // Refetch in background to ensure calendar updates
                         try {
                           await refetch();
                         } catch (error) {
                           console.error('Failed to refresh tasks after update', error);
                         }
-
-                        closeTaskModal();
                       }
                     } finally {
                       setIsSubmitting(false);
