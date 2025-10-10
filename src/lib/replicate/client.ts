@@ -35,57 +35,47 @@ export async function runGPT5Pro(options: GPT5Options): Promise<string> {
   } = options;
 
   try {
-    console.log('🔧 Getting Replicate client...');
     const replicate = getReplicate();
-    console.log('🔧 Replicate client initialized');
-    console.log('🔧 Creating GPT-5 Pro prediction...');
-    
-    // Create prediction and get stream URL
+
+    const input: Record<string, unknown> = {
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      temperature,
+      top_p,
+    };
+
+    if (typeof max_tokens === 'number') {
+      // Replicate currently expects `max_output_tokens` for OpenAI models.
+      input.max_output_tokens = max_tokens;
+    }
+
     const prediction = await replicate.predictions.create({
-      model: "openai/gpt-5-pro",
-      input: {
-        messages: messages.map(m => ({ role: m.role, content: m.content })),
-        max_completion_tokens: max_tokens,
-        verbosity: "medium",
-      },
-      stream: true,
-    } as any);
+      model: 'openai/gpt-5-pro',
+      input,
+    });
 
-    console.log('🔧 Prediction created:', prediction.id);
-    
-    // Wait for prediction to complete and get output
     let finalPrediction = prediction;
-    while (finalPrediction.status !== 'succeeded' && finalPrediction.status !== 'failed' && finalPrediction.status !== 'canceled') {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      finalPrediction = await replicate.predictions.get(prediction.id);
-      console.log('🔧 Status:', finalPrediction.status);
-    }
-    
-    if (finalPrediction.status === 'failed') {
-      throw new Error(`GPT-5 Pro failed: ${finalPrediction.error}`);
-    }
-    
-    // Get the output - GPT-5 Pro returns array of strings
-    const output = finalPrediction.output;
-    console.log('🔧 Output type:', typeof output, 'Is array:', Array.isArray(output));
-    console.log('🔧 Raw output:', JSON.stringify(output));
-    
-    let fullResponse = '';
-    if (Array.isArray(output)) {
-      fullResponse = output.filter(s => s && s.trim()).join('');
-    } else if (typeof output === 'string') {
-      fullResponse = output;
-    } else if (output && typeof output === 'object') {
-      fullResponse = JSON.stringify(output);
+    const pollStart = Date.now();
+    const pollTimeoutMs = 90_000;
+    const pollDelayMs = 1_000;
+
+    while (finalPrediction.status === 'starting' || finalPrediction.status === 'processing') {
+      if (Date.now() - pollStart > pollTimeoutMs) {
+        throw new Error('GPT-5 Pro prediction timed out after 90s');
+      }
+      await new Promise(resolve => setTimeout(resolve, pollDelayMs));
+      finalPrediction = await replicate.predictions.get(finalPrediction.id);
     }
 
-    console.log('✅ Streaming completed, response length:', fullResponse.length);
-    console.log('🔧 Response preview:', fullResponse.substring(0, 100));
-    
-    if (!fullResponse || fullResponse.trim().length === 0) {
-      throw new Error('GPT-5 Pro returned empty response - check Replicate account access');
+    if (finalPrediction.status !== 'succeeded') {
+      throw new Error(`GPT-5 Pro prediction failed with status ${finalPrediction.status}`);
     }
-    
+
+    const fullResponse = extractText(finalPrediction.output);
+
+    if (!fullResponse || fullResponse.trim().length === 0) {
+      throw new Error('GPT-5 Pro returned an empty response');
+    }
+
     return fullResponse.trim();
   } catch (error) {
     console.error('❌ Error in runGPT5Pro:', error);
@@ -129,4 +119,63 @@ export async function* streamGPT5Pro(options: GPT5Options) {
     console.error('Error streaming GPT-5 Pro:', error);
     throw error;
   }
+}
+
+function extractText(node: unknown): string {
+  if (node == null) return '';
+
+  if (typeof node === 'string') {
+    return node;
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(extractText).join('');
+  }
+
+  if (typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+
+    if (typeof obj.text === 'string') {
+      return obj.text;
+    }
+
+    if (typeof obj.output_text === 'string') {
+      return obj.output_text;
+    }
+
+    if (typeof obj.delta === 'string') {
+      return obj.delta;
+    }
+
+    if (obj.delta) {
+      return extractText(obj.delta);
+    }
+
+    if (obj.content) {
+      return extractText(obj.content);
+    }
+
+    if (obj.output) {
+      return extractText(obj.output);
+    }
+
+    if (obj.message) {
+      return extractText(obj.message);
+    }
+
+    if (obj.choices) {
+      return extractText(obj.choices);
+    }
+
+    if (obj.data) {
+      return extractText(obj.data);
+    }
+
+    return Object.entries(obj)
+      .filter(([key]) => !['id', 'role', 'type', 'finish_reason', 'index', 'created', 'model'].includes(key))
+      .map(([, value]) => extractText(value))
+      .join('');
+  }
+
+  return '';
 }

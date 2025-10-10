@@ -196,12 +196,6 @@ if (prefs) {
   systemContext = `System: The user has the following life buckets (tabs): ${prefs.life_buckets.join(', ')}. Widgets per bucket: ${bucketSummary}.${dynamicString}`
 }
 
-    // Create OpenAI messages format
-    const openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
-      ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
-    ]
-
     // Instruction to optionally emit a command block for task creation
     const todayIso = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
     const currentYear = todayIso.slice(0,4)
@@ -215,7 +209,7 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
       ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
     ]
 
-    let reply: string
+    let reply: string | undefined
     try {
       console.log('🤖 Attempting GPT-5 Pro via Replicate...')
       console.log('Message count:', gpt5Messages.length)
@@ -234,13 +228,23 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
       console.error('Error details:', error instanceof Error ? error.message : String(error))
       console.error('Error type:', typeof error)
       console.error('Error keys:', error ? Object.keys(error) : 'null')
-      
-      // Use a simpler fallback message since OpenAI is out of quota
-      return NextResponse.json({ 
-        reply: "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment.",
-        audioUrl: undefined,
-        createdTask: null
-      }, { status: 200 })
+      try {
+        const fallbackStart = Date.now()
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: gpt5Messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+          max_tokens: 1024,
+          temperature: 0.7,
+        })
+        reply = completion.choices[0]?.message?.content ?? undefined
+        console.log(`✅ OpenAI fallback responded in ${Date.now() - fallbackStart}ms`)
+      } catch (fallbackErr) {
+        console.error('❌ OpenAI fallback error:', fallbackErr)
+        reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
+      }
+    }
+    if (!reply) {
+      reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
     }
 
     // Detect and execute a task creation command if present

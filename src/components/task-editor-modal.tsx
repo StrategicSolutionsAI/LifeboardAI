@@ -103,6 +103,14 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     }, [allTasks]);
 
     const openWithTask = useCallback((task: Task | undefined, dateStr: string, options: TaskEditorOpenOptions = {}) => {
+      console.log('📝 Opening task editor:', { 
+        taskId: task?.id, 
+        taskStartDate: task?.startDate, 
+        taskEndDate: task?.endDate,
+        dateStr,
+        taskAllDay: task?.allDay,
+        taskHourSlot: task?.hourSlot
+      });
       const effectiveDate = dateStr || task?.startDate || task?.due?.date || resolveDefaultDate();
       const fallbackEndDate = options.fallbackEndDate ?? task?.endDate ?? effectiveDate;
       const bucketDefault = evaluateBucketDefault();
@@ -233,11 +241,25 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           updates.hourSlot = isAllDayEvent ? null : toHourSlot(formTime);
           updates.endHourSlot = isAllDayEvent ? null : toHourSlot(formEndTime);
 
+          console.log('💾 Updating task:', {
+            taskId: editTaskId,
+            formTime,
+            formEndTime,
+            isAllDayEvent,
+            hourSlot: updates.hourSlot,
+            endHourSlot: updates.endHourSlot,
+            startDate: resolvedStartDate,
+            endDate: resolvedEndDate,
+            updates
+          });
+
           await batchUpdateTasks([{
             taskId: editTaskId,
             updates,
             occurrenceDate: resolvedStartDate,
           }]);
+          
+          console.log('✅ Task update completed');
 
           resetState();
           try {

@@ -807,7 +807,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, [view, currentDateKey]);
 
   // Get tasks from context
-  const { allTasks, scheduledTasks, deleteTask, refetch, getTaskForOccurrence } = useTasksContext();
+  const { allTasks, scheduledTasks, deleteTask, refetch, getTaskForOccurrence, createTask } = useTasksContext();
   
   // Use calendar sync hook
   const resolveTaskById = useCallback((taskId?: string | null) => {
@@ -1005,6 +1005,55 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const taskEditorDefaultDate = useCallback(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
 
   const openCalendarEvent = useCallback(async (calendarEvent: DayEvent, dateStr: string) => {
+    // If it's a Google Calendar event, convert it to a task first
+    if (calendarEvent.source === 'google') {
+      try {
+        // Create a new task from the Google Calendar event
+        const hourSlot = calendarEvent.time ? isoToHourLabel(calendarEvent.time) : null;
+        // Convert hour slot to hour number (e.g., "9AM" -> 9, "2PM" -> 14)
+        const hourNumber = hourSlot ? (() => {
+          const match = hourSlot.match(/(\d{1,2})(AM|PM)/i);
+          if (!match) return null;
+          let hours = parseInt(match[1], 10);
+          const period = match[2].toUpperCase();
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+          return hours;
+        })() : null;
+        
+        const task = await createTask(
+          calendarEvent.title,
+          dateStr,
+          hourNumber,
+          calendarEvent.bucket || undefined,
+          undefined,
+          {
+            allDay: calendarEvent.allDay ?? !calendarEvent.time,
+            endDate: dateStr,
+          }
+        );
+        
+        if (task?.id) {
+          // Refresh tasks to get the new task
+          await refetch();
+          // Open the newly created task in the editor
+          taskEditorRef.current?.openByTaskId(task.id.toString(), {
+            plannerDate: dateStr,
+            hourSlot: hourSlot || undefined,
+          });
+        } else {
+          console.error('❌ Task creation returned no ID');
+        }
+        return;
+      } catch (error) {
+        console.error('Failed to convert Google Calendar event to task:', error);
+        if (typeof window !== 'undefined') {
+          window.alert('Failed to convert this Google Calendar event into an editable task. Please try again.');
+        }
+        return;
+      }
+    }
+    
     if (calendarEvent.source !== 'lifeboard' && calendarEvent.source !== 'uploaded') {
       return;
     }
@@ -1064,7 +1113,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
 
     openTaskEditor(hydratedEvent, dateStr);
-  }, [ensureTaskForEvent, setEventsByDate, setUploadRefreshIndex, refetch, openTaskEditor]);
+  }, [ensureTaskForEvent, setEventsByDate, setUploadRefreshIndex, refetch, openTaskEditor, createTask]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -1491,11 +1540,27 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
           const isRangeStart = dayKey === startDateStr;
           const isRangeEnd = dayKey === endDateStr;
+          // Prefer the task's hour slot when available so week/month times match the editable task view
+          const resolvedHourSlot = typeof matchedTask?.hourSlot === 'string'
+            ? matchedTask.hourSlot
+            : typeof ev.hour_slot === 'string'
+              ? ev.hour_slot
+              : undefined;
+
+          let eventTime: string | undefined;
+          if (!eventAllDay && isRangeStart) {
+            if (resolvedHourSlot) {
+              eventTime = hourSlotToISO(resolvedHourSlot, startDateStr);
+            }
+            if (!eventTime && ev.start_time) {
+              eventTime = ev.start_time ?? undefined;
+            }
+          }
 
           bucket.push({
             source: resolvedTaskId ? 'lifeboard' : 'uploaded',
             title: ev.title ?? 'Uploaded Event',
-            time: !eventAllDay && isRangeStart ? ev.start_time ?? undefined : undefined,
+            time: eventTime,
             allDay: eventAllDay || (!isRangeStart && !isRangeEnd),
             location: ev.location ?? undefined,
             taskId: resolvedTaskId,
@@ -1539,6 +1604,46 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       cursor = addDays(cursor, 1);
     }
 
+    // De-duplicate events per day by title.
+    // Rule: keep a single event per normalized title with priority lifeboard > uploaded > google.
+    // If priorities tie, prefer the one that has a concrete time.
+    Object.keys(map).forEach(dateStr => {
+      const events = map[dateStr];
+
+      const normalizeTitle = (t?: string) =>
+        (t ?? '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')
+          .trim();
+
+      const priority = (source: DayEvent['source']) => (
+        source === 'lifeboard' ? 3 : source === 'uploaded' ? 2 : 1
+      );
+
+      const grouped: Record<string, DayEvent[]> = {};
+      for (const e of events) {
+        const key = normalizeTitle(e.title);
+        (grouped[key] ||= []).push(e);
+      }
+
+      const winners: DayEvent[] = [];
+      for (const key of Object.keys(grouped)) {
+        const group = grouped[key];
+        // Sort by priority desc, then by has time desc (timed over all-day)
+        group.sort((a, b) => {
+          const pDiff = priority(b.source) - priority(a.source);
+          if (pDiff !== 0) return pDiff;
+          const aHasTime = Boolean(a.time) && a.allDay !== true;
+          const bHasTime = Boolean(b.time) && b.allDay !== true;
+          if (aHasTime !== bHasTime) return bHasTime ? 1 : -1;
+          return 0;
+        });
+        winners.push(group[0]);
+      }
+
+      map[dateStr] = winners;
+    });
+
     setEventsByDate(map);
   }, [
     googleEvents,
@@ -1547,7 +1652,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     rangeEndMs,
     buildLifeboardEventsForDate,
     selectedBucketFilters,
-    allTasks
+    allTasks,
+    hourSlotToISO
   ]);
 
   const getCellSize = () => {
@@ -2064,12 +2170,27 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             {/* No inline creation here – handled by hover modal */}
                             {visibleEvents.length > 0 ? (
                               visibleEvents.map((ev: DayEvent, i: number) => {
+                                // Suppress external duplicates if a Lifeboard task with same title exists that day
+                                const normalizeTitle = (t?: string) =>
+                                  (t ?? '')
+                                    .toLowerCase()
+                                    .replace(/\s+/g, ' ')
+                                    .replace(/\s*([@&:,;\-])\s*/g, '$1')
+                                    .trim();
+                                const lifeboardTitleSet = new Set(
+                                  visibleEvents
+                                    .filter(e => e.source === 'lifeboard')
+                                    .map(e => normalizeTitle(e.title))
+                                );
+                                if ((ev.source === 'google' || ev.source === 'uploaded') && lifeboardTitleSet.has(normalizeTitle(ev.title))) {
+                                  return null; // hide duplicate
+                                }
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const hasTask = Boolean(ev.taskId);
-                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
+                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
                                 const draggableId = hasTask
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;
@@ -2207,6 +2328,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = day.toISOString().slice(0,10);
                 const dayEvents = eventsByDate[dayStr] ?? [];
+                
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isToday = isSameDay(day, today);
                 const formattedDayLabel = format(day, 'MMMM d, yyyy');
@@ -2293,13 +2415,34 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
                             <div className="mt-1 w-full space-y-0.5 sm:space-y-1">
-                              {getEventsForDisplay(dayEvents).map((ev: DayEvent, i: number) => {
+                              {(() => {
+                                const displayEvents = getEventsForDisplay(dayEvents);
+                                
+                                // Suppress external duplicates for month view too
+                                const normalizeTitle = (t?: string) =>
+                                  (t ?? '')
+                                    .toLowerCase()
+                                    .replace(/\s+/g, ' ')
+                                    .replace(/\s*([@&:,;\-])\s*/g, '$1')
+                                    .trim();
+                                const lifeboardTitleSet = new Set(
+                                  displayEvents
+                                    .filter(e => e.source === 'lifeboard')
+                                    .map(e => normalizeTitle(e.title))
+                                );
+                                const filtered = displayEvents.filter(e => (
+                                  (e.source !== 'google' && e.source !== 'uploaded') ||
+                                  !lifeboardTitleSet.has(normalizeTitle(e.title))
+                                ));
+
+                                return filtered;
+                              })().map((ev: DayEvent, i: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
                                 const repeatLabel = getRepeatLabel(ev.repeatRule);
                                 const hasTask = Boolean(ev.taskId);
-                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded';
+                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
                                 const draggableId = hasTask
                                   ? `lifeboard::${ev.taskId}`
                                   : `event::${dayStr}::${i}`;

@@ -323,19 +323,6 @@ export function EnhancedTasksView({
         </div>
       )}
 
-      <details className="mt-8">
-        <summary className="cursor-pointer p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors font-medium text-gray-700">
-          📋 Advanced Task Management
-        </summary>
-        <div className="mt-4 bg-white rounded-lg border border-gray-200 p-6">
-          <CalendarTaskList
-            selectedDate={new Date()}
-            availableBuckets={buckets}
-            selectedBucket={activeBucket}
-            dashboardView={true}
-          />
-        </div>
-      </details>
     </div>
   );
 }

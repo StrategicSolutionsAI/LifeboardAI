@@ -952,23 +952,42 @@ export function useTasks(selectedDate?: Date) {
     updateDailyOptimistically(tasks => mergeTasks(tasks, updatesForAll, { constrainToDate: true }))
     updateAllOptimistically(tasks => mergeTasks(tasks, updatesForAll))
 
+    // Separate updates by task source (Supabase vs Todoist)
+    const supabaseUpdates = updatesForAll.filter(update => {
+      const task = resolveTask(update.taskId);
+      const source = task?.source || inferSourceFromId(update.taskId);
+      return source === 'supabase';
+    });
+    
+    const todoistUpdates = updatesForAll.filter(update => {
+      const task = resolveTask(update.taskId);
+      const source = task?.source || inferSourceFromId(update.taskId);
+      return source === 'todoist';
+    });
+
     // Send batch update to server (soft-fail if API unreachable)
     try {
-      if (todoistConnectedRef.current === false) {
+      // Update Supabase tasks
+      if (supabaseUpdates.length > 0) {
         const res = await fetch('/api/tasks/batch-update', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: updatesForAll })
+          body: JSON.stringify({ updates: supabaseUpdates })
         })
         if (!res.ok) console.warn('Supabase batch update failed')
-        return
       }
+      
+      // Update Todoist tasks
+      if (todoistUpdates.length === 0) {
+        return;
+      }
+      
       const res = await fetch('/api/integrations/todoist/tasks/batch-update', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: updatesForAll })
+        body: JSON.stringify({ updates: todoistUpdates })
       })
       if (!res.ok) {
         const errorText = await res.text().catch(() => '')

@@ -237,6 +237,12 @@ export async function POST(request: NextRequest) {
         // Always update description to include metadata
         todoistUpdate.description = newDescription.trim();
 
+        console.log('📤 Sending Todoist update:', {
+          taskId: update.taskId,
+          newMeta,
+          todoistUpdate
+        });
+
         // Update task in Todoist
         const updateRes = await fetch(`${TODOIST_TASKS_ENDPOINT}/${update.taskId}`, {
           method: 'POST',
