@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { User } from "@supabase/supabase-js";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -243,6 +244,57 @@ const iconMap: Record<string, LucideIcon> = {
   financial_goals: Flag,
 };
 
+type ProfileNameRow = {
+  first_name?: string | null;
+};
+
+const extractFirstWord = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const [first] = trimmed.split(/\s+/);
+  return first || null;
+};
+
+const deriveGreetingName = (profile: ProfileNameRow | null, supabaseUser: User | null): string => {
+  if (!supabaseUser) {
+    return "there";
+  }
+
+  const metadata = (supabaseUser.user_metadata ?? {}) as Record<string, unknown>;
+  const candidates: unknown[] = [
+    profile?.first_name,
+    metadata.preferred_name,
+    metadata.first_name,
+    metadata.given_name,
+    metadata.nickname,
+    metadata.name,
+    metadata.full_name,
+    metadata.user_name,
+    metadata.username,
+  ];
+
+  for (const candidate of candidates) {
+    const extracted = extractFirstWord(candidate);
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  if (typeof supabaseUser.email === "string" && supabaseUser.email.includes("@")) {
+    const [localPart] = supabaseUser.email.split("@");
+    if (localPart) {
+      return localPart;
+    }
+  }
+
+  return "there";
+};
+
 // Helper to get icon component from string name
 const getIconComponent = (name: string): LucideIcon | null => {
   return iconMap[name] || null
@@ -386,7 +438,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
 
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [greetingName, setGreetingName] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   // Track when we've completed the initial auth check to avoid clearing
   // localStorage/state before Supabase auth resolves on first load
@@ -2038,6 +2091,49 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     };
   }, []);
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    const fetchGreetingName = async () => {
+      if (!user) {
+        if (!isCancelled) {
+          setGreetingName("");
+        }
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Failed to load profile for greeting', error);
+        }
+
+        setGreetingName(deriveGreetingName(profile ?? null, user));
+      } catch (err) {
+        if (isCancelled) {
+          return;
+        }
+        console.error('Failed to resolve greeting name', err);
+        setGreetingName(deriveGreetingName(null, user));
+      }
+    };
+
+    fetchGreetingName();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user]);
+
   // Effect for user state changes (login/logout)
   useEffect(() => {
     // Do not act until the initial auth status has been determined
@@ -2835,7 +2931,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           {/* Greeting */}
           <section className="w-full mb-4">
             <h1 className="text-xl font-semibold text-gray-900 mb-1">
-              Hello <span className="text-theme-primary-600">Dalit</span>
+              Hello <span className="text-theme-primary-600">{greetingName || 'there'}</span>
             </h1>
             <p className="text-sm text-gray-600">You've got this! Let's make today productive.</p>
           </section>
@@ -2874,8 +2970,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   onDragEnd={() => setDragIndex(null)}
                   onClick={() => setActiveBucket(b)}
                   style={{
-                    // Active tab always highest; otherwise cascade left-over-right
-                    zIndex: b === activeBucket ? 50 : 9 - idx,
+                    // Active tab always highest; otherwise cascade left-over-right without negative z-index
+                    zIndex: b === activeBucket ? 50 : Math.max(buckets.length - idx, 1),
                     marginRight: '-10px',
                     backgroundColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.85),
                     borderColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.6),
