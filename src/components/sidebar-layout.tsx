@@ -42,9 +42,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] pl-0 md:pl-[120px] pb-16 md:pb-0 overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#F6F6FC] flex flex-col overflow-x-hidden md:grid md:h-screen md:grid-cols-[80px_1fr] md:grid-rows-[64px_1fr] md:overflow-hidden">
       {/* Sidebar */}
-      <aside className="hidden md:flex w-20 flex-shrink-0 border-r border-gray-100 bg-white flex-col items-center py-4 gap-6 fixed left-0 top-16 bottom-0 z-30">
+      <aside className="hidden md:flex w-20 flex-shrink-0 flex-col items-center gap-6 border-r border-gray-100 bg-white/90 py-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 md:row-start-2 md:sticky md:top-16 md:h-[calc(100vh-64px)] md:max-h-[calc(100vh-64px)] md:overflow-y-auto z-30">
         {navItems.map(({ href, icon: Icon, label }) => {
           // More precise active state detection
           let active = false;
@@ -91,7 +91,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </aside>
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white pl-4 pr-4 md:pl-5 md:pr-10 md:-ml-[120px] md:w-[calc(100%+120px)]">
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white/95 px-4 md:col-span-2 md:px-10 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3 text-2xl font-semibold">
             <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-lg">
@@ -147,7 +147,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </header>
 
       {/* Main content area */}
-      <div className="flex-1 overflow-y-auto pr-4 md:pr-10 pt-4 sm:pt-10">{children}</div>
+      <main className="flex-1 w-full px-4 pb-24 pt-4 sm:pt-10 md:col-start-2 md:row-start-2 md:h-full md:overflow-y-auto md:px-10 md:pb-10">
+        {children}
+      </main>
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
