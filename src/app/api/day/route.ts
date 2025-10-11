@@ -1,0 +1,117 @@
+// app/api/day/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/utils/supabase/server'
+import { supabaseFromBearer } from '@/utils/supabase/bearer'
+
+function getClientFromRequest(req: NextRequest) {
+  const auth = req.headers.get('authorization')
+  if (auth?.startsWith('Bearer ')) {
+    return supabaseFromBearer(auth.slice(7))
+  }
+  return supabaseServer()
+}
+
+// lifeboard_tasks → unified item
+function mapTaskRow(row: any) {
+  const startDate: string | undefined = row.start_date ?? row.due_date ?? undefined
+  const endDate: string | undefined = row.end_date ?? startDate ?? undefined
+  return {
+    id: `task:${row.id}`,
+    kind: 'task' as const,
+    content: row.content,
+    completed: !!row.completed,
+    startDate,
+    endDate,
+    hourSlot: row.hour_slot ?? undefined,
+    allDay: row.all_day ?? (!row.hour_slot && !row.end_hour_slot),
+    created_at: row.created_at,
+    position: row.position ?? undefined,
+  }
+}
+
+// calendar_events → unified item
+function mapEventRow(row: any) {
+  const title =
+    row.title ?? row.summary ?? row.name ?? row.content ?? 'Event'
+  const startDate: string | undefined = row.start_date ?? row.date ?? row.due_date ?? undefined
+  const endDate: string | undefined = row.end_date ?? startDate ?? undefined
+  return {
+    id: `event:${row.id}`,
+    kind: 'event' as const,
+    content: title,
+    completed: false,
+    startDate,
+    endDate,
+    hourSlot: row.hour_slot ?? undefined,
+    allDay: row.all_day ?? (!row.hour_slot),
+    created_at: row.created_at,
+    position: row.position ?? undefined,
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const sp = req.nextUrl.searchParams
+    const date = sp.get('date') // YYYY-MM-DD (required)
+    const includeCompleted = sp.get('includeCompleted') // show completed tasks too
+
+    if (!date) {
+      return NextResponse.json({ error: 'Missing date parameter' }, { status: 400 })
+    }
+
+    const supabase = getClientFromRequest(req)
+    const { data: { user }, error: authErr } = await supabase.auth.getUser()
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // --- lifeboard_tasks (date matches due_date OR start_date)
+    let taskQuery = supabase
+      .from('lifeboard_tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .or(`due_date.eq.${date},start_date.eq.${date}`)
+
+    if (!includeCompleted) {
+      taskQuery = taskQuery.eq('completed', false)
+    }
+
+    // --- calendar_events (assumes start_date column)
+    // If your column is named differently, change 'start_date' here.
+    const eventQuery = supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('start_date', date)
+
+    const [tasksRes, eventsRes] = await Promise.all([taskQuery, eventQuery])
+
+    if (tasksRes.error) {
+      console.error('tasks fetch error', tasksRes.error)
+      return NextResponse.json({ error: 'Database error (tasks)' }, { status: 500 })
+    }
+    if (eventsRes.error) {
+      console.error('events fetch error', eventsRes.error)
+      return NextResponse.json({ error: 'Database error (events)' }, { status: 500 })
+    }
+
+    const taskItems = (tasksRes.data ?? []).map(mapTaskRow)
+    const eventItems = (eventsRes.data ?? []).map(mapEventRow)
+
+    // Merge + sort: time first, then position, then created_at
+    const items = [...taskItems, ...eventItems].sort((a: any, b: any) => {
+      const ah = typeof a.hourSlot === 'number' ? a.hourSlot : 99
+      const bh = typeof b.hourSlot === 'number' ? b.hourSlot : 99
+      if (ah !== bh) return ah - bh
+      const ap = a.position ?? Number.MAX_SAFE_INTEGER
+      const bp = b.position ?? Number.MAX_SAFE_INTEGER
+      if (ap !== bp) return ap - bp
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+
+    return NextResponse.json({ items })
+  } catch (e) {
+    console.error('GET /api/day error', e)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
