@@ -1,10 +1,13 @@
 "use client";
 
 import { WidgetInstance } from "@/types/widgets";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
+import { useTasksContext } from "@/contexts/tasks-context";
+import type { RepeatOption } from "@/hooks/use-tasks";
+import { format } from "date-fns";
 
 // Colour map reused
 const COLORS = [
@@ -46,13 +49,81 @@ interface WidgetEditorProps {
   onClose: () => void;
   onSave: (updated: WidgetInstance) => void;
   isNewWidget?: boolean;
+  availableBuckets?: string[];
+  defaultBucket?: string;
+  selectedDate?: Date;
 }
 
-export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNewWidget = false }: WidgetEditorProps) {
+type WidgetTaskConfig = NonNullable<WidgetInstance["linkedTaskConfig"]>;
+
+const DEFAULT_TASK_CONFIG: WidgetTaskConfig = {
+  enabled: false,
+  title: "",
+  bucket: "",
+  dueDate: undefined,
+  startTime: "",
+  endTime: "",
+  allDay: true,
+  repeat: "none",
+};
+
+const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
+  { value: "none", label: "Does not repeat" },
+  { value: "daily", label: "Daily" },
+  { value: "weekdays", label: "Weekdays" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+
+const timeToHourSlot = (time?: string | null): string | undefined => {
+  if (!time) return undefined;
+  const [rawHour, rawMinute = "0"] = time.split(":");
+  const hour = Number.parseInt(rawHour ?? "", 10);
+  if (Number.isNaN(hour)) return undefined;
+  const minute = Number.parseInt(rawMinute, 10);
+  let adjustedHour = hour;
+  if (minute >= 30) {
+    adjustedHour = Math.min(23, hour + 1);
+  }
+  const displayHour = (adjustedHour % 12) || 12;
+  const suffix = adjustedHour >= 12 ? "PM" : "AM";
+  return `hour-${displayHour}${suffix}`;
+};
+
+const normalizeTaskConfig = (
+  widgetInstance: WidgetInstance,
+  defaults: { title: string; bucket?: string; dueDate?: string },
+): WidgetTaskConfig => {
+  const base = widgetInstance.linkedTaskConfig ?? {};
+  return {
+    enabled: base.enabled ?? Boolean(widgetInstance.linkedTaskId),
+    title: base.title ?? widgetInstance.linkedTaskTitle ?? widgetInstance.name,
+    bucket: base.bucket ?? defaults.bucket ?? "",
+    dueDate: base.dueDate ?? defaults.dueDate,
+    startTime: base.startTime ?? "",
+    endTime: base.endTime ?? "",
+    allDay: base.allDay ?? true,
+    repeat: base.repeat ?? "none",
+  };
+};
+
+export default function WidgetEditorSheet({
+  widget,
+  open,
+  onClose,
+  onSave,
+  isNewWidget = false,
+  availableBuckets = [],
+  defaultBucket,
+  selectedDate,
+}: WidgetEditorProps) {
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
   const [isWithingsConnected, setIsWithingsConnected] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const { createTask, batchUpdateTasks, deleteTask } = useTasksContext();
 
   // Check if Fitbit or Google Fit is connected
   useEffect(() => {
@@ -79,12 +150,205 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
     checkConnections();
   }, []);
 
-  // keep draft in sync when widget changes
-  if (widget && draft?.instanceId !== widget.instanceId) {
-    setDraft(widget);
-  }
+  useEffect(() => {
+    if (widget && draft?.instanceId !== widget.instanceId) {
+      setDraft(widget);
+    }
+  }, [widget, draft?.instanceId]);
+
+  const defaultDueDate = useMemo(() => {
+    if (!selectedDate) return undefined;
+    return format(selectedDate, "yyyy-MM-dd");
+  }, [selectedDate]);
+
+  useEffect(() => {
+    setDraft(prev => {
+      if (!prev) return prev;
+      const normalized = normalizeTaskConfig(prev, {
+        title: prev.linkedTaskTitle ?? prev.name,
+        bucket: defaultBucket,
+        dueDate: defaultDueDate,
+      });
+      if (JSON.stringify(prev.linkedTaskConfig) === JSON.stringify(normalized)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        linkedTaskConfig: normalized,
+      };
+    });
+  }, [defaultBucket, defaultDueDate]);
+
+  const taskConfig = useMemo(() => draft?.linkedTaskConfig ?? DEFAULT_TASK_CONFIG, [draft]);
+  const derivedBuckets = useMemo(() => {
+    const set = new Set<string>();
+    availableBuckets.forEach(b => {
+      if (b) set.add(b);
+    });
+    if (defaultBucket) set.add(defaultBucket);
+    if (taskConfig.bucket) set.add(taskConfig.bucket);
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [availableBuckets, defaultBucket, taskConfig.bucket]);
 
   if (!draft) return null;
+
+  const updateTaskConfig = (updates: Partial<WidgetTaskConfig>) => {
+    setDraft(prev => {
+      if (!prev) return prev;
+      const merged = {
+        ...normalizeTaskConfig(prev, {
+          title: prev.linkedTaskTitle ?? prev.name,
+          bucket: defaultBucket,
+          dueDate: defaultDueDate,
+        }),
+        ...updates,
+      };
+      return {
+        ...prev,
+        linkedTaskConfig: merged,
+      };
+    });
+  };
+
+  const handleSave = async () => {
+    if (!draft) return;
+    setIsSaving(true);
+    setSaveError(null);
+
+    let updatedDraft: WidgetInstance = { ...draft };
+    const config = normalizeTaskConfig(updatedDraft, {
+      title: updatedDraft.linkedTaskTitle ?? updatedDraft.name,
+      bucket: defaultBucket,
+      dueDate: defaultDueDate,
+    });
+    const enabled = config.enabled ?? false;
+    const content = (config.title || updatedDraft.name || "Widget Task").trim();
+    const bucketName = config.bucket?.trim() || undefined;
+    const dueDate = config.dueDate?.trim() || null;
+    const repeatRule: RepeatOption = config.repeat ?? "none";
+    const hourSlot = config.allDay ? undefined : timeToHourSlot(config.startTime);
+    const endHourSlot = config.allDay ? undefined : timeToHourSlot(config.endTime);
+    const allDay = config.allDay ?? true;
+
+    try {
+      if (enabled) {
+        if (updatedDraft.linkedTaskId) {
+          const updates: Record<string, any> = {
+            content,
+            bucket: bucketName,
+            allDay,
+            repeatRule: repeatRule === "none" ? null as any : repeatRule,
+          };
+
+          if (dueDate) {
+            updates.due = { date: dueDate };
+            updates.startDate = dueDate;
+            updates.endDate = dueDate;
+          } else {
+            updates.due = null as any;
+            updates.startDate = null as any;
+            updates.endDate = null as any;
+          }
+
+          if (allDay) {
+            updates.hourSlot = null as any;
+            updates.endHourSlot = null as any;
+          } else {
+            updates.hourSlot = hourSlot ?? null;
+            updates.endHourSlot = endHourSlot ?? null;
+          }
+
+          await batchUpdateTasks([{
+            taskId: updatedDraft.linkedTaskId,
+            updates,
+            occurrenceDate: dueDate ?? undefined,
+          }]);
+
+          const nextConfig: WidgetTaskConfig = {
+            ...config,
+            enabled: true,
+            bucket: bucketName,
+            dueDate: dueDate ?? undefined,
+            startTime: config.startTime,
+            endTime: config.endTime,
+            allDay,
+            repeat: repeatRule,
+          };
+
+          updatedDraft = {
+            ...updatedDraft,
+            linkedTaskTitle: content,
+            linkedTaskConfig: nextConfig,
+          };
+        } else {
+          const createdTask = await createTask(
+            content,
+            dueDate,
+            hourSlot,
+            bucketName,
+            repeatRule,
+            {
+              endHourSlot,
+              allDay,
+              endDate: dueDate,
+            },
+          );
+
+          if (!createdTask) {
+            throw new Error("Unable to create task from widget details");
+          }
+
+          const nextConfig: WidgetTaskConfig = {
+            ...config,
+            enabled: true,
+            bucket: bucketName,
+            dueDate: dueDate ?? undefined,
+            startTime: config.startTime,
+            endTime: config.endTime,
+            allDay,
+            repeat: repeatRule,
+          };
+
+          updatedDraft = {
+            ...updatedDraft,
+            linkedTaskId: createdTask.id?.toString?.() ?? createdTask.id,
+            linkedTaskSource: createdTask.source,
+            linkedTaskAutoCreated: true,
+            linkedTaskTitle: createdTask.content,
+            linkedTaskConfig: nextConfig,
+          };
+        }
+      } else {
+        if (updatedDraft.linkedTaskId && updatedDraft.linkedTaskAutoCreated) {
+          try {
+            await deleteTask(updatedDraft.linkedTaskId);
+          } catch (error) {
+            console.warn("Failed to delete linked task during unlink", error);
+          }
+        }
+
+        updatedDraft = {
+          ...updatedDraft,
+          linkedTaskId: enabled ? updatedDraft.linkedTaskId : undefined,
+          linkedTaskAutoCreated: enabled ? updatedDraft.linkedTaskAutoCreated : false,
+          linkedTaskTitle: enabled ? updatedDraft.linkedTaskTitle : undefined,
+          linkedTaskConfig: {
+            ...config,
+            enabled: false,
+          },
+        };
+      }
+
+      setDraft(updatedDraft);
+      onSave(updatedDraft);
+      onClose();
+    } catch (error) {
+      console.error("Failed to save widget task details", error);
+      setSaveError(error instanceof Error ? error.message : "Unable to save task details");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -907,6 +1171,116 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
             </div>
           </div>
 
+          {/* Task / Event Details */}
+          <div className="space-y-3 border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-600">Task &amp; Event</p>
+              <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={Boolean(taskConfig.enabled)}
+                  onChange={e => updateTaskConfig({ enabled: e.target.checked })}
+                />
+                Show in Tasks
+              </label>
+            </div>
+
+            {taskConfig.enabled && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Title</p>
+                  <input
+                    type="text"
+                    value={taskConfig.title ?? ""}
+                    onChange={e => updateTaskConfig({ title: e.target.value })}
+                    placeholder="Task title"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Bucket</p>
+                  <select
+                    value={taskConfig.bucket ?? ""}
+                    onChange={e => updateTaskConfig({ bucket: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">Select bucket</option>
+                    {derivedBuckets.map(bucket => (
+                      <option key={bucket} value={bucket}>{bucket}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Due Date</p>
+                  <input
+                    type="date"
+                    value={taskConfig.dueDate ?? ""}
+                    onChange={e => updateTaskConfig({ dueDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={taskConfig.allDay ?? true}
+                      onChange={e => updateTaskConfig({ allDay: e.target.checked })}
+                    />
+                    All-day
+                  </label>
+                  <span className="text-[11px] text-gray-500">
+                    {draft.linkedTaskId ? "Updating linked task" : "Will create task"}
+                  </span>
+                </div>
+
+                {!taskConfig.allDay && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-gray-600">Start Time</p>
+                      <input
+                        type="time"
+                        value={taskConfig.startTime ?? ""}
+                        onChange={e => updateTaskConfig({ startTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-gray-600">End Time</p>
+                      <input
+                        type="time"
+                        value={taskConfig.endTime ?? ""}
+                        onChange={e => updateTaskConfig({ endTime: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Repeat</p>
+                  <select
+                    value={taskConfig.repeat ?? "none"}
+                    onChange={e => updateTaskConfig({ repeat: e.target.value as RepeatOption })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    {REPEAT_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {draft.linkedTaskId && (
+                  <p className="text-[11px] text-gray-500">
+                    Linked task ID: <span className="font-mono">{draft.linkedTaskId}</span>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Schedule */}
           {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'nutrition'].includes(draft.id) && (
             <div className="space-y-2">
@@ -919,8 +1293,16 @@ export default function WidgetEditorSheet({ widget, open, onClose, onSave, isNew
             </div>
           )}
 
+          {saveError && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {saveError}
+            </div>
+          )}
+
           <div className="pt-4 flex gap-2">
-            <Button className="flex-1" onClick={()=>{draft && onSave(draft); onClose();}}>Save</Button>
+            <Button className="flex-1" disabled={isSaving} onClick={handleSave}>
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
             <SheetClose asChild>
               <Button variant="outline" className="flex-1">Cancel</Button>
             </SheetClose>

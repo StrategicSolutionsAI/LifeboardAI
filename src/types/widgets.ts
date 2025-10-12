@@ -20,6 +20,21 @@ export interface WidgetInstance extends WidgetTemplate {
   rewardDollarPerGoal?: number;  // optional: dollars per achieved goal
   dataSource?: string;           // e.g. "Apple Health", "Manual"
   createdAt: string;             // ISO timestamp
+  // Optional linkage to a task so the item can appear in both views
+  linkedTaskId?: string;         // task id if this widget is mirrored as a task
+  linkedTaskSource?: 'todoist' | 'supabase' | 'local';
+  linkedTaskAutoCreated?: boolean; // whether the linked task was generated from this widget
+  linkedTaskTitle?: string;      // cached task title for quick display
+  linkedTaskConfig?: {
+    enabled?: boolean;           // whether the widget should surface as a task
+    title?: string;              // custom title when creating the task
+    bucket?: string;             // preferred bucket for the mirrored task
+    dueDate?: string;            // ISO date string (YYYY-MM-DD)
+    startTime?: string;          // HH:mm string for start time
+    endTime?: string;            // HH:mm string for end time
+    allDay?: boolean;            // treat the mirrored task as all-day
+    repeat?: 'none' | 'daily' | 'weekly' | 'weekdays' | 'monthly';
+  };
   // Birthday widget specific data
   birthdayData?: {
     friendName: string;          // name of the friend

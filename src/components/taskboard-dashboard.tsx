@@ -8,7 +8,7 @@ import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
-import { format, addDays, isSameDay } from 'date-fns';
+import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
@@ -94,6 +94,7 @@ import {
 } from "lucide-react";
 import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
+import type { Task, RepeatOption } from "@/hooks/use-tasks";
 import dynamic from 'next/dynamic';
 
 function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
@@ -414,7 +415,7 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
   // Access tasks context for all task operations
-  const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask } = useTasksContext();
+  const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask, allTasks, toggleTaskCompletion: toggleTaskCompletionContext } = useTasksContext();
   
   // State for task management
   const [taskView, setTaskView] = useState('Today');
@@ -2012,6 +2013,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // First try to load from localStorage for immediate display
     let loadedFromLocal = false;
     let localWidgets = {};
+    let localSavedAt: string | null = null;
     
     if (typeof window !== 'undefined') {
       try {
@@ -2023,6 +2025,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           // Handle both old format (direct widgets) and new format (with metadata)
           if (parsed.widgets && parsed.savedAt) {
             localWidgets = parsed.widgets;
+            localSavedAt = parsed.savedAt;
           } else {
             localWidgets = parsed;
           }
@@ -2046,15 +2049,34 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const prefs = await getUserPreferencesClient();
       
       if (prefs?.widgets_by_bucket && Object.keys(prefs.widgets_by_bucket).length > 0) {
-        
-        const supabaseWidgetsStr = JSON.stringify(prefs.widgets_by_bucket);
-        const localWidgetsStr = JSON.stringify(localWidgets);
+        const supabaseUpdatedAt = prefs.updated_at ? Date.parse(prefs.updated_at) : 0;
+        const localUpdatedAt = localSavedAt ? Date.parse(localSavedAt) : 0;
+        const supabaseWidgetsStr = JSON.stringify(prefs.widgets_by_bucket ?? {});
+        const localWidgetsStr = JSON.stringify(localWidgets ?? {});
+
         const dataIsDifferent = supabaseWidgetsStr !== localWidgetsStr;
-        
-        
-        if (dataIsDifferent) {
-          
-          // Migrate existing widgets to match current templates
+
+        if (dataIsDifferent && localUpdatedAt > supabaseUpdatedAt) {
+          // Local copy is newer – promote it to Supabase and keep it
+          const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
+          setWidgetsByBucket(migratedLocalWidgets);
+
+          if (prefs) {
+            await saveUserPreferences({
+              ...prefs,
+              widgets_by_bucket: migratedLocalWidgets,
+            });
+          }
+
+          if (typeof window !== 'undefined') {
+            const dataToSave = {
+              widgets: migratedLocalWidgets,
+              savedAt: new Date().toISOString(),
+            };
+            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+          }
+        } else if (dataIsDifferent) {
+          // Supabase copy is newer – adopt it locally
           const migratedWidgets = migrateWidgetsToTemplates(prefs.widgets_by_bucket);
           setWidgetsByBucket(migratedWidgets);
           
@@ -2077,7 +2099,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           });
           
           if (typeof window !== 'undefined') {
-            localStorage.setItem('widgets_by_bucket', supabaseWidgetsStr);
+            const dataToSave = {
+              widgets: migratedWidgets,
+              savedAt: new Date().toISOString(),
+            };
+            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
           }
         } else {
         }
@@ -2286,7 +2312,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // Preserve the local ordering as the primary source of truth and append any server-only buckets.
         if (loadedFromLocal && localBuckets.length) {
           const merged = [...localBuckets];
-          (prefs.life_buckets ?? []).forEach((bucket) => {
+          (prefs.life_buckets ?? []).forEach((bucket: string) => {
             if (!merged.includes(bucket)) {
               merged.push(bucket);
             }
@@ -2457,6 +2483,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   const handleSaveWidget = (updated: WidgetInstance) => {
     if (!editingBucket) return;
+    let nextState: Record<string, WidgetInstance[]> | undefined;
     setWidgetsByBucket(prev => {
       const updatedState = { ...prev };
       updatedState[editingBucket] = (updatedState[editingBucket] ?? []).map(w =>
@@ -2466,8 +2493,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       if (typeof window !== 'undefined') {
         localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: updatedState, savedAt: new Date().toISOString() }));
       }
+      nextState = updatedState;
       return updatedState;
     });
+    if (nextState) {
+      widgetsByBucketRef.current = nextState;
+      void saveWidgets(nextState, progressByWidgetRef.current);
+    }
     setEditingWidget(null);
     setNewlyCreatedWidgetId(null);
   };
@@ -2822,17 +2854,270 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Use tasks from context instead of local state
   const dailyVisibleTasks = contextDailyTasks;
 
+  const linkedTaskMap = useMemo(() => {
+    const map: Record<string, { bucket: string; widgetId: string }> = {};
+    Object.entries(widgetsByBucket).forEach(([bucketName, widgets]) => {
+      (widgets || []).forEach((widget) => {
+        if (widget?.linkedTaskId) {
+          map[widget.linkedTaskId] = { bucket: bucketName, widgetId: widget.instanceId };
+        }
+      });
+    });
+    return map;
+  }, [widgetsByBucket]);
+
+  const findWidgetForTask = useCallback((taskId: string) => {
+    const widgetsState = widgetsByBucketRef.current;
+    for (const [bucketName, widgets] of Object.entries(widgetsState)) {
+      const match = (widgets || []).find((widget) => widget.linkedTaskId === taskId);
+      if (match) {
+        return { bucket: bucketName, widget: match };
+      }
+    }
+    return null;
+  }, [widgetsByBucketRef]);
+
+  const toggleTaskWidgetLink = useCallback(async (task: Task, bucketOverride?: string) => {
+    if (!task?.id) return;
+    const taskId = task.id.toString();
+    const existing = findWidgetForTask(taskId);
+
+    if (existing) {
+      let nextState: Record<string, WidgetInstance[]> | undefined;
+      setWidgetsByBucket((prev) => {
+        const updated = { ...prev };
+        const currentWidgets = updated[existing.bucket] ?? [];
+        updated[existing.bucket] = currentWidgets.filter(
+          (widget) => widget.instanceId !== existing.widget.instanceId,
+        );
+        nextState = updated;
+        return updated;
+      });
+      if (nextState) {
+        widgetsByBucketRef.current = nextState;
+        await saveWidgets(nextState, progressByWidgetRef.current);
+      }
+      return { status: "removed" as const, bucket: existing.bucket };
+    }
+
+    const candidateBuckets = [bucketOverride, task.bucket, activeBucket, buckets[0], "General"].filter(
+      (value): value is string => Boolean(value && value.trim().length > 0),
+    );
+    const targetBucket = candidateBuckets[0] ?? "General";
+
+    const newWidget: WidgetInstance = {
+      id: "linked_task",
+      name: task.content,
+      description: "Task shortcut",
+      icon: ListChecks,
+      category: "tasks",
+      color: "indigo",
+      defaultTarget: 1,
+      unit: "task",
+      units: ["task"],
+      instanceId: `task-link-${taskId}-${Date.now()}`,
+      target: 1,
+      schedule: [true, true, true, true, true, true, true],
+      dataSource: "task",
+      createdAt: new Date().toISOString(),
+      linkedTaskId: taskId,
+      linkedTaskSource: task.source,
+      linkedTaskAutoCreated: false,
+      linkedTaskTitle: task.content,
+      linkedTaskConfig: {
+        enabled: true,
+        title: task.content,
+        bucket: targetBucket,
+        dueDate: task.due?.date ?? undefined,
+        startTime: undefined,
+        endTime: undefined,
+        allDay: true,
+        repeat: "none",
+      },
+    };
+
+    let nextState: Record<string, WidgetInstance[]> | undefined;
+    setWidgetsByBucket((prev) => {
+      const updated = { ...prev };
+      const bucketWidgets = updated[targetBucket] ?? [];
+      // Avoid duplicates if toggled fast
+      const existingIndex = bucketWidgets.findIndex((widget) => widget.linkedTaskId === taskId);
+      if (existingIndex >= 0) {
+        bucketWidgets[existingIndex] = newWidget;
+      } else {
+        bucketWidgets.push(newWidget);
+      }
+      updated[targetBucket] = [...bucketWidgets];
+      nextState = updated;
+      return updated;
+    });
+    if (nextState) {
+      widgetsByBucketRef.current = nextState;
+      await saveWidgets(nextState, progressByWidgetRef.current);
+    }
+    return { status: "added" as const, bucket: targetBucket };
+  }, [activeBucket, buckets, debouncedSaveToSupabase, findWidgetForTask]);
+
+  const handleToggleTaskWidget = useCallback(
+    async (task: Task) => {
+      await toggleTaskWidgetLink(task, activeBucket);
+    },
+    [activeBucket, toggleTaskWidgetLink],
+  );
+
+  const resolveWidgetBucket = useCallback(
+    (widgetId: string, fallback?: string) => {
+      if (fallback && fallback.trim().length > 0) {
+        return fallback;
+      }
+      const widgetsState = widgetsByBucketRef.current;
+      for (const [bucketName, widgets] of Object.entries(widgetsState)) {
+        if ((widgets || []).some((entry) => entry.instanceId === widgetId)) {
+          return bucketName;
+        }
+      }
+      return activeBucket;
+    },
+    [activeBucket],
+  );
+
   // Helpers for droppable id parsing
   const isHour = (id: string) => id.startsWith('hour-');
   const hourKey = (id: string) => id.replace('hour-', '');
 
-  // Add the convertWidgetToTask function after the createTask function (around line 1480)
-  const convertWidgetToTask = async (widget: WidgetInstance) => {
-    // Create a task content string from the widget
-    const taskContent = `${widget.name}: ${widget.target} ${widget.unit}`;
-    
-    // Create a task for today
-    await contextCreateTask(taskContent, selectedDateStr);
+  const widgetTimeToHourSlot = (time?: string | null): string | undefined => {
+    if (!time) return undefined;
+    const [rawHour, rawMinute = "0"] = time.split(":");
+    const hour = Number.parseInt(rawHour ?? "", 10);
+    if (Number.isNaN(hour)) return undefined;
+    const minute = Number.parseInt(rawMinute, 10);
+    let adjustedHour = hour;
+    if (minute >= 30) {
+      adjustedHour = Math.min(23, hour + 1);
+    }
+    const displayHour = (adjustedHour % 12) || 12;
+    const suffix = adjustedHour >= 12 ? "PM" : "AM";
+    return `hour-${displayHour}${suffix}`;
+  };
+
+  const convertWidgetToTask = async (widget: WidgetInstance, bucket: string) => {
+    if (!widget) return;
+
+    if (widget.linkedTaskId) {
+      const shouldUnlink =
+        typeof window === "undefined" ||
+        window.confirm("Remove this widget from the Tasks tab?");
+      if (!shouldUnlink) return;
+
+      if (widget.linkedTaskAutoCreated && widget.linkedTaskId) {
+        try {
+          await deleteTask(widget.linkedTaskId);
+        } catch (error) {
+          console.error("Failed to delete auto-created task:", error);
+        }
+      }
+
+      let nextState: Record<string, WidgetInstance[]> | undefined;
+      setWidgetsByBucket((prev) => {
+        const updated = { ...prev };
+        const bucketName = resolveWidgetBucket(widget.instanceId, bucket);
+        const resolvedBucket = bucketName && bucketName.length > 0 ? bucketName : activeBucket;
+        if (!resolvedBucket) {
+          nextState = updated;
+          return updated;
+        }
+        const widgetsList = updated[resolvedBucket] ?? [];
+        updated[resolvedBucket] = widgetsList.map((entry) => {
+          if (entry.instanceId !== widget.instanceId) return entry;
+          const sanitized = { ...entry };
+          delete sanitized.linkedTaskId;
+          delete sanitized.linkedTaskSource;
+          delete sanitized.linkedTaskAutoCreated;
+          delete sanitized.linkedTaskTitle;
+          if (sanitized.linkedTaskConfig) {
+            sanitized.linkedTaskConfig = {
+              ...sanitized.linkedTaskConfig,
+              enabled: false,
+            };
+          }
+          return sanitized;
+        });
+        nextState = updated;
+        return updated;
+      });
+      if (nextState) {
+        widgetsByBucketRef.current = nextState;
+        await saveWidgets(nextState, progressByWidgetRef.current);
+      }
+      return;
+    }
+
+    try {
+      const config = widget.linkedTaskConfig ?? {};
+      const taskContent = (config.title || widget.linkedTaskTitle || widget.name || "Widget Task").trim();
+      const bucketName = resolveWidgetBucket(widget.instanceId, bucket);
+      const targetBucket = bucketName && bucketName.length > 0 ? bucketName : activeBucket;
+      const resolvedBucket = config.bucket?.trim() || targetBucket || undefined;
+      const preferredDueDate = config.dueDate?.trim();
+      const resolvedDueDate = preferredDueDate || selectedDateStr || null;
+      const allDay = config.allDay ?? true;
+      const hourSlot = allDay ? undefined : widgetTimeToHourSlot(config.startTime);
+      const endHourSlot = allDay ? undefined : widgetTimeToHourSlot(config.endTime);
+      const repeatRule = (config.repeat ?? "none") as RepeatOption;
+      const newTask = await contextCreateTask(
+        taskContent,
+        resolvedDueDate,
+        hourSlot,
+        resolvedBucket,
+        repeatRule,
+        {
+          endHourSlot,
+          allDay,
+          endDate: resolvedDueDate ?? undefined,
+        },
+      );
+      if (!newTask) return;
+
+      let nextState: Record<string, WidgetInstance[]> | undefined;
+      setWidgetsByBucket((prev) => {
+        const updated = { ...prev };
+        const resolvedBucketTarget = targetBucket && targetBucket.length > 0 ? targetBucket : activeBucket;
+        if (!resolvedBucketTarget) {
+          nextState = updated;
+          return updated;
+        }
+        const widgetsList = updated[resolvedBucketTarget] ?? [];
+        updated[resolvedBucketTarget] = widgetsList.map((entry) => {
+          if (entry.instanceId !== widget.instanceId) return entry;
+          return {
+            ...entry,
+            linkedTaskId: newTask.id?.toString?.() ?? newTask.id,
+            linkedTaskSource: newTask.source,
+            linkedTaskAutoCreated: true,
+            linkedTaskTitle: newTask.content,
+            linkedTaskConfig: {
+              ...entry.linkedTaskConfig,
+              enabled: true,
+              title: taskContent,
+              bucket: resolvedBucket,
+              dueDate: resolvedDueDate ?? undefined,
+              startTime: config.startTime,
+              endTime: config.endTime,
+              allDay,
+              repeat: repeatRule,
+            },
+          };
+        });
+        nextState = updated;
+        return updated;
+      });
+      if (nextState) {
+        widgetsByBucketRef.current = nextState;
+        await saveWidgets(nextState, progressByWidgetRef.current);
+      }
+    } catch (error) {
+      console.error("Failed to convert widget to task:", error);
+    }
   };
 
   // -----------------------------------------------------------------------------
@@ -3136,12 +3421,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                   {/* Widget cards */}
                   {activeWidgets.map((w) => {
+                    const isLinkedTask = Boolean(w.linkedTaskId);
+                    const linkedTask = isLinkedTask
+                      ? allTasks.find((task) => task.id?.toString?.() === w.linkedTaskId)
+                      : undefined;
+                    const linkedTaskCompleted = Boolean(linkedTask?.completed);
+                    const linkedTaskContent = linkedTask?.content ?? w.linkedTaskTitle ?? w.name;
+                    const linkedTaskDueRaw = linkedTask?.due?.date ?? linkedTask?.due?.datetime ?? null;
+                    const linkedTaskDueDisplay = (() => {
+                      if (!linkedTaskDueRaw) return null;
+                      try {
+                        const parsed =
+                          linkedTaskDueRaw.length === 10
+                            ? parseISO(`${linkedTaskDueRaw}T00:00:00`)
+                            : parseISO(linkedTaskDueRaw);
+                        return format(parsed, "MMM d");
+                      } catch {
+                        return null;
+                      }
+                    })();
                     // Determine today's progress value and percentage towards target
                     let todayVal = 0;
                     let isFitbitData = false;
                     let isGoogleFitData = false;
                     
-                    if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
+                    if (isLinkedTask) {
+                      todayVal = linkedTaskCompleted ? (w.target || 1) : 0;
+                    } else if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
                       todayVal = fitbitData.water;
                       isFitbitData = true;
                     } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
@@ -3159,8 +3465,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
                     }
                     
-                    const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
-                    const goalMet = pct >= 100;
+                    const normalizedTarget = w.target && w.target > 0 ? w.target : 1;
+                    const pct = isLinkedTask
+                      ? (linkedTaskCompleted ? 100 : 0)
+                      : Math.min(100, Math.round((todayVal / normalizedTarget) * 100));
+                    const goalMet = isLinkedTask ? linkedTaskCompleted : pct >= 100;
 
                     // Background tint (5% opacity of widget color) when goal met
                     const bgTintClasses: Record<string,string> = {
@@ -3207,13 +3516,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              convertWidgetToTask(w);
+                              convertWidgetToTask(w, activeBucket);
                             }}
-                            className="rounded-full bg-theme-primary-100 hover:bg-theme-primary-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition"
-                            aria-label="Convert to task"
-                            title="Convert to task"
+                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition ${
+                              w.linkedTaskId
+                                ? "bg-theme-primary-600 hover:bg-theme-primary-700"
+                                : "bg-theme-primary-100 hover:bg-theme-primary-200"
+                            }`}
+                            aria-label={w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"}
+                            title={w.linkedTaskId ? "Remove from Tasks tab" : "Show in Tasks tab"}
                           >
-                            <ListChecks className="h-3 w-3 text-theme-primary-600" />
+                            <ListChecks
+                              className={`h-3 w-3 ${
+                                w.linkedTaskId ? "text-white" : "text-theme-primary-600"
+                              }`}
+                            />
                           </button>
                           <button
                             onClick={(e) => {
@@ -3288,6 +3605,35 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                              <span className="text-sm font-medium truncate">{w.name}</span>
                           )}
                         </div>
+                        {isLinkedTask && (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-sm text-gray-700">
+                                <ListChecks className="h-4 w-4 text-theme-primary-600" />
+                                <span className="truncate">{linkedTaskContent}</span>
+                              </div>
+                              <button
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  if (!linkedTask) return;
+                                  void toggleTaskCompletionContext(linkedTask.id.toString());
+                                }}
+                                disabled={!linkedTask}
+                                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                                  linkedTaskCompleted
+                                    ? "border-green-500 text-green-600 bg-green-50 hover:bg-green-100"
+                                    : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                                } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
+                              >
+                                {linkedTaskCompleted ? "Undo" : "Mark done"}
+                              </button>
+                            </div>
+                            {linkedTaskDueDisplay ? (
+                              <p className="text-xs text-gray-500">Due {linkedTaskDueDisplay}</p>
+                            ) : null}
+                          </div>
+                        )}
 
                         {(() => {
                           // Special handling for birthday widgets
@@ -3763,7 +4109,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           }
 
                           // Regular progress bar for other widgets
-                          const pct = Math.min(100, Math.round((todayVal / w.target) * 100));
+                          const displayPct = pct;
                           const prog = progressByWidget[w.instanceId];
                            
                           return (
@@ -3784,7 +4130,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 )}
                               </div>
                               <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
-                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-theme-primary-500'}`} style={{ width: `${pct}%` }} />
+                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-theme-primary-500'}`} style={{ width: `${displayPct}%` }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
@@ -3796,7 +4142,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && (
+                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && !isLinkedTask && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -3856,6 +4202,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         <EnhancedTasksView
                           activeBucket={activeBucket}
                           buckets={buckets}
+                          linkedTaskMap={linkedTaskMap}
+                          onToggleTaskWidget={handleToggleTaskWidget}
                         />
                       </TasksProvider>
                     )}
@@ -4032,6 +4380,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             }}
             isNewWidget={editingWidget?.instanceId === newlyCreatedWidgetId}
             onSave={handleSaveWidget}
+            availableBuckets={buckets}
+            defaultBucket={activeBucket}
+            selectedDate={selectedDate}
           />
         )}
 

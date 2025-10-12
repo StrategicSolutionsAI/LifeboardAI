@@ -14,11 +14,14 @@ import {
   Calendar as CalendarIcon,
   Flag,
   Target,
+  LayoutDashboard,
 } from "lucide-react";
 
 interface EnhancedTasksViewProps {
   activeBucket: string;
   buckets: string[];
+  linkedTaskMap?: Record<string, { bucket: string; widgetId: string }>;
+  onToggleTaskWidget?: (task: Task) => Promise<void>;
 }
 
 const parseDueDate = (task: Task): Date | null => {
@@ -38,9 +41,14 @@ const parseDueDate = (task: Task): Date | null => {
 export function EnhancedTasksView({
   activeBucket,
   buckets,
+  linkedTaskMap,
+  onToggleTaskWidget,
 }: EnhancedTasksViewProps) {
   const { allTasks, createTask, toggleTaskCompletion } = useTasksContext();
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+  const linkedMap = linkedTaskMap ?? {};
+  const toggleWidgetHandler = onToggleTaskWidget;
 
   const bucketTasks = useMemo(() => {
     const tasks = Array.isArray(allTasks) ? allTasks : [];
@@ -181,6 +189,25 @@ export function EnhancedTasksView({
     const dueDate = parseDueDate(task);
     const isOverdue = dueDate ? isPast(dueDate) && !isToday(dueDate) : false;
     const isDueToday = dueDate ? isToday(dueDate) : false;
+    const taskId = task.id.toString();
+    const linkedInfo = linkedMap[taskId];
+    const isToggling = togglingTaskId === taskId;
+
+    const onToggle = async (
+      event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
+    ) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!toggleWidgetHandler) return;
+      setTogglingTaskId(taskId);
+      try {
+        await toggleWidgetHandler(task);
+      } catch (error) {
+        console.error("Failed to toggle widget link:", error);
+      } finally {
+        setTogglingTaskId((current) => (current === taskId ? null : current));
+      }
+    };
 
     return (
       <div className="p-4 hover:bg-gray-50 transition-colors">
@@ -192,7 +219,36 @@ export function EnhancedTasksView({
             className="mt-1 w-5 h-5 rounded border-gray-300 cursor-pointer accent-blue-600"
           />
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900">{task.content}</h4>
+            <div className="flex items-start justify-between gap-2">
+              <h4 className="font-medium text-gray-900">{task.content}</h4>
+              {toggleWidgetHandler ? (
+                <button
+                  type="button"
+                  onClick={onToggle}
+                  disabled={isToggling}
+                  className={`rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
+                    linkedInfo
+                      ? "border-blue-500 text-blue-600 bg-blue-50 hover:bg-blue-100"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                  } ${isToggling ? "opacity-60 cursor-progress" : ""}`}
+                  title={
+                    linkedInfo
+                      ? "Remove from overview"
+                      : "Show on overview"
+                  }
+                >
+                  <span className="flex items-center gap-1">
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    {linkedInfo ? "On overview" : "To overview"}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+            {linkedInfo ? (
+              <p className="text-xs text-blue-600 mt-1">
+                Showing on overview ({linkedInfo.bucket})
+              </p>
+            ) : null}
             {dueDate && (
               <p
                 className={`text-xs mt-1 ${
