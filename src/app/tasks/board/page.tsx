@@ -43,6 +43,9 @@ function BoardContent() {
       bucketId: normalizeBucketId(t.bucket),
       status: 'open',
       position: typeof t.position === 'number' ? t.position : null,
+      dueDate: t.due?.date ?? null,
+      startDate: t.startDate ?? null,
+      endDate: t.endDate ?? null,
     }))
   ), [openTasks]);
 
@@ -87,4 +90,3 @@ export default function TasksBoardPage() {
     </TasksProvider>
   );
 }
-

@@ -4,13 +4,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SidebarLayout } from "@/components/sidebar-layout";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
-import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask, type TasksBoardHandle } from "@/components/TasksBoard";
+import TasksBoard, { type Bucket as BoardBucket, type Task as BoardTask } from "@/components/TasksBoard";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { differenceInCalendarDays, parseISO, isValid, format } from "date-fns";
-import { Plus, Clock, ChevronRight } from "lucide-react";
+import { Plus, Clock } from "lucide-react";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,6 @@ function TasksBoardShell() {
   const [dueSoonOnly, setDueSoonOnly] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const boardRef = useRef<TasksBoardHandle | null>(null);
   const quickAddInputRef = useRef<HTMLInputElement>(null);
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
 
@@ -98,6 +97,8 @@ function TasksBoardShell() {
       status: t.completed ? 'done' : 'open',
       position: typeof t.position === 'number' ? t.position : null,
       dueDate: t.due?.date ?? null,
+      startDate: t.startDate ?? null,
+      endDate: t.endDate ?? null,
       createdAt: t.created_at ?? null,
     }));
   }, [tasksForBoard]);
@@ -315,25 +316,11 @@ function TasksBoardShell() {
             </Button>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setViewMode("open");
-              setDueSoonOnly(false);
-              boardRef.current?.focusBuckets();
-            }}
-            className="h-7 text-xs gap-1"
-          >
-            Jump to bucket
-            <ChevronRight className="h-3 w-3" />
-          </Button>
         </div>
       </header>
 
       <div className="flex-1 min-h-0">
         <TasksBoard
-          ref={boardRef}
           buckets={boardBuckets}
           tasks={boardTasks}
           onCompleteTask={handleToggleTask}
@@ -344,7 +331,6 @@ function TasksBoardShell() {
           }}
           onMoveTask={handleMoveTask}
           viewMode={viewMode}
-          filters={{ dueSoonOnly }}
           loadingTasks={loadingTasks}
           onTaskOpen={(taskId) => {
             taskEditorRef.current?.openByTaskId(taskId);

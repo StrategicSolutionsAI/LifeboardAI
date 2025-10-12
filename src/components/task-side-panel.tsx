@@ -156,6 +156,9 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
       bucketId: normalizeBucketId(task.bucket),
       status: task.completed ? "done" : "open",
       position: typeof task.position === "number" ? task.position : null,
+      dueDate: task.due?.date ?? null,
+      startDate: task.startDate ?? null,
+      endDate: task.endDate ?? null,
     }));
   }, [openTasksToShow]);
 

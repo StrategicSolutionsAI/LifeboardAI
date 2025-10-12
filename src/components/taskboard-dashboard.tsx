@@ -432,8 +432,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [editingBucketNewName, setEditingBucketNewName] = useState("");
   const [draggedBucketIndex, setDraggedBucketIndex] = useState<number | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
+  const bucketsRef = useRef<string[]>([]);
+  const dragIndexRef = useRef<number | null>(null);
+  const manageDragIndexRef = useRef<number | null>(null);
   const fetchedYesterdayRef = useRef(false);
   const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
 
@@ -444,6 +446,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Track when we've completed the initial auth check to avoid clearing
   // localStorage/state before Supabase auth resolves on first load
   const [authInitialized, setAuthInitialized] = useState(false);
+
+  useEffect(() => {
+    bucketsRef.current = buckets;
+  }, [buckets]);
 
   // Bucket color utility functions
   const getBucketColor = (bucket: string) => {
@@ -528,15 +534,30 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Listen for bucket color changes
   useEffect(() => {
     const handleBucketColorsChanged = () => {
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('bucket_colors');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed === 'object') {
+              setBucketColors(parsed);
+              return;
+            }
+          } catch (error) {
+            console.warn('Failed to parse locally stored bucket_colors', error);
+          }
+        }
+      }
+
       getUserPreferencesClient()
         .then(userPrefs => {
           if (userPrefs?.bucket_colors) {
-            setBucketColors(userPrefs.bucket_colors)
+            setBucketColors(userPrefs.bucket_colors);
           }
         })
         .catch(error => {
-          console.error("Failed to reload bucket colors:", error)
-        })
+          console.error("Failed to reload bucket colors:", error);
+        });
     }
 
     window.addEventListener('bucketColorsChanged', handleBucketColorsChanged)
@@ -1932,47 +1953,56 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Handle bucket tab drag start
   const handleBucketDragStart = (index: number) => {
+    manageDragIndexRef.current = index;
     setDraggedBucketIndex(index);
   };
 
   // Handle bucket tab drag over
   const handleBucketDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedBucketIndex === null || draggedBucketIndex === index) return;
+    const currentIndex = manageDragIndexRef.current;
+    if (currentIndex === null || currentIndex === index) return;
 
-    const newBuckets = [...buckets];
-    const draggedBucket = newBuckets[draggedBucketIndex];
-    newBuckets.splice(draggedBucketIndex, 1);
-    newBuckets.splice(index, 0, draggedBucket);
-
-    setBuckets(newBuckets);
+    setBuckets((prev) => {
+      if (currentIndex < 0 || currentIndex >= prev.length) {
+        return prev;
+      }
+      const updated = [...prev];
+      const [draggedBucket] = updated.splice(currentIndex, 1);
+      updated.splice(index, 0, draggedBucket);
+      manageDragIndexRef.current = index;
+      bucketsRef.current = updated;
+      return updated;
+    });
     setDraggedBucketIndex(index);
   };
 
   // Handle bucket tab drag end
   const handleBucketDragEnd = async () => {
-    if (draggedBucketIndex === null) return;
+    if (manageDragIndexRef.current === null) return;
+
+    manageDragIndexRef.current = null;
+    setDraggedBucketIndex(null);
+
+    const latestBuckets = bucketsRef.current.length ? bucketsRef.current : buckets;
 
     // Save to localStorage
     if (typeof window !== 'undefined') {
-      localStorage.setItem('life_buckets', JSON.stringify(buckets));
+      localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
-
     // Save to Supabase
     try {
       const prefs = await getUserPreferencesClient();
       if (prefs) {
         await saveUserPreferences({
           ...prefs,
-          life_buckets: buckets,
+          life_buckets: latestBuckets,
         });
       }
     } catch (err) {
       console.error('Failed to save bucket order to Supabase:', err);
     }
-
-    setDraggedBucketIndex(null);
   };
 
   async function loadWidgets() {
@@ -2252,15 +2282,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             localStorage.setItem('bucket_colors', JSON.stringify(serverColors));
           }
         }
-        // If we have locally cached buckets that aren't yet on the server, merge and persist them
+        // If we have locally cached buckets that aren't yet on the server, merge and persist them.
+        // Preserve the local ordering as the primary source of truth and append any server-only buckets.
         if (loadedFromLocal && localBuckets.length) {
-          const union = Array.from(new Set([...(prefs.life_buckets ?? []), ...localBuckets]));
-          if (union.length !== prefs.life_buckets.length) {
-            setBuckets(union);
-            const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || union[0];
-            setActiveBucket(union.includes(active || '') ? (active as string) : union[0]);
+          const merged = [...localBuckets];
+          (prefs.life_buckets ?? []).forEach((bucket) => {
+            if (!merged.includes(bucket)) {
+              merged.push(bucket);
+            }
+          });
+          if (merged.length !== prefs.life_buckets.length || merged.some((name, idx) => name !== prefs.life_buckets[idx])) {
+            setBuckets(merged);
+            const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || merged[0];
+            setActiveBucket(merged.includes(active || '') ? (active as string) : merged[0]);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('life_buckets', JSON.stringify(union));
+              localStorage.setItem('life_buckets', JSON.stringify(merged));
               window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
             }
             const mergedColors = {
@@ -2269,7 +2305,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             } as Record<string, string>;
             await saveUserPreferences({
               ...prefs,
-              life_buckets: union,
+              life_buckets: merged,
               bucket_colors: mergedColors,
             });
           }
@@ -2951,23 +2987,43 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 <button
                   key={b}
                   draggable
-                  onDragStart={() => setDragIndex(idx)}
+                  onDragStart={() => {
+                    dragIndexRef.current = idx;
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    if (dragIndex === null || dragIndex === idx) return;
-                    // reorder
-                    const updated = [...buckets];
-                    const [moved] = updated.splice(dragIndex, 1);
-                    updated.splice(idx, 0, moved);
-                    setBuckets(updated);
-                    setDragIndex(idx);
-                    // Persist reordering to localStorage & Supabase
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('life_buckets', JSON.stringify(updated));
-                    }
-                    debouncedSaveBucketsToSupabase(updated);
+                    const currentDragIndex = dragIndexRef.current;
+                    if (currentDragIndex === null || currentDragIndex === idx) return;
+
+                    setBuckets((prev) => {
+                      if (
+                        currentDragIndex === null ||
+                        currentDragIndex < 0 ||
+                        currentDragIndex >= prev.length
+                      ) {
+                        return prev;
+                      }
+                      const updated = [...prev];
+                      const [moved] = updated.splice(currentDragIndex, 1);
+                      updated.splice(idx, 0, moved);
+                      dragIndexRef.current = idx;
+                      bucketsRef.current = updated;
+                      return updated;
+                    });
                   }}
-                  onDragEnd={() => setDragIndex(null)}
+                  onDragEnd={() => {
+                    const dragOrigin = dragIndexRef.current;
+                    dragIndexRef.current = null;
+                    if (dragOrigin === null) {
+                      return;
+                    }
+                    const latestBuckets = bucketsRef.current.length ? bucketsRef.current : buckets;
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
+                      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+                    }
+                    debouncedSaveBucketsToSupabase(latestBuckets);
+                  }}
                   onClick={() => setActiveBucket(b)}
                   style={{
                     // Active tab always highest; otherwise cascade left-over-right without negative z-index

@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +25,8 @@ export type Task = {
   tags?: string[];
   position?: number | null;
   dueDate?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt?: string | null;
 };
 
@@ -36,15 +37,6 @@ type BucketSummary = {
 
 export type TasksBoardViewMode = "open" | "completed";
 
-export type TasksBoardHandle = {
-  focusBuckets: () => void;
-  scrollToBucket: (bucketId: string) => void;
-};
-
-type TasksBoardFilters = {
-  dueSoonOnly?: boolean;
-};
-
 type TasksBoardProps = {
   buckets?: Bucket[];
   tasks?: Task[];
@@ -53,7 +45,6 @@ type TasksBoardProps = {
   onAddTask?: (bucketId: string, title: string) => void;
   onMoveTask?: (taskId: string, newBucketId: string) => void;
   viewMode?: TasksBoardViewMode;
-  filters?: TasksBoardFilters;
   loadingTasks?: Set<string>;
   onTaskOpen?: (taskId: string) => void;
 };
@@ -108,6 +99,66 @@ function formatDueDate(due?: string | null) {
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? "accent" as const : "default" as const };
 }
 
+function parseTaskDate(value?: string | null) {
+  if (!value) return null;
+  try {
+    const isoValue = value.length === 10 ? `${value}T00:00:00` : value;
+    const parsed = parseISO(isoValue);
+    return isValid(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatDateRangeLabel(start: Date, end: Date) {
+  const sameDay = differenceInCalendarDays(end, start) === 0;
+  if (sameDay) {
+    return format(start, "MMM d");
+  }
+
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+  const startFormat = sameYear ? "MMM d" : "MMM d, yyyy";
+  const endFormat = sameMonth ? "d" : sameYear ? "MMM d" : "MMM d, yyyy";
+
+  return `${format(start, startFormat)} - ${format(end, endFormat)}`;
+}
+
+function toneForDateRange(start: Date, end: Date) {
+  const today = new Date();
+  const startDiff = differenceInCalendarDays(start, today);
+  const endDiff = differenceInCalendarDays(end, today);
+
+  if (endDiff < 0) {
+    return "destructive" as const;
+  }
+  if (startDiff <= 0 && endDiff >= 0) {
+    return "accent" as const;
+  }
+  if (startDiff <= 3) {
+    return "accent" as const;
+  }
+  return "default" as const;
+}
+
+function formatTaskDateBadge(task: Task) {
+  const start = parseTaskDate(task.startDate ?? task.dueDate ?? null);
+  const end = parseTaskDate(task.endDate ?? null);
+
+  if (start && end) {
+    const span = differenceInCalendarDays(end, start);
+    if (span > 0) {
+      return {
+        label: formatDateRangeLabel(start, end),
+        tone: toneForDateRange(start, end),
+      };
+    }
+  }
+
+  const fallbackDate = task.dueDate ?? task.startDate ?? task.endDate ?? null;
+  return formatDueDate(fallbackDate);
+}
+
 function TaskCard({
   task,
   index,
@@ -127,7 +178,10 @@ function TaskCard({
 }) {
   const [showBucketDropdown, setShowBucketDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const due = useMemo(() => formatDueDate(task.dueDate), [task.dueDate]);
+  const dateBadge = useMemo(
+    () => formatTaskDateBadge(task),
+    [task.dueDate, task.startDate, task.endDate]
+  );
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -183,17 +237,17 @@ function TaskCard({
             {task.title}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {due && (
+            {dateBadge && (
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border",
-                  due.tone === "destructive" && "border-destructive/40 bg-destructive/5 text-destructive",
-                  due.tone === "accent" && "border-primary/40 bg-primary/5 text-primary",
-                  due.tone === "default" && "border-border bg-muted/50 text-muted-foreground"
+                  dateBadge.tone === "destructive" && "border-destructive/40 bg-destructive/5 text-destructive",
+                  dateBadge.tone === "accent" && "border-primary/40 bg-primary/5 text-primary",
+                  dateBadge.tone === "default" && "border-border bg-muted/50 text-muted-foreground"
                 )}
               >
                 <CalendarDays className="h-3 w-3" />
-                {due.label}
+                {dateBadge.label}
               </span>
             )}
             {!!task.tags?.length && task.tags.map((tag) => (
@@ -452,21 +506,17 @@ function BucketColumn({
   );
 }
 
-const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksBoard(
-  {
-    buckets: bucketsProp,
-    tasks: tasksProp,
-    onCompleteTask,
-    onUncompleteTask,
-    onAddTask,
-    onMoveTask,
-    onTaskOpen,
-    viewMode = "open",
-    filters,
-    loadingTasks = new Set(),
-  },
-  ref
-) {
+function TasksBoard({
+  buckets: bucketsProp,
+  tasks: tasksProp,
+  onCompleteTask,
+  onUncompleteTask,
+  onAddTask,
+  onMoveTask,
+  onTaskOpen,
+  viewMode = "open",
+  loadingTasks = new Set(),
+}: TasksBoardProps) {
   const mockBuckets: Bucket[] = [
     { id: "b1", name: "Health", color: "#7C4DFF" },
     { id: "b2", name: "Work", color: "#4F46E5" },
@@ -495,7 +545,6 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
   );
 
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const bucketFilterBarRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeBucket, setActiveBucket] = useState<string | null>(null);
 
@@ -506,33 +555,6 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
       element.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
     }
   }, []);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      focusBuckets: () => {
-        setActiveBucket(null);
-        if (bucketFilterBarRef.current) {
-          bucketFilterBarRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          bucketFilterBarRef.current.focus({ preventScroll: true });
-        }
-      },
-      scrollToBucket: (bucketId: string) => {
-        handleJump(bucketId);
-      },
-    }),
-    [handleJump]
-  );
-
-  const primaryLabel = viewMode === "completed" ? "Completed tasks" : "Open tasks";
-  const primaryCount = tasks.length;
-  const primaryBadgeClasses = viewMode === "completed"
-    ? "bg-emerald-100 text-emerald-700"
-    : "bg-primary/10 text-primary";
-
-  const showSecondarySummary = viewMode === "open";
-  const secondaryLabel = filters?.dueSoonOnly ? "Due soon (filtered)" : "Due soon";
-  const secondaryCount = filters?.dueSoonOnly ? tasks.length : totalDueSoon;
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -556,7 +578,6 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
       {/* Simplified bucket navigation - smaller and cleaner */}
       <div className="flex items-center justify-between gap-3">
         <div
-          ref={bucketFilterBarRef}
           tabIndex={-1}
           className="flex items-center gap-1.5 overflow-x-auto pb-1 focus-visible:outline-none"
           aria-label="Buckets"
@@ -655,6 +676,6 @@ const TasksBoard = forwardRef<TasksBoardHandle, TasksBoardProps>(function TasksB
     </div>
     </DragDropContext>
   );
-});
+}
 
 export default TasksBoard;
