@@ -169,10 +169,11 @@ export async function POST(request: NextRequest) {
 // Minimal PATCH: toggle completion
 export async function PATCH(request: NextRequest) {
   try {
-    const { id, completed } = await request.json();
+    const body = await request.json();
+    const { id } = body ?? {};
 
-    if (!id || typeof completed !== 'boolean') {
-      return NextResponse.json({ error: 'id and completed required' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'id required' }, { status: 400 });
     }
 
     const supabase = getClientFromRequest(request);
@@ -181,9 +182,67 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    const updatePayload: Record<string, any> = {};
+
+    if (typeof body.completed === 'boolean') {
+      updatePayload.completed = body.completed;
+    }
+
+    if (typeof body.content === 'string' && body.content.trim().length > 0) {
+      updatePayload.content = body.content.trim();
+    }
+
+    if (body.bucket !== undefined) {
+      updatePayload.bucket = body.bucket ? String(body.bucket).trim() : null;
+    }
+
+    const dueDate = body.due_date ?? body.dueDate;
+    if (dueDate !== undefined) {
+      updatePayload.due_date = dueDate ? String(dueDate).trim() : null;
+    }
+
+    const startDate = body.start_date ?? body.startDate;
+    if (startDate !== undefined) {
+      updatePayload.start_date = startDate ? String(startDate).trim() : null;
+    }
+
+    const endDate = body.end_date ?? body.endDate;
+    if (endDate !== undefined) {
+      updatePayload.end_date = endDate ? String(endDate).trim() : null;
+    }
+
+    if (body.hour_slot !== undefined || body.hourSlot !== undefined) {
+      const normalized = normalizeHourSlot(body.hour_slot ?? body.hourSlot);
+      updatePayload.hour_slot = normalized ?? null;
+    }
+
+    if (body.end_hour_slot !== undefined || body.endHourSlot !== undefined) {
+      const normalizedEnd = normalizeHourSlot(body.end_hour_slot ?? body.endHourSlot);
+      updatePayload.end_hour_slot = normalizedEnd ?? null;
+    }
+
+    const allDay = body.all_day ?? body.allDay;
+    if (typeof allDay === 'boolean') {
+      updatePayload.all_day = allDay;
+    }
+
+    const duration = body.duration;
+    if (duration !== undefined) {
+      updatePayload.duration = typeof duration === 'number' && Number.isFinite(duration) ? duration : null;
+    }
+
+    const repeatRule = body.repeat_rule ?? body.repeatRule;
+    if (repeatRule !== undefined) {
+      updatePayload.repeat_rule = repeatRule ? String(repeatRule).trim() : null;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: 'no update fields provided' }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from('lifeboard_tasks')
-      .update({ completed })
+      .update(updatePayload)
       .eq('id', id)
       .eq('user_id', user.id)
       .select(SELECT_COLUMNS)

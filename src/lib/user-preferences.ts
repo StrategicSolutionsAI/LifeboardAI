@@ -42,9 +42,7 @@ export async function getUserPreferencesClient() {
         bucket_colors: {},
         widgets_by_bucket: {},
         progress_by_widget: {},
-        hourly_plan: {},
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        hourly_plan: {}
       };
       
       const { data: newData, error: insertError } = await supabase
@@ -109,14 +107,15 @@ export async function getUserPreferencesClient() {
  */
 export async function saveUserPreferences(preferences: UserPreferences) {
   try {
-    // Ensure widgets_by_bucket exists and is properly formatted before saving
+    // Only include fields that exist in the database schema
+    // Exclude id, created_at, updated_at as they are auto-managed
     const safePreferences = {
-      ...preferences,
+      user_id: preferences.user_id,
+      life_buckets: preferences.life_buckets || [],
       bucket_colors: preferences.bucket_colors || {},
       widgets_by_bucket: preferences.widgets_by_bucket || {},
       progress_by_widget: preferences.progress_by_widget || {},
       hourly_plan: preferences.hourly_plan || {},
-      updated_at: new Date().toISOString(),
     };
     
     // Verify data is properly structured before saving
@@ -125,18 +124,36 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       return false;
     }
     
-    const { error } = await supabase
+    // Debug logging - show actual data structure
+    console.log('Attempting to save preferences:', {
+      user_id: safePreferences.user_id,
+      life_buckets: safePreferences.life_buckets,
+      bucket_colors: safePreferences.bucket_colors,
+      widgets_by_bucket_sample: Object.keys(safePreferences.widgets_by_bucket).slice(0, 2),
+      progress_by_widget_sample: Object.keys(safePreferences.progress_by_widget).slice(0, 2),
+      hourly_plan_sample: Object.keys(safePreferences.hourly_plan).slice(0, 2),
+    });
+    
+    const { data, error } = await supabase
       .from('user_preferences')
       .upsert(
         safePreferences,
         { onConflict: 'user_id' }
-      );
+      )
+      .select();
     
     if (error) {
-      console.error('Error saving user preferences to Supabase:', error);
+      console.error('Error saving user preferences to Supabase:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
       return false;
     }
     
+    console.log('Successfully saved preferences:', data);
     return true;
   } catch (err) {
     console.error('Exception saving user preferences:', err);

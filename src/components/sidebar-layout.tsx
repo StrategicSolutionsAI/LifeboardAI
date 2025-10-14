@@ -14,7 +14,8 @@ import {
   Bell,
   User,
   Zap,
-  Menu
+  Menu,
+  ShoppingCart
 } from "lucide-react"
 import { supabase } from "@/utils/supabase/client"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
+  { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
   { href: "/history", icon: History, label: "History" },
 ]
 
