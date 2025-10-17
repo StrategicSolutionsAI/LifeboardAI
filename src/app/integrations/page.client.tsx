@@ -33,9 +33,85 @@ const integrations: Integration[] = [
   { id: 'slack', name: 'Slack', description: 'Get notifications and manage tasks from Slack (Coming Soon)', icon: '💬' },
 ]
 
+const integerFormatter = new Intl.NumberFormat()
+const decimalFormatter = new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+const pluralize = (count: number, singular: string, plural?: string) => {
+  const word = count === 1 ? singular : (plural ?? `${singular}s`)
+  return `${count} ${word}`
+}
+
+const formatRefreshSummary = (provider: string, data: any): string | null => {
+  if (!data) return null
+
+  switch (provider) {
+    case 'todoist': {
+      if (Array.isArray(data.tasks)) {
+        const count = data.tasks.length
+        return count
+          ? `Synced ${pluralize(count, 'task')} from Todoist.`
+          : 'Todoist returned no tasks this sync.'
+      }
+      break
+    }
+    case 'google': {
+      if (Array.isArray(data.events)) {
+        const count = data.events.length
+        return count
+          ? `Loaded ${pluralize(count, 'upcoming event')} from Google Calendar.`
+          : 'No upcoming Google Calendar events in the selected window.'
+      }
+      break
+    }
+    case 'fitbit': {
+      const parts: string[] = []
+      if (typeof data.steps === 'number' && Number.isFinite(data.steps)) {
+        parts.push(`${integerFormatter.format(data.steps)} steps`)
+      }
+      if (typeof data.calories === 'number' && Number.isFinite(data.calories)) {
+        parts.push(`${integerFormatter.format(Math.round(data.calories))} cal`)
+      }
+      if (typeof data.water === 'number' && Number.isFinite(data.water)) {
+        parts.push(`${decimalFormatter.format(data.water)} cups water`)
+      }
+      if (parts.length > 0) {
+        return `Synced Fitbit stats (${parts.join(', ')}).`
+      }
+      break
+    }
+    case 'google-fit': {
+      const parts: string[] = []
+      const steps = typeof data.steps === 'number' && Number.isFinite(data.steps) ? data.steps : data?.summary?.steps
+      const water = typeof data.water === 'number' && Number.isFinite(data.water) ? data.water : data?.summary?.water
+      if (typeof steps === 'number' && Number.isFinite(steps)) {
+        parts.push(`${integerFormatter.format(steps)} steps`)
+      }
+      if (typeof water === 'number' && Number.isFinite(water)) {
+        parts.push(`${decimalFormatter.format(water)} water units`)
+      }
+      if (parts.length > 0) {
+        return `Synced Google Fit metrics (${parts.join(', ')}).`
+      }
+      break
+    }
+    case 'withings': {
+      const weight = typeof data.weightKg === 'number' && Number.isFinite(data.weightKg) ? data.weightKg : undefined
+      if (typeof weight === 'number') {
+        return `Latest Withings weight: ${decimalFormatter.format(weight)} kg.`
+      }
+      break
+    }
+    default:
+      break
+  }
+
+  return null
+}
+
 export default function IntegrationsPageClient() {
   const [integrationStatuses, setIntegrationStatuses] = useState<Record<string, IntegrationStatus>>({})
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState<string | null>(null)
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [calendarImports, setCalendarImports] = useState<CalendarImport[]>([])
@@ -48,7 +124,10 @@ export default function IntegrationsPageClient() {
   const [bucketSelections, setBucketSelections] = useState<Record<string, string>>({})
   const { buckets } = useBuckets()
 
-  const fetchIntegrationStatuses = useCallback(async (invalidateCache = false) => {
+  const fetchIntegrationStatuses = useCallback(async ({ invalidateCache = false, initial = false }: { invalidateCache?: boolean; initial?: boolean } = {}) => {
+    if (initial) {
+      setInitialLoading(true)
+    }
     setLoading(true)
     setGlobalError(null)
     const statuses: Record<string, IntegrationStatus> = {}
@@ -70,6 +149,9 @@ export default function IntegrationsPageClient() {
       setGlobalError('Unable to load integration statuses. Please refresh the page.')
     } finally {
       setLoading(false)
+      if (initial) {
+        setInitialLoading(false)
+      }
     }
   }, [])
 
@@ -139,7 +221,7 @@ export default function IntegrationsPageClient() {
     }
   }, [fetchCalendarImports])
 
-  const handleUpdateImportBucket = useCallback(async (importId: string, bucketValue: string) => {
+  const handleUpdateImportBucket = useCallback(async (importId: string, bucketValue: string, previousBucket: string) => {
     if (!importId) return
     setUpdatingBucketId(importId)
     setCalendarMessage(null)
@@ -170,6 +252,10 @@ export default function IntegrationsPageClient() {
     } catch (error) {
       console.error('Failed to update calendar import bucket', error)
       setCalendarError('Failed to update bucket for imported events. Please try again.')
+      setBucketSelections((prev) => ({
+        ...prev,
+        [importId]: previousBucket,
+      }))
     } finally {
       setUpdatingBucketId(null)
     }
@@ -177,10 +263,11 @@ export default function IntegrationsPageClient() {
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'r' && !loading) {
-        event.preventDefault()
-        fetchIntegrationStatuses(true)
-      }
+      const isModifierPressed = event.metaKey || event.ctrlKey
+      if (!isModifierPressed || !event.shiftKey || loading) return
+      if (event.key.toLowerCase() !== 'u') return
+      event.preventDefault()
+      fetchIntegrationStatuses({ invalidateCache: true })
     }
     document.addEventListener('keydown', handleKeyboard)
     return () => document.removeEventListener('keydown', handleKeyboard)
@@ -228,11 +315,13 @@ export default function IntegrationsPageClient() {
     try {
       const dataResult = await fetchIntegrationData(integrationId)
       const dataFetched = dataResult !== null
+      const summary = formatRefreshSummary(integrationId, dataResult)
       if (dataFetched) invalidateIntegrationCaches(integrationId)
       const statusResponse = await fetch(`/api/integrations/status?provider=${integrationId}`)
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
-        setIntegrationStatuses(prev => ({ ...prev, [integrationId]: { ...statusData, lastUpdated: new Date().toISOString(), message: dataFetched ? 'Successfully refreshed' : 'Status updated' } }))
+        const message = summary ?? (dataFetched ? 'Successfully refreshed' : 'Status updated')
+        setIntegrationStatuses(prev => ({ ...prev, [integrationId]: { ...statusData, lastUpdated: new Date().toISOString(), message } }))
         setTimeout(() => { setIntegrationStatuses(prev => ({ ...prev, [integrationId]: { ...prev[integrationId], message: undefined } })) }, 3000)
       } else { throw new Error('Failed to update status') }
     } catch (error) {
@@ -241,7 +330,7 @@ export default function IntegrationsPageClient() {
   }
 
   useEffect(() => {
-    fetchIntegrationStatuses()
+    fetchIntegrationStatuses({ initial: true })
     fetchCalendarImports()
   }, [fetchIntegrationStatuses, fetchCalendarImports])
 
@@ -251,10 +340,10 @@ export default function IntegrationsPageClient() {
   }
 
   const getMessageStyle = (message: string, connected: boolean) => {
-    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed')) return 'text-green-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-red-600 font-medium'; if (lower.includes('disconnect')) return 'text-amber-600'; return 'text-muted-foreground'
+    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed') || lower.includes('synced') || lower.includes('loaded')) return 'text-green-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-red-600 font-medium'; if (lower.includes('disconnect')) return 'text-amber-600'; return 'text-muted-foreground'
   }
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <SidebarLayout>
         <SectionLoadTimer name="/integrations" />
@@ -280,7 +369,7 @@ export default function IntegrationsPageClient() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
             <h1 className="text-2xl sm:text-3xl font-bold">Integrations</h1>
-            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses(true)} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (⌘R)'}>
+            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} aria-hidden="true" />
               <span className="relative z-10">{loading ? 'Refreshing...' : 'Refresh All'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -382,11 +471,12 @@ export default function IntegrationsPageClient() {
                               value={currentBucket}
                               onChange={(event) => {
                                 const nextValue = event.target.value;
+                                const previousValue = currentBucket;
                                 setBucketSelections((prev) => ({
                                   ...prev,
                                   [calendar.id]: nextValue,
                                 }));
-                                void handleUpdateImportBucket(calendar.id, nextValue);
+                                void handleUpdateImportBucket(calendar.id, nextValue, previousValue);
                               }}
                               disabled={isUpdatingBucket || deletingImportId === calendar.id}
                               className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[140px]"

@@ -2076,7 +2076,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 px-2 sm:px-0 snap-center`}>
               {view === 'week' ? (
                 // Week view: Clean, professional layout
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden p-2 sm:p-4 sm:min-h-[520px]">
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-2 sm:p-4 sm:min-h-[520px]">
                   {weekdayHeader}
                   <div className="grid grid-cols-1 sm:grid-cols-7 gap-y-3 sm:gap-y-2 sm:gap-x-1.5">
                     {rows.flat().map((day: Date, idx: number) => {
@@ -2116,17 +2116,37 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
                       const visibleEvents = getEventsForDisplay(dayEvents);
+                      const normalizeTitle = (t?: string) =>
+                        (t ?? '')
+                          .toLowerCase()
+                          .replace(/\s+/g, ' ')
+                          .replace(/\s*([@&:,;\-])\s*/g, '$1')
+                          .trim();
+                      const lifeboardTitleSet = new Set(
+                        visibleEvents
+                          .filter(e => e.source === 'lifeboard')
+                          .map(e => normalizeTitle(e.title))
+                      );
+                      const filteredEvents = visibleEvents.filter(ev => {
+                        if ((ev.source === 'google' || ev.source === 'uploaded') && lifeboardTitleSet.has(normalizeTitle(ev.title))) {
+                          return false;
+                        }
+                        return true;
+                      });
                       return (
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('.lb-day-add')) return;
-                            if (dayEvents.length) setSelectedModalDate(dayStr);
-                          }}
-                          className={cellClasses}
+                          className="h-full"
                         >
+                          <div
+                            onClick={(e) => {
+                              const target = e.target as HTMLElement;
+                              if (target.closest('.lb-day-add')) return;
+                              if (dayEvents.length) setSelectedModalDate(dayStr);
+                            }}
+                            className={cellClasses}
+                          >
                           {/* Clean Day Header */}
                           <div className="relative w-full pb-2 border-b border-gray-100 pr-2">
                             <div className="flex items-start justify-between gap-2 pr-12">
@@ -2166,25 +2186,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           </div>
                           
                           {/* Events Container */}
-                          <div className="flex-1 space-y-1 overflow-visible sm:overflow-y-auto">
+                          <div className="flex-1 space-y-1">
                             {/* No inline creation here – handled by hover modal */}
-                            {visibleEvents.length > 0 ? (
-                              visibleEvents.map((ev: DayEvent, i: number) => {
-                                // Suppress external duplicates if a Lifeboard task with same title exists that day
-                                const normalizeTitle = (t?: string) =>
-                                  (t ?? '')
-                                    .toLowerCase()
-                                    .replace(/\s+/g, ' ')
-                                    .replace(/\s*([@&:,;\-])\s*/g, '$1')
-                                    .trim();
-                                const lifeboardTitleSet = new Set(
-                                  visibleEvents
-                                    .filter(e => e.source === 'lifeboard')
-                                    .map(e => normalizeTitle(e.title))
-                                );
-                                if ((ev.source === 'google' || ev.source === 'uploaded') && lifeboardTitleSet.has(normalizeTitle(ev.title))) {
-                                  return null; // hide duplicate
-                                }
+                            {filteredEvents.map((ev: DayEvent, filteredIndex: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
                                 const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
@@ -2193,13 +2197,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
                                 const draggableId = hasTask
                                   ? `lifeboard::${ev.taskId}`
-                                  : `event::${dayStr}::${i}`;
+                                  : `event::${dayStr}::${filteredIndex}`;
 
                                 return (
                                   <Draggable
                                     key={draggableId}
                                     draggableId={draggableId}
-                                    index={i}
+                                    index={filteredIndex}
                                     isDragDisabled={!hasTask}
                                   >
                                     {(dragProvided, dragSnapshot) => {
@@ -2305,13 +2309,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     }}
                                   </Draggable>
                                 );
-                              })
-                            ) : null}
+                              })}
                             
                             {/* Scroll padding */}
                             <div className="h-4"></div>
                           </div>
                           {provided.placeholder}
+                          </div>
                         </div>
                       );
                     }}
@@ -2362,17 +2366,37 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         'hover:border-blue-200 hover:text-blue-600 active:scale-95',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white'
                       ].join(' ');
+                      const displayEvents = getEventsForDisplay(dayEvents);
+                      const normalizeTitle = (t?: string) =>
+                        (t ?? '')
+                          .toLowerCase()
+                          .replace(/\s+/g, ' ')
+                          .replace(/\s*([@&:,;\-])\s*/g, '$1')
+                          .trim();
+                      const lifeboardTitleSet = new Set(
+                        displayEvents
+                          .filter(e => e.source === 'lifeboard')
+                          .map(e => normalizeTitle(e.title))
+                      );
+                      const filteredEvents = displayEvents.filter(e => (
+                        (e.source !== 'google' && e.source !== 'uploaded') ||
+                        !lifeboardTitleSet.has(normalizeTitle(e.title))
+                      ));
+
                       return (
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('.lb-day-add')) return;
-                            if (dayEvents.length) setSelectedModalDate(dayStr);
-                          }}
-                          className={cellClasses}
+                          className="h-full"
                         >
+                          <div
+                            onClick={(e) => {
+                              const target = e.target as HTMLElement;
+                              if (target.closest('.lb-day-add')) return;
+                              if (dayEvents.length) setSelectedModalDate(dayStr);
+                            }}
+                            className={cellClasses}
+                          >
                           {/* Clean Date Header */}
                           <div className="relative w-full pr-1">
                             <div className="flex w-full items-start justify-between gap-1 sm:gap-2 pr-12">
@@ -2415,148 +2439,127 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           {/* No inline creation here – handled by hover modal */}
                           {dayEvents.length > 0 && (
                             <div className="mt-1 w-full space-y-0.5 sm:space-y-1">
-                              {(() => {
-                                const displayEvents = getEventsForDisplay(dayEvents);
-                                
-                                // Suppress external duplicates for month view too
-                                const normalizeTitle = (t?: string) =>
-                                  (t ?? '')
-                                    .toLowerCase()
-                                    .replace(/\s+/g, ' ')
-                                    .replace(/\s*([@&:,;\-])\s*/g, '$1')
-                                    .trim();
-                                const lifeboardTitleSet = new Set(
-                                  displayEvents
-                                    .filter(e => e.source === 'lifeboard')
-                                    .map(e => normalizeTitle(e.title))
-                                );
-                                const filtered = displayEvents.filter(e => (
-                                  (e.source !== 'google' && e.source !== 'uploaded') ||
-                                  !lifeboardTitleSet.has(normalizeTitle(e.title))
-                                ));
+                              {filteredEvents.map((ev: DayEvent, filteredIndex: number) => {
+                                  const styles = resolveEventStyles(ev.source, ev);
+                                  const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
+                                  const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
+                                  const repeatLabel = getRepeatLabel(ev.repeatRule);
+                                  const hasTask = Boolean(ev.taskId);
+                                  const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
+                                  const draggableId = hasTask
+                                    ? `lifeboard::${ev.taskId}`
+                                    : `event::${dayStr}::${filteredIndex}`;
 
-                                return filtered;
-                              })().map((ev: DayEvent, i: number) => {
-                                const styles = resolveEventStyles(ev.source, ev);
-                                const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
-                                const timeLabel = timeDisplay ? timeDisplay.toLowerCase() : '';
-                                const repeatLabel = getRepeatLabel(ev.repeatRule);
-                                const hasTask = Boolean(ev.taskId);
-                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
-                                const draggableId = hasTask
-                                  ? `lifeboard::${ev.taskId}`
-                                  : `event::${dayStr}::${i}`;
+                                  return (
+                                    <Draggable
+                                      key={draggableId}
+                                      draggableId={draggableId}
+                                      index={filteredIndex}
+                                      isDragDisabled={!hasTask}
+                                    >
+                                      {(dragProvided, dragSnapshot) => {
+                                        const showMinimalEvent = isCompactBreakpoint;
+                                        const baseDragStyle = dragProvided.draggableProps.style ?? {};
+                                        const eventContainerClasses = showMinimalEvent
+                                          ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
+                                          : `group relative w-full rounded-2xl border-0 overflow-hidden backdrop-blur-sm px-2.5 py-2 text-left transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-[0.99] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg scale-[1.01]' : 'shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5'}`;
+                                        const eventContainerStyle = showMinimalEvent
+                                          ? baseDragStyle
+                                          : {
+                                              ...baseDragStyle,
+                                              backgroundColor: styles.customColor ? styles.customColor + '12' : '#f5f5f5',
+                                              border: 'none'
+                                            };
 
-                                return (
-                                  <Draggable
-                                    key={draggableId}
-                                    draggableId={draggableId}
-                                    index={i}
-                                    isDragDisabled={!hasTask}
-                                  >
-                                    {(dragProvided, dragSnapshot) => {
-                                      const showMinimalEvent = isCompactBreakpoint;
-                                      const baseDragStyle = dragProvided.draggableProps.style ?? {};
-                                      const eventContainerClasses = showMinimalEvent
-                                        ? 'group relative w-full px-0 py-1 text-left text-[11px] text-gray-900 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-0'
-                                        : `group relative w-full rounded-2xl border-0 overflow-hidden backdrop-blur-sm px-2.5 py-2 text-left transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-[0.99] ${styles.container} ${dragSnapshot.isDragging ? 'shadow-lg scale-[1.01]' : 'shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5'}`;
-                                      const eventContainerStyle = showMinimalEvent
-                                        ? baseDragStyle
-                                        : {
-                                            ...baseDragStyle,
-                                            backgroundColor: styles.customColor ? styles.customColor + '12' : '#f5f5f5',
-                                            border: 'none'
-                                          };
-
-                                      return (
-                                        <div
-                                          ref={dragProvided.innerRef}
-                                          {...dragProvided.draggableProps}
-                                          {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                          role={canEditEvent ? 'button' : undefined}
-                                          tabIndex={canEditEvent ? 0 : undefined}
-                                          onClick={async (event) => {
-                                            if (!canEditEvent) return;
-                                            event.stopPropagation();
-                                            const target = event.currentTarget as HTMLElement | null;
-                                            if (target && typeof target.blur === 'function') target.blur();
-                                            await openCalendarEvent(ev, dayStr);
-                                          }}
-                                          onKeyDown={async (event) => {
-                                            if (!canEditEvent) return;
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                              event.preventDefault();
+                                        return (
+                                          <div
+                                            ref={dragProvided.innerRef}
+                                            {...dragProvided.draggableProps}
+                                            {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                            role={canEditEvent ? 'button' : undefined}
+                                            tabIndex={canEditEvent ? 0 : undefined}
+                                            onClick={async (event) => {
+                                              if (!canEditEvent) return;
                                               event.stopPropagation();
                                               const target = event.currentTarget as HTMLElement | null;
                                               if (target && typeof target.blur === 'function') target.blur();
                                               await openCalendarEvent(ev, dayStr);
-                                            }
-                                          }}
-                                          className={eventContainerClasses}
-                                          style={eventContainerStyle as CSSProperties}
-                                          title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
-                                        >
-                                          {showMinimalEvent ? (
-                                            <p className="truncate font-medium text-gray-900">
-                                              {ev.title}
-                                            </p>
-                                          ) : (
-                                            <div className="flex items-start gap-2">
-                                              <div className="flex-1 min-w-0 space-y-0.5">
-                                                <div className="flex items-center gap-1.5">
-                                                  <span
-                                                    className="inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                                                    style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                                  />
-                                                  <p className="text-sm font-medium text-gray-900 truncate leading-tight">
-                                                    {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
-                                                  </p>
+                                            }}
+                                            onKeyDown={async (event) => {
+                                              if (!canEditEvent) return;
+                                              if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                const target = event.currentTarget as HTMLElement | null;
+                                                if (target && typeof target.blur === 'function') target.blur();
+                                                await openCalendarEvent(ev, dayStr);
+                                              }
+                                            }}
+                                            className={eventContainerClasses}
+                                            style={eventContainerStyle as CSSProperties}
+                                            title={`${ev.title}${timeDisplay ? ` at ${timeDisplay}` : ''}${ev.duration ? ` (${ev.duration}min)` : ''}`}
+                                          >
+                                            {showMinimalEvent ? (
+                                              <p className="truncate font-medium text-gray-900">
+                                                {ev.title}
+                                              </p>
+                                            ) : (
+                                              <div className="flex items-start gap-2">
+                                                <div className="flex-1 min-w-0 space-y-0.5">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span
+                                                      className="inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                                                      style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                                    />
+                                                    <p className="text-sm font-medium text-gray-900 truncate leading-tight">
+                                                      {ev.title.length > 25 ? `${ev.title.substring(0, 25)}…` : ev.title}
+                                                    </p>
+                                                  </div>
+                                                  {timeLabel && (
+                                                    <time
+                                                      dateTime={ev.time}
+                                                      className="block text-[11px] font-medium tracking-wide leading-tight text-gray-500"
+                                                    >
+                                                      {timeLabel}
+                                                    </time>
+                                                  )}
+                                                  {ev.duration && (
+                                                    <p className="text-[11px] text-gray-400 font-normal">
+                                                      {ev.duration} min
+                                                    </p>
+                                                  )}
+                                                  {repeatLabel && (
+                                                    <span className="text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
+                                                      <span className="text-xs">↻</span>
+                                                    </span>
+                                                  )}
                                                 </div>
-                                                {timeLabel && (
-                                                  <time
-                                                    dateTime={ev.time}
-                                                    className="block text-[11px] font-medium tracking-wide leading-tight text-gray-500"
-                                                  >
-                                                    {timeLabel}
-                                                  </time>
-                                                )}
-                                                {ev.duration && (
-                                                  <p className="text-[11px] text-gray-400 font-normal">
-                                                    {ev.duration} min
-                                                  </p>
-                                                )}
-                                                {repeatLabel && (
-                                                  <span className="text-emerald-600" title={repeatLabel} aria-label={repeatLabel}>
-                                                    <span className="text-xs">↻</span>
-                                                  </span>
-                                                )}
+                                                <div className="flex flex-shrink-0 items-start gap-1">
+                                                  {!showMinimalEvent && hasTask && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
+                                                      }}
+                                                      className="rounded-lg p-0.5 text-gray-400 opacity-0 transition-all duration-150 hover:bg-black/5 hover:text-red-500 group-hover:opacity-100"
+                                                      title="Delete task"
+                                                      aria-label={`Delete ${ev.title}`}
+                                                    >
+                                                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                      </svg>
+                                                    </button>
+                                                  )}
+                                                </div>
                                               </div>
-                                              <div className="flex flex-shrink-0 items-start gap-1">
-                                                {!showMinimalEvent && hasTask && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={(event) => {
-                                                      event.stopPropagation();
-                                                      setDeleteConfirmTask({ id: ev.taskId!, title: ev.title, date: dayStr });
-                                                    }}
-                                                    className="rounded-lg p-0.5 text-gray-400 opacity-0 transition-all duration-150 hover:bg-black/5 hover:text-red-500 group-hover:opacity-100"
-                                                    title="Delete task"
-                                                    aria-label={`Delete ${ev.title}`}
-                                                  >
-                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                  </button>
-                                                )}
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    }}
-                                  </Draggable>
-                                );
-                              })}
+                                            )}
+                                          </div>
+                                        );
+                                      }}
+                                    </Draggable>
+                                  );
+                                })}
                               {(() => {
                                 const maxVisible = getMaxVisibleEvents(dayEvents);
                                 return dayEvents.length > maxVisible && (
@@ -2575,6 +2578,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             </div>
                           )}
                           {provided.placeholder}
+                          </div>
                         </div>
                       );
                     }}

@@ -263,34 +263,60 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   
   // Handle creating a new task at a specific time slot
   const handleCreateTaskAtTime = async () => {
-    const timeSlot = addModalSlot;
+    const resolvedContent = newTaskContent.trim();
+    const chosenSlot = newTaskStart || addModalSlot || TIME_SLOTS[0];
 
-    if (!timeSlot || !newTaskContent.trim() || isCreatingTask) {
+    if (!chosenSlot || !resolvedContent || isCreatingTask) {
       return;
     }
 
     setIsCreatingTask(true);
 
     try {
-      const dateStr = activePlannerDate;
+      const ensureHourPrefix = (slot: string) =>
+        slot.startsWith('hour-') ? slot : `hour-${slot}`;
+      const stripHourPrefix = (slot: string) =>
+        slot.startsWith('hour-') ? slot.replace('hour-', '') : slot;
 
-      const newTask = await createTask(newTaskContent.trim(), dateStr, undefined, taskBucket);
+      const dateStr = activePlannerDate;
+      const startLabel = stripHourPrefix(chosenSlot);
+      const normalizedStartSlot = ensureHourPrefix(chosenSlot);
+      const endLabel = calculateEndTime(startLabel, newTaskDuration);
+      const normalizedEndSlot = endLabel ? ensureHourPrefix(endLabel) : undefined;
+      const repeatRule = newTaskRepeat ?? 'none';
+
+      const newTask = await createTask(
+        resolvedContent,
+        dateStr,
+        normalizedStartSlot,
+        taskBucket,
+        repeatRule,
+        {
+          endDate: dateStr,
+          endHourSlot: normalizedEndSlot,
+          allDay: false,
+        }
+      );
 
       if (newTask) {
         await batchUpdateTasks([
           {
             taskId: newTask.id,
             updates: {
-              hourSlot: `hour-${timeSlot}`,
+              hourSlot: normalizedStartSlot,
+              endHourSlot: normalizedEndSlot ?? null,
               duration: newTaskDuration,
+              allDay: false,
             },
             occurrenceDate: dateStr,
           },
         ]);
       }
 
-      setNewTaskContent("");
+      setNewTaskContent('');
       setNewTaskDuration(60);
+      setNewTaskRepeat('none');
+      setNewTaskStart('');
       setAddModalSlot(null);
     } catch (error) {
       console.error('Failed to create task:', error);

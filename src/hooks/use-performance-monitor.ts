@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import * as Sentry from '@sentry/nextjs'
 
 interface PerformanceMetrics {
@@ -7,64 +7,91 @@ interface PerformanceMetrics {
   endTime?: number
   duration?: number
   metadata?: Record<string, any>
+  completed?: boolean
 }
+
+const SLOW_OPERATION_THRESHOLD_MS = 1000
 
 export function usePerformanceMonitor(operationName: string, metadata?: Record<string, any>) {
   const metricsRef = useRef<PerformanceMetrics>({
     operationName,
     startTime: performance.now(),
-    metadata
+    metadata,
+    completed: false
   })
 
   useEffect(() => {
     // Start tracking when component mounts
     const startTime = performance.now()
-    metricsRef.current.startTime = startTime
+    metricsRef.current = {
+      operationName,
+      startTime,
+      metadata,
+      completed: false
+    }
 
     return () => {
+      if (metricsRef.current.completed) {
+        return
+      }
+
       // Track when component unmounts
       const endTime = performance.now()
       const duration = endTime - startTime
 
-      metricsRef.current.endTime = endTime
-      metricsRef.current.duration = duration
+      const finalMetadata = metricsRef.current.metadata ?? {}
 
-      // Log slow operations (> 1 second)
-      if (duration > 1000) {
-        console.warn(`Slow operation detected: ${operationName} took ${duration.toFixed(2)}ms`)
-
-        // Send to Sentry
-        Sentry.addBreadcrumb({
-          message: `Slow operation: ${operationName}`,
-          level: 'warning',
-          data: {
-            duration: duration,
-            ...metadata
-          }
-        })
+      metricsRef.current = {
+        ...metricsRef.current,
+        endTime,
+        duration,
+        completed: true
       }
 
-      // Track performance metrics
+      // Track cleanup without completion for visibility
       Sentry.addBreadcrumb({
-        message: `Performance: ${operationName}`,
+        message: `Performance cleanup: ${operationName}`,
         level: 'info',
         data: {
-          duration: duration,
-          ...metadata
+          duration,
+          ...finalMetadata
         }
       })
     }
   }, [operationName, metadata])
 
-  const markComplete = (additionalMetadata?: Record<string, any>) => {
+  const markComplete = useCallback((additionalMetadata?: Record<string, any>) => {
     const endTime = performance.now()
     const duration = endTime - metricsRef.current.startTime
-    
+
+    const mergedMetadata = {
+      ...(metricsRef.current.metadata ?? {}),
+      ...(additionalMetadata ?? {})
+    }
+
     const finalMetrics = {
       ...metricsRef.current,
       endTime,
       duration,
-      metadata: { ...metadata, ...additionalMetadata }
+      metadata: mergedMetadata,
+      completed: true
+    }
+
+    metricsRef.current = finalMetrics
+
+    if (duration > SLOW_OPERATION_THRESHOLD_MS) {
+      console.warn(`Slow operation detected: ${operationName} took ${duration.toFixed(2)}ms`)
+
+      Sentry.addBreadcrumb({
+        message: `Slow operation: ${operationName}`,
+        level: 'warning',
+        data: {
+          duration,
+          ...mergedMetadata
+        }
+      })
+
+      return finalMetrics
     }
 
     // Track in Sentry
@@ -75,7 +102,7 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
     })
 
     return finalMetrics
-  }
+  }, [operationName])
 
   return { markComplete, metrics: metricsRef.current }
 }
@@ -98,19 +125,20 @@ export async function measureAsync<T>(
       startTime,
       endTime,
       duration,
-      metadata
+      metadata,
+      completed: true
     }
 
     // Log slow operations
-    if (duration > 1000) {
+    if (duration > SLOW_OPERATION_THRESHOLD_MS) {
       console.warn(`Slow async operation: ${operationName} took ${duration.toFixed(2)}ms`)
     }
 
     // Track in Sentry
     Sentry.addBreadcrumb({
       message: `Async operation: ${operationName}`,
-      level: duration > 1000 ? 'warning' : 'info',
-      data: { duration, ...metadata }
+      level: duration > SLOW_OPERATION_THRESHOLD_MS ? 'warning' : 'info',
+      data: { duration, ...(metadata ?? {}) }
     })
 
     return { result, metrics }

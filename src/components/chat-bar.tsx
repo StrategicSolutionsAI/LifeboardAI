@@ -327,14 +327,32 @@ export function ChatBar() {
       // If we're speaking, stop so you can barge in
       cancelTTS()
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          deviceId: micDeviceId ? { exact: micDeviceId } : undefined,
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100
-        } 
-      })
+      // Try with specific device first, fallback to default if it fails
+      let stream: MediaStream | null = null
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            deviceId: micDeviceId ? { exact: micDeviceId } : undefined,
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100
+          } 
+        })
+      } catch (deviceError: any) {
+        console.warn('⚠️ Failed with specific device, trying default microphone:', deviceError)
+        // If specific device fails, try without device constraint
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100
+          } 
+        })
+        // Clear the saved device ID since it's not working
+        setMicDeviceId('')
+      }
+      
+      if (!stream) throw new Error('Failed to get microphone stream')
 
       setHasRequestedDeviceAccess(true)
       enumerateAudioDevices(false)
@@ -404,10 +422,38 @@ export function ChatBar() {
       
     } catch (error: any) {
       console.error('❌ Error accessing microphone:', error)
+      console.error('Error details:', {
+        name: error?.name,
+        message: error?.message,
+        micDeviceId,
+        hasRequestedDeviceAccess
+      })
+      
+      // Provide more helpful error messages based on the error type
+      let errorMessage = 'Microphone access error. '
+      
+      if (error?.name === 'NotAllowedError' || error?.message?.includes('Permission denied')) {
+        errorMessage += 'Permission denied. To use voice mode:\n\n' +
+          '1. Click the 🔒 or ⓘ icon in your browser\'s address bar\n' +
+          '2. Find "Microphone" permissions\n' +
+          '3. Change it to "Allow"\n' +
+          '4. Refresh the page and try again'
+      } else if (error?.name === 'NotFoundError') {
+        errorMessage += 'No microphone found. Please connect a microphone and try again.'
+      } else if (error?.name === 'NotReadableError') {
+        errorMessage += 'Microphone is already in use by another application. Please close other apps using your microphone and try again.'
+      } else {
+        errorMessage += `${error?.message || 'Unknown error'}. Please check your browser permissions and try again.`
+      }
+      
       setMessages(prev => [...prev, { 
         role: "assistant", 
-        content: `Microphone error: ${error?.message || 'Unknown error'}. Please check your browser permissions and try again.`
+        content: errorMessage
       }])
+      
+      // Reset voice mode state on error
+      setIsVoiceMode(false)
+      setIsRecording(false)
     }
   }
 
@@ -482,10 +528,24 @@ export function ChatBar() {
       const { client_secret, model } = await sessRes.json()
       if (!client_secret) throw new Error('Missing client_secret')
 
-      // 2) Capture mic
-      const local = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: micDeviceId ? { exact: micDeviceId } : undefined, echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
-      })
+      // 2) Capture mic - try specific device first, fallback to default
+      let local: MediaStream | null = null
+      try {
+        local = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: micDeviceId ? { exact: micDeviceId } : undefined, echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+        })
+      } catch (deviceError: any) {
+        console.warn('⚠️ Realtime: Failed with specific device, trying default microphone:', deviceError)
+        // If specific device fails, try without device constraint
+        local = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+        })
+        // Clear the saved device ID since it's not working
+        setMicDeviceId('')
+      }
+      
+      if (!local) throw new Error('Failed to get microphone stream')
+      
       setHasRequestedDeviceAccess(true)
       enumerateAudioDevices(false)
       rtLocalStreamRef.current = local
@@ -524,12 +584,19 @@ export function ChatBar() {
       if (!remoteAudio) {
         console.warn('Realtime: remote audio element not available')
       } else {
+        console.log('🔧 Realtime: Configuring audio element', {
+          speakReplies,
+          muted: !speakReplies,
+          volume: speakReplies ? 1 : 0,
+          speakerDeviceId
+        })
         remoteAudio.autoplay = true
         remoteAudio.muted = !speakReplies
         remoteAudio.volume = speakReplies ? 1 : 0
         try {
           if (speakerDeviceId && typeof (remoteAudio as any).setSinkId === 'function') {
             await (remoteAudio as any).setSinkId(speakerDeviceId)
+            console.log('✅ Realtime: Audio output device set to:', speakerDeviceId)
           }
         } catch (e) {
           console.warn('Failed to set output device (setSinkId)', e)
@@ -550,13 +617,26 @@ export function ChatBar() {
         if (stream && rtRemoteAudioRef.current) {
           gotTrack = true
           clearTimeout(trackTimeout)
+          console.log('🔊 Realtime: Received audio track, setting up playback')
           rtRemoteAudioRef.current.srcObject = stream
           rtRemoteAudioRef.current
             .play()
-            .then(() => setIsSpeaking(true))
-            .catch(() => {/* autoplay may be blocked; will set state on user action */})
-          rtRemoteAudioRef.current.onplay = () => setIsSpeaking(true)
-          rtRemoteAudioRef.current.onpause = rtRemoteAudioRef.current.onended = () => setIsSpeaking(false)
+            .then(() => {
+              console.log('✅ Realtime: Audio playback started successfully')
+              setIsSpeaking(true)
+            })
+            .catch((err) => {
+              console.error('❌ Realtime: Audio playback failed:', err)
+              console.log('💡 Try clicking anywhere on the page to enable audio autoplay')
+            })
+          rtRemoteAudioRef.current.onplay = () => {
+            console.log('▶️ Realtime: Audio playing')
+            setIsSpeaking(true)
+          }
+          rtRemoteAudioRef.current.onpause = rtRemoteAudioRef.current.onended = () => {
+            console.log('⏸️ Realtime: Audio stopped')
+            setIsSpeaking(false)
+          }
         }
       }
 
@@ -895,9 +975,25 @@ export function ChatBar() {
       const answerSDP = await resp.text()
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSDP })
 
-    } catch (e) {
+    } catch (e: any) {
+      console.error('❌ Realtime voice error:', e)
       setIsRealtimeActive(false)
       stopRealtime()
+      
+      // Provide helpful error message for microphone permission issues
+      if (e?.name === 'NotAllowedError' || e?.message?.includes('Permission denied')) {
+        setMessages(prev => [...prev, { 
+          role: "assistant", 
+          content: 'Microphone access error. Permission denied. To use voice mode:\n\n' +
+            '1. Click the 🔒 or ⓘ icon in your browser\'s address bar\n' +
+            '2. Find "Microphone" permissions\n' +
+            '3. Change it to "Allow"\n' +
+            '4. Refresh the page and try again'
+        }])
+        setIsVoiceMode(false)
+        return // Don't throw, just exit gracefully
+      }
+      
       throw e
     }
   }

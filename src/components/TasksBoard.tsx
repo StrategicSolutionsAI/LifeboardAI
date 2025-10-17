@@ -28,6 +28,11 @@ export type Task = {
   startDate?: string | null;
   endDate?: string | null;
   createdAt?: string | null;
+  due?: {
+    date?: string;
+    datetime?: string;
+    is_recurring?: boolean;
+  } | null;
 };
 
 type BucketSummary = {
@@ -83,7 +88,7 @@ function groupByBucket(tasks: Task[]) {
   return map;
 }
 
-function formatDueDate(due?: string | null) {
+function formatDueDate(due?: string | null, isRecurring?: boolean) {
   if (!due) return null;
   let parsed: Date;
   try {
@@ -95,7 +100,8 @@ function formatDueDate(due?: string | null) {
   const diff = differenceInCalendarDays(parsed, new Date());
   if (diff === 0) return { label: "Today", tone: "accent" as const };
   if (diff === 1) return { label: "Tomorrow", tone: "default" as const };
-  if (diff < 0) return { label: `Overdue`, tone: "destructive" as const };
+  // Don't mark recurring tasks as overdue - the date represents the next occurrence
+  if (diff < 0 && !isRecurring) return { label: `Overdue`, tone: "destructive" as const };
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? "accent" as const : "default" as const };
 }
 
@@ -156,7 +162,8 @@ function formatTaskDateBadge(task: Task) {
   }
 
   const fallbackDate = task.dueDate ?? task.startDate ?? task.endDate ?? null;
-  return formatDueDate(fallbackDate);
+  const isRecurring = task.due?.is_recurring ?? false;
+  return formatDueDate(fallbackDate, isRecurring);
 }
 
 function TaskCard({

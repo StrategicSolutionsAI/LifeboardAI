@@ -87,7 +87,8 @@ export function EnhancedTasksView({
       if (dueDate) {
         if (isToday(dueDate)) {
           today += 1;
-        } else if (isPast(dueDate)) {
+        } else if (isPast(dueDate) && !task.due?.is_recurring) {
+          // Only count as overdue if not a recurring task
           overdue += 1;
         }
       }
@@ -144,7 +145,8 @@ export function EnhancedTasksView({
       if (activeFilter === "overdue") {
         return openTasks.filter((task) => {
           const dueDate = parseDueDate(task);
-          return dueDate ? isPast(dueDate) && !isToday(dueDate) : false;
+          // Don't include recurring tasks in overdue filter
+          return dueDate ? isPast(dueDate) && !isToday(dueDate) && !task.due?.is_recurring : false;
         });
       }
 
@@ -187,7 +189,8 @@ export function EnhancedTasksView({
 
   const renderTask = (task: Task) => {
     const dueDate = parseDueDate(task);
-    const isOverdue = dueDate ? isPast(dueDate) && !isToday(dueDate) : false;
+    // Don't mark recurring tasks as overdue
+    const isOverdue = dueDate ? isPast(dueDate) && !isToday(dueDate) && !task.due?.is_recurring : false;
     const isDueToday = dueDate ? isToday(dueDate) : false;
     const taskId = task.id.toString();
     const linkedInfo = linkedMap[taskId];

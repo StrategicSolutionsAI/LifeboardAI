@@ -100,6 +100,7 @@ function TasksBoardShell() {
       startDate: t.startDate ?? null,
       endDate: t.endDate ?? null,
       createdAt: t.created_at ?? null,
+      due: t.due,
     }));
   }, [tasksForBoard]);
 
