@@ -11,7 +11,7 @@ import type { ListTask } from "@/components/task-list-view";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import { Plus, ListTodo, Search } from "lucide-react";
+import { Plus, ListTodo, Search, ListChecks, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { useToast, ToastProvider } from "@/components/ui/use-toast";
@@ -205,6 +205,27 @@ function TasksBoardShell() {
   const completedTasks = useMemo(() => allTasks.filter((t) => t.completed), [allTasks]);
   const totalOpen = openTasks.length;
   const totalCompleted = completedTasks.length;
+
+  const overdueTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return openTasks.filter((t) => {
+      if (!t.due?.date) return false;
+      if (t.due?.is_recurring) return false;
+      const parsed = parseISO(t.due.date);
+      return isValid(parsed) && parsed < today;
+    });
+  }, [openTasks]);
+
+  const inProgressTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return openTasks.filter((t) => {
+      if (!t.due?.date) return false;
+      const parsed = parseISO(t.due.date);
+      return isValid(parsed) && parsed >= today;
+    });
+  }, [openTasks]);
 
   // Board view data (uses filtered tasks)
   const boardFilteredTasks = useMemo(() => {
@@ -413,6 +434,38 @@ function TasksBoardShell() {
               placeholder="Search tasks..."
               className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#dbd6cf] bg-white text-[13px] text-[#314158] placeholder:text-[#b5b0a8] focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
             />
+          </div>
+        </div>
+
+        {/* Stat Summary Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_1px_3px_rgba(163,133,96,0.06)]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.15)] mb-2">
+              <ListChecks className="h-[18px] w-[18px] text-[#B1916A]" />
+            </div>
+            <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{allTasks.length}</p>
+            <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Total Tasks</p>
+          </div>
+          <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_1px_3px_rgba(163,133,96,0.06)]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.15)] mb-2">
+              <Clock className="h-[18px] w-[18px] text-[#4AADE0]" />
+            </div>
+            <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{inProgressTasks.length}</p>
+            <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">In Progress</p>
+          </div>
+          <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_1px_3px_rgba(163,133,96,0.06)]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.15)] mb-2">
+              <CheckCircle2 className="h-[18px] w-[18px] text-[#48B882]" />
+            </div>
+            <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{totalCompleted}</p>
+            <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Completed</p>
+          </div>
+          <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_1px_3px_rgba(163,133,96,0.06)]">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.15)] mb-2">
+              <AlertTriangle className="h-[18px] w-[18px] text-[#d62a9a]" />
+            </div>
+            <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{overdueTasks.length}</p>
+            <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Overdue</p>
           </div>
         </div>
 

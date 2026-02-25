@@ -363,6 +363,20 @@ const BG_TINT_CLASSES: Record<string, string> = {
   stone: 'bg-[rgba(184,176,168,0.08)]',
 };
 
+// Icon container tint classes (15% opacity — transparent colored bg for icon containers)
+const BG_ICON_TINT_CLASSES: Record<string, string> = {
+  tan: 'bg-[rgba(177,145,106,0.15)]',
+  green: 'bg-[rgba(72,184,130,0.15)]',
+  blue: 'bg-[rgba(74,173,224,0.15)]',
+  purple: 'bg-[rgba(139,127,212,0.15)]',
+  pink: 'bg-[rgba(208,122,164,0.15)]',
+  gold: 'bg-[rgba(196,164,78,0.15)]',
+  orange: 'bg-[rgba(226,138,93,0.15)]',
+  teal: 'bg-[rgba(94,155,140,0.15)]',
+  slate: 'bg-[rgba(142,153,168,0.15)]',
+  stone: 'bg-[rgba(184,176,168,0.15)]',
+};
+
 // Display labels for the color picker
 const WIDGET_COLOR_LABELS: Record<string, string> = {
   tan: 'Tan',
@@ -3936,28 +3950,28 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   {activeWidgets.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
                       <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.15)] mb-2">
                           <LayoutDashboard className="h-[18px] w-[18px] text-[#B1916A]" />
                         </div>
                         <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.length}</p>
                         <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Total Widgets</p>
                       </div>
                       <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.08)] mb-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.15)] mb-2">
                           <Activity className="h-[18px] w-[18px] text-[#4AADE0]" />
                         </div>
                         <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val > 0 && val < (w.target || 1); }).length}</p>
                         <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">In Progress</p>
                       </div>
                       <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.08)] mb-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.15)] mb-2">
                           <Check className="h-[18px] w-[18px] text-[#48B882]" />
                         </div>
                         <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val >= (w.target || 1); }).length}</p>
                         <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Completed</p>
                       </div>
                       <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.08)] mb-2">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.15)] mb-2">
                           <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
                         </div>
                         <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val === 0; }).length}</p>
@@ -3975,11 +3989,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm hover:shadow-warm relative cursor-pointer transition-shadow"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#B1916A] shadow-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.15)]">
                           {isRefreshing ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                            <Loader2 className="h-5 w-5 animate-spin text-[#B1916A]" />
                           ) : (
-                            <RotateCw className="h-5 w-5 text-white" />
+                            <RotateCw className="h-5 w-5 text-[#B1916A]" />
                           )}
                         </div>
                         <span className="text-sm font-medium truncate">Refresh</span>
@@ -4133,9 +4147,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                             return (
                               <div
-                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#B1916A]'}`}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center ${BG_ICON_TINT_CLASSES[widgetColor] ?? 'bg-[rgba(177,145,106,0.15)]'}`}
                               >
-                                <IconComponent className="h-5 w-5 text-white" />
+                                <IconComponent className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-[#B1916A]'}`} />
                               </div>
                             );
                           })()}
@@ -4881,11 +4895,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             return (
                               <div key={widget.instanceId} className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-                                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${BG_COLOR_CLASSES[widget.color || "tan"] ?? "bg-[#B1916A]"}`}>
+                                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${BG_ICON_TINT_CLASSES[widget.color || "tan"] ?? "bg-[rgba(177,145,106,0.15)]"}`}>
                                     {IconComponent ? (
-                                      <IconComponent className="h-5 w-5 text-white" />
+                                      <IconComponent className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widget.color || "tan"] ?? "text-[#B1916A]"}`} />
                                     ) : (
-                                      <LayoutDashboard className="h-5 w-5 text-white" />
+                                      <LayoutDashboard className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widget.color || "tan"] ?? "text-[#B1916A]"}`} />
                                     )}
                                   </div>
                                   <div>
