@@ -96,29 +96,29 @@ export function NutritionSummaryWidget({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-gray-900">
+              <span className="text-lg font-bold text-[#314158]">
                 {Math.round(dailyTotals.calories)}
               </span>
-              <span className="text-sm text-gray-500">/ {nutritionGoals.calories} cal</span>
+              <span className="text-sm text-[#8e99a8]">/ {nutritionGoals.calories} cal</span>
             </div>
             {calorieProgress < 25 && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500 text-white">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warm-500 text-white">
                 Low
               </span>
             )}
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-1">
+          <div className="w-full bg-[#f5f0eb] rounded-full h-1">
             <div 
               className={`h-1 rounded-full transition-all duration-300 ${
-                calorieProgress >= 100 ? "bg-blue-500" : 
+                calorieProgress >= 100 ? "bg-warm-500" : 
                 calorieProgress >= 75 ? "bg-green-500" : 
-                calorieProgress >= 25 ? "bg-yellow-500" : "bg-gray-300"
+                calorieProgress >= 25 ? "bg-yellow-500" : "bg-[#ebe5de]"
               }`}
               style={{ width: `${Math.min(calorieProgress, 100)}%` }}
             />
           </div>
           {mealsWithFood.length > 0 && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-[#8e99a8]">
               {mealsWithFood.length} meal{mealsWithFood.length !== 1 ? 's' : ''} logged
             </div>
           )}
@@ -129,22 +129,22 @@ export function NutritionSummaryWidget({
 
   if (isLoading) {
     return (
-      <div className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative animate-pulse">
+      <div className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative animate-pulse">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-9 h-9 rounded-lg bg-green-500/90 shadow-sm">
             <Utensils className="h-5 w-5 text-white m-2" />
           </div>
           <span className="text-sm font-medium truncate">Daily Nutrition</span>
         </div>
-        <div className="w-20 h-8 bg-gray-200 rounded mb-2 mt-1"></div>
-        <div className="w-full h-1 bg-gray-100 rounded"></div>
+        <div className="w-20 h-8 bg-[#ebe5de] rounded mb-2 mt-1"></div>
+        <div className="w-full h-1 bg-[#f5f0eb] rounded"></div>
       </div>
     )
   }
 
   return (
     <div 
-      className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-gray-50 hover:shadow-md transition-all"
+      className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative cursor-pointer hover:bg-[#faf8f5] hover:shadow-warm transition-all"
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
@@ -155,25 +155,25 @@ export function NutritionSummaryWidget({
       </div>
       
       <div className="mt-2 mb-1">
-        <span className="text-3xl font-black text-gray-900">
+        <span className="text-3xl font-black text-[#314158]">
           {Math.round(dailyTotals.calories)}
         </span>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-[#8e99a8]">
           {" "}/ {nutritionGoals.calories}
         </span>
         {calorieProgress < 25 && (
-          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-500 text-white">
+          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warm-500 text-white">
             Low
           </span>
         )}
       </div>
       
-      <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
+      <div className="w-full bg-[#f5f0eb] rounded-full h-1 mt-2">
         <div 
           className={`h-1 rounded-full transition-all duration-300 ${
-            calorieProgress >= 100 ? "bg-blue-500" : 
+            calorieProgress >= 100 ? "bg-warm-500" : 
             calorieProgress >= 75 ? "bg-green-500" : 
-            calorieProgress >= 25 ? "bg-yellow-500" : "bg-gray-300"
+            calorieProgress >= 25 ? "bg-yellow-500" : "bg-[#ebe5de]"
           }`}
           style={{ width: `${Math.min(calorieProgress, 100)}%` }}
         />

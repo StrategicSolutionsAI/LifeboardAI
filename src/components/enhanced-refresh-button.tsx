@@ -142,7 +142,7 @@ export function EnhancedRefreshButton({
   const getVariantClasses = () => {
     switch (variant) {
       case 'primary':
-        return 'bg-theme-primary hover:bg-theme-primary-dark text-white shadow-sm hover:shadow-md'
+        return 'bg-theme-primary hover:bg-theme-primary-dark text-white shadow-sm hover:shadow-warm'
       case 'secondary':
         return 'border border-theme-gray-300 bg-white hover:bg-theme-gray-50 text-theme-gray-700'
       case 'tertiary':
@@ -205,7 +205,7 @@ export function EnhancedRefreshButton({
           
           // Interactive effects
           'hover:scale-[1.02] active:scale-[0.98]',
-          'hover:shadow-lg hover:-translate-y-0.5',
+          'hover:shadow-warm-lg hover:-translate-y-0.5',
           
           // State-specific styles
           {
@@ -265,14 +265,14 @@ export function EnhancedRefreshButton({
       
       {/* Error tooltip */}
       {error && (
-        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-red-900 text-white text-sm rounded-md shadow-lg z-10 whitespace-nowrap">
+        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-red-900 text-white text-sm rounded-md shadow-warm-lg z-10 whitespace-nowrap">
           {error}
         </div>
       )}
       
       {/* Success message */}
       {successMessage && showSuccess && (
-        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-green-900 text-white text-sm rounded-md shadow-lg z-10 whitespace-nowrap">
+        <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-green-900 text-white text-sm rounded-md shadow-warm-lg z-10 whitespace-nowrap">
           {successMessage}
         </div>
       )}

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { isToday, isThisWeek, isPast, startOfDay, parseISO } from "date-fns";
+import { isPast, isThisWeek, isToday, parseISO } from "date-fns";
 
 interface Task {
   id: string;
@@ -18,12 +18,23 @@ interface TasksGroupedListProps {
 }
 
 interface TaskGroup {
+  key: string;
   title: string;
-  emoji: string;
-  color: string;
+  tone: "critical" | "accent" | "success" | "neutral";
   tasks: Task[];
   defaultCollapsed: boolean;
 }
+
+const parseDueDate = (raw?: string): Date | null => {
+  if (!raw) return null;
+  try {
+    const normalized = raw.length === 10 ? `${raw}T00:00:00` : raw;
+    const parsed = parseISO(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch {
+    return null;
+  }
+};
 
 export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
   const groups = useMemo(() => {
@@ -33,8 +44,6 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     const later: Task[] = [];
     const noDueDate: Task[] = [];
 
-    const now = new Date();
-
     tasks.forEach((task) => {
       if (task.completed) return; // Skip completed tasks
 
@@ -43,21 +52,20 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
         return;
       }
 
-      try {
-        const dueDate = parseISO(task.due.date);
-        
-        if (isPast(dueDate) && !isToday(dueDate)) {
-          overdue.push(task);
-        } else if (isToday(dueDate)) {
-          today.push(task);
-        } else if (isThisWeek(dueDate, { weekStartsOn: 0 })) {
-          thisWeek.push(task);
-        } else {
-          later.push(task);
-        }
-      } catch (e) {
-        // If date parsing fails, put in no due date
+      const dueDate = parseDueDate(task.due.date);
+      if (!dueDate) {
         noDueDate.push(task);
+        return;
+      }
+
+      if (isPast(dueDate) && !isToday(dueDate)) {
+        overdue.push(task);
+      } else if (isToday(dueDate)) {
+        today.push(task);
+      } else if (isThisWeek(dueDate, { weekStartsOn: 0 })) {
+        thisWeek.push(task);
+      } else {
+        later.push(task);
       }
     });
 
@@ -65,9 +73,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     
     if (overdue.length > 0) {
       result.push({
+        key: "overdue",
         title: "Overdue",
-        emoji: "⚠️",
-        color: "red",
+        tone: "critical",
         tasks: overdue,
         defaultCollapsed: false,
       });
@@ -75,9 +83,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     
     if (today.length > 0) {
       result.push({
+        key: "today",
         title: "Today",
-        emoji: "⭐",
-        color: "blue",
+        tone: "accent",
         tasks: today,
         defaultCollapsed: false,
       });
@@ -85,9 +93,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     
     if (thisWeek.length > 0) {
       result.push({
+        key: "this-week",
         title: "This Week",
-        emoji: "📅",
-        color: "green",
+        tone: "success",
         tasks: thisWeek,
         defaultCollapsed: false,
       });
@@ -95,9 +103,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     
     if (later.length > 0) {
       result.push({
+        key: "later",
         title: "Later",
-        emoji: "🗓️",
-        color: "gray",
+        tone: "neutral",
         tasks: later,
         defaultCollapsed: true,
       });
@@ -105,9 +113,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     
     if (noDueDate.length > 0) {
       result.push({
+        key: "no-due-date",
         title: "No Due Date",
-        emoji: "📝",
-        color: "gray",
+        tone: "neutral",
         tasks: noDueDate,
         defaultCollapsed: true,
       });
@@ -117,36 +125,56 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
   }, [tasks]);
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    return new Set(groups.filter(g => g.defaultCollapsed).map(g => g.title));
+    return new Set(groups.filter((g) => g.defaultCollapsed).map((g) => g.key));
   });
 
-  const toggleGroup = (title: string) => {
+  useEffect(() => {
+    const availableKeys = new Set(groups.map((group) => group.key));
+    setCollapsedGroups((prev) => {
+      const next = new Set<string>();
+      prev.forEach((key) => {
+        if (availableKeys.has(key)) {
+          next.add(key);
+        }
+      });
+
+      groups.forEach((group) => {
+        if (group.defaultCollapsed && !prev.has(group.key)) {
+          next.add(group.key);
+        }
+      });
+
+      return next;
+    });
+  }, [groups]);
+
+  const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(title)) {
-        next.delete(title);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(title);
+        next.add(key);
       }
       return next;
     });
   };
 
-  const getGroupStyles = (color: string) => {
+  const getGroupStyles = (tone: TaskGroup["tone"]) => {
     const styles = {
-      red: "bg-red-50 border-red-200 text-red-700",
-      blue: "bg-blue-50 border-blue-200 text-blue-700",
-      green: "bg-green-50 border-green-200 text-green-700",
-      gray: "bg-gray-50 border-gray-200 text-gray-700",
+      critical: "border-red-200/70 bg-red-50/60 text-red-700",
+      accent: "border-[#dbd6cf]/70 bg-[#fdf8f6]/60 text-[#9a7b5a]",
+      success: "border-emerald-200/70 bg-emerald-50/60 text-emerald-700",
+      neutral: "border-border/70 bg-muted/40 text-muted-foreground",
     };
-    return styles[color as keyof typeof styles] || styles.gray;
+    return styles[tone];
   };
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <p className="text-lg mb-2">🎉 All caught up!</p>
-        <p className="text-sm">You have no pending tasks.</p>
+      <div className="py-12 text-center text-muted-foreground">
+        <p className="mb-2 text-lg">All caught up</p>
+        <p className="text-sm">No open tasks in this section.</p>
       </div>
     );
   }
@@ -154,31 +182,25 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
   return (
     <div className="space-y-4">
       {groups.map((group) => {
-        const isCollapsed = collapsedGroups.has(group.title);
+        const isCollapsed = collapsedGroups.has(group.key);
         
         return (
-          <div key={group.title} className="border border-gray-200 rounded-lg overflow-hidden">
-            {/* Group Header */}
+          <div key={group.key} className="overflow-hidden rounded-xl border border-border/70">
             <button
-              onClick={() => toggleGroup(group.title)}
-              className={`w-full flex items-center justify-between p-4 font-medium transition-colors hover:bg-gray-50 ${getGroupStyles(group.color)}`}
+              onClick={() => toggleGroup(group.key)}
+              className={`flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors ${getGroupStyles(group.tone)}`}
             >
               <div className="flex items-center gap-2">
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-                <span>
-                  {group.emoji} {group.title}
-                </span>
-                <span className="text-sm opacity-75">({group.tasks.length})</span>
+                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <span>{group.title}</span>
+              </div>
+              <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-background/70 px-2 text-xs font-semibold text-foreground">
+                {group.tasks.length}
               </div>
             </button>
 
-            {/* Group Tasks */}
             {!isCollapsed && (
-              <div className="divide-y divide-gray-100 bg-white">
+              <div className="divide-y divide-border/60 bg-background">
                 {group.tasks.map((task, index) => (
                   <div key={task.id}>{renderTask(task, index)}</div>
                 ))}

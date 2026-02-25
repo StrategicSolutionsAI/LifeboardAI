@@ -8,7 +8,7 @@ import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
-import { format, addDays, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, isSameDay, parseISO, formatDistanceToNow } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
@@ -117,7 +117,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import WidgetSelector from "./widget-selector";
-import { TasksContext, TasksProvider, useTasksContext } from '@/contexts/tasks-context';
+import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TasksQuickActions } from "@/components/tasks-quick-actions";
 import { TasksGroupedList } from "@/components/tasks-grouped-list";
@@ -320,14 +320,47 @@ const getTemplateColor = (id: string): string | null => {
 };
 
 // Color to Tailwind background class map (500 tone)
-const BG_COLOR_CLASSES: Record<string,string> = {
-  blue:'bg-blue-500', green:'bg-green-500', red:'bg-red-500', orange:'bg-orange-500', purple:'bg-purple-500', indigo:'bg-indigo-500', amber:'bg-amber-500', teal:'bg-teal-500', rose:'bg-rose-500', cyan:'bg-cyan-500', yellow:'bg-yellow-500', sky:'bg-sky-500', emerald:'bg-emerald-500', violet:'bg-violet-500', lime:'bg-lime-500', fuchsia:'bg-fuchsia-500', gray:'bg-gray-500', slate:'bg-slate-500', stone:'bg-stone-500'
+const BG_COLOR_CLASSES: Record<string, string> = {
+  blue: 'bg-warm-500', green: 'bg-green-500', red: 'bg-red-500', orange: 'bg-orange-500', purple: 'bg-amber-500', indigo: 'bg-warm-500', amber: 'bg-amber-500', teal: 'bg-teal-500', rose: 'bg-rose-500', cyan: 'bg-cyan-500', yellow: 'bg-yellow-500', sky: 'bg-sky-500', emerald: 'bg-emerald-500', violet: 'bg-violet-500', lime: 'bg-lime-500', fuchsia: 'bg-fuchsia-500', gray: 'bg-[#b8b0a8]', slate: 'bg-slate-500', stone: 'bg-stone-500'
 };
 
 // Text color classes to match widget icon color (500 tone)
-const TEXT_COLOR_CLASSES: Record<string,string> = {
-  blue:'text-blue-500', green:'text-green-500', red:'text-red-500', orange:'text-orange-500', purple:'text-purple-500', indigo:'text-indigo-500', amber:'text-amber-500', teal:'text-teal-500', rose:'text-rose-500', cyan:'text-cyan-500', yellow:'text-yellow-500', sky:'text-sky-500', emerald:'text-emerald-500', violet:'text-violet-500', lime:'text-lime-500', fuchsia:'text-fuchsia-500', gray:'text-gray-500', slate:'text-slate-500', stone:'text-stone-500'
+const TEXT_COLOR_CLASSES: Record<string, string> = {
+  blue: 'text-warm-500', green: 'text-green-500', red: 'text-red-500', orange: 'text-orange-500', purple: 'text-amber-500', indigo: 'text-warm-500', amber: 'text-amber-500', teal: 'text-teal-500', rose: 'text-rose-500', cyan: 'text-cyan-500', yellow: 'text-yellow-500', sky: 'text-sky-500', emerald: 'text-emerald-500', violet: 'text-violet-500', lime: 'text-lime-500', fuchsia: 'text-fuchsia-500', gray: 'text-[#8e99a8]', slate: 'text-slate-500', stone: 'text-stone-500'
 };
+
+const WIDGET_COLOR_OPTIONS = Object.keys(BG_COLOR_CLASSES);
+
+const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
+  progress: "bg-warm-500",
+  integration: "bg-emerald-500",
+  entry: "bg-violet-500",
+  task: "bg-amber-500",
+  system: "bg-[#b8b0a8]",
+};
+
+interface WidgetLogEntry {
+  id: string;
+  widgetInstanceId: string;
+  widgetName: string;
+  message: string;
+  details?: string;
+  occurredAt: string;
+  kind: "progress" | "integration" | "entry" | "task" | "system";
+}
+
+interface DestructiveConfirmState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  onConfirm: () => Promise<void> | void;
+}
+
+interface UndoState {
+  id: number;
+  message: string;
+  onUndo: () => Promise<void> | void;
+}
 
 /**
  * TaskBoardDashboard
@@ -376,17 +409,17 @@ const SUGGESTED_BUCKETS = [
 function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstance[]>): Record<string, WidgetInstance[]> {
   const migratedWidgets = { ...widgetsByBucket };
   let hasChanges = false;
-  
+
   // Create a lookup map for templates
   const templateMap = new Map<string, WidgetTemplate>();
   widgetTemplates.forEach(template => {
     templateMap.set(template.id, template);
   });
-  
+
   // Migrate widgets in each bucket
   Object.keys(migratedWidgets).forEach(bucketName => {
     const widgets = migratedWidgets[bucketName];
-    
+
     widgets.forEach((widget, index) => {
       const template = templateMap.get(widget.id);
       if (template) {
@@ -408,7 +441,7 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
       }
     });
   });
-  
+
   return migratedWidgets;
 }
 
@@ -416,7 +449,7 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
   // Access tasks context for all task operations
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask, allTasks, toggleTaskCompletion: toggleTaskCompletionContext } = useTasksContext();
-  
+
   // State for task management
   const [taskView, setTaskView] = useState('Today');
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
@@ -454,7 +487,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Bucket color utility functions
   const getBucketColor = (bucket: string) => {
-    return bucketColors[bucket] || '#8491FF'
+    return bucketColors[bucket] || '#B1916A'
   }
 
   const hexToRgba = (hex: string, alpha: number) => {
@@ -484,7 +517,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     wellness: '#10B981',   // emerald-500
     family: '#60A5FA',     // blue-400
     social: '#F43F5E',     // rose-500
-    work: '#6366F1',       // indigo-500
+    work: '#B1916A',       // indigo-500
     personal: '#8B5CF6',   // violet-500
     projects: '#0EA5E9',   // sky-500
     home: '#64748B',       // slate-500
@@ -494,7 +527,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   function getSuggestedColorForBucket(name: string): string {
     const key = name?.toLowerCase?.().trim() || ''
-    return SUGGESTED_BUCKET_COLOR_MAP[key] || '#6366F1'
+    return SUGGESTED_BUCKET_COLOR_MAP[key] || '#B1916A'
   }
 
   const suggestedToShow = useMemo(
@@ -504,7 +537,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Preset color palette (hex) for bucket color selection
   const BUCKET_COLOR_PALETTE = [
-    '#6366F1', // indigo-500
+    '#B1916A', // indigo-500
     '#22C55E', // green-500
     '#EF4444', // red-500
     '#F59E0B', // amber-500
@@ -584,6 +617,40 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [shouldLoadExerciseWidget, setShouldLoadExerciseWidget] = useState(false);
   const [shouldLoadHomeProjectsWidget, setShouldLoadHomeProjectsWidget] = useState(false);
   const [chatBarReady, setChatBarReady] = useState(false);
+  const [confirmState, setConfirmState] = useState<DestructiveConfirmState | null>(null);
+  const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const undoTimeoutRef = useRef<number | null>(null);
+
+  const clearUndoTimer = useCallback(() => {
+    if (undoTimeoutRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+  }, []);
+
+  const pushUndo = useCallback(
+    (message: string, onUndo: () => Promise<void> | void) => {
+      clearUndoTimer();
+      const next: UndoState = {
+        id: Date.now(),
+        message,
+        onUndo,
+      };
+      setUndoState(next);
+      if (typeof window !== "undefined") {
+        undoTimeoutRef.current = window.setTimeout(() => {
+          setUndoState((current) => (current?.id === next.id ? null : current));
+        }, 6000);
+      }
+    },
+    [clearUndoTimer]
+  );
+
+  useEffect(() => {
+    return () => {
+      clearUndoTimer();
+    };
+  }, [clearUndoTimer]);
 
   useEffect(() => {
     const updateMobileView = () => setIsMobileView(window.innerWidth < 768);
@@ -641,7 +708,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // ----------------------------------------------------------------------
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
   // ----------------------------------------------------------------------
-  interface ProgressEntry { value:number; date:string; streak:number; lastCompleted:string; }
+  interface ProgressEntry { value: number; date: string; streak: number; lastCompleted: string; }
   const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
 
   // ----------------------------------------------------------------------
@@ -660,21 +727,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
     }
   }, [activeBucket]);
-  
+
   // Add a ref for progress too
   const progressByWidgetRef = useRef(progressByWidget);
   progressByWidgetRef.current = progressByWidget;
 
   // Fitbit data state
-  const [fitbitData, setFitbitData] = useState<Record<string, number>>(()=>{
-    if (typeof window !== 'undefined'){
-      try{ const stored=localStorage.getItem('fitbit_metrics'); if(stored) return JSON.parse(stored);}catch(e){}
+  const [fitbitData, setFitbitData] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      try { const stored = localStorage.getItem('fitbit_metrics'); if (stored) return JSON.parse(stored); } catch (e) { }
     }
     return {};
   });
 
   // Google Fit data state
-  const [googleFitData, setGoogleFitData] = useState<Record<string, number>>(()=>{
+  const [googleFitData, setGoogleFitData] = useState<Record<string, number>>(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('googlefit_metrics') : null;
     return stored ? JSON.parse(stored) : {};
   });
@@ -735,16 +802,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     };
   }, [widgetsByBucketRef.current]);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Todoist task state
   const [todoistTasks, setTodoistTasks] = useState<any[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
-  
+
   // Master list of all open tasks
   const [allTodoistTasks, setAllTodoistTasks] = useState<any[]>([]);
-  
+
   const [isCompletingTask, setIsCompletingTask] = useState<Record<string, boolean>>({});
-  
+
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState('');
   const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
@@ -753,15 +820,189 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isNext2WeeksCollapsed, setIsNext2WeeksCollapsed] = useState(false);
   const [isLaterCollapsed, setIsLaterCollapsed] = useState(false);
   const [isNoDueDateCollapsed, setIsNoDueDateCollapsed] = useState(true);
-  
+
   // Dashboard inner subtabs (left panel)
-  const [activeSubTab, setActiveSubTab] = useState<'Overview'|'Trends'|'Logs'|'Tasks'|'Settings'>('Overview');
-  
+  const [activeSubTab, setActiveSubTab] = useState<'Overview' | 'Trends' | 'Logs' | 'Tasks' | 'Settings'>('Overview');
+
   // Widget selection for filtering
   const [selectedLogsWidget, setSelectedLogsWidget] = useState<string | 'all'>('all');
   const [selectedSettingsWidget, setSelectedSettingsWidget] = useState<string | 'all'>('all');
   const activeWidgets = useMemo(() => getDisplayWidgets(activeBucket), [widgetsByBucket, activeBucket]);
-  
+  const todayDateString = new Date().toISOString().slice(0, 10);
+  const [widgetHistoryLogs, setWidgetHistoryLogs] = useState<WidgetLogEntry[]>([]);
+  const [isWidgetLogsLoading, setIsWidgetLogsLoading] = useState(false);
+  const [widgetLogsError, setWidgetLogsError] = useState<string | null>(null);
+
+  const activeWidgetMap = useMemo(() => {
+    return new Map(activeWidgets.map((widget) => [widget.instanceId, widget]));
+  }, [activeWidgets]);
+
+  const localWidgetLogs = useMemo<WidgetLogEntry[]>(() => {
+    const logs: WidgetLogEntry[] = [];
+
+    activeWidgets.forEach((widget) => {
+      const progress = progressByWidget[widget.instanceId];
+      if (progress?.date) {
+        const reachedTarget = progress.value >= (widget.target || 1);
+        logs.push({
+          id: `local-progress-${widget.instanceId}-${progress.date}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: reachedTarget ? "Goal reached" : "Progress updated",
+          details: `${progress.value.toLocaleString()} / ${(widget.target || 1).toLocaleString()} ${widget.unit || ""}`.trim(),
+          occurredAt: `${progress.date}T20:00:00`,
+          kind: "progress",
+        });
+      }
+
+      if (widget.dataSource === "fitbit" || widget.dataSource === "googlefit") {
+        let syncedValue: number | null = null;
+        if (widget.id === "water") {
+          syncedValue = widget.dataSource === "fitbit" ? (fitbitData.water ?? null) : (googleFitData.water ?? null);
+        } else if (widget.id === "steps") {
+          syncedValue = widget.dataSource === "fitbit" ? (fitbitData.steps ?? null) : (googleFitData.steps ?? null);
+        }
+
+        if (typeof syncedValue === "number") {
+          logs.push({
+            id: `integration-${widget.instanceId}-${todayDateString}`,
+            widgetInstanceId: widget.instanceId,
+            widgetName: widget.name,
+            message: `Synced from ${widget.dataSource === "fitbit" ? "Fitbit" : "Google Fit"}`,
+            details: `${syncedValue.toLocaleString()} ${widget.unit || ""}`.trim(),
+            occurredAt: `${todayDateString}T12:00:00`,
+            kind: "integration",
+          });
+        }
+      }
+
+      if (widget.moodData?.lastUpdated) {
+        logs.push({
+          id: `mood-${widget.instanceId}-${widget.moodData.lastUpdated}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: "Mood logged",
+          details: widget.moodData.currentMood ? `Mood ${widget.moodData.currentMood}/5` : undefined,
+          occurredAt: widget.moodData.lastUpdated,
+          kind: "entry",
+        });
+      }
+
+      if (widget.journalData?.lastEntryDate) {
+        const words = widget.journalData.todaysEntry?.trim().split(/\s+/).filter(Boolean).length;
+        logs.push({
+          id: `journal-${widget.instanceId}-${widget.journalData.lastEntryDate}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: "Journal entry saved",
+          details: words ? `${words} words` : undefined,
+          occurredAt: `${widget.journalData.lastEntryDate}T20:00:00`,
+          kind: "entry",
+        });
+      }
+
+      if (widget.gratitudeData?.lastEntryDate) {
+        const count = widget.gratitudeData.gratitudeItems?.filter((item) => item.trim().length > 0).length;
+        logs.push({
+          id: `gratitude-${widget.instanceId}-${widget.gratitudeData.lastEntryDate}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: "Gratitude entry updated",
+          details: count ? `${count} items` : undefined,
+          occurredAt: `${widget.gratitudeData.lastEntryDate}T20:00:00`,
+          kind: "entry",
+        });
+      }
+
+      if (widget.weightData?.lastEntryDate && typeof widget.weightData.currentWeight === "number") {
+        logs.push({
+          id: `weight-${widget.instanceId}-${widget.weightData.lastEntryDate}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: "Weight logged",
+          details: `${widget.weightData.currentWeight} ${widget.weightData.unit || widget.unit || "lbs"}`,
+          occurredAt: `${widget.weightData.lastEntryDate}T20:00:00`,
+          kind: "entry",
+        });
+      }
+
+      if (widget.homeProjectsData?.lastUpdated) {
+        logs.push({
+          id: `home-projects-${widget.instanceId}-${widget.homeProjectsData.lastUpdated}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: "Projects updated",
+          details: widget.homeProjectsData.totalProjects
+            ? `${widget.homeProjectsData.totalProjects} total projects`
+            : undefined,
+          occurredAt: widget.homeProjectsData.lastUpdated,
+          kind: "entry",
+        });
+      }
+
+      if (widget.linkedTaskId) {
+        const linkedTask = allTasks.find((task) => task.id?.toString?.() === widget.linkedTaskId);
+        logs.push({
+          id: `task-link-${widget.instanceId}-${widget.linkedTaskId}`,
+          widgetInstanceId: widget.instanceId,
+          widgetName: widget.name,
+          message: linkedTask?.completed ? "Linked task completed" : "Linked to Tasks tab",
+          details: linkedTask?.content || widget.linkedTaskTitle,
+          occurredAt: linkedTask?.due?.date ? `${linkedTask.due.date}T09:00:00` : widget.createdAt,
+          kind: "task",
+        });
+      }
+
+      logs.push({
+        id: `widget-created-${widget.instanceId}`,
+        widgetInstanceId: widget.instanceId,
+        widgetName: widget.name,
+        message: "Widget created",
+        occurredAt: widget.createdAt,
+        kind: "system",
+      });
+    });
+
+    return logs;
+  }, [activeWidgets, progressByWidget, fitbitData, googleFitData, allTasks, todayDateString]);
+
+  const combinedWidgetLogs = useMemo(() => {
+    const merged = [...widgetHistoryLogs, ...localWidgetLogs];
+    const deduped = new Map<string, WidgetLogEntry>();
+
+    merged.forEach((entry) => {
+      const key = `${entry.widgetInstanceId}|${entry.message}|${entry.occurredAt.slice(0, 10)}|${entry.details ?? ""}`;
+      if (!deduped.has(key)) {
+        deduped.set(key, entry);
+      }
+    });
+
+    return Array.from(deduped.values()).sort((a, b) => {
+      const aTime = Date.parse(a.occurredAt);
+      const bTime = Date.parse(b.occurredAt);
+      if (Number.isNaN(aTime) || Number.isNaN(bTime)) {
+        return b.occurredAt.localeCompare(a.occurredAt);
+      }
+      return bTime - aTime;
+    });
+  }, [widgetHistoryLogs, localWidgetLogs]);
+
+  const filteredWidgetLogs = useMemo(() => {
+    if (selectedLogsWidget === "all") return combinedWidgetLogs;
+    return combinedWidgetLogs.filter((entry) => entry.widgetInstanceId === selectedLogsWidget);
+  }, [combinedWidgetLogs, selectedLogsWidget]);
+
+  const selectedSettingsWidgets = useMemo(() => {
+    if (selectedSettingsWidget === "all") return activeWidgets;
+    return activeWidgets.filter((widget) => widget.instanceId === selectedSettingsWidget);
+  }, [activeWidgets, selectedSettingsWidget]);
+
+  const formatLogTimestamp = (timestamp: string) => {
+    const parsed = Date.parse(timestamp);
+    if (Number.isNaN(parsed)) return "Unknown";
+    return formatDistanceToNow(parsed, { addSuffix: true });
+  };
+
   // Debounced persistence of bucket order to Supabase
   const debouncedSaveBucketsToSupabase = useRef(
     debounce(async (ordered: string[]) => {
@@ -779,7 +1020,69 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }, 1500)
   ).current;
 
-  const fetchIntegrationsData = useCallback( async () => {
+  const loadWidgetHistoryLogs = useCallback(async () => {
+    if (!user || activeWidgets.length === 0) {
+      setWidgetHistoryLogs([]);
+      setWidgetLogsError(null);
+      return;
+    }
+
+    setIsWidgetLogsLoading(true);
+    setWidgetLogsError(null);
+
+    try {
+      const widgetIds = activeWidgets.map((widget) => widget.instanceId);
+      const { data, error } = await supabase
+        .from("widget_progress_history")
+        .select("widget_instance_id,date,value,created_at")
+        .in("widget_instance_id", widgetIds)
+        .order("date", { ascending: false })
+        .limit(200);
+
+      if (error) {
+        throw error;
+      }
+
+      const historyLogs: WidgetLogEntry[] = (data ?? []).map((row: any) => {
+        const widget = activeWidgetMap.get(row.widget_instance_id);
+        const target = widget?.target && widget.target > 0 ? widget.target : 1;
+        const value = Number(row.value ?? 0);
+
+        return {
+          id: `history-${row.widget_instance_id}-${row.date}`,
+          widgetInstanceId: row.widget_instance_id,
+          widgetName: widget?.name ?? "Widget",
+          message: value >= target ? "Goal reached" : "Progress logged",
+          details: `${value.toLocaleString()} / ${target.toLocaleString()} ${widget?.unit || ""}`.trim(),
+          occurredAt: row.created_at ?? `${row.date}T12:00:00`,
+          kind: "progress",
+        };
+      });
+
+      setWidgetHistoryLogs(historyLogs);
+    } catch (error: any) {
+      setWidgetHistoryLogs([]);
+      setWidgetLogsError(error?.message || "Unable to load widget logs");
+    } finally {
+      setIsWidgetLogsLoading(false);
+    }
+  }, [activeWidgetMap, activeWidgets, user]);
+
+  useEffect(() => {
+    if (selectedLogsWidget !== "all" && !activeWidgetMap.has(selectedLogsWidget)) {
+      setSelectedLogsWidget("all");
+    }
+    if (selectedSettingsWidget !== "all" && !activeWidgetMap.has(selectedSettingsWidget)) {
+      setSelectedSettingsWidget("all");
+    }
+  }, [activeWidgetMap, selectedLogsWidget, selectedSettingsWidget]);
+
+  useEffect(() => {
+    if (activeSubTab !== "Logs") return;
+    void loadWidgetHistoryLogs();
+  }, [activeSubTab, loadWidgetHistoryLogs]);
+
+  const fetchIntegrationsData = useCallback(async () => {
     if (!user) return; // must be signed in to fetch integration data
 
     setIsRefreshing(true);
@@ -799,7 +1102,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             const allTasks: any[] = taskData.tasks || [];
             setAllTodoistTasks(allTasks);
 
-            const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}`;
+            const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
             setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
 
             if (typeof window !== 'undefined') {
@@ -1093,7 +1396,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const fetchTodoistTasks = useCallback(async (d: Date) => {
     try {
       setIsLoadingTasks(true);
-      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const res = await fetch(`/api/integrations/todoist/tasks?date=${iso}`);
       if (!res.ok) {
         setTodoistTasks([]);
@@ -1124,13 +1427,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               const allTasks: any[] = cached.tasks || [];
               setAllTodoistTasks(allTasks);
               if (dateForDaily) {
-                const iso = `${dateForDaily.getFullYear()}-${String(dateForDaily.getMonth() + 1).padStart(2,'0')}-${String(dateForDaily.getDate()).padStart(2,'0')}`;
+                const iso = `${dateForDaily.getFullYear()}-${String(dateForDaily.getMonth() + 1).padStart(2, '0')}-${String(dateForDaily.getDate()).padStart(2, '0')}`;
                 setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
               }
               return; // fresh cache
             }
           }
-        } catch {}
+        } catch { }
       }
 
       const res = await fetch('/api/integrations/todoist/tasks?all=true');
@@ -1176,7 +1479,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // ----------------------------------------------------------------------
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  
+
   const getTimeUntilDue = (dueDate: string | null) => {
     if (!dueDate) return null;
     const due = new Date(dueDate);
@@ -1274,10 +1577,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // ------------------------------------------------------------------
     // 1) Moves involving the hourly planner - now using TasksContext
     // ------------------------------------------------------------------
-    
+
     // Note: The HourlyPlanner component now uses TasksContext, so we need to
     // update tasks through the batch update API instead of local state
-    
+
     if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
       // Daily ➜ Hour slot - schedule the task
       const moved = todoistTasks[source.index];
@@ -1286,7 +1589,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
 
       const dstHour = hourKey(destination.droppableId);
-      
+
       try {
         // Use batchUpdateTasks for optimistic updates
         await batchUpdateTasks([{
@@ -1294,7 +1597,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           updates: { hourSlot: dstHour, duration: 60 }, // Default 60 minutes
           occurrenceDate: selectedDateStr,
         }]);
-        
+
       } catch (error) {
         console.error('Failed to schedule task:', error);
       }
@@ -1310,21 +1613,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       if (!moved) return;
 
       const dstHour = hourKey(destination.droppableId);
-      
+
       try {
         // Use batchUpdateTasks for optimistic updates
         await batchUpdateTasks([{
           taskId: draggableId,
-          updates: { 
-            hourSlot: dstHour, 
+          updates: {
+            hourSlot: dstHour,
             duration: 60 // Default 60 minutes
           },
           occurrenceDate: selectedDateStr,
         }]);
-        
+
         // Also update the due date
         await updateTaskDueDate(draggableId, selectedDateStr);
-        
+
       } catch (error) {
         console.error('Failed to schedule task from open list:', error);
       }
@@ -1335,12 +1638,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (isHour(source.droppableId) && isHour(destination.droppableId)) {
       const srcHour = hourKey(source.droppableId);
       const dstHour = hourKey(destination.droppableId);
-      
+
       if (srcHour === dstHour) {
         return;
       }
-      
-      
+
+
       try {
         // Use batchUpdateTasks for optimistic updates
         await batchUpdateTasks([{
@@ -1348,7 +1651,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           updates: { hourSlot: dstHour },
           occurrenceDate: selectedDateStr,
         }]);
-        
+
       } catch (error) {
         console.error('Failed to move task between hours:', error);
       }
@@ -1461,12 +1764,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // 3) Upcoming task group drag and drop handling
     // ------------------------------------------------------------------
     const upcomingDroppableIds = ['next7Days', 'next2Weeks', 'later', 'noDueDate'];
-    
+
     if (upcomingDroppableIds.includes(source.droppableId) || upcomingDroppableIds.includes(destination.droppableId)) {
-      
+
       // Get the task being moved
       let movedTask: any = null;
-      
+
       // Find the task in the appropriate source group
       if (source.droppableId === 'next7Days') {
         movedTask = upcomingTaskGroups.next7Days[source.index];
@@ -1482,11 +1785,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         const openVisible = allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr);
         movedTask = openVisible[source.index];
       }
-      
+
       if (!movedTask) {
         return;
       }
-      
+
       // Determine what date to set based on destination
       let newDueDate: string | null = null;
       const tomorrow = new Date(today);
@@ -1496,7 +1799,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       nextWeek.setDate(nextWeek.getDate() + 8);
       const nextMonth = new Date(today);
       nextMonth.setDate(nextMonth.getDate() + 30);
-      
+
       if (destination.droppableId === 'next7Days') {
         newDueDate = tomorrow.toISOString().split('T')[0];
       } else if (destination.droppableId === 'next2Weeks') {
@@ -1510,9 +1813,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       } else if (destination.droppableId === 'openTasks') {
         newDueDate = null;
       }
-      
+
       // Update the task's due date
-      
+
       // Optimistically update the state
       setAllTodoistTasks((prev) => {
         return prev.map((task) => {
@@ -1523,7 +1826,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           return task;
         });
       });
-      
+
       // Also update daily tasks if moving to/from daily
       if (destination.droppableId === 'dailyTasks') {
         setTodoistTasks((prev) => {
@@ -1537,7 +1840,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           return prev.filter((task) => task.id.toString() !== draggableId);
         });
       }
-      
+
       // Update the server
       await updateTaskDueDate(draggableId, newDueDate);
     }
@@ -1588,7 +1891,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           console.error('Failed to load progress from Supabase', err);
         }
       }
-      
+
       if (!loaded) {
       }
     }
@@ -1597,10 +1900,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, [user]);
 
   // Helper to get today string  
-  const todayStrGlobal = new Date().toISOString().slice(0,10);
+  const todayStrGlobal = new Date().toISOString().slice(0, 10);
 
   const incrementProgress = async (w: WidgetInstance) => {
-    
+
     setProgressByWidget(prev => {
       const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
       let { value, streak, lastCompleted } = entry;
@@ -1634,7 +1937,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           }).catch((err) => console.error('Failed to load confetti', err));
         }
       }
-      
+
       const newProgress = { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
       return newProgress;
     });
@@ -1672,12 +1975,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
       Object.entries(widgetsToSave).forEach(([bucket, widgets]) => {
       });
-      
+
       // Verify save by reading back
       const savedData = localStorage.getItem('widgets_by_bucket');
       const verified = JSON.parse(savedData!);
     }
-    
+
     // Save to Supabase
     try {
       const prefs = await getUserPreferencesClient();
@@ -1742,7 +2045,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const existingColor = bucketColors[name];
     const colorToUse = existingColor || getSuggestedColorForBucket(name);
     if (!existingColor) {
-      const nextColors = { ...bucketColors, [name]: colorToUse } as Record<string,string>;
+      const nextColors = { ...bucketColors, [name]: colorToUse } as Record<string, string>;
       setBucketColors(nextColors);
       if (typeof window !== 'undefined') {
         localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
@@ -1757,12 +2060,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       // Notify other views (e.g., Calendar) that buckets changed
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
-    
+
     // Save to Supabase for persistence
     try {
       const prefs = await getUserPreferencesClient();
       if (prefs) {
-        const mergedColors = { ...(prefs.bucket_colors || {}), [name]: colorToUse } as Record<string,string>;
+        const mergedColors = { ...(prefs.bucket_colors || {}), [name]: colorToUse } as Record<string, string>;
         await saveUserPreferences({
           ...prefs,
           life_buckets: updated,
@@ -1793,7 +2096,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // Auto-assign suggested color if missing
         const existing = (bucketColors[trimmed] || (prefs.bucket_colors || {})[trimmed]);
         const colorToUse = existing || getSuggestedColorForBucket(trimmed);
-        const nextColors = { ...(prefs.bucket_colors || {}), [trimmed]: colorToUse } as Record<string,string>;
+        const nextColors = { ...(prefs.bucket_colors || {}), [trimmed]: colorToUse } as Record<string, string>;
         setBucketColors(prev => ({ ...nextColors }));
         if (typeof window !== 'undefined') {
           localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
@@ -1813,7 +2116,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
   };
 
-  const handleRemoveBucket = async (bucket: string) => {
+  const handleRemoveBucketImmediate = async (bucket: string) => {
     const updated = buckets.filter(b => b !== bucket);
     setBuckets(updated);
     if (activeBucket === bucket && updated.length) {
@@ -1825,7 +2128,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       localStorage.setItem('life_buckets', JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
-    
+
     // Save to Supabase for persistence
     try {
       const prefs = await getUserPreferencesClient();
@@ -1838,6 +2141,48 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
+  };
+
+  const requestRemoveBucket = (bucket: string) => {
+    const previousBuckets = [...buckets];
+    const previousActiveBucket = activeBucket;
+
+    setConfirmState({
+      title: `Remove "${bucket}" tab?`,
+      description: "This removes the tab from your dashboard. You can undo immediately after confirming.",
+      confirmLabel: "Remove tab",
+      onConfirm: async () => {
+        await handleRemoveBucketImmediate(bucket);
+        pushUndo(`Removed ${bucket} tab`, async () => {
+          setBuckets(previousBuckets);
+          bucketsRef.current = previousBuckets;
+          if (previousActiveBucket) {
+            setActiveBucket(previousActiveBucket);
+          } else if (previousBuckets.length > 0) {
+            setActiveBucket(previousBuckets[0]);
+          } else {
+            setActiveBucket("");
+          }
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("life_buckets", JSON.stringify(previousBuckets));
+            window.dispatchEvent(new CustomEvent("lifeBucketsChanged"));
+          }
+
+          try {
+            const prefs = await getUserPreferencesClient();
+            if (prefs) {
+              await saveUserPreferences({
+                ...prefs,
+                life_buckets: previousBuckets,
+              });
+            }
+          } catch (err) {
+            console.error("Failed to restore bucket after undo:", err);
+          }
+        });
+      },
+    });
   };
 
   // Assign / update a color for a given bucket and persist
@@ -2007,21 +2352,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   async function loadWidgets() {
-    
+
     setIsWidgetLoadComplete(false);
-    
+
     // First try to load from localStorage for immediate display
     let loadedFromLocal = false;
     let localWidgets = {};
     let localSavedAt: string | null = null;
-    
+
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('widgets_by_bucket');
-        
+
         if (stored) {
           const parsed = JSON.parse(stored);
-          
+
           // Handle both old format (direct widgets) and new format (with metadata)
           if (parsed.widgets && parsed.savedAt) {
             localWidgets = parsed.widgets;
@@ -2029,25 +2374,25 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           } else {
             localWidgets = parsed;
           }
-          
-          
+
+
           // Count widgets per bucket
           Object.entries(localWidgets).forEach(([bucket, widgets]) => {
           });
-          
+
           setWidgetsByBucket(localWidgets);
           loadedFromLocal = true;
         } else {
         }
-      } catch(e) {
+      } catch (e) {
         console.error('Failed to parse stored widgets', e);
       }
     }
-    
+
     // Always try to load from Supabase (source of truth)
     try {
       const prefs = await getUserPreferencesClient();
-      
+
       if (prefs?.widgets_by_bucket && Object.keys(prefs.widgets_by_bucket).length > 0) {
         const supabaseUpdatedAt = prefs.updated_at ? Date.parse(prefs.updated_at) : 0;
         const localUpdatedAt = localSavedAt ? Date.parse(localSavedAt) : 0;
@@ -2079,7 +2424,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           // Supabase copy is newer – adopt it locally
           const migratedWidgets = migrateWidgetsToTemplates(prefs.widgets_by_bucket);
           setWidgetsByBucket(migratedWidgets);
-          
+
           // --- NEW: ensure bucket list includes any bucket keys from widgets ---
           const widgetBuckets = Object.keys(prefs.widgets_by_bucket);
           setBuckets(prev => {
@@ -2097,7 +2442,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             }
             return merged;
           });
-          
+
           if (typeof window !== 'undefined') {
             const dataToSave = {
               widgets: migratedWidgets,
@@ -2108,11 +2453,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         } else {
         }
       } else if (loadedFromLocal && Object.keys(localWidgets).length > 0) {
-        
+
         // Migrate local widgets before saving to Supabase
         const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
         setWidgetsByBucket(migratedLocalWidgets);
-        
+
         if (prefs) {
           await saveUserPreferences({
             ...prefs,
@@ -2209,8 +2554,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!isWidgetLoadComplete || !user) {
       return; // Don't save on initial load or if logged out
     }
-    
-    
+
+
     // Save to localStorage immediately
     if (typeof window !== 'undefined') {
       const dataToSave = {
@@ -2220,12 +2565,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
       Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
       });
-      
+
       // Verify save by reading back
       const savedData = localStorage.getItem('widgets_by_bucket');
       const verified = JSON.parse(savedData!);
     }
-    
+
     // Debounce the Supabase save
     debouncedSaveToSupabase();
   }, [widgetsByBucket, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
@@ -2281,7 +2626,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             }
           }
         }
-      } catch(e) {
+      } catch (e) {
         console.error('Failed to parse stored buckets', e);
       }
     }
@@ -2360,7 +2705,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           setBucketColors(defaultColors);
           const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
           setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
-          
+
           // Save the default buckets
           if (typeof window !== 'undefined') {
             localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
@@ -2368,7 +2713,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             // Broadcast so any open views refresh colors
             window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
           }
-          
+
           // Save to Supabase
           if (prefs) {
             await saveUserPreferences({
@@ -2397,13 +2742,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('onboarded')
         .eq('id', user.id)
         .single();
-      
+
       // If user has buckets but onboarded flag is false, fix it
       const prefs = await getUserPreferencesClient();
       if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
@@ -2466,11 +2811,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Clean up debug widgets from all buckets
   const cleanupDebugWidgets = async () => {
     const cleaned: Record<string, WidgetInstance[]> = {};
-    
+
     Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
       cleaned[bucket] = widgets.filter(w => !w.instanceId?.startsWith('debug-'));
     });
-    
+
     setWidgetsByBucket(cleaned);
     await saveWidgets(cleaned);
   };
@@ -2480,6 +2825,120 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const widgets = widgetsByBucket[bucket] ?? [];
     return widgets.filter((w) => !w.instanceId?.startsWith('debug-'));
   }
+
+  const resolveWidgetIcon = (widget: WidgetInstance): LucideIcon | null => {
+    if (typeof widget.icon === "string") {
+      const key = widget.icon.replace(/^Lucide/, "");
+      return getIconComponent(key) || getIconComponent(widget.icon);
+    }
+    if (typeof widget.icon === "function") {
+      return widget.icon;
+    }
+    return getIconComponent(widget.id);
+  };
+
+  const getDataSourceOptions = (widget: WidgetInstance): string[] => {
+    if (widget.id === "water" || widget.id === "steps") {
+      return ["manual", "fitbit", "googlefit"];
+    }
+    if (widget.id === "weight") {
+      return ["manual", "withings"];
+    }
+    return ["manual"];
+  };
+
+  const patchWidgetInActiveBucket = (widgetId: string, updates: Partial<WidgetInstance>) => {
+    setWidgetsByBucket((prev) => {
+      const updated = { ...prev };
+      updated[activeBucket] = (updated[activeBucket] ?? []).map((widget) =>
+        widget.instanceId === widgetId ? { ...widget, ...updates } : widget
+      );
+      widgetsByBucketRef.current = updated;
+      return updated;
+    });
+  };
+
+  const removeWidgetByIdImmediate = async (widgetId: string) => {
+    let nextWidgetsState: Record<string, WidgetInstance[]> | undefined;
+    setWidgetsByBucket((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((bucketName) => {
+        updated[bucketName] = (updated[bucketName] ?? []).filter(
+          (widget) => widget.instanceId !== widgetId
+        );
+      });
+      nextWidgetsState = updated;
+      widgetsByBucketRef.current = updated;
+      return updated;
+    });
+
+    const { [widgetId]: _removedProgress, ...nextProgressState } = progressByWidgetRef.current;
+    progressByWidgetRef.current = nextProgressState;
+    setProgressByWidget(nextProgressState);
+
+    if (nextWidgetsState) {
+      await saveWidgets(nextWidgetsState, nextProgressState);
+    }
+  };
+
+  const requestRemoveWidget = (widget: WidgetInstance) => {
+    const bucketEntry = Object.entries(widgetsByBucketRef.current).find(([, bucketWidgets]) =>
+      (bucketWidgets ?? []).some((entry) => entry.instanceId === widget.instanceId)
+    );
+    const widgetBucket = bucketEntry?.[0] || activeBucket || buckets[0] || "General";
+    const progressSnapshot = progressByWidgetRef.current[widget.instanceId];
+
+    setConfirmState({
+      title: `Remove "${widget.name}" widget?`,
+      description: "This widget will be removed from your dashboard. You can undo immediately after confirming.",
+      confirmLabel: "Remove widget",
+      onConfirm: async () => {
+        await removeWidgetByIdImmediate(widget.instanceId);
+        pushUndo(`Removed ${widget.name}`, async () => {
+          let restoredWidgetsState: Record<string, WidgetInstance[]> | undefined;
+          setWidgetsByBucket((prev) => {
+            const updated = { ...prev };
+            const existing = updated[widgetBucket] ?? [];
+            const alreadyPresent = existing.some((entry) => entry.instanceId === widget.instanceId);
+            updated[widgetBucket] = alreadyPresent ? existing : [...existing, widget];
+            restoredWidgetsState = updated;
+            widgetsByBucketRef.current = updated;
+            return updated;
+          });
+
+          const restoredProgressState: Record<string, ProgressEntry> = {
+            ...progressByWidgetRef.current,
+          };
+          if (progressSnapshot) {
+            restoredProgressState[widget.instanceId] = progressSnapshot;
+          } else {
+            delete restoredProgressState[widget.instanceId];
+          }
+          progressByWidgetRef.current = restoredProgressState;
+          setProgressByWidget(restoredProgressState);
+
+          if (restoredWidgetsState) {
+            await saveWidgets(restoredWidgetsState, restoredProgressState);
+          }
+        });
+      },
+    });
+  };
+
+  const resetWidgetProgress = async (widget: WidgetInstance) => {
+    const nextProgressState: Record<string, ProgressEntry> = {
+      ...progressByWidgetRef.current,
+      [widget.instanceId]: {
+        value: 0,
+        date: todayStrGlobal,
+        streak: 0,
+        lastCompleted: "",
+      },
+    };
+    progressByWidgetRef.current = nextProgressState;
+    setProgressByWidget(nextProgressState);
+    await saveWidgets(widgetsByBucketRef.current, nextProgressState);
+  };
 
   const handleSaveWidget = (updated: WidgetInstance) => {
     if (!editingBucket) return;
@@ -2594,7 +3053,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
           const getIconForCode = (c: number): LucideIcon => {
             if (c === 0) return iconMap.clear;
-            if ([1,2].includes(c)) return iconMap.partly;
+            if ([1, 2].includes(c)) return iconMap.partly;
             if (c === 3) return iconMap.cloud;
             if (c >= 45 && c <= 48) return iconMap.cloud;
             if (c >= 51 && c <= 57) return iconMap.drizzle;
@@ -2749,9 +3208,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     });
     return obj;
   });
-  
+
   // Removed manual saveHourlyPlan function
-  
+
   // Automatically save hourly plan whenever it changes
   useEffect(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -2781,14 +3240,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     return () => clearTimeout(supabaseDebounce);
   }, [hourlyPlan, selectedDate]);
-  
+
   // Load hourly plan for the selected date
   useEffect(() => {
     const loadHourlyPlan = async () => {
       try {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         let savedPlan = null;
-        
+
         // First try to load from Supabase
         try {
           const prefs = await getUserPreferencesClient();
@@ -2800,21 +3259,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         } catch (supabaseError) {
           console.warn('Could not load hourly plan from Supabase:', supabaseError);
         }
-        
+
         // If not found in Supabase, try localStorage
         if (!savedPlan) {
           const localStorageKey = 'lifeboard_hourly_plan';
           const localData = localStorage.getItem(localStorageKey);
-          
+
           if (localData) {
             const localPlans = JSON.parse(localData);
             savedPlan = localPlans[dateKey];
-            
+
             if (savedPlan) {
             }
           }
         }
-        
+
         if (savedPlan) {
           // Merge saved plan with empty structure to ensure all hours exist
           const obj: Record<string, any[]> = {};
@@ -2832,7 +3291,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }
       } catch (error) {
         console.error('Failed to load hourly plan:', error);
-        
+
         // Fallback to empty plan on error
         const obj: Record<string, any[]> = {};
         hours.forEach((h) => {
@@ -2841,7 +3300,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         setHourlyPlan(obj);
       }
     };
-    
+
     loadHourlyPlan();
   }, [selectedDate, hours]);
 
@@ -3165,19 +3624,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     })();
 
 
-      // 2️⃣  Update local state and persistence
-      setProgressByWidget(updatedProgress);
+    // 2️⃣  Update local state and persistence
+    setProgressByWidget(updatedProgress);
 
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('widget_progress', JSON.stringify(updatedProgress));
-        } catch (err) {
-          console.error('Failed to persist reset progress to localStorage', err);
-        }
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('widget_progress', JSON.stringify(updatedProgress));
+      } catch (err) {
+        console.error('Failed to persist reset progress to localStorage', err);
       }
+    }
 
-      // Persist to Supabase preferences as well
-      saveWidgets(widgetsByBucketRef.current, updatedProgress);
+    // Persist to Supabase preferences as well
+    saveWidgets(widgetsByBucketRef.current, updatedProgress);
 
     // 3️⃣  Clear integration caches and trigger fresh integration fetch (once per day)
     if (typeof window !== 'undefined') {
@@ -3194,11 +3653,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   useEffect(() => {
     // Check for resets immediately when component mounts
     checkAndResetWidgets();
-    
+
     // Set up an interval to check for resets periodically (every hour)
     // This handles the case where the app is left open overnight
     const intervalId = setInterval(checkAndResetWidgets, 60 * 60 * 1000);
-    
+
     return () => clearInterval(intervalId);
   }, [checkAndResetWidgets]);
 
@@ -3222,10 +3681,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         checkAndResetWidgets();
       }
     };
-    
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
-      
+
       return () => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
@@ -3234,159 +3693,154 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   return (
     <div className="flex-1 relative min-h-screen overflow-hidden">
-        {/* Background Image Layer */}
-        <div className="absolute inset-0 w-full h-full -z-10 pointer-events-none">
-          <img 
-            src="/images/background.png" 
-            alt="dashboard background" 
-            className="w-full h-full object-cover object-center" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-white/50 via-white/25 to-white/10"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-transparent"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
-        </div>
-        
-        {/* Main wrapper: no styling, acts purely as a container */}
-        <div className="relative z-10 flex flex-col">
+      {/* Background Image Layer */}
+      <div className="absolute inset-0 w-full h-full -z-10 pointer-events-none">
+        <img
+          src="/images/background.png"
+          alt="dashboard background"
+          className="w-full h-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/50 via-white/25 to-white/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
+      </div>
 
-          {/* Greeting */}
-          <section className="w-full mb-4">
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">
-              Hello <span className="text-theme-primary-600">{greetingName || 'there'}</span>
-            </h1>
-            <p className="text-sm text-gray-600">You've got this! Let's make today productive.</p>
-          </section>
-          
-          {/* Bucket tabs row (scrollable) */}
-          <div
-            className="relative z-10 mt-6 transition-all duration-300 ease-in-out"
-            style={{ width: '100%' }}
-          >
-            <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
-              {bucketsInitialized && buckets.length === 0 && (
-                <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-gray-300 bg-white/70 px-4 text-sm text-gray-500">
-                  <span>No tabs yet. Click + to add your first bucket.</span>
-                </div>
-              )}
-              {bucketsInitialized && buckets.length > 0 && buckets.map((b, idx) => (
-                <button
-                  key={b}
-                  draggable
-                  onDragStart={() => {
-                    dragIndexRef.current = idx;
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    const currentDragIndex = dragIndexRef.current;
-                    if (currentDragIndex === null || currentDragIndex === idx) return;
+      {/* Main wrapper: no styling, acts purely as a container */}
+      <div className="relative z-10 flex flex-col">
 
-                    setBuckets((prev) => {
-                      if (
-                        currentDragIndex === null ||
-                        currentDragIndex < 0 ||
-                        currentDragIndex >= prev.length
-                      ) {
-                        return prev;
-                      }
-                      const updated = [...prev];
-                      const [moved] = updated.splice(currentDragIndex, 1);
-                      updated.splice(idx, 0, moved);
-                      dragIndexRef.current = idx;
-                      bucketsRef.current = updated;
-                      return updated;
-                    });
-                  }}
-                  onDragEnd={() => {
-                    const dragOrigin = dragIndexRef.current;
-                    dragIndexRef.current = null;
-                    if (dragOrigin === null) {
-                      return;
-                    }
-                    const latestBuckets = bucketsRef.current.length ? bucketsRef.current : buckets;
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
-                      window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
-                    }
-                    debouncedSaveBucketsToSupabase(latestBuckets);
-                  }}
-                  onClick={() => setActiveBucket(b)}
-                  style={{
-                    // Active tab always highest; otherwise cascade left-over-right without negative z-index
-                    zIndex: b === activeBucket ? 50 : Math.max(buckets.length - idx, 1),
-                    marginRight: '-10px',
-                    backgroundColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.85),
-                    borderColor: b === activeBucket ? getBucketColor(b) : getLighterColor(getBucketColor(b), 0.6),
-                    color: b === activeBucket ? 'white' : '#374151'
-                  }}
-                  className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 border-2 ${
-                    b === activeBucket
-                      ? 'scale-[1.02] shadow-lg text-white'
-                      : 'hover:scale-[1.01] shadow-none'
-                  }`}
-                  onMouseEnter={(e) => {
-                    if (b !== activeBucket) {
-                      e.currentTarget.style.backgroundColor = getLighterColor(getBucketColor(b), 0.7)
-                      e.currentTarget.style.borderColor = getLighterColor(getBucketColor(b), 0.4)
-                      e.currentTarget.style.color = '#1F2937'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (b !== activeBucket) {
-                      e.currentTarget.style.backgroundColor = getLighterColor(getBucketColor(b), 0.85)
-                      e.currentTarget.style.borderColor = getLighterColor(getBucketColor(b), 0.6)
-                      e.currentTarget.style.color = '#374151'
-                    }
-                  }}
-                >
-                  {b}
-                </button>
-              ))}
+        {/* Greeting */}
+        <section className="w-full mb-6 mt-2">
+          <h1 className="text-[28px] tracking-[0.5px] font-semibold text-[#171A1F] mb-1">
+            Hello <span className="text-theme-primary-600 font-bold">{greetingName || 'there'}</span>
+          </h1>
+          <p className="text-[15px] text-[#6b7688]">You've got this! Let's make today productive.</p>
+        </section>
+        {/* Bucket tabs row (scrollable) */}
+        <div
+          className="relative z-10 mt-6 transition-all duration-300 ease-in-out"
+          style={{ width: '100%' }}
+        >
+          <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
+            {bucketsInitialized && buckets.length === 0 && (
+              <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-[#dbd6cf] bg-white/70 px-4 text-sm text-[#8e99a8]">
+                <span>No tabs yet. Click + to add your first bucket.</span>
+              </div>
+            )}
+            {bucketsInitialized && buckets.length > 0 && buckets.map((b, idx) => (
               <button
-                onClick={() => setIsEditorOpen(true)}
-                style={{ 
-                  // "+" tab participates in the same stacking order (lowest, furthest right)
-                  zIndex: 0,
-                  marginRight: '-10px'
+                key={b}
+                draggable
+                onDragStart={() => {
+                  dragIndexRef.current = idx;
                 }}
-                className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-gray-100 shadow-none"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  const currentDragIndex = dragIndexRef.current;
+                  if (currentDragIndex === null || currentDragIndex === idx) return;
+
+                  setBuckets((prev) => {
+                    if (
+                      currentDragIndex === null ||
+                      currentDragIndex < 0 ||
+                      currentDragIndex >= prev.length
+                    ) {
+                      return prev;
+                    }
+                    const updated = [...prev];
+                    const [moved] = updated.splice(currentDragIndex, 1);
+                    updated.splice(idx, 0, moved);
+                    dragIndexRef.current = idx;
+                    bucketsRef.current = updated;
+                    return updated;
+                  });
+                }}
+                onDragEnd={() => {
+                  const dragOrigin = dragIndexRef.current;
+                  dragIndexRef.current = null;
+                  if (dragOrigin === null) {
+                    return;
+                  }
+                  const latestBuckets = bucketsRef.current.length ? bucketsRef.current : buckets;
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
+                    window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
+                  }
+                  debouncedSaveBucketsToSupabase(latestBuckets);
+                }}
+                onClick={() => setActiveBucket(b)}
+                style={{
+                  // Active tab always highest; otherwise cascade left-over-right without negative z-index
+                  zIndex: b === activeBucket ? 50 : Math.max(buckets.length - idx, 1),
+                  marginRight: '-10px',
+                  backgroundColor: b === activeBucket ? getBucketColor(b) : 'rgba(252, 250, 248, 0.9)',
+                  borderColor: b === activeBucket ? getBucketColor(b) : 'rgba(219, 214, 207, 0.6)',
+                  color: b === activeBucket ? 'white' : '#314158'
+                }}
+                className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 border-2 ${b === activeBucket
+                  ? 'scale-[1.02] shadow-[0px_8px_24px_rgba(163,133,96,0.15)] text-white'
+                  : 'hover:scale-[1.01] shadow-none'
+                  }`}
+                onMouseEnter={(e) => {
+                  if (b !== activeBucket) {
+                    e.currentTarget.style.backgroundColor = 'rgba(252, 250, 248, 1)'
+                    e.currentTarget.style.borderColor = 'rgba(219, 214, 207, 0.9)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (b !== activeBucket) {
+                    e.currentTarget.style.backgroundColor = 'rgba(252, 250, 248, 0.9)'
+                    e.currentTarget.style.borderColor = 'rgba(219, 214, 207, 0.6)'
+                  }
+                }}
               >
-                <span className="text-theme-primary-600">
-                  +
-                </span>
+                {b}
               </button>
-            </div>
-            {/* scroll container ends */}
-            {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
-            {showLeftTabFade && (
-              <div
-                className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
-                style={{ zIndex: 70 }}
-              />
-            )}
-            {showRightTabFade && (
-              <div
-                className="pointer-events-none absolute inset-y-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
-                style={{ zIndex: 70, right: '0px' }}
-              />
-            )}
-            </div>
+            ))}
+            <button
+              onClick={() => setIsEditorOpen(true)}
+              style={{
+                // "+" tab participates in the same stacking order (lowest, furthest right)
+                zIndex: 0,
+                marginRight: '-10px'
+              }}
+              className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-[#dbd6cf]/60 shadow-none"
+            >
+              <span className="text-theme-primary-600">
+                +
+              </span>
+            </button>
+          </div>
+          {/* scroll container ends */}
+          {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
+          {showLeftTabFade && (
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
+              style={{ zIndex: 70 }}
+            />
+          )}
+          {showRightTabFade && (
+            <div
+              className="pointer-events-none absolute inset-y-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
+              style={{ zIndex: 70, right: '0px' }}
+            />
+          )}
+        </div>
         {/* Main content container */}
         <div className="w-full flex-1 pb-24">
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
             {/* Content container: white widget box with subtle shadow */}
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-[#dbd6cf]/60 bg-white shadow-sm">
               {/* Inner nav */}
               <nav className="flex items-center gap-4 sm:gap-8 border-b border-white/20 px-4 sm:px-6 pt-3 sm:pt-4 text-sm font-semibold">
-                {(['Overview','Trends','Logs','Tasks','Settings'] as const).map((item) => (
+                {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                   <button
                     key={item}
                     onClick={() => setActiveSubTab(item)}
-                    className={`pb-3 border-b-2 transition-all duration-300 ${
-                      item === activeSubTab
-                        ? 'border-theme-primary-500 text-theme-primary-600 font-bold'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-theme-primary-300/50'
-                    }`}
+                    className={`pb-3 border-b-2 transition-all duration-300 ${item === activeSubTab
+                      ? 'border-theme-primary-500 text-theme-primary-600 font-bold'
+                      : 'border-transparent text-[#8e99a8] hover:text-[#4a5568] hover:border-theme-primary-300/50'
+                      }`}
                   >
                     {item}
                   </button>
@@ -3413,7 +3867,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         </div>
                         <span className="text-sm font-medium truncate">Refresh</span>
                       </div>
-                      <p className="mt-2 text-xs text-gray-500 truncate">Sync integrations</p>
+                      <p className="mt-2 text-xs text-[#8e99a8] truncate">Sync integrations</p>
                       {/* Invisible progress bar placeholder to equalize height */}
                       <div className="mt-3 h-1 bg-transparent" />
                     </div>
@@ -3444,7 +3898,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     let todayVal = 0;
                     let isFitbitData = false;
                     let isGoogleFitData = false;
-                    
+
                     if (isLinkedTask) {
                       todayVal = linkedTaskCompleted ? (w.target || 1) : 0;
                     } else if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
@@ -3464,7 +3918,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       const prog = progressByWidget[w.instanceId];
                       todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
                     }
-                    
+
                     const normalizedTarget = w.target && w.target > 0 ? w.target : 1;
                     const pct = isLinkedTask
                       ? (linkedTaskCompleted ? 100 : 0)
@@ -3472,14 +3926,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     const goalMet = isLinkedTask ? linkedTaskCompleted : pct >= 100;
 
                     // Background tint (5% opacity of widget color) when goal met
-                    const bgTintClasses: Record<string,string> = {
-                      blue:'bg-blue-500/5', green:'bg-green-500/5', red:'bg-red-500/5', orange:'bg-orange-500/5', purple:'bg-purple-500/5', indigo:'bg-indigo-500/5', amber:'bg-amber-500/5', teal:'bg-teal-500/5', rose:'bg-rose-500/5', cyan:'bg-cyan-500/5', yellow:'bg-yellow-500/5', sky:'bg-sky-500/5', emerald:'bg-emerald-500/5', violet:'bg-violet-500/5', lime:'bg-lime-500/5', fuchsia:'bg-fuchsia-500/5', gray:'bg-gray-500/5', slate:'bg-slate-500/5', stone:'bg-stone-500/5'
+                    const bgTintClasses: Record<string, string> = {
+                      blue: 'bg-warm-500/5', green: 'bg-green-500/5', red: 'bg-red-500/5', orange: 'bg-orange-500/5', purple: 'bg-amber-500/5', indigo: 'bg-warm-500/5', amber: 'bg-amber-500/5', teal: 'bg-teal-500/5', rose: 'bg-rose-500/5', cyan: 'bg-cyan-500/5', yellow: 'bg-yellow-500/5', sky: 'bg-sky-500/5', emerald: 'bg-emerald-500/5', violet: 'bg-violet-500/5', lime: 'bg-lime-500/5', fuchsia: 'bg-fuchsia-500/5', gray: 'bg-[#b8b0a8]/5', slate: 'bg-slate-500/5', stone: 'bg-stone-500/5'
                     };
                     const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
-                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-gray-100/60') : 'bg-white/80';
+                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-[rgba(183,148,106,0.08)]/60') : 'bg-white/80';
 
                     return (
-                      <div key={w.instanceId} className={`rounded-2xl border border-white/40 ${cardBgClass} backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative group cursor-pointer hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0`} onClick={() => { 
+                      <div key={w.instanceId} className={`rounded-2xl border border-white/40 ${cardBgClass} backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative group cursor-pointer hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0`} onClick={() => {
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -3502,8 +3956,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingWidget(w); 
-                                setEditingBucket(activeBucket); 
+                                setEditingWidget(w);
+                                setEditingBucket(activeBucket);
                                 setNewlyCreatedWidgetId(null);
                               }}
                               className="rounded-full bg-green-100 hover:bg-green-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition"
@@ -3518,43 +3972,22 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               convertWidgetToTask(w, activeBucket);
                             }}
-                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition ${
-                              w.linkedTaskId
-                                ? "bg-theme-primary-600 hover:bg-theme-primary-700"
-                                : "bg-theme-primary-100 hover:bg-theme-primary-200"
-                            }`}
+                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition ${w.linkedTaskId
+                              ? "bg-theme-primary-600 hover:bg-theme-primary-700"
+                              : "bg-theme-primary-100 hover:bg-theme-primary-200"
+                              }`}
                             aria-label={w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"}
                             title={w.linkedTaskId ? "Remove from Tasks tab" : "Show in Tasks tab"}
                           >
                             <ListChecks
-                              className={`h-3 w-3 ${
-                                w.linkedTaskId ? "text-white" : "text-theme-primary-600"
-                              }`}
+                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-theme-primary-600"
+                                }`}
                             />
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Use callback pattern to ensure we're working with the latest state
-                              setWidgetsByBucket(prevWidgets => {
-                                const updatedWidgets = { ...prevWidgets };
-                                updatedWidgets[activeBucket] = (updatedWidgets[activeBucket] ?? []).filter(widget => widget.instanceId !== w.instanceId);
-                                
-                                
-                                // Also update the ref immediately
-                                widgetsByBucketRef.current = updatedWidgets;
-                                
-                                // Force immediate save to localStorage
-                                if (typeof window !== 'undefined') {
-                                  const dataToSave = {
-                                    widgets: updatedWidgets,
-                                    savedAt: new Date().toISOString()
-                                  };
-                                  localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-                                }
-                                
-                                return updatedWidgets;
-                              });
+                              requestRemoveWidget(w);
                             }}
                             className="rounded-full bg-red-100 hover:bg-red-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 transition"
                             aria-label="Delete widget"
@@ -3580,14 +4013,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             if (!IconComponent || typeof IconComponent !== 'function') {
                               IconComponent = getIconComponent(w.id);
                             }
-                            if (!IconComponent) return <div className="h-5 w-5 bg-gray-300 rounded" />;
+                            if (!IconComponent) return <div className="h-5 w-5 bg-[#dbd6cf] rounded" />;
 
                             // Get color - fallback to widget template default if not set
                             const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
 
                             return (
                               <div
-                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-gray-500'}`}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#b8b0a8]'}`}
                               >
                                 <IconComponent className="h-5 w-5 text-white" />
                               </div>
@@ -3600,15 +4033,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           ) : w.id === 'holidays' && w.holidayData && w.holidayData.holidayName ? (
                             <span className="text-sm font-medium truncate">{w.holidayData.holidayName}</span>
                           ) : w.id === 'quit_habit' && w.quitHabitData && w.quitHabitData.habitName ? (
-                             <span className="text-sm font-medium truncate">{w.quitHabitData.habitName}</span>
-                           ) : (
-                             <span className="text-sm font-medium truncate">{w.name}</span>
+                            <span className="text-sm font-medium truncate">{w.quitHabitData.habitName}</span>
+                          ) : (
+                            <span className="text-sm font-medium truncate">{w.name}</span>
                           )}
                         </div>
                         {isLinkedTask && (
                           <div className="mt-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-sm text-gray-700">
+                              <div className="flex items-center gap-2 text-sm text-[#4a5568]">
                                 <ListChecks className="h-4 w-4 text-theme-primary-600" />
                                 <span className="truncate">{linkedTaskContent}</span>
                               </div>
@@ -3620,17 +4053,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   void toggleTaskCompletionContext(linkedTask.id.toString());
                                 }}
                                 disabled={!linkedTask}
-                                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                                  linkedTaskCompleted
-                                    ? "border-green-500 text-green-600 bg-green-50 hover:bg-green-100"
-                                    : "border-gray-300 text-gray-600 hover:bg-gray-100"
-                                } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
+                                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${linkedTaskCompleted
+                                  ? "border-green-500 text-green-600 bg-green-50 hover:bg-green-100"
+                                  : "border-[#dbd6cf] text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)]"
+                                  } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
                               >
                                 {linkedTaskCompleted ? "Undo" : "Mark done"}
                               </button>
                             </div>
                             {linkedTaskDueDisplay ? (
-                              <p className="text-xs text-gray-500">Due {linkedTaskDueDisplay}</p>
+                              <p className="text-xs text-[#8e99a8]">Due {linkedTaskDueDisplay}</p>
                             ) : null}
                           </div>
                         )}
@@ -3642,139 +4074,139 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               const birthDate = new Date(w.birthdayData.birthDate);
                               const today = new Date();
                               const currentYear = today.getFullYear();
-                              
+
                               // Create this year's birthday
                               const thisYearBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
-                              
+
                               // If birthday already passed this year, show next year's
-                              const nextBirthday = thisYearBirthday < today 
+                              const nextBirthday = thisYearBirthday < today
                                 ? new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate())
                                 : thisYearBirthday;
-                              
+
                               // Calculate days until birthday
                               const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                              
+
                               return (
                                 <div className="mt-2">
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-[#8e99a8]">
                                     {birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-gray-600 mt-1">
-                                    {daysUntil === 0 ? '🎉 Today!' : 
-                                     daysUntil === 1 ? '🎂 Tomorrow' : 
-                                     `🗓️ ${daysUntil} days`}
+                                  <div className="text-xs text-[#6b7688] mt-1">
+                                    {daysUntil === 0 ? '🎉 Today!' :
+                                      daysUntil === 1 ? '🎂 Tomorrow' :
+                                        `🗓️ ${daysUntil} days`}
                                   </div>
                                 </div>
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-gray-500">
+                                <div className="mt-2 text-xs text-[#8e99a8]">
                                   Click to add birthday details
                                 </div>
                               );
                             }
                           }
-                          
+
                           // Special handling for events widgets
                           if (w.id === 'social_events') {
                             if (w.eventData && w.eventData.eventDate) {
                               const eventDate = new Date(w.eventData.eventDate);
                               const today = new Date();
                               const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                              
+
                               return (
                                 <div className="mt-2">
                                   {w.eventData.description && (
-                                    <div className="text-xs text-gray-600">
+                                    <div className="text-xs text-[#6b7688]">
                                       {w.eventData.description}
                                     </div>
                                   )}
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-[#8e99a8]">
                                     {eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-gray-600 mt-1">
-                                    {daysUntil === 0 ? '🎉 Today!' : 
-                                     daysUntil === 1 ? '📅 Tomorrow' : 
-                                     daysUntil < 0 ? '✅ Past event' :
-                                     `📆 ${daysUntil} days`}
+                                  <div className="text-xs text-[#6b7688] mt-1">
+                                    {daysUntil === 0 ? '🎉 Today!' :
+                                      daysUntil === 1 ? '📅 Tomorrow' :
+                                        daysUntil < 0 ? '✅ Past event' :
+                                          `📆 ${daysUntil} days`}
                                   </div>
                                 </div>
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-gray-500">
+                                <div className="mt-2 text-xs text-[#8e99a8]">
                                   Click to add event details
                                 </div>
                               );
                             }
                           }
-                          
+
                           // Special handling for holidays widgets  
                           if (w.id === 'holidays') {
                             if (w.holidayData && w.holidayData.holidayDate) {
                               const holidayDate = new Date(w.holidayData.holidayDate);
                               const today = new Date();
                               const currentYear = today.getFullYear();
-                              
+
                               // Create this year's holiday
                               const thisYearHoliday = new Date(currentYear, holidayDate.getMonth(), holidayDate.getDate());
-                              
+
                               // If holiday already passed this year, show next year's
-                              const nextHoliday = thisYearHoliday < today 
+                              const nextHoliday = thisYearHoliday < today
                                 ? new Date(currentYear + 1, holidayDate.getMonth(), holidayDate.getDate())
                                 : thisYearHoliday;
-                                
+
                               const daysUntil = Math.ceil((nextHoliday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                              
+
                               return (
                                 <div className="mt-2">
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-[#8e99a8]">
                                     {holidayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-gray-600 mt-1">
-                                    {daysUntil === 0 ? '🎄 Today!' : 
-                                     daysUntil === 1 ? '🎁 Tomorrow' : 
-                                     `🗓️ ${daysUntil} days`}
+                                  <div className="text-xs text-[#6b7688] mt-1">
+                                    {daysUntil === 0 ? '🎄 Today!' :
+                                      daysUntil === 1 ? '🎁 Tomorrow' :
+                                        `🗓️ ${daysUntil} days`}
                                   </div>
                                 </div>
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-gray-500">
+                                <div className="mt-2 text-xs text-[#8e99a8]">
                                   Click to add holiday details
                                 </div>
                               );
                             }
                           }
-                          
+
                           // Special handling for mood tracker widget
                           if (w.id === 'mood') {
                             const moodEmojis = ['😢', '😕', '😐', '😊', '😁'];
                             const moodLabels = ['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'];
-                            
+
                             if (w.moodData?.currentMood) {
                               const moodIndex = w.moodData.currentMood - 1;
                               const emoji = moodEmojis[moodIndex];
                               const label = moodLabels[moodIndex];
-                              
+
                               return (
                                 <div className="mt-3">
                                   <div className="flex items-center gap-2">
                                     <span className="text-2xl">{emoji}</span>
                                     <div>
-                                      <div className="text-sm font-medium text-gray-900">{label}</div>
-                                      <div className="text-xs text-gray-500">Today's mood</div>
+                                      <div className="text-sm font-medium text-[#314158]">{label}</div>
+                                      <div className="text-xs text-[#8e99a8]">Today's mood</div>
                                     </div>
                                   </div>
                                   {w.moodData.moodNote && (
-                                    <div className="text-xs text-gray-600 mt-2 italic">
+                                    <div className="text-xs text-[#6b7688] mt-2 italic">
                                       "{w.moodData.moodNote}"
                                     </div>
                                   )}
                                   <div className="flex gap-1 mt-2">
                                     {moodEmojis.map((emoji, index) => (
-                                      <span 
-                                        key={index} 
+                                      <span
+                                        key={index}
                                         className={`text-xs ${index === moodIndex ? 'opacity-100' : 'opacity-30'}`}
                                       >
                                         {emoji}
@@ -3788,7 +4220,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">😐</div>
-                                    <div className="text-xs text-gray-500">Tap to log mood</div>
+                                    <div className="text-xs text-[#8e99a8]">Tap to log mood</div>
                                   </div>
                                   <div className="flex gap-1 mt-2 justify-center">
                                     {moodEmojis.map((emoji, index) => (
@@ -3799,31 +4231,31 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             }
                           }
-                          
+
                           // Special handling for journal widget
                           if (w.id === 'journal') {
                             const today = new Date().toISOString().split('T')[0];
                             const hasEntryToday = w.journalData?.lastEntryDate === today;
-                            const entryPreview = w.journalData?.todaysEntry ? 
+                            const entryPreview = w.journalData?.todaysEntry ?
                               w.journalData.todaysEntry.substring(0, 100) + (w.journalData.todaysEntry.length > 100 ? '...' : '') : '';
-                            
+
                             if (hasEntryToday && w.journalData?.todaysEntry) {
                               const wordCount = w.journalData.todaysEntry.split(' ').filter(word => word.length > 0).length;
-                              
+
                               return (
                                 <div className="mt-3">
                                   <div className="flex items-center gap-2 mb-2">
                                     <span className="text-lg">📖</span>
                                     <div>
-                                      <div className="text-sm font-medium text-gray-900">Today's Entry</div>
-                                      <div className="text-xs text-gray-500">{wordCount} words</div>
+                                      <div className="text-sm font-medium text-[#314158]">Today's Entry</div>
+                                      <div className="text-xs text-[#8e99a8]">{wordCount} words</div>
                                     </div>
                                   </div>
-                                  <div className="text-xs text-gray-700 italic bg-gray-50 p-2 rounded">
+                                  <div className="text-xs text-[#4a5568] italic bg-[#faf8f5] p-2 rounded">
                                     "{entryPreview}"
                                   </div>
                                   {w.journalData.entryCount && w.journalData.entryCount > 1 && (
-                                    <div className="text-xs text-gray-500 mt-2">
+                                    <div className="text-xs text-[#8e99a8] mt-2">
                                       📚 {w.journalData.entryCount} total entries
                                     </div>
                                   )}
@@ -3832,23 +4264,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             } else {
                               const prompts = [
                                 "What are you grateful for today?",
-                                "How are you feeling right now?", 
+                                "How are you feeling right now?",
                                 "What did you learn today?",
                                 "What's on your mind?",
                                 "Describe your day in three words."
                               ];
                               const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-                              
+
                               return (
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">📝</div>
-                                    <div className="text-xs text-gray-500 mb-2">No entry today</div>
-                                    <div className="text-xs text-gray-600 italic px-2">
+                                    <div className="text-xs text-[#8e99a8] mb-2">No entry today</div>
+                                    <div className="text-xs text-[#6b7688] italic px-2">
                                       "{randomPrompt}"
                                     </div>
                                     {w.journalData?.entryCount && (
-                                      <div className="text-xs text-gray-500 mt-2">
+                                      <div className="text-xs text-[#8e99a8] mt-2">
                                         📚 {w.journalData.entryCount} total entries
                                       </div>
                                     )}
@@ -3857,7 +4289,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             }
                           }
-                          
+
                           // Special handling for quit habit tracker widget
                           if (w.id === 'quit_habit') {
                             if (w.quitHabitData && w.quitHabitData.habitName && w.quitHabitData.quitDate) {
@@ -3881,11 +4313,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3 space-y-2">
                                   <div className="flex items-center gap-2 text-xs">
                                     <span className="text-sm">🚫</span>
-                                    <span className="font-medium text-gray-700">
+                                    <span className="font-medium text-[#4a5568]">
                                       Quitting {w.quitHabitData.habitName}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <div className="flex items-center gap-2 text-xs text-[#6b7688]">
                                     <span className="text-sm">📅</span>
                                     <span>Since {quitDate.toLocaleDateString()}</span>
                                   </div>
@@ -3894,7 +4326,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <span className="text-sm text-green-600 font-medium">days clean</span>
                                   </div>
                                   {w.quitHabitData.costPerDay && w.quitHabitData.costPerDay > 0 && (
-                                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                                    <div className="flex items-center gap-2 text-xs text-[#6b7688]">
                                       <span className="text-sm">💰</span>
                                       <span>
                                         Daily savings: {w.quitHabitData.currency || '$'}{w.quitHabitData.costPerDay.toFixed(2)}
@@ -3911,7 +4343,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             } else {
                               return (
-                                <div className="mt-3 text-xs text-gray-500 text-center">
+                                <div className="mt-3 text-xs text-[#8e99a8] text-center">
                                   Click to set up habit tracking
                                 </div>
                               );
@@ -3922,32 +4354,32 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           if (w.id === 'gratitude') {
                             const today = new Date().toISOString().split('T')[0];
                             const hasEntryToday = w.gratitudeData?.lastEntryDate === today;
-                            
+
                             if (hasEntryToday && w.gratitudeData?.gratitudeItems?.length) {
                               return (
                                 <div className="mt-3">
                                   <div className="flex items-center gap-2 mb-2">
                                     <span className="text-lg">✨</span>
                                     <div>
-                                      <div className="text-sm font-medium text-gray-900">Today's Gratitude</div>
-                                      <div className="text-xs text-gray-500">{w.gratitudeData.gratitudeItems.length} items</div>
+                                      <div className="text-sm font-medium text-[#314158]">Today's Gratitude</div>
+                                      <div className="text-xs text-[#8e99a8]">{w.gratitudeData.gratitudeItems.length} items</div>
                                     </div>
                                   </div>
                                   <div className="space-y-1">
                                     {w.gratitudeData.gratitudeItems.slice(0, 2).map((item, index) => (
-                                      <div key={index} className="text-xs text-gray-700 flex items-start gap-1">
+                                      <div key={index} className="text-xs text-[#4a5568] flex items-start gap-1">
                                         <span className="text-yellow-500 mt-0.5">•</span>
                                         <span className="italic">"{item}"</span>
                                       </div>
                                     ))}
                                     {w.gratitudeData.gratitudeItems.length > 2 && (
-                                      <div className="text-xs text-gray-500">
+                                      <div className="text-xs text-[#8e99a8]">
                                         +{w.gratitudeData.gratitudeItems.length - 2} more...
                                       </div>
                                     )}
                                   </div>
                                   {w.gratitudeData.entryCount && w.gratitudeData.entryCount > 1 && (
-                                    <div className="text-xs text-gray-500 mt-2">
+                                    <div className="text-xs text-[#8e99a8] mt-2">
                                       🙏 {w.gratitudeData.entryCount} grateful days
                                     </div>
                                   )}
@@ -3958,12 +4390,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">🙏</div>
-                                    <div className="text-xs text-gray-500 mb-2">What are you grateful for?</div>
-                                    <div className="text-xs text-gray-600 italic">
+                                    <div className="text-xs text-[#8e99a8] mb-2">What are you grateful for?</div>
+                                    <div className="text-xs text-[#6b7688] italic">
                                       Tap to add today's gratitude
                                     </div>
                                     {w.gratitudeData?.entryCount && (
-                                      <div className="text-xs text-gray-500 mt-2">
+                                      <div className="text-xs text-[#8e99a8] mt-2">
                                         🙏 {w.gratitudeData.entryCount} grateful days
                                       </div>
                                     )}
@@ -3972,7 +4404,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             }
                           }
-                          
+
                           // Special handling for weight tracking widget
                           if (w.id === 'weight') {
                             if (w.weightData && w.weightData.currentWeight !== undefined) {
@@ -3981,9 +4413,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {/* Current weight */}
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs">⚖️</span>
-                                    <p className="text-xs font-medium text-gray-700">Current Weight</p>
+                                    <p className="text-xs font-medium text-[#4a5568]">Current Weight</p>
                                   </div>
-                                  <p className="text-lg font-bold text-purple-600">
+                                  <p className="text-lg font-bold text-amber-600">
                                     {w.weightData.currentWeight} {w.weightData.unit || w.unit || 'lbs'}
                                   </p>
 
@@ -3992,7 +4424,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">📈</span>
                                       <p
-                                        className={`text-xs ${w.weightData.currentWeight < w.weightData.startingWeight ? 'text-green-600' : w.weightData.currentWeight > w.weightData.startingWeight ? 'text-orange-600' : 'text-gray-600'}`}
+                                        className={`text-xs ${w.weightData.currentWeight < w.weightData.startingWeight ? 'text-green-600' : w.weightData.currentWeight > w.weightData.startingWeight ? 'text-orange-600' : 'text-[#6b7688]'}`}
                                       >
                                         {w.weightData.currentWeight < w.weightData.startingWeight ? 'Lost' : w.weightData.currentWeight > w.weightData.startingWeight ? 'Gained' : 'No change'}: {Math.abs(w.weightData.currentWeight - w.weightData.startingWeight).toFixed(1)} {w.weightData.unit || w.unit || 'lbs'}
                                       </p>
@@ -4003,7 +4435,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {w.weightData.goalWeight !== undefined && (
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">🎯</span>
-                                      <p className="text-xs text-blue-600">
+                                      <p className="text-xs text-warm-600">
                                         Goal: {w.weightData.goalWeight} {w.weightData.unit || w.unit || 'lbs'}
                                       </p>
                                     </div>
@@ -4012,7 +4444,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             }
                             return (
-                              <div className="mt-3 text-xs text-gray-500 text-center">
+                              <div className="mt-3 text-xs text-[#8e99a8] text-center">
                                 Click to set up weight tracking
                               </div>
                             );
@@ -4022,7 +4454,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           if (w.id === 'nutrition') {
                             return (
                               <div className="mt-3">
-                                <NutritionSummaryWidget 
+                                <NutritionSummaryWidget
                                   variant="embedded"
                                   className="p-0"
                                 />
@@ -4035,8 +4467,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             return (
                               <div className="mt-3 text-center">
                                 <div className="text-2xl mb-2">💪</div>
-                                <div className="text-xs text-gray-600 mb-1">Exercise Tracker</div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-[#6b7688] mb-1">Exercise Tracker</div>
+                                <div className="text-xs text-[#8e99a8]">
                                   Track workouts & goals
                                 </div>
                               </div>
@@ -4047,8 +4479,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           if (w.id === 'home_projects') {
                             const projects = w.homeProjectsData?.projects || [];
                             const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
-                            const urgentProjects = projects.filter(p => 
-                              (p.priority === 'critical' || p.priority === 'high') && 
+                            const urgentProjects = projects.filter(p =>
+                              (p.priority === 'critical' || p.priority === 'high') &&
                               p.status !== 'completed'
                             );
                             const completedProjects = projects.filter(p => p.status === 'completed');
@@ -4058,8 +4490,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               return (
                                 <div className="mt-3 text-center">
                                   <div className="text-2xl mb-2">🔨</div>
-                                  <div className="text-xs text-gray-600 mb-1">Home Projects</div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-[#6b7688] mb-1">Home Projects</div>
+                                  <div className="text-xs text-[#8e99a8]">
                                     Track household tasks & improvements
                                   </div>
                                 </div>
@@ -4078,29 +4510,29 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-2 text-center">
                                   <div>
-                                    <div className="text-sm font-semibold text-gray-900">{activeProjects.length}</div>
-                                    <div className="text-xs text-gray-500">Active</div>
+                                    <div className="text-sm font-semibold text-[#314158]">{activeProjects.length}</div>
+                                    <div className="text-xs text-[#8e99a8]">Active</div>
                                   </div>
                                   <div>
                                     <div className="text-sm font-semibold text-red-600">{urgentProjects.length}</div>
-                                    <div className="text-xs text-gray-500">Urgent</div>
+                                    <div className="text-xs text-[#8e99a8]">Urgent</div>
                                   </div>
                                   <div>
                                     <div className="text-sm font-semibold text-green-600">{completionRate}%</div>
-                                    <div className="text-xs text-gray-500">Done</div>
+                                    <div className="text-xs text-[#8e99a8]">Done</div>
                                   </div>
                                 </div>
-                                
+
                                 {/* Next priority project */}
                                 {nextProject && (
-                                  <div className="border-t border-gray-100 pt-2">
-                                    <div className="text-xs text-gray-600 mb-1">Next Priority:</div>
+                                  <div className="border-t border-[#dbd6cf]/60 pt-2">
+                                    <div className="text-xs text-[#6b7688] mb-1">Next Priority:</div>
                                     <div className="flex items-center gap-1">
-                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-blue-500' : 'bg-gray-400'}`}></span>
-                                      <span className="text-xs font-medium text-gray-900 truncate">{nextProject.title}</span>
+                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-warm-500' : 'bg-[#b8b0a8]'}`}></span>
+                                      <span className="text-xs font-medium text-[#314158] truncate">{nextProject.title}</span>
                                     </div>
                                     {nextProject.room && (
-                                      <div className="text-xs text-gray-500 capitalize mt-1">📍 {nextProject.room}</div>
+                                      <div className="text-xs text-[#8e99a8] capitalize mt-1">📍 {nextProject.room}</div>
                                     )}
                                   </div>
                                 )}
@@ -4111,15 +4543,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           // Regular progress bar for other widgets
                           const displayPct = pct;
                           const prog = progressByWidget[w.instanceId];
-                           
+
                           return (
                             <div className="mt-2 mb-1">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg font-bold text-gray-900">
+                                  <span className="text-lg font-bold text-[#314158]">
                                     {todayVal}
                                   </span>
-                                  <span className="text-sm text-gray-500">
+                                  <span className="text-sm text-[#8e99a8]">
                                     / {w.target}
                                   </span>
                                 </div>
@@ -4129,12 +4561,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   </span>
                                 )}
                               </div>
-                              <div className="w-full bg-gray-100 rounded-full h-1 mt-2">
+                              <div className="w-full bg-[rgba(183,148,106,0.08)] rounded-full h-1 mt-2">
                                 <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-theme-primary-500'}`} style={{ width: `${displayPct}%` }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
-                                  {w.dataSource === 'fitbit' && <span className="text-xs text-blue-500">Fitbit</span>}
+                                  {w.dataSource === 'fitbit' && <span className="text-xs text-warm-500">Fitbit</span>}
                                   {w.dataSource === 'googlefit' && <span className="text-xs text-green-600">Google Fit</span>}
                                 </div>
                               )}
@@ -4142,7 +4574,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           );
                         })()}
 
-                        {!( ['water','steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && !isLinkedTask && (
+                        {!(['water', 'steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && !isLinkedTask && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -4164,15 +4596,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       <Plus className="h-6 w-6 text-theme-primary-600" />
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-gray-800">Add Widget</p>
-                      <p className="text-xs text-gray-500">Track your stats</p>
+                      <p className="text-sm font-semibold text-[#314158]">Add Widget</p>
+                      <p className="text-xs text-[#8e99a8]">Track your stats</p>
                     </div>
                   </div>
                 </div>
 
                 {activeSubTab === 'Trends' && (
-                  <TrendsPanel 
-                    widgets={activeWidgets} 
+                  <TrendsPanel
+                    widgets={activeWidgets}
                     bucketName={activeBucket}
                   />
                 )}
@@ -4180,85 +4612,104 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 {activeSubTab === 'Tasks' && (
                   <div>
                     {buckets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-gray-300 rounded-2xl bg-white/80">
-                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-                          <ListChecks className="h-8 w-8 text-blue-600" />
+                      <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-[#dbd6cf] rounded-2xl bg-white/80">
+                        <div className="w-16 h-16 bg-warm-50 rounded-full flex items-center justify-center mb-4">
+                          <ListChecks className="h-8 w-8 text-warm-600" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        <h3 className="text-xl font-semibold text-[#314158] mb-2">
                           Set up your first bucket
                         </h3>
-                        <p className="text-sm text-gray-500 max-w-md mb-6">
+                        <p className="text-sm text-[#8e99a8] max-w-md mb-6">
                           Buckets help you organise widgets and tasks together. Create one to unlock the full dashboard experience.
                         </p>
                         <button
                           onClick={() => setIsEditorOpen(true)}
-                          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                          className="px-6 py-3 bg-warm-600 text-white rounded-lg hover:bg-warm-700 font-medium transition-colors"
                         >
                           Create Bucket
                         </button>
                       </div>
                     ) : (
-                      <TasksProvider selectedDate={new Date()}>
-                        <EnhancedTasksView
-                          activeBucket={activeBucket}
-                          buckets={buckets}
-                          linkedTaskMap={linkedTaskMap}
-                          onToggleTaskWidget={handleToggleTaskWidget}
-                        />
-                      </TasksProvider>
+                      <EnhancedTasksView
+                        activeBucket={activeBucket}
+                        buckets={buckets}
+                        linkedTaskMap={linkedTaskMap}
+                        onToggleTaskWidget={handleToggleTaskWidget}
+                      />
                     )}
                   </div>
                 )}
 
                 {activeSubTab === 'Logs' && (
                   <div>
-                    {/* Logs Header with Widget Selector */}
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-semibold">Widget Logs</h2>
-                      <WidgetSelector
-                        widgets={activeWidgets}
-                        selectedWidget={selectedLogsWidget}
-                        onWidgetChange={setSelectedLogsWidget}
-                        showAllOption={true}
-                        className="w-48"
-                      />
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold">Widget Logs</h2>
+                        <p className="text-sm text-[#8e99a8]">
+                          Recent syncs, entries, and progress updates for this bucket.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => void loadWidgetHistoryLogs()}
+                          disabled={isWidgetLogsLoading || activeWidgets.length === 0}
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-[#dbd6cf] px-3 text-sm text-[#6b7688] transition hover:bg-[#faf8f5] disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Refresh widget logs"
+                          aria-label="Refresh widget logs"
+                        >
+                          <RotateCw className={`h-4 w-4 ${isWidgetLogsLoading ? "animate-spin" : ""}`} />
+                        </button>
+                        <WidgetSelector
+                          widgets={activeWidgets}
+                          selectedWidget={selectedLogsWidget}
+                          onWidgetChange={setSelectedLogsWidget}
+                          showAllOption={true}
+                          className="w-56"
+                        />
+                      </div>
                     </div>
-                    
-                    {/* Logs Content */}
+
                     <div className="space-y-4">
+                      {widgetLogsError ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          Unable to load full history. Showing local activity only.
+                        </div>
+                      ) : null}
                       {activeWidgets.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
+                        <div className="text-center py-12 text-[#8e99a8]">
                           <p>No widgets available to show logs for.</p>
                           <p className="text-sm mt-2">Add some widgets to see their activity logs here.</p>
                         </div>
+                      ) : filteredWidgetLogs.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-[#dbd6cf] bg-white px-6 py-12 text-center text-[#8e99a8]">
+                          <p>No activity yet for this selection.</p>
+                          <p className="mt-1 text-sm">Track progress or update a widget to start building logs.</p>
+                        </div>
                       ) : (
-                        <div className="bg-white rounded-lg border border-gray-200 p-6">
-                          <h3 className="text-lg font-medium mb-4">
-                            {selectedLogsWidget === 'all' ? 'All Widget Activity' : 
-                             `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
+                        <div className="bg-white rounded-lg border border-[#dbd6cf] p-6">
+                          <h3 className="mb-4 text-lg font-medium">
+                            {selectedLogsWidget === 'all' ? 'All Widget Activity' :
+                              `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
+                            <span className="ml-2 text-sm font-normal text-[#8e99a8]">
+                              ({filteredWidgetLogs.length})
+                            </span>
                           </h3>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">Widget data updated</p>
-                                <p className="text-xs text-gray-500">2 minutes ago</p>
+                          <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
+                            {filteredWidgetLogs.slice(0, 80).map((entry) => (
+                              <div key={entry.id} className="flex items-start gap-3 rounded bg-[#faf8f5] p-3">
+                                <div className={`mt-1.5 h-2 w-2 rounded-full ${LOG_KIND_DOT_CLASS[entry.kind]}`} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium text-[#314158]">{entry.message}</p>
+                                  <p className="truncate text-xs text-[#8e99a8]">
+                                    {entry.widgetName}
+                                    {entry.details ? ` • ${entry.details}` : ""}
+                                  </p>
+                                </div>
+                                <p className="whitespace-nowrap text-xs text-[#8e99a8]/70">
+                                  {formatLogTimestamp(entry.occurredAt)}
+                                </p>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">Progress updated</p>
-                                <p className="text-xs text-gray-500">15 minutes ago</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded">
-                              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">Goal target reached</p>
-                                <p className="text-xs text-gray-500">1 hour ago</p>
-                              </div>
-                            </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -4268,95 +4719,145 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                 {activeSubTab === 'Settings' && (
                   <div>
-                    {/* Settings Header with Widget Selector */}
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <h2 className="text-xl font-semibold">Widget Settings</h2>
                       <WidgetSelector
                         widgets={activeWidgets}
                         selectedWidget={selectedSettingsWidget}
                         onWidgetChange={setSelectedSettingsWidget}
                         showAllOption={true}
-                        className="w-48"
+                        className="w-56"
                       />
                     </div>
-                    
-                    {/* Settings Content */}
+
                     <div className="space-y-6">
                       {activeWidgets.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500">
+                        <div className="text-center py-12 text-[#8e99a8]">
                           <p>No widgets available to configure.</p>
                           <p className="text-sm mt-2">Add some widgets to manage their settings here.</p>
                         </div>
                       ) : (
                         <div className="grid gap-6">
-                          {(selectedSettingsWidget === 'all' ? activeWidgets : activeWidgets.filter(w => w.instanceId === selectedSettingsWidget)).map((widget) => (
-                            <div key={widget.instanceId} className="bg-white rounded-lg border border-gray-200 p-6">
-                              <div className="flex items-center gap-3 mb-4">
-                                <span className="text-2xl">{typeof widget.icon === 'string' ? widget.icon : '📊'}</span>
-                                <div>
-                                  <h3 className="text-lg font-medium">{widget.name}</h3>
-                                  <p className="text-sm text-gray-500">Widget ID: {widget.id}</p>
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Target</label>
-                                  <input 
-                                    type="number" 
-                                    value={widget.target || 0}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    readOnly
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-6 h-6 rounded ${BG_COLOR_CLASSES[widget.color || 'indigo']}`}></div>
-                                    <span className="text-sm text-gray-600">{widget.color || 'indigo'}</span>
+                          {selectedSettingsWidgets.map((widget) => {
+                            const IconComponent = resolveWidgetIcon(widget);
+                            const sourceOptions = getDataSourceOptions(widget);
+                            const activeDataSource = widget.dataSource || "manual";
+                            const selectedDataSource = sourceOptions.includes(activeDataSource)
+                              ? activeDataSource
+                              : sourceOptions[0];
+
+                            return (
+                              <div key={widget.instanceId} className="bg-white rounded-lg border border-[#dbd6cf] p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${BG_COLOR_CLASSES[widget.color || "gray"] ?? "bg-[#b8b0a8]"}`}>
+                                    {IconComponent ? (
+                                      <IconComponent className="h-5 w-5 text-white" />
+                                    ) : (
+                                      <LayoutDashboard className="h-5 w-5 text-white" />
+                                    )}
                                   </div>
-                                </div>
-                                {widget.dataSource && (
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Source</label>
-                                    <span className="text-sm text-gray-600 capitalize">{widget.dataSource}</span>
+                                    <h3 className="text-lg font-medium">{widget.name}</h3>
+                                    <p className="text-sm text-[#8e99a8]">Widget ID: {widget.id}</p>
                                   </div>
-                                )}
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">Created</label>
-                                  <span className="text-sm text-gray-600">
-                                    {new Date().toLocaleDateString()}
-                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Daily target</label>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      step={1}
+                                      value={widget.target || 1}
+                                      onChange={(event) => {
+                                        const parsed = Number.parseInt(event.target.value, 10);
+                                        if (Number.isNaN(parsed)) return;
+                                        patchWidgetInActiveBucket(widget.instanceId, {
+                                          target: Math.max(1, parsed),
+                                        });
+                                      }}
+                                      className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Color</label>
+                                    <select
+                                      value={widget.color || "gray"}
+                                      onChange={(event) => {
+                                        patchWidgetInActiveBucket(widget.instanceId, {
+                                          color: event.target.value,
+                                        });
+                                      }}
+                                      className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                    >
+                                      {WIDGET_COLOR_OPTIONS.map((colorName) => (
+                                        <option key={colorName} value={colorName}>
+                                          {colorName}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Data source</label>
+                                    <select
+                                      value={selectedDataSource}
+                                      onChange={(event) => {
+                                        patchWidgetInActiveBucket(widget.instanceId, {
+                                          dataSource: event.target.value,
+                                        });
+                                        void fetchIntegrationsData();
+                                      }}
+                                      className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                    >
+                                      {sourceOptions.map((option) => (
+                                        <option key={option} value={option}>
+                                          {option}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Created</label>
+                                    <span className="text-sm text-[#6b7688]">
+                                      {widget.createdAt
+                                        ? new Date(widget.createdAt).toLocaleDateString()
+                                        : "Unknown"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap gap-2 border-t border-[#dbd6cf] pt-4">
+                                  <button
+                                    onClick={() => {
+                                      setEditingBucket(activeBucket);
+                                      setEditingWidget(widget);
+                                      setNewlyCreatedWidgetId(null);
+                                    }}
+                                    className="rounded-md bg-theme-primary-500 px-4 py-2 text-white hover:bg-theme-primary-500/90 focus:outline-none focus:ring-2 focus:ring-theme-primary-500"
+                                  >
+                                    Open Editor
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      void resetWidgetProgress(widget);
+                                    }}
+                                    className="rounded-md border border-[#dbd6cf] px-4 py-2 text-[#4a5568] hover:bg-[#faf8f5] focus:outline-none focus:ring-2 focus:ring-[#bb9e7b]"
+                                  >
+                                    Reset Today
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      requestRemoveWidget(widget);
+                                    }}
+                                    className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                  >
+                                    Remove Widget
+                                  </button>
                                 </div>
                               </div>
-                              
-                              <div className="mt-4 pt-4 border-t border-gray-200">
-                                <button 
-                                  onClick={() => {
-                                    setEditingWidget(widget);
-                                    setIsWidgetSheetOpen(true);
-                                  }}
-                                  className="px-4 py-2 bg-theme-primary-500 text-white rounded-md hover:bg-theme-primary-500/90 focus:outline-none focus:ring-2 focus:ring-theme-primary-500 mr-2"
-                                >
-                                  Edit Widget
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setWidgetsByBucket(prev => {
-                                      const updated = { ...prev };
-                                      Object.keys(updated).forEach(bucket => {
-                                        updated[bucket] = updated[bucket].filter(w => w.instanceId !== widget.instanceId);
-                                      });
-                                      return updated;
-                                    });
-                                  }}
-                                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                >
-                                  Remove Widget
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -4369,10 +4870,78 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         </div>
 
 
+        {confirmState && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={confirmState.title}
+              className="w-full max-w-md rounded-xl border border-[#dbd6cf] bg-white p-5 shadow-xl"
+            >
+              <h3 className="text-base font-semibold text-[#314158]">{confirmState.title}</h3>
+              <p className="mt-2 text-sm text-[#6b7688]">{confirmState.description}</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmState(null)}
+                  className="rounded-md border border-[#dbd6cf] px-3 py-2 text-sm text-[#4a5568] hover:bg-[#faf8f5]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pending = confirmState;
+                    setConfirmState(null);
+                    void Promise.resolve(pending.onConfirm());
+                  }}
+                  className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+                >
+                  {confirmState.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {undoState && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-[#dbd6cf] bg-white p-3 shadow-warm-lg"
+          >
+            <p className="text-sm text-[#314158]">{undoState.message}</p>
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  clearUndoTimer();
+                  setUndoState(null);
+                }}
+                className="rounded-md border border-[#dbd6cf] px-2 py-1 text-xs text-[#6b7688] hover:bg-[#faf8f5]"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pending = undoState;
+                  clearUndoTimer();
+                  setUndoState(null);
+                  void Promise.resolve(pending.onUndo());
+                }}
+                className="rounded-md bg-theme-primary-600 px-2 py-1 text-xs text-white hover:bg-theme-primary-700"
+              >
+                Undo
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Widget editor sheet */}
         {typeof window !== 'undefined' && (
           <WidgetEditorSheet
-            widget={editingWidget} 
+            widget={editingWidget}
             open={editingWidget !== null}
             onClose={() => {
               setEditingWidget(null)
@@ -4393,7 +4962,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             className={`w-full sm:w-[800px] max-w-full p-0 sm:p-6 flex flex-col ${isMobileView ? 'max-h-[90vh]' : ''}`}
           >
             <SheetHeader
-              className={`px-4 pt-6 pb-4 sm:px-0 sm:pt-0 sm:pb-6 border-b border-gray-200 sm:border-none ${isMobileView ? 'sticky top-0 z-10 bg-white/95 backdrop-blur' : ''}`}
+              className={`px-4 pt-6 pb-4 sm:px-0 sm:pt-0 sm:pb-6 border-b border-[#dbd6cf] sm:border-none ${isMobileView ? 'sticky top-0 z-10 bg-white/95 backdrop-blur' : ''}`}
             >
               <SheetTitle>Add a Widget</SheetTitle>
             </SheetHeader>
@@ -4405,14 +4974,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   const newInstance: WidgetInstance = isInstance
                     ? (widgetOrTemplate as WidgetInstance)
                     : {
-                        ...(widgetOrTemplate as WidgetTemplate),
-                        instanceId: `${(widgetOrTemplate as WidgetTemplate).id}-${Date.now()}`,
-                        target: (widgetOrTemplate as WidgetTemplate).defaultTarget || 100,
-                        color: (widgetOrTemplate as WidgetTemplate).color || 'gray',
-                        dataSource: 'manual',
-                        createdAt: new Date().toISOString(),
-                        schedule: [true, true, true, true, true, true, true],
-                      };
+                      ...(widgetOrTemplate as WidgetTemplate),
+                      instanceId: `${(widgetOrTemplate as WidgetTemplate).id}-${Date.now()}`,
+                      target: (widgetOrTemplate as WidgetTemplate).defaultTarget || 100,
+                      color: (widgetOrTemplate as WidgetTemplate).color || 'gray',
+                      dataSource: 'manual',
+                      createdAt: new Date().toISOString(),
+                      schedule: [true, true, true, true, true, true, true],
+                    };
 
                   setWidgetsByBucket(prev => {
                     const updated = { ...prev };
@@ -4440,11 +5009,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
           <SheetContent side="right" className="w-full sm:w-[520px] md:w-[560px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-gray-900">Manage Tabs</SheetTitle>
+              <SheetTitle className="text-[#314158]">Manage Tabs</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Add a new tab</label>
+                <label className="block text-sm font-medium text-[#4a5568] mb-1">Add a new tab</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -4452,7 +5021,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     value={newBucket}
                     onChange={(e) => setNewBucket(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddBucket()}
-                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    className="flex-1 rounded-md border border-[#dbd6cf] px-3 py-2 text-sm focus:border-warm-500 focus:ring-1 focus:ring-warm-500 focus:outline-none"
                   />
                   <button
                     onClick={handleAddBucket}
@@ -4465,28 +5034,28 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </div>
 
               <div>
-                <div className="text-sm font-medium text-gray-700 mb-2">Suggested tabs</div>
+                <div className="text-sm font-medium text-[#4a5568] mb-2">Suggested tabs</div>
                 <div className="flex flex-wrap gap-2">
                   {suggestedToShow.length > 0 ? (
                     suggestedToShow.map((name) => (
                       <button
                         key={name}
                         onClick={() => handleAddBucketQuick(name)}
-                        className="px-3 py-1.5 rounded-full border border-gray-200 text-sm hover:bg-gray-50 active:bg-gray-100"
+                        className="px-3 py-1.5 rounded-full border border-[#dbd6cf] text-sm hover:bg-[#faf8f5] active:bg-[rgba(183,148,106,0.08)]"
                         aria-label={`Add ${name} tab`}
                       >
                         {name}
                       </button>
                     ))
                   ) : (
-                    <div className="text-xs text-gray-500">All suggested tabs are already added</div>
+                    <div className="text-xs text-[#8e99a8]">All suggested tabs are already added</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <div className="text-sm font-medium text-gray-700 mb-2">Existing tabs</div>
-                <ul className="divide-y divide-gray-200 rounded-md border border-gray-200 overflow-hidden">
+                <div className="text-sm font-medium text-[#4a5568] mb-2">Existing tabs</div>
+                <ul className="divide-y divide-[#dbd6cf] rounded-md border border-[#dbd6cf] overflow-hidden">
                   {buckets.map((b, index) => (
                     <li
                       key={b}
@@ -4499,10 +5068,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {editingBucketName !== b && (
-                            <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
+                            <GripVertical className="w-4 h-4 text-[#8e99a8]/70 cursor-grab active:cursor-grabbing" />
                           )}
                           <span
-                            className="inline-block w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
+                            className="inline-block w-4 h-4 rounded-full border border-[#dbd6cf] flex-shrink-0"
                             style={{ backgroundColor: getBucketColor(b) }}
                             aria-hidden
                           />
@@ -4515,11 +5084,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 if (e.key === 'Enter') handleSaveEditBucket();
                                 if (e.key === 'Escape') handleCancelEditBucket();
                               }}
-                              className="flex-1 text-sm border border-blue-500 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="flex-1 text-sm border border-warm-500 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-warm-500"
                               autoFocus
                             />
                           ) : (
-                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-gray-700'}`}>{b}</span>
+                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-[#4a5568]'}`}>{b}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -4534,7 +5103,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               </button>
                               <button
                                 onClick={handleCancelEditBucket}
-                                className="text-xs p-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50"
+                                className="text-xs p-1.5 rounded-md border border-[#dbd6cf] text-[#6b7688] hover:bg-[#faf8f5]"
                                 title="Cancel"
                               >
                                 <X className="w-3.5 h-3.5" />
@@ -4544,13 +5113,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             <>
                               <button
                                 onClick={() => handleStartEditBucket(b)}
-                                className="text-xs p-1.5 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50"
+                                className="text-xs p-1.5 rounded-md border border-warm-200 text-warm-600 hover:bg-warm-50"
                                 title="Edit name"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleRemoveBucket(b)}
+                                onClick={() => requestRemoveBucket(b)}
                                 className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
                               >
                                 Remove
@@ -4561,7 +5130,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       </div>
                       {/* Custom color picker only (auto-assigned initially) */}
                       <div className="mt-3 flex items-center justify-end gap-3">
-                        <label className="flex items-center gap-2 text-xs text-gray-500">
+                        <label className="flex items-center gap-2 text-xs text-[#8e99a8]">
                           <span>Custom</span>
                           <input
                             type="color"
@@ -4575,7 +5144,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     </li>
                   ))}
                   {buckets.length === 0 && (
-                    <li className="px-3 py-6 text-sm text-gray-500 text-center">No tabs yet</li>
+                    <li className="px-3 py-6 text-sm text-[#8e99a8] text-center">No tabs yet</li>
                   )}
                 </ul>
               </div>
@@ -4584,7 +5153,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         </Sheet>
 
         {/* Nutrition Widget Modal */}
-        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => { 
+        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => {
           setNutritionWidgetOpen(open)
           if (open) {
             setShouldLoadNutritionWidget(true)
@@ -4597,10 +5166,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-gray-900">Daily Nutrition Tracker</SheetTitle>
+              <SheetTitle className="text-[#314158]">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
-              { (nutritionWidgetOpen || shouldLoadNutritionWidget) && (
+              {(nutritionWidgetOpen || shouldLoadNutritionWidget) && (
                 shouldLoadNutritionWidget ? <NutritionMealTracker /> : <Skeleton className="h-32 w-full" />
               )}
             </div>
@@ -4616,7 +5185,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-gray-900">Medication Tracker</SheetTitle>
+              <SheetTitle className="text-[#314158]">Medication Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               {(medicationWidgetOpen || shouldLoadMedicationWidget) && (
@@ -4635,7 +5204,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-indigo-950">Exercise Tracker</SheetTitle>
+              <SheetTitle className="text-warm-950">Exercise Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               {(exerciseWidgetOpen || shouldLoadExerciseWidget) && (
@@ -4654,12 +5223,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-indigo-950">Home Projects</SheetTitle>
+              <SheetTitle className="text-warm-950">Home Projects</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               {(homeProjectsWidgetOpen || shouldLoadHomeProjectsWidget) && (
                 shouldLoadHomeProjectsWidget ? (
-                  <HomeProjectsWidget 
+                  <HomeProjectsWidget
                     widget={{
                       id: 'home-projects-modal',
                       instanceId: 'home-projects-modal',
@@ -4674,18 +5243,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       schedule: [true, true, true, true, true, true, true],
                       createdAt: new Date().toISOString()
                     }}
-                    onUpdate={() => {}}
+                    onUpdate={() => { }}
                   />
                 ) : <Skeleton className="h-24 w-full" />
               )}
             </div>
           </SheetContent>
         </Sheet>
-        </div>
-        {chatBarReady && <ChatBarLazy />}
       </div>
-    );
-  }
+      {chatBarReady && <ChatBarLazy />}
+    </div>
+  );
+}
 
 // Main exported component that wraps with TasksProvider
 export function TaskBoardDashboard() {
@@ -4693,11 +5262,11 @@ export function TaskBoardDashboard() {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   });
-  
+
   return (
     <TasksProvider selectedDate={selectedDate}>
-      <TaskBoardDashboardInner 
-        selectedDate={selectedDate} 
+      <TaskBoardDashboardInner
+        selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
       />
     </TasksProvider>

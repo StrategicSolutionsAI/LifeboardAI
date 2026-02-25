@@ -78,10 +78,10 @@ export function RefinedMedicationWidget({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'taken': return <CheckCircle className="w-3 h-3 text-green-600" />
-      case 'upcoming': return <Clock className="w-3 h-3 text-blue-600" />
+      case 'upcoming': return <Clock className="w-3 h-3 text-warm-600" />
       case 'missed': return <XCircle className="w-3 h-3 text-red-600" />
       case 'skipped': return <AlertTriangle className="w-3 h-3 text-yellow-600" />
-      default: return <Clock className="w-3 h-3 text-gray-400" />
+      default: return <Clock className="w-3 h-3 text-[#8e99a8]" />
     }
   }
 
@@ -104,15 +104,15 @@ export function RefinedMedicationWidget({
     >
       {/* Next dose reminder */}
       {nextMed && (
-        <div className="p-2 bg-blue-50 rounded-lg">
+        <div className="p-2 bg-[#fdf8f6] rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="w-3 h-3 text-blue-600" />
-              <span className="text-xs font-medium text-blue-800">Next Dose</span>
+              <Clock className="w-3 h-3 text-warm-600" />
+              <span className="text-xs font-medium text-[#314158]">Next Dose</span>
             </div>
-            <span className="text-xs text-blue-600 font-semibold">{nextMed.nextDose}</span>
+            <span className="text-xs text-warm-600 font-semibold">{nextMed.nextDose}</span>
           </div>
-          <div className="text-xs text-blue-700 mt-1">
+          <div className="text-xs text-[#9a7b5a] mt-1">
             {nextMed.name} {nextMed.dosage}
           </div>
         </div>
@@ -120,24 +120,24 @@ export function RefinedMedicationWidget({
 
       {/* Medication list */}
       <div className="space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
+        <span className="text-xs font-semibold uppercase tracking-widest text-[#6b7688]">
           Today's Schedule
         </span>
         {medications.slice(0, 3).map((med) => (
           <div key={med.id} className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               {getStatusIcon(med.status)}
-              <span className="font-medium text-gray-700">
+              <span className="font-medium text-[#4a5568]">
                 {med.name}
               </span>
-              <span className="text-gray-500">
+              <span className="text-[#8e99a8]">
                 {med.dosage}
               </span>
             </div>
             <span className={cn(
               'text-xs font-medium',
               med.status === 'taken' && 'text-green-600',
-              med.status === 'upcoming' && 'text-blue-600',
+              med.status === 'upcoming' && 'text-warm-600',
               med.status === 'missed' && 'text-red-600',
               med.status === 'skipped' && 'text-yellow-600'
             )}>
@@ -146,7 +146,7 @@ export function RefinedMedicationWidget({
           </div>
         ))}
         {medications.length > 3 && (
-          <div className="text-xs text-gray-500 pt-1">
+          <div className="text-xs text-[#8e99a8] pt-1">
             +{medications.length - 3} more medication{medications.length - 3 !== 1 ? 's' : ''}
           </div>
         )}

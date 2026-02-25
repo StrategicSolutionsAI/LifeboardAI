@@ -119,14 +119,14 @@ export function FatSecretNutritionWidget({ className }: NutritionWidgetProps) {
               {searchResults.map((food) => (
                 <div
                   key={food.food_id}
-                  className="p-2 border rounded cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="p-2 border rounded cursor-pointer hover:bg-[#faf8f5] transition-colors"
                   onClick={() => getFoodDetails(food.food_id)}
                 >
                   <div className="font-medium text-sm">{food.food_name}</div>
                   {food.brand_name && (
-                    <div className="text-xs text-gray-500">{food.brand_name}</div>
+                    <div className="text-xs text-[#8e99a8]">{food.brand_name}</div>
                   )}
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-[#8e99a8] mt-1">
                     {food.food_description}
                   </div>
                 </div>
@@ -219,7 +219,7 @@ export function FatSecretNutritionWidget({ className }: NutritionWidgetProps) {
                 ))}
 
                 {selectedFood.food.servings.serving.length > 3 && (
-                  <div className="text-center text-sm text-gray-500">
+                  <div className="text-center text-sm text-[#8e99a8]">
                     + {selectedFood.food.servings.serving.length - 3} more serving sizes available
                   </div>
                 )}
@@ -230,7 +230,7 @@ export function FatSecretNutritionWidget({ className }: NutritionWidgetProps) {
 
         {/* Empty State */}
         {searchResults.length === 0 && !selectedFood && !isSearching && searchQuery && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-[#8e99a8]">
             <Apple className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No foods found for "{searchQuery}"</p>
             <p className="text-sm">Try a different search term</p>
@@ -239,7 +239,7 @@ export function FatSecretNutritionWidget({ className }: NutritionWidgetProps) {
 
         {/* Initial State */}
         {!searchQuery && searchResults.length === 0 && !selectedFood && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-[#8e99a8]">
             <Search className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>Search for any food to see nutrition facts</p>
             <p className="text-sm">Try searching for "apple", "chicken breast", or "oatmeal"</p>

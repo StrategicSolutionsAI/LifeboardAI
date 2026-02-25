@@ -90,15 +90,15 @@ export default function OnboardingStep3() {
                   {/* Color preview circles */}
                   <div className="flex gap-1">
                     <div 
-                      className="w-6 h-6 rounded-full border border-gray-200"
+                      className="w-6 h-6 rounded-full border border-[#dbd6cf]"
                       style={{ backgroundColor: theme.primary }}
                     />
                     <div 
-                      className="w-6 h-6 rounded-full border border-gray-200"
+                      className="w-6 h-6 rounded-full border border-[#dbd6cf]"
                       style={{ backgroundColor: theme.secondary }}
                     />
                     <div 
-                      className="w-6 h-6 rounded-full border border-gray-200"
+                      className="w-6 h-6 rounded-full border border-[#dbd6cf]"
                       style={{ backgroundColor: theme.accent }}
                     />
                   </div>
@@ -107,7 +107,7 @@ export default function OnboardingStep3() {
                     <h3 className="text-[16px] font-medium text-[#171A1F]">
                       {theme.name}
                       {theme.isCustom && (
-                        <span className="ml-2 px-2 py-0.5 text-xs font-medium text-purple-600 bg-purple-100 rounded-full">
+                        <span className="ml-2 px-2 py-0.5 text-xs font-medium text-amber-600 bg-amber-100 rounded-full">
                           Custom
                         </span>
                       )}
@@ -129,9 +129,9 @@ export default function OnboardingStep3() {
           {/* Create Custom Theme Button */}
           <button
             onClick={() => setShowCustomColorForm(!showCustomColorForm)}
-            className="w-full p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-theme-primary transition-all text-left bg-gray-50 hover:bg-gray-100"
+            className="w-full p-4 rounded-lg border-2 border-dashed border-[#dbd6cf] hover:border-theme-primary transition-all text-left bg-[#faf8f5] hover:bg-[#f5f0eb]"
           >
-            <div className="flex items-center justify-center gap-2 text-gray-600 hover:text-theme-primary">
+            <div className="flex items-center justify-center gap-2 text-[#6b7688] hover:text-theme-primary">
               <Plus className="w-5 h-5" />
               <span className="font-medium">Create Your Own Theme</span>
             </div>
@@ -140,12 +140,12 @@ export default function OnboardingStep3() {
         
         {/* Custom Color Form */}
         {showCustomColorForm && (
-          <div className="mt-6 p-6 bg-gray-50 rounded-lg border">
+          <div className="mt-6 p-6 bg-[#faf8f5] rounded-lg border">
             <h4 className="text-lg font-medium mb-4">Create Custom Theme</h4>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-[#4a5568] mb-2">
                   Theme Name
                 </label>
                 <input
@@ -153,13 +153,13 @@ export default function OnboardingStep3() {
                   value={customThemeName}
                   onChange={(e) => setCustomThemeName(e.target.value)}
                   placeholder="My Awesome Theme"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
                 />
               </div>
               
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#4a5568] mb-2">
                     Primary Color
                   </label>
                   <div className="flex gap-2 items-center">
@@ -167,19 +167,19 @@ export default function OnboardingStep3() {
                       type="color"
                       value={customPrimary}
                       onChange={(e) => setCustomPrimary(e.target.value)}
-                      className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                      className="w-12 h-10 border border-[#dbd6cf] rounded cursor-pointer"
                     />
                     <input
                       type="text"
                       value={customPrimary}
                       onChange={(e) => setCustomPrimary(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                      className="flex-1 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#4a5568] mb-2">
                     Secondary Color
                   </label>
                   <div className="flex gap-2 items-center">
@@ -187,19 +187,19 @@ export default function OnboardingStep3() {
                       type="color"
                       value={customSecondary}
                       onChange={(e) => setCustomSecondary(e.target.value)}
-                      className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                      className="w-12 h-10 border border-[#dbd6cf] rounded cursor-pointer"
                     />
                     <input
                       type="text"
                       value={customSecondary}
                       onChange={(e) => setCustomSecondary(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                      className="flex-1 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-[#4a5568] mb-2">
                     Accent Color
                   </label>
                   <div className="flex gap-2 items-center">
@@ -207,13 +207,13 @@ export default function OnboardingStep3() {
                       type="color"
                       value={customAccent}
                       onChange={(e) => setCustomAccent(e.target.value)}
-                      className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                      className="w-12 h-10 border border-[#dbd6cf] rounded cursor-pointer"
                     />
                     <input
                       type="text"
                       value={customAccent}
                       onChange={(e) => setCustomAccent(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+                      className="flex-1 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export default function OnboardingStep3() {
               
               {/* Live Preview */}
               <div className="mt-4 p-4 bg-white rounded-lg border">
-                <h5 className="text-sm font-medium text-gray-700 mb-3">Preview</h5>
+                <h5 className="text-sm font-medium text-[#4a5568] mb-3">Preview</h5>
                 <div className="flex items-center gap-3 flex-wrap">
                   <div 
                     className="px-4 py-2 rounded-full text-white text-sm font-medium"
@@ -254,7 +254,7 @@ export default function OnboardingStep3() {
                 </button>
                 <button
                   onClick={() => setShowCustomColorForm(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 border border-[#dbd6cf] text-[#4a5568] rounded-md hover:bg-[#faf8f5] transition-colors"
                 >
                   Cancel
                 </button>

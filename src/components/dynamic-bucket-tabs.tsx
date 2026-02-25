@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getUserPreferencesClient, UserPreferences } from "@/lib/user-preferences"
-import { Plus, Cloud, Search } from "lucide-react"
+import { getUserPreferencesClient } from "@/lib/user-preferences"
+import { Plus } from "lucide-react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { WidgetLibrary } from "./widget-library"
-import { Button } from "./ui/button"
 import { Card, CardContent } from "./ui/card"
 
 // Default buckets in case user hasn't selected any
@@ -29,16 +28,10 @@ export function DynamicBucketTabs({
     async function loadUserBuckets() {
       try {
         const userPrefs = await getUserPreferencesClient()
-        
+
         if (userPrefs && userPrefs.life_buckets && userPrefs.life_buckets.length > 0) {
           setUserBuckets(userPrefs.life_buckets)
           setBucketColors(userPrefs.bucket_colors || {})
-
-          // If the currently selected bucket isn't in the user's buckets,
-          // select the first one of their buckets
-          if (!userPrefs.life_buckets.includes(selectedBucket) && userPrefs.life_buckets.length > 0) {
-            onSelectBucket(userPrefs.life_buckets[0])
-          }
         }
       } catch (error) {
         console.error("Failed to load user buckets:", error)
@@ -46,9 +39,16 @@ export function DynamicBucketTabs({
         setLoading(false)
       }
     }
-    
+
     loadUserBuckets()
-  }, [selectedBucket, onSelectBucket])
+  }, [])
+
+  useEffect(() => {
+    if (loading) return
+    if (userBuckets.length > 0 && !userBuckets.includes(selectedBucket)) {
+      onSelectBucket(userBuckets[0])
+    }
+  }, [loading, selectedBucket, userBuckets, onSelectBucket])
 
   // Listen for bucket color changes
   useEffect(() => {
@@ -86,7 +86,7 @@ export function DynamicBucketTabs({
 
   // Get bucket color with fallback to default theme color
   const getBucketColor = (bucket: string) => {
-    return bucketColors[bucket] || '#8491FF'
+    return bucketColors[bucket] || '#B1916A'
   }
 
   // Convert hex to rgba for background colors
@@ -100,7 +100,7 @@ export function DynamicBucketTabs({
   return (
     <>
       {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6">
+      <div className="bg-white border-b border-[#dbd6cf] px-4 sm:px-6">
         <div className="flex gap-1 sm:gap-2">
           {userBuckets.map((bucket) => {
             const bucketColor = getBucketColor(bucket)
@@ -111,8 +111,8 @@ export function DynamicBucketTabs({
                 onClick={() => onSelectBucket(bucket)}
                 className={`relative px-4 sm:px-6 py-3 text-xs font-medium tracking-wide transition-all duration-200 rounded-t-lg border-2 ${
                   isSelected
-                    ? 'text-white shadow-lg transform scale-105'
-                    : 'text-gray-700 hover:text-white border-gray-200 hover:border-opacity-50'
+                    ? 'text-white shadow-warm-lg transform scale-105'
+                    : 'text-[#314158] hover:text-white border-[#dbd6cf] hover:border-opacity-50'
                 }`}
                 style={{
                   backgroundColor: isSelected ? bucketColor : hexToRgba(bucketColor, 0.1),

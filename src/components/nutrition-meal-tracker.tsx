@@ -556,7 +556,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
 
         {/* Daily Totals Summary */}
         {currentView === 'meals' && (
-          <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg">
+          <div className="bg-gradient-to-r from-[#fdf8f6] to-green-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-sm">Today's Progress</h4>
               <div className="flex gap-2">
@@ -587,7 +587,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   <span className="text-xs font-medium">Calories</span>
                   <span className="text-xs">{Math.round(dailyTotals.calories)}/{nutritionGoals.calories}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-[#ebe5de] rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(calculateProgress(dailyTotals.calories, nutritionGoals.calories))}`}
                     style={{ width: `${calculateProgress(dailyTotals.calories, nutritionGoals.calories)}%` }}
@@ -601,7 +601,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   <span className="text-xs font-medium">Protein</span>
                   <span className="text-xs">{Math.round(dailyTotals.protein)}g/{nutritionGoals.protein}g</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-[#ebe5de] rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(calculateProgress(dailyTotals.protein, nutritionGoals.protein))}`}
                     style={{ width: `${calculateProgress(dailyTotals.protein, nutritionGoals.protein)}%` }}
@@ -615,7 +615,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   <span className="text-xs font-medium">Carbs</span>
                   <span className="text-xs">{Math.round(dailyTotals.carbs)}g/{nutritionGoals.carbs}g</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-[#ebe5de] rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(calculateProgress(dailyTotals.carbs, nutritionGoals.carbs))}`}
                     style={{ width: `${calculateProgress(dailyTotals.carbs, nutritionGoals.carbs)}%` }}
@@ -629,7 +629,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   <span className="text-xs font-medium">Fat</span>
                   <span className="text-xs">{Math.round(dailyTotals.fat)}g/{nutritionGoals.fat}g</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-[#ebe5de] rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(calculateProgress(dailyTotals.fat, nutritionGoals.fat))}`}
                     style={{ width: `${calculateProgress(dailyTotals.fat, nutritionGoals.fat)}%` }}
@@ -660,14 +660,14 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   </div>
 
                   {foods.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">No foods added yet</p>
+                    <p className="text-sm text-[#8e99a8] italic">No foods added yet</p>
                   ) : (
                     <div className="space-y-2">
                       {foods.map((food: MealFood) => (
-                        <div key={food.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <div key={food.id} className="flex items-center justify-between bg-[#faf8f5] p-2 rounded">
                           <div className="flex-1">
                             <div className="font-medium text-sm">{food.food_name}</div>
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-[#6b7688]">
                               {food.quantity}x {food.serving.serving_description} • {Math.round(parseFloat(food.serving.calories || '0') * food.quantity)} cal
                             </div>
                           </div>
@@ -692,7 +692,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
         {/* Goals View */}
         {currentView === 'goals' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg">
+            <div className="bg-gradient-to-r from-green-50 to-[#fdf8f6] p-4 rounded-lg">
               <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
                 <Target className="h-4 w-4" />
                 Nutrition Goals
@@ -785,7 +785,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                     <div key={favorite.id} className="flex items-center justify-between bg-white p-2 rounded border">
                       <div className="flex-1">
                         <div className="font-medium text-sm">{favorite.food_name}</div>
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-[#6b7688]">
                           {favorite.serving.serving_description} • Added {favorite.added_count} times
                         </div>
                       </div>
@@ -853,7 +853,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                     <div key={favorite.id} className="flex items-center justify-between bg-white p-2 rounded border">
                       <div className="flex-1">
                         <div className="font-medium text-sm">{favorite.food_name}</div>
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-[#6b7688]">
                           {favorite.serving.serving_description} • {favorite.serving.calories} cal
                         </div>
                       </div>
@@ -929,14 +929,14 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                   {searchResults.map((food) => (
                     <div
                       key={food.food_id}
-                      className="p-2 border rounded cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="p-2 border rounded cursor-pointer hover:bg-[#faf8f5] transition-colors"
                       onClick={() => getFoodDetails(food.food_id)}
                     >
                       <div className="font-medium text-sm">{food.food_name}</div>
                       {food.brand_name && (
-                        <div className="text-xs text-gray-500">{food.brand_name}</div>
+                        <div className="text-xs text-[#8e99a8]">{food.brand_name}</div>
                       )}
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className="text-xs text-[#8e99a8] mt-1">
                         {food.food_description}
                       </div>
                     </div>
@@ -980,8 +980,8 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                           key={serving.serving_id || index}
                           className={`border rounded p-3 cursor-pointer transition-colors ${
                             selectedServing?.serving_id === serving.serving_id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'hover:bg-gray-50'
+                              ? 'border-warm-500 bg-warm-50'
+                              : 'hover:bg-[#faf8f5]'
                           }`}
                           onClick={() => setSelectedServing(serving)}
                         >
@@ -1052,7 +1052,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
                           </div>
                         </div>
 
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-[#6b7688]">
                           Total: {Math.round(parseFloat(selectedServing.calories || '0') * quantity)} calories
                         </div>
 
@@ -1069,7 +1069,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
 
             {/* Empty State */}
             {!showFavorites && searchResults.length === 0 && !selectedFood && !isSearching && searchQuery && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-[#8e99a8]">
                 <Apple className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>No foods found for "{searchQuery}"</p>
                 <p className="text-sm">Try a different search term</p>
@@ -1078,7 +1078,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
 
             {/* Initial State */}
             {!showFavorites && !searchQuery && searchResults.length === 0 && !selectedFood && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-[#8e99a8]">
                 <Search className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>Search for any food to add to your meals</p>
                 <p className="text-sm">Try searching for "apple", "chicken breast", or "oatmeal"</p>

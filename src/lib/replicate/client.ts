@@ -44,12 +44,12 @@ export async function runGPT5Pro(options: GPT5Options): Promise<string> {
     };
 
     if (typeof max_tokens === 'number') {
-      // Replicate currently expects `max_output_tokens` for OpenAI models.
-      input.max_output_tokens = max_tokens;
+      // Replicate expects `max_completion_tokens` for GPT-5
+      input.max_completion_tokens = max_tokens;
     }
 
     const prediction = await replicate.predictions.create({
-      model: 'openai/gpt-5-pro',
+      model: 'openai/gpt-5',
       input,
     });
 
@@ -100,16 +100,20 @@ export async function* streamGPT5Pro(options: GPT5Options) {
 
   try {
     const replicate = getReplicate();
+
+    const input: Record<string, unknown> = {
+      messages,
+      temperature,
+      top_p,
+    };
+
+    if (typeof max_tokens === 'number') {
+      input.max_completion_tokens = max_tokens;
+    }
+
     const stream = await replicate.stream(
-      "openai/gpt-5-pro" as any,
-      {
-        input: {
-          messages,
-          temperature,
-          max_tokens,
-          top_p,
-        },
-      }
+      "openai/gpt-5" as any,
+      { input }
     );
 
     for await (const event of stream) {

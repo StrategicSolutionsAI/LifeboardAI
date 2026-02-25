@@ -907,7 +907,7 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
                       activeHomeProjects.map((project) => {
                         const statusConfig = PROJECT_STATUS[project.status];
                         const priorityColors = {
-                          low: 'text-blue-600',
+                          low: 'text-warm-600',
                           medium: 'text-yellow-600', 
                           high: 'text-orange-600',
                           critical: 'text-red-600'
@@ -922,10 +922,10 @@ export function TaskSidePanel({ onDragStart, onDragEnd }: {
                               <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${
                                   statusConfig.color === 'green' ? 'bg-green-500' : 
-                                  statusConfig.color === 'blue' ? 'bg-blue-500' : 
+                                  statusConfig.color === 'blue' ? 'bg-warm-500' :
                                   statusConfig.color === 'amber' ? 'bg-amber-500' : 
                                   statusConfig.color === 'orange' ? 'bg-orange-500' : 
-                                  'bg-gray-500'
+                                  'bg-[#b8b0a8]'
                                 }`} />
                                 <p className="text-sm font-medium text-theme-text-primary truncate">
                                   {project.title}

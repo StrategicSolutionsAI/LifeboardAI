@@ -18,10 +18,10 @@ export const WIDGET_DESIGN_TOKENS = {
   typography: {
     metric: 'text-3xl font-black leading-none tracking-tight',
     metricLarge: 'text-4xl font-black leading-none tracking-tight',
-    unit: 'text-sm font-medium text-gray-500',
-    label: 'text-xs font-semibold uppercase tracking-widest text-gray-600',
-    secondary: 'text-sm font-medium text-gray-700',
-    description: 'text-xs text-gray-500'
+    unit: 'text-sm font-medium text-[#8e99a8]',
+    label: 'text-xs font-semibold uppercase tracking-widest text-[#6b7688]',
+    secondary: 'text-sm font-medium text-[#4a5568]',
+    description: 'text-xs text-[#8e99a8]'
   },
   
   // Color Palette
@@ -38,32 +38,32 @@ export const WIDGET_DESIGN_TOKENS = {
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
     danger: 'bg-red-500',
-    info: 'bg-blue-500',
+    info: 'bg-[#bb9e7b]',
     
     // Progress bars
-    progressBg: 'bg-gray-100',
+    progressBg: 'bg-[#f5f0eb]',
     progressFill: {
       low: 'bg-red-400',
       medium: 'bg-amber-400', 
       high: 'bg-emerald-500',
-      complete: 'bg-blue-500',
+      complete: 'bg-[#bb9e7b]',
       over: 'bg-purple-500'
     }
   },
   
   // Interactive States
   interactions: {
-    hover: 'hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5',
+    hover: 'hover:shadow-warm-lg hover:scale-[1.02] hover:-translate-y-0.5',
     active: 'active:scale-[0.98] active:translate-y-0',
     transition: 'transition-all duration-200 ease-out',
-    focus: 'focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-2'
+    focus: 'focus:ring-2 focus:ring-[rgba(163,133,96,0.15)] focus:ring-offset-2'
   },
   
   // Shadows & Borders
   elevation: {
-    card: 'shadow-sm border border-gray-100/80',
-    elevated: 'shadow-md border border-gray-100/60',
-    floating: 'shadow-lg border border-gray-100/40'
+    card: 'shadow-sm border border-[#dbd6cf]/80',
+    elevated: 'shadow-warm border border-[#dbd6cf]/60',
+    floating: 'shadow-warm-lg border border-[#dbd6cf]/40'
   }
 } as const
 
@@ -132,8 +132,8 @@ export function RefinedWidgetBase({
     success: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     warning: 'bg-amber-100 text-amber-800 border-amber-200', 
     danger: 'bg-red-100 text-red-800 border-red-200',
-    info: 'bg-blue-100 text-blue-800 border-blue-200',
-    neutral: 'bg-gray-100 text-gray-800 border-gray-200'
+    info: 'bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]',
+    neutral: 'bg-[#f5f0eb] text-[#314158] border-[#dbd6cf]'
   }
 
   if (isLoading) {
@@ -152,12 +152,12 @@ export function RefinedWidgetBase({
             WIDGET_DESIGN_TOKENS.colors[iconColor],
             'opacity-50'
           )} />
-          <div className="h-4 bg-gray-200 rounded flex-1" />
+          <div className="h-4 bg-[#ebe5de] rounded flex-1" />
         </div>
         <div className="space-y-3">
-          <div className="h-8 bg-gray-200 rounded w-3/4" />
+          <div className="h-8 bg-[#ebe5de] rounded w-3/4" />
           {progress !== undefined && (
-            <div className="h-2 bg-gray-100 rounded w-full" />
+            <div className="h-2 bg-[#f5f0eb] rounded w-full" />
           )}
         </div>
       </div>
@@ -186,7 +186,7 @@ export function RefinedWidgetBase({
       {/* Subtle hover glow effect */}
       <div className={cn(
         'absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300',
-        'bg-gradient-to-br from-blue-50/50 to-purple-50/50'
+        'bg-gradient-to-br from-[#fdf8f6]/50 to-[#faf8f5]/50'
       )} />
       
       {/* Content */}
@@ -205,7 +205,7 @@ export function RefinedWidgetBase({
             <span className={cn(
               WIDGET_DESIGN_TOKENS.typography.label,
               'transition-colors duration-200',
-              isHovered && 'text-gray-700'
+              isHovered && 'text-[#4a5568]'
             )}>
               {title}
             </span>
@@ -227,8 +227,8 @@ export function RefinedWidgetBase({
         <div className="flex items-baseline gap-2 mb-3">
           <span className={cn(
             size === 'large' ? WIDGET_DESIGN_TOKENS.typography.metricLarge : WIDGET_DESIGN_TOKENS.typography.metric,
-            'text-gray-900 transition-all duration-200',
-            isHovered && 'text-gray-800'
+            'text-[#314158] transition-all duration-200',
+            isHovered && 'text-[#314158]'
           )}>
             {primaryValue}
           </span>
@@ -246,10 +246,10 @@ export function RefinedWidgetBase({
         {(secondaryValue || secondaryLabel) && (
           <div className="flex items-center justify-between text-xs mb-3">
             {secondaryLabel && (
-              <span className="text-gray-500">{secondaryLabel}</span>
+              <span className="text-[#8e99a8]">{secondaryLabel}</span>
             )}
             {secondaryValue && (
-              <span className="font-medium text-gray-700">{secondaryValue}</span>
+              <span className="font-medium text-[#4a5568]">{secondaryValue}</span>
             )}
           </div>
         )}
@@ -273,7 +273,7 @@ export function RefinedWidgetBase({
               />
             </div>
             {variant === 'detailed' && (
-              <div className="flex justify-between text-xs text-gray-500">
+              <div className="flex justify-between text-xs text-[#8e99a8]">
                 <span>{Math.round(progress)}%</span>
                 <span>Goal</span>
               </div>
@@ -283,7 +283,7 @@ export function RefinedWidgetBase({
 
         {/* Additional Content */}
         {children && (
-          <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="mt-3 pt-3 border-t border-[#dbd6cf]">
             {children}
           </div>
         )}
@@ -293,7 +293,7 @@ export function RefinedWidgetBase({
       {onClick && (
         <div className={cn(
           'absolute inset-0 opacity-0 group-active:opacity-10 transition-opacity duration-75',
-          'bg-gray-900 pointer-events-none'
+          'bg-[#314158] pointer-events-none'
         )} />
       )}
     </div>

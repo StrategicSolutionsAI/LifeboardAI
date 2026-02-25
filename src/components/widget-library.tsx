@@ -590,12 +590,12 @@ const widgetTemplates: WidgetTemplate[] = [
 // Helper function to convert color name to Tailwind class
 const getColorClass = (color: string): string => {
   const colorMap: Record<string, string> = {
-    blue: "bg-blue-500",
+    blue: "bg-warm-500",
     green: "bg-green-500",
     red: "bg-red-500",
     orange: "bg-orange-500",
-    purple: "bg-purple-500",
-    indigo: "bg-indigo-500",
+    purple: "bg-amber-500",
+    indigo: "bg-warm-500",
     amber: "bg-amber-500",
     teal: "bg-teal-500",
     rose: "bg-rose-500",
@@ -738,24 +738,24 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
       <div className="flex-1 space-y-6">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#8e99a8]/70 w-4 h-4" />
           <input
             type="text"
             placeholder="Search widgets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-[#dbd6cf] rounded-md focus:ring-2 focus:ring-warm-500 focus:border-warm-500 outline-none"
           />
         </div>
         
         {/* Category Filter */}
         <div className="space-y-2">
-          <span className="text-sm font-medium text-gray-700">Category</span>
+          <span className="text-sm font-medium text-[#4a5568]">Category</span>
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:gap-1">
             <button
               className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
-                ? 'bg-indigo-100 text-indigo-700 font-medium' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                ? 'bg-warm-100 text-warm-700 font-medium' 
+                : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'}`}
               onClick={() => setSelectedCategory('all')}
             >
               All
@@ -764,17 +764,17 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               <button
                 key={category}
                 className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
-                  ? 'bg-indigo-100 text-indigo-700 font-medium' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} ${
+                  ? 'bg-warm-100 text-warm-700 font-medium' 
+                  : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'} ${
                     getRecommendedCategory(bucket) === category && selectedCategory !== category 
-                      ? 'ring-2 ring-indigo-300 ring-offset-1' 
+                      ? 'ring-2 ring-warm-300 ring-offset-1' 
                       : ''
                   }`}
                 onClick={() => setSelectedCategory(category)}
               >
                 {category.charAt(0).toUpperCase() + category.slice(1)}
                 {getRecommendedCategory(bucket) === category && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-warm-500 rounded-full animate-pulse" />
                 )}
               </button>
             ))}
@@ -783,11 +783,11 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
         {/* Show a hint if not viewing the recommended category */}
         {selectedCategory !== getRecommendedCategory(bucket) && selectedCategory !== 'all' && (
-          <div className="text-sm text-gray-500 flex items-center gap-2">
-            <span className="inline-block w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+          <div className="text-sm text-[#8e99a8] flex items-center gap-2">
+            <span className="inline-block w-2 h-2 bg-warm-500 rounded-full animate-pulse" />
             <span>Tip: Try the <button 
               onClick={() => setSelectedCategory(getRecommendedCategory(bucket))} 
-              className="text-indigo-600 hover:underline font-medium"
+              className="text-warm-600 hover:underline font-medium"
             >
               {getRecommendedCategory(bucket).charAt(0).toUpperCase() + getRecommendedCategory(bucket).slice(1)}
             </button> category for widgets that match your "{bucket}" bucket</span>
@@ -799,7 +799,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           {filteredWidgets.map((widget) => {
             const Icon = widget.icon
             return (
-              <Card key={widget.id} className={`hover:shadow-md transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-indigo-400' : ''}`} onClick={() => setSelectedTemplate(widget)}>
+              <Card key={widget.id} className={`hover:shadow-warm transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-warm-400' : ''}`} onClick={() => setSelectedTemplate(widget)}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClass(widget.color)}`}>
@@ -807,13 +807,13 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     </div>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-sm font-medium">{widget.name}</CardTitle>
-                      <p className="text-xs text-gray-500 mt-1">{widget.description}</p>
+                      <p className="text-xs text-[#8e99a8] mt-1">{widget.description}</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-[#8e99a8]">
                       Target: {widget.defaultTarget} {widget.unit}
                     </div>
                     <Button 
@@ -834,7 +834,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
         </div>
 
         {filteredWidgets.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-[#8e99a8]">
             <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p>No widgets found matching your criteria</p>
           </div>
@@ -843,8 +843,8 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
       {/* Right: live preview & config */}
       <div className="w-full lg:w-72 shrink-0 space-y-4 lg:sticky lg:top-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-700">Preview</h4>
+        <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm">
+          <h4 className="text-sm font-semibold text-[#4a5568]">Preview</h4>
           {draftWidget ? (
             <>
               <div className="mt-3">
@@ -853,11 +853,11 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
               {/* Target input */}
               <div className="pt-4 space-y-2 border-t">
-                <p className="text-xs font-medium text-gray-600">Daily target</p>
+                <p className="text-xs font-medium text-[#6b7688]">Daily target</p>
                 <div className="flex items-center gap-2">
                   <button
                     aria-label="Decrease target"
-                    className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="px-2 py-1 rounded bg-[rgba(183,148,106,0.08)] hover:bg-[#ebe5de]"
                     onClick={() =>
                       setDraftWidget((prev) =>
                         prev ? { ...prev, target: Math.max(0, prev.target - 1) } : prev
@@ -877,10 +877,10 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     className="w-16 text-center border rounded"
                     aria-label="Target value"
                   />
-                  <span className="text-sm text-gray-600">{draftWidget.unit}</span>
+                  <span className="text-sm text-[#6b7688]">{draftWidget.unit}</span>
                   <button
                     aria-label="Increase target"
-                    className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="px-2 py-1 rounded bg-[rgba(183,148,106,0.08)] hover:bg-[#ebe5de]"
                     onClick={() =>
                       setDraftWidget((prev) =>
                         prev ? { ...prev, target: prev.target + 1 } : prev
@@ -894,13 +894,13 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
               {/* Color picker */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-600">Colour</p>
+                <p className="text-xs font-medium text-[#6b7688]">Colour</p>
                 <div className="flex flex-wrap gap-2">
                   {COLORS.map((clr) => (
                     <button
                       key={clr}
                       aria-label={clr}
-                      className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-indigo-500' : 'border-white'}`}
+                      className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-warm-500' : 'border-white'}`}
                       onClick={() =>
                         setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
                       }
@@ -912,7 +912,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               {/* Data Source Selector - Only for water widget with Fitbit connected */}
               {['water','steps'].includes(draftWidget.id) && (connectedIntegrations.includes('fitbit') || connectedIntegrations.includes('googlefit')) && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-600">Data Source</p>
+                  <p className="text-xs font-medium text-[#6b7688]">Data Source</p>
                   <div className="space-y-2">
                     <label className="flex items-center space-x-2">
                       <input
@@ -921,7 +921,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                         value="manual"
                         checked={draftWidget.dataSource === 'manual'}
                         onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
-                        className="text-indigo-600"
+                        className="text-warm-600"
                       />
                       <span className="text-sm">Manual tracking</span>
                     </label>
@@ -932,7 +932,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                         value="fitbit"
                         checked={draftWidget.dataSource === 'fitbit'}
                         onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
-                        className="text-indigo-600"
+                        className="text-warm-600"
                       />
                       <span className="text-sm">Fitbit (automatic)</span>
                     </label>
@@ -944,14 +944,14 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                           value="googlefit"
                           checked={draftWidget.dataSource === 'googlefit'}
                           onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
-                          className="text-indigo-600"
+                          className="text-warm-600"
                         />
                         <span className="text-sm">Google Fit (automatic)</span>
                       </label>
                     )}
                   </div>
                   {draftWidget.dataSource === 'fitbit' && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[#8e99a8] mt-1">
                       {draftWidget.name} will sync automatically from your Fitbit device
                     </p>
                   )}
@@ -960,13 +960,13 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
 
               {/* Schedule picker */}
               <div className="space-y-2 pt-4 border-t">
-                <p className="text-xs font-medium text-gray-600">Schedule</p>
+                <p className="text-xs font-medium text-[#6b7688]">Schedule</p>
                 <div className="flex flex-wrap gap-2">
                   {WEEKDAYS.map((d, idx) => (
                     <button
                       key={d}
                       aria-label={d}
-                      className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-indigo-500 text-white' : 'bg-white text-gray-600'} hover:bg-indigo-100`}
+                      className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-warm-500 text-white' : 'bg-white text-[#6b7688]'} hover:bg-warm-100`}
                       onClick={() =>
                         setDraftWidget((prev) =>
                           prev
@@ -987,7 +987,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                 {/* Presets */}
                 <div className="flex flex-wrap gap-2 pt-2">
                   <button
-                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="text-[11px] px-2 py-1 rounded bg-[rgba(183,148,106,0.08)] hover:bg-[#ebe5de]"
                     onClick={() =>
                       setDraftWidget((prev) =>
                         prev ? { ...prev, schedule: [true, true, true, true, true, true, true] } : prev
@@ -995,7 +995,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     }
                   >Every day</button>
                   <button
-                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="text-[11px] px-2 py-1 rounded bg-[rgba(183,148,106,0.08)] hover:bg-[#ebe5de]"
                     onClick={() =>
                       setDraftWidget((prev) =>
                         prev ? { ...prev, schedule: [false, true, true, true, true, true, false] } : prev
@@ -1003,7 +1003,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     }
                   >Weekdays</button>
                   <button
-                    className="text-[11px] px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="text-[11px] px-2 py-1 rounded bg-[rgba(183,148,106,0.08)] hover:bg-[#ebe5de]"
                     onClick={() =>
                       setDraftWidget((prev) =>
                         prev ? { ...prev, schedule: [true, false, true, false, true, false, true] } : prev
@@ -1014,7 +1014,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               </div>
 
               <button
-                className="w-full mt-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium"
+                className="w-full mt-4 py-2 rounded bg-warm-600 hover:bg-warm-700 text-white text-sm font-medium"
                 onClick={() => {
                   if (!draftWidget) return;
                   // Convert component to its name string for persistence
@@ -1035,7 +1035,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               </button>
             </>
           ) : (
-            <p className="mt-3 text-xs text-gray-500">Select a widget to see a preview</p>
+            <p className="mt-3 text-xs text-[#8e99a8]">Select a widget to see a preview</p>
           )}
         </div>
       </div>

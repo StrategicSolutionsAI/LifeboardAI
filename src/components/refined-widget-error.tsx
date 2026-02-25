@@ -74,10 +74,10 @@ export function RefinedWidgetError({
     >
       <div className="text-center space-y-3">
         <div>
-          <div className="text-sm font-medium text-gray-900 mb-1">
+          <div className="text-sm font-medium text-[#314158] mb-1">
             {config.title}
           </div>
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-[#6b7688]">
             {config.message}
           </div>
         </div>
@@ -92,7 +92,7 @@ export function RefinedWidgetError({
             >
               <RefreshCw className="w-3 h-3 mr-1 transition-transform duration-300 group-hover:rotate-180" />
               Retry
-              <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div className="absolute inset-0 bg-warm-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
             </Button>
           )}
           
@@ -164,7 +164,7 @@ export function RefinedWidgetEmpty({
       variant="minimal"
     >
       <div className="text-center space-y-3">
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-[#8e99a8]">
           {message}
         </div>
         

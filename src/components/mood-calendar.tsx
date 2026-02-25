@@ -314,7 +314,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-[#8e99a8] mb-2">
           <div>Sun</div>
           <div>Mon</div>
           <div>Tue</div>
@@ -336,13 +336,13 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                 disabled={!d}
                 onClick={() => d && (setSelectedDate(d), setViewMonth(firstDayOfMonth(d)))}
                 className={classNames(
-                  "aspect-square rounded border flex flex-col items-center justify-center text-xs transition hover:bg-gray-50",
+                  "aspect-square rounded border flex flex-col items-center justify-center text-xs transition hover:bg-[#faf8f5]",
                   d
                     ? active
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      ? "border-[#bb9e7b] bg-[#fdf8f6] text-[#9a7b5a]"
                       : inMonth
-                      ? "border-gray-200 bg-white text-gray-800"
-                      : "border-gray-200 bg-gray-50 text-gray-400"
+                      ? "border-[#dbd6cf] bg-white text-[#314158]"
+                      : "border-[#dbd6cf] bg-[#faf8f5] text-[#8e99a8]"
                     : "border-transparent bg-transparent cursor-default"
                 )}
               >
@@ -354,7 +354,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                         {MOODS.find((m) => m.key === mood)!.emoji}
                       </span>
                     ) : (
-                      <span className="text-gray-300 text-sm" aria-hidden>•</span>
+                      <span className="text-[#b8b0a8] text-sm" aria-hidden>•</span>
                     )}
                   </>
                 )}
@@ -365,16 +365,16 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
 
         {/* Quick Stats */}
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div className="bg-gray-50 rounded p-2">
-            <div className="text-xs text-gray-600">Logged</div>
+          <div className="bg-[#faf8f5] rounded p-2">
+            <div className="text-xs text-[#6b7688]">Logged</div>
             <div className="text-sm font-bold">{stats.totalLogged}</div>
           </div>
-          <div className="bg-gray-50 rounded p-2">
-            <div className="text-xs text-gray-600">Streak</div>
+          <div className="bg-[#faf8f5] rounded p-2">
+            <div className="text-xs text-[#6b7688]">Streak</div>
             <div className="text-sm font-bold">{stats.streak}d</div>
           </div>
-          <div className="bg-gray-50 rounded p-2">
-            <div className="text-xs text-gray-600">Average</div>
+          <div className="bg-[#faf8f5] rounded p-2">
+            <div className="text-xs text-[#6b7688]">Average</div>
             <div className="text-sm font-bold">{stats.avg.toFixed(1)}</div>
           </div>
         </div>
@@ -388,11 +388,11 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Today's Mood</h3>
-          <span className="text-sm text-gray-500">{formatter.format(selectedDate)}</span>
+          <span className="text-sm text-[#8e99a8]">{formatter.format(selectedDate)}</span>
         </div>
         
         <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-3">How are you feeling?</p>
+          <p className="text-sm text-[#6b7688] mb-3">How are you feeling?</p>
           <div className="grid grid-cols-5 gap-2">
             {MOODS.map((m) => {
               const active = selectedEntry?.mood === m.key;
@@ -440,7 +440,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
             </Button>
           </div>
 
-          <div className="grid grid-cols-7 gap-2 text-center text-xs text-gray-500 mb-2">
+          <div className="grid grid-cols-7 gap-2 text-center text-xs text-[#8e99a8] mb-2">
             <div>Sun</div>
             <div>Mon</div>
             <div>Tue</div>
@@ -462,13 +462,13 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                   disabled={!d}
                   onClick={() => d && (setSelectedDate(d), setViewMonth(firstDayOfMonth(d)))}
                   className={classNames(
-                    "aspect-square rounded border flex flex-col items-center justify-center text-sm transition hover:bg-gray-50",
+                    "aspect-square rounded border flex flex-col items-center justify-center text-sm transition hover:bg-[#faf8f5]",
                     d
                       ? active
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        ? "border-[#bb9e7b] bg-[#fdf8f6] text-[#9a7b5a]"
                         : inMonth
-                        ? "border-gray-200 bg-white text-gray-800"
-                        : "border-gray-200 bg-gray-50 text-gray-400"
+                        ? "border-[#dbd6cf] bg-white text-[#314158]"
+                        : "border-[#dbd6cf] bg-[#faf8f5] text-[#8e99a8]"
                       : "border-transparent bg-transparent cursor-default"
                   )}
                 >
@@ -480,7 +480,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                           {MOODS.find((m) => m.key === mood)!.emoji}
                         </span>
                       ) : (
-                        <span className="text-gray-300 text-xl" aria-hidden>•</span>
+                        <span className="text-[#b8b0a8] text-xl" aria-hidden>•</span>
                       )}
                     </>
                   )}
@@ -495,16 +495,16 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
           <h3 className="text-lg font-semibold mb-4">Overview</h3>
           
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-gray-50 rounded p-3 text-center">
-              <div className="text-sm text-gray-600">Logged Days</div>
+            <div className="bg-[#faf8f5] rounded p-3 text-center">
+              <div className="text-sm text-[#6b7688]">Logged Days</div>
               <div className="text-2xl font-bold">{stats.totalLogged}</div>
             </div>
-            <div className="bg-gray-50 rounded p-3 text-center">
-              <div className="text-sm text-gray-600">Current Streak</div>
+            <div className="bg-[#faf8f5] rounded p-3 text-center">
+              <div className="text-sm text-[#6b7688]">Current Streak</div>
               <div className="text-2xl font-bold">{stats.streak}d</div>
             </div>
-            <div className="bg-gray-50 rounded p-3 text-center">
-              <div className="text-sm text-gray-600">Average Mood</div>
+            <div className="bg-[#faf8f5] rounded p-3 text-center">
+              <div className="text-sm text-[#6b7688]">Average Mood</div>
               <div className="text-2xl font-bold">{stats.avg.toFixed(1)}</div>
             </div>
           </div>
@@ -520,9 +520,9 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                       <span className="text-lg" aria-hidden>{m.emoji}</span>
                       <span>{m.label}</span>
                     </div>
-                    <span className="text-gray-600">{count} ({percent.toFixed(0)}%)</span>
+                    <span className="text-[#6b7688]">{count} ({percent.toFixed(0)}%)</span>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-2 rounded-full bg-[#f5f0eb] overflow-hidden">
                     <div
                       className={`h-full bg-${m.color}-400`}
                       style={{ width: `${percent}%` }}
@@ -544,9 +544,9 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
             value={note}
             onChange={(e) => saveNote(e.target.value.slice(0, maxNoteChars))}
             placeholder="Write a quick note about your day..."
-            className="w-full h-32 resize-none rounded border border-gray-300 p-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full h-32 resize-none rounded border border-[#dbd6cf] p-3 text-[#314158] placeholder-[#8e99a8] focus:outline-none focus:ring-2 focus:ring-[rgba(163,133,96,0.15)]"
           />
-          <div className="mt-2 text-right text-xs text-gray-500">
+          <div className="mt-2 text-right text-xs text-[#8e99a8]">
             {note.length}/{maxNoteChars}
           </div>
         </Card>
@@ -554,7 +554,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
         {/* Tags */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">Tags</h3>
-          <p className="text-sm text-gray-600 mb-4">Mark what influenced your mood.</p>
+          <p className="text-sm text-[#6b7688] mb-4">Mark what influenced your mood.</p>
           
           <div className="flex flex-wrap gap-2 mb-4">
             {combinedTags.map((tag) => {
@@ -583,7 +583,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
                 }
               }}
               placeholder="Add custom tag"
-              className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="flex-1 rounded border border-[#dbd6cf] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(163,133,96,0.15)]"
             />
             <Button onClick={addCustomTag} size="sm">Add</Button>
           </div>

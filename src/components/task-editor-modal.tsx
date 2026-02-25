@@ -318,17 +318,17 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         >
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{editTaskId ? "Edit Task" : "Add Task"}</h3>
-              <p className="text-xs text-gray-500 mt-1">{modalDateLabel}</p>
+              <h3 className="text-lg font-semibold text-[#314158]">{editTaskId ? "Edit Task" : "Add Task"}</h3>
+              <p className="text-xs text-[#8e99a8] mt-1">{modalDateLabel}</p>
             </div>
-            <button className="text-gray-400 hover:text-gray-600" onClick={resetState}>&times;</button>
+            <button className="text-[#8e99a8] hover:text-[#6b7688]" onClick={resetState}>&times;</button>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Task</label>
+              <label className="block text-xs text-[#6b7688] mb-1">Task</label>
               <input
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
                 placeholder="What do you want to do?"
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
@@ -337,18 +337,18 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Starts</label>
+                <label className="block text-xs text-[#6b7688] mb-1">Starts</label>
                 <input
                   type="date"
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
                   value={startDate ?? ""}
                   onChange={(e) => setStartDate(e.target.value || null)}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Start time</label>
+                <label className="block text-xs text-[#6b7688] mb-1">Start time</label>
                 <select
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white disabled:bg-[#f5f0eb] disabled:text-[#8e99a8]"
                   value={formTime}
                   onChange={(e) => setFormTime(e.target.value)}
                   disabled={formAllDay}
@@ -363,19 +363,19 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Ends</label>
+                <label className="block text-xs text-[#6b7688] mb-1">Ends</label>
                 <input
                   type="date"
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
                   value={formEndDate ?? startDate ?? ""}
                   min={startDate ?? undefined}
                   onChange={(e) => setFormEndDate(e.target.value || null)}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">End time</label>
+                <label className="block text-xs text-[#6b7688] mb-1">End time</label>
                 <select
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white disabled:bg-[#f5f0eb] disabled:text-[#8e99a8]"
                   value={formEndTime}
                   onChange={(e) => setFormEndTime(e.target.value)}
                   disabled={formAllDay}
@@ -389,10 +389,10 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="inline-flex items-center text-xs text-gray-600 select-none">
+              <label className="inline-flex items-center text-xs text-[#6b7688] select-none">
                 <input
                   type="checkbox"
-                  className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="mr-2 h-4 w-4 rounded border-[#dbd6cf] text-warm-600 focus:ring-warm-500"
                   checked={formAllDay}
                   onChange={(e) => {
                     const checked = e.target.checked;
@@ -410,9 +410,9 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             <div className={`grid gap-3 ${availableBuckets.length > 0 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
               {availableBuckets.length > 0 && (
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Category</label>
+                  <label className="block text-xs text-[#6b7688] mb-1">Category</label>
                   <select
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                    className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white"
                     value={formBucket}
                     onChange={(e) => setFormBucket(e.target.value)}
                   >
@@ -424,9 +424,9 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                 </div>
               )}
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Repeat</label>
+                <label className="block text-xs text-[#6b7688] mb-1">Repeat</label>
                 <select
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white"
                   value={formRepeat}
                   onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
                 >
@@ -441,13 +441,13 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
-                className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="px-3 py-1.5 text-sm rounded border border-[#dbd6cf] text-[#4a5568] hover:bg-[#faf8f5]"
                 onClick={resetState}
               >
                 Close
               </button>
               <button
-                className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                className="px-3 py-1.5 text-sm rounded bg-warm-600 text-white hover:bg-warm-700 disabled:opacity-50"
                 disabled={!formContent.trim() || isSubmitting}
                 onClick={handleSubmit}
               >

@@ -57,7 +57,7 @@ export function ToastProvider({
             }`}
           >
             {t.title && <div className="font-medium">{t.title}</div>}
-            {t.description && <div className="text-sm text-gray-500">{t.description}</div>}
+            {t.description && <div className="text-sm text-[#8e99a8]">{t.description}</div>}
             {t.action && <div className="mt-2">{t.action}</div>}
           </div>
         ))}

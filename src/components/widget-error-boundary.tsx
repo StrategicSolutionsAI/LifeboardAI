@@ -15,14 +15,14 @@ function WidgetErrorFallback({ error, retry }: WidgetErrorFallbackProps) {
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
+        <CardTitle className="text-sm font-medium text-[#8e99a8] flex items-center">
           <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
           Widget Error
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="text-center py-4">
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="text-sm text-[#6b7688] mb-3">
             This widget encountered an error and couldn't load properly.
           </p>
           <Button 

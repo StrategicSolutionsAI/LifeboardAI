@@ -124,17 +124,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       return false;
     }
     
-    // Debug logging - show actual data structure
-    console.log('Attempting to save preferences:', {
-      user_id: safePreferences.user_id,
-      life_buckets: safePreferences.life_buckets,
-      bucket_colors: safePreferences.bucket_colors,
-      widgets_by_bucket_sample: Object.keys(safePreferences.widgets_by_bucket).slice(0, 2),
-      progress_by_widget_sample: Object.keys(safePreferences.progress_by_widget).slice(0, 2),
-      hourly_plan_sample: Object.keys(safePreferences.hourly_plan).slice(0, 2),
-    });
-    
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_preferences')
       .upsert(
         safePreferences,
@@ -153,7 +143,6 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       return false;
     }
     
-    console.log('Successfully saved preferences:', data);
     return true;
   } catch (err) {
     console.error('Exception saving user preferences:', err);

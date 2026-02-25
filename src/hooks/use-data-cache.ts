@@ -13,10 +13,16 @@ interface CacheOptions {
 }
 
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
+const CACHE_UPDATE_EVENT = 'lifeboard:data-cache-update'
 
 // Global cache for sharing between components
 const globalCache = new Map<string, CacheEntry<any>>()
 const globalPendingRequests = new Map<string, Promise<any>>()
+
+function emitCacheUpdate(key: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(CACHE_UPDATE_EVENT, { detail: { key } }))
+}
 
 // Global cache invalidation functions that can be called from anywhere
 export function invalidateTaskCaches() {
@@ -29,6 +35,7 @@ export function invalidateTaskCaches() {
   })
   keysToDelete.forEach(key => globalCache.delete(key))
   keysToDelete.forEach(key => globalPendingRequests.delete(key))
+  keysToDelete.forEach(key => emitCacheUpdate(key))
 }
 
 // Invalidate all integration-related caches
@@ -60,13 +67,14 @@ export function invalidateIntegrationCaches(integrationId?: string) {
   })
   keysToDelete.forEach(key => globalCache.delete(key))
   keysToDelete.forEach(key => globalPendingRequests.delete(key))
+  keysToDelete.forEach(key => emitCacheUpdate(key))
 }
 
 // Invalidate all caches (nuclear option)
 export function invalidateAllCaches() {
-  const count = globalCache.size
   globalCache.clear()
   globalPendingRequests.clear()
+  emitCacheUpdate('*')
 }
 
 export function useDataCache<T>(
@@ -78,6 +86,7 @@ export function useDataCache<T>(
   
   const cacheRef = useRef<Map<string, CacheEntry<T>>>(new Map())
   const pendingRef = useRef<Map<string, Promise<T>>>(new Map())
+  const requestVersionRef = useRef(0)
 
   const [data, setData] = useState<T | null>(() => {
     const cached = globalCache.get(key) as CacheEntry<T> | undefined
@@ -89,6 +98,40 @@ export function useDataCache<T>(
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+
+  const getLatestRequestVersion = useCallback(() => requestVersionRef.current, [])
+  const advanceRequestVersion = useCallback(() => {
+    requestVersionRef.current += 1
+    return requestVersionRef.current
+  }, [])
+  const isLatestRequest = useCallback(
+    (version: number) => version === getLatestRequestVersion(),
+    [getLatestRequestVersion]
+  )
+  const setDataIfLatest = useCallback(
+    (version: number, nextData: T) => {
+      if (isLatestRequest(version)) {
+        setData(nextData)
+      }
+    },
+    [isLatestRequest]
+  )
+  const setErrorIfLatest = useCallback(
+    (version: number, nextError: Error | null) => {
+      if (isLatestRequest(version)) {
+        setError(nextError)
+      }
+    },
+    [isLatestRequest]
+  )
+  const setLoadingIfLatest = useCallback(
+    (version: number, nextLoading: boolean) => {
+      if (isLatestRequest(version)) {
+        setLoading(nextLoading)
+      }
+    },
+    [isLatestRequest]
+  )
   
   // Check if cache entry is still valid
   const isValidCache = useCallback((entry: CacheEntry<T>) => {
@@ -97,53 +140,55 @@ export function useDataCache<T>(
   
   // Get from cache or fetch
   const fetchWithCache = useCallback(async () => {
+    const requestVersion = advanceRequestVersion()
+
     const localCached = cacheRef.current.get(key)
     if (localCached && isValidCache(localCached)) {
-      setData(localCached.data)
+      setDataIfLatest(requestVersion, localCached.data)
       return localCached.data
     }
 
     const globalCached = globalCache.get(key) as CacheEntry<T> | undefined
     if (globalCached && isValidCache(globalCached)) {
       cacheRef.current.set(key, globalCached)
-      setData(globalCached.data)
+      setDataIfLatest(requestVersion, globalCached.data)
       return globalCached.data
     }
 
     const localPending = pendingRef.current.get(key)
     if (localPending) {
-      setLoading(true)
+      setLoadingIfLatest(requestVersion, true)
       try {
         const result = await localPending
-        setData(result)
+        setDataIfLatest(requestVersion, result)
         return result
       } catch (err) {
-        setError(err as Error)
+        setErrorIfLatest(requestVersion, err as Error)
         throw err
       } finally {
-        setLoading(false)
+        setLoadingIfLatest(requestVersion, false)
       }
     }
 
     const globalPending = globalPendingRequests.get(key) as Promise<T> | undefined
     if (globalPending) {
       pendingRef.current.set(key, globalPending)
-      setLoading(true)
+      setLoadingIfLatest(requestVersion, true)
       try {
         const result = await globalPending
-        setData(result)
+        setDataIfLatest(requestVersion, result)
         return result
       } catch (err) {
-        setError(err as Error)
+        setErrorIfLatest(requestVersion, err as Error)
         throw err
       } finally {
-        setLoading(false)
+        setLoadingIfLatest(requestVersion, false)
       }
     }
 
     // Fetch new data
-    setLoading(true)
-    setError(null)
+    setLoadingIfLatest(requestVersion, true)
+    setErrorIfLatest(requestVersion, null)
     
     const loadPromise = (async () => {
       const result = await fetcher()
@@ -155,6 +200,7 @@ export function useDataCache<T>(
       }
       cacheRef.current.set(key, entry)
       globalCache.set(key, entry)
+      emitCacheUpdate(key)
       return result
     })()
 
@@ -163,21 +209,31 @@ export function useDataCache<T>(
 
     try {
       const result = await loadPromise
-      setData(result)
+      setDataIfLatest(requestVersion, result)
       return result
     } catch (err) {
-      setError(err as Error)
+      setErrorIfLatest(requestVersion, err as Error)
       throw err
     } finally {
-      setLoading(false)
+      setLoadingIfLatest(requestVersion, false)
       pendingRef.current.delete(key)
       globalPendingRequests.delete(key)
     }
-  }, [key, fetcher, ttl, isValidCache])
+  }, [
+    key,
+    fetcher,
+    ttl,
+    isValidCache,
+    advanceRequestVersion,
+    setDataIfLatest,
+    setErrorIfLatest,
+    setLoadingIfLatest
+  ])
   
   // Optimistic update function
   const updateOptimistically = useCallback((updater: (current: T | null) => T) => {
     if (!optimisticUpdate) return
+    advanceRequestVersion()
     
     const newData = updater(data)
     setData(newData)
@@ -191,15 +247,18 @@ export function useDataCache<T>(
     }
     cacheRef.current.set(key, entry)
     globalCache.set(key, entry)
-  }, [data, key, ttl, optimisticUpdate])
+    emitCacheUpdate(key)
+  }, [data, key, ttl, optimisticUpdate, advanceRequestVersion])
   
   // Invalidate cache entry
   const invalidate = useCallback(() => {
+    advanceRequestVersion()
     cacheRef.current.delete(key)
     globalCache.delete(key)
     pendingRef.current.delete(key)
     globalPendingRequests.delete(key)
-  }, [key])
+    emitCacheUpdate(key)
+  }, [key, advanceRequestVersion])
   
   // Refetch data (bypassing cache)
   const refetch = useCallback(async () => {
@@ -210,9 +269,32 @@ export function useDataCache<T>(
   // Initial fetch
   useEffect(() => {
     if (prefetch || data === null) {
-      fetchWithCache()
+      void fetchWithCache().catch(() => {
+        // Error state is already handled inside fetchWithCache; avoid unhandled promise rejections.
+      })
     }
   }, [prefetch, data, fetchWithCache])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const onCacheUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ key?: string }>
+      const changedKey = customEvent.detail?.key
+      if (changedKey !== key && changedKey !== '*') return
+
+      const cached = globalCache.get(key) as CacheEntry<T> | undefined
+      if (cached && Date.now() < cached.expiresAt) {
+        cacheRef.current.set(key, cached)
+        setData(cached.data)
+      }
+    }
+
+    window.addEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
+    return () => {
+      window.removeEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
+    }
+  }, [key])
   
   return {
     data,
@@ -252,32 +334,54 @@ export function useGlobalCache<T>(
         return cached.data
       }
     }
+
+    const pending = globalPendingRequests.get(key) as Promise<T> | undefined
+    if (pending) {
+      setLoading(true)
+      try {
+        const result = await pending
+        setData(result)
+        return result
+      } catch (err) {
+        setError(err as Error)
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    }
     
     setLoading(true)
     setError(null)
     
-    try {
+    const loadPromise = (async () => {
       const result = await fetcher()
-      
-      // Update global cache
       globalCache.set(key, {
         data: result,
         timestamp: Date.now(),
         expiresAt: Date.now() + ttl
       })
-      
+      emitCacheUpdate(key)
+      return result
+    })()
+    globalPendingRequests.set(key, loadPromise)
+
+    try {
+      const result = await loadPromise
       setData(result)
       return result
     } catch (err) {
       setError(err as Error)
       throw err
     } finally {
+      globalPendingRequests.delete(key)
       setLoading(false)
     }
   }, [key, fetcher, ttl])
   
   const invalidate = useCallback(() => {
     globalCache.delete(key)
+    globalPendingRequests.delete(key)
+    emitCacheUpdate(key)
   }, [key])
   
   const refetch = useCallback(() => {
@@ -286,16 +390,23 @@ export function useGlobalCache<T>(
   
   // Subscribe to cache updates from other components
   useEffect(() => {
-    const checkCache = () => {
+    if (typeof window === 'undefined') return
+
+    const onCacheUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ key?: string }>
+      const changedKey = customEvent.detail?.key
+      if (changedKey !== key && changedKey !== '*') return
+
       const cached = globalCache.get(key)
       if (cached && Date.now() < cached.expiresAt) {
         setData(cached.data)
       }
     }
-    
-    // Check periodically for updates
-    const interval = setInterval(checkCache, 1000)
-    return () => clearInterval(interval)
+
+    window.addEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
+    return () => {
+      window.removeEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
+    }
   }, [key])
   
   // Initial fetch if no cached data

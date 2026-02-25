@@ -276,38 +276,6 @@ export default function WorldClassLandingEffects({ children }: WorldClassLanding
           : '50%'
       } as React.CSSProperties}
     >
-      {/* Advanced background elements */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        {/* Animated gradient orbs */}
-        <div 
-          className="absolute w-96 h-96 rounded-full opacity-20 parallax-slow"
-          style={{
-            background: 'radial-gradient(circle, rgba(132, 145, 255, 0.3), transparent)',
-            top: '10%',
-            left: '10%',
-            transform: `translateY(${scrollY * 0.1}px) translateX(${Math.sin(scrollY * 0.01) * 20}px)`
-          }}
-        />
-        <div 
-          className="absolute w-64 h-64 rounded-full opacity-15 parallax-medium"
-          style={{
-            background: 'radial-gradient(circle, rgba(168, 85, 247, 0.3), transparent)',
-            top: '60%',
-            right: '20%',
-            transform: `translateY(${scrollY * 0.15}px) translateX(${Math.cos(scrollY * 0.008) * 30}px)`
-          }}
-        />
-        <div 
-          className="absolute w-48 h-48 rounded-full opacity-10 parallax-fast"
-          style={{
-            background: 'radial-gradient(circle, rgba(236, 72, 153, 0.3), transparent)',
-            bottom: '20%',
-            left: '60%',
-            transform: `translateY(${scrollY * 0.08}px) translateX(${Math.sin(scrollY * 0.012) * 25}px)`
-          }}
-        />
-      </div>
-
       {children}
     </div>
   );

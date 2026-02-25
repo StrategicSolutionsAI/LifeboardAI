@@ -288,7 +288,7 @@ export default function OnboardingStep4() {
 
         {/* Info text */}
         <div className="flex flex-col gap-2 mt-4">
-          <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="p-3 bg-[#faf8f5] rounded-lg">
             <p className="text-[12px] text-[#6B7280]">
               💡 Don't see your app? More integrations are coming soon! You can always manage connections later from settings.
             </p>

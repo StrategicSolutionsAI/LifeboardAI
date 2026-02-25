@@ -1,95 +1,103 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Filter, SortAsc } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export interface TasksQuickActionFilter {
+  key: string;
+  label: string;
+  count: number;
+  disabled?: boolean;
+  emphasis?: "default" | "destructive";
+}
 
 interface TasksQuickActionsProps {
-  onQuickAdd: (taskContent: string) => void;
-  taskCounts: {
-    all: number;
-    today: number;
-    overdue: number;
-    highPriority: number;
-  };
+  onQuickAdd: (taskContent: string) => Promise<void> | void;
+  filters: TasksQuickActionFilter[];
   activeFilter: string;
   onFilterChange: (filter: string) => void;
+  quickAddPlaceholder?: string;
 }
 
 export function TasksQuickActions({
   onQuickAdd,
-  taskCounts,
+  filters,
   activeFilter,
   onFilterChange,
+  quickAddPlaceholder = "Add a task...",
 }: TasksQuickActionsProps) {
   const [quickAddInput, setQuickAddInput] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
-  const handleQuickAdd = () => {
-    if (quickAddInput.trim()) {
-      onQuickAdd(quickAddInput.trim());
+  const handleQuickAdd = async () => {
+    const trimmed = quickAddInput.trim();
+    if (!trimmed || isAdding) {
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      await Promise.resolve(onQuickAdd(trimmed));
       setQuickAddInput("");
+    } finally {
+      setIsAdding(false);
     }
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200 p-4 mb-6 shadow-sm">
-      {/* Quick Add Input */}
-      <div className="flex items-center gap-3 mb-4">
-        <input
-          type="text"
+    <div className="sticky top-0 z-10 mb-6 rounded-xl border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="mb-3 flex items-center gap-2">
+        <Input
           value={quickAddInput}
           onChange={(e) => setQuickAddInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              handleQuickAdd();
+              void handleQuickAdd();
             }
           }}
-          placeholder="Quick add task... (e.g., 'Buy groceries tomorrow')"
-          className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+          placeholder={quickAddPlaceholder}
+          className="h-8 flex-1 border-border/70 text-sm"
+          disabled={isAdding}
         />
-        <button
-          onClick={handleQuickAdd}
-          disabled={!quickAddInput.trim()}
-          className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
+        <Button
+          size="sm"
+          onClick={() => void handleQuickAdd()}
+          disabled={!quickAddInput.trim() || isAdding}
+          className="h-8 gap-1.5 px-3"
         >
           <Plus className="h-4 w-4" />
-          Add Task
-        </button>
+          {isAdding ? "Adding..." : "Add"}
+        </Button>
       </div>
 
-      {/* Quick Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Badge
-          variant={activeFilter === "all" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => onFilterChange("all")}
-        >
-          All Tasks ({taskCounts.all})
-        </Badge>
-        <Badge
-          variant={activeFilter === "today" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-blue-50 transition-colors"
-          onClick={() => onFilterChange("today")}
-        >
-          Today ({taskCounts.today})
-        </Badge>
-        {taskCounts.overdue > 0 && (
-          <Badge
-            variant={activeFilter === "overdue" ? "destructive" : "outline"}
-            className="cursor-pointer hover:bg-red-50 transition-colors"
-            onClick={() => onFilterChange("overdue")}
-          >
-            ⚠️ Overdue ({taskCounts.overdue})
-          </Badge>
-        )}
-        <Badge
-          variant={activeFilter === "high-priority" ? "default" : "outline"}
-          className="cursor-pointer hover:bg-orange-50 transition-colors"
-          onClick={() => onFilterChange("high-priority")}
-        >
-          High Priority ({taskCounts.highPriority})
-        </Badge>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {filters.map((filter) => {
+          const isActive = activeFilter === filter.key;
+          const variant =
+            isActive && filter.emphasis === "destructive"
+              ? "destructive"
+              : isActive
+                ? "default"
+                : "ghost";
+
+          return (
+            <Button
+              key={filter.key}
+              type="button"
+              size="sm"
+              variant={variant}
+              disabled={filter.disabled}
+              onClick={() => onFilterChange(filter.key)}
+              className="h-7 gap-1 rounded-md px-2.5 text-xs"
+            >
+              {filter.label}
+              <span className="opacity-80">{filter.count}</span>
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

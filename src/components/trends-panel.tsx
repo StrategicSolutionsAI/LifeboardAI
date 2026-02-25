@@ -52,8 +52,8 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
                 onClick={() => setRangeDays(days)}
                 className={`px-2 py-1 rounded text-sm ${
                   rangeDays === days
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-warm-500 text-white'
+                    : 'bg-[#f5f0eb] text-[#6b7688] hover:bg-[#ebe5de]'
                 }`}
               >
                 {label}

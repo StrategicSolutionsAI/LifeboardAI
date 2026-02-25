@@ -312,10 +312,10 @@ export function HomeProjectsWidget({
         <div className="space-y-3">
           {/* Next Priority Project */}
           {nextProject && (
-            <div className="border-t border-gray-100 pt-3">
-              <div className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors group">
+            <div className="border-t border-[#dbd6cf] pt-3">
+              <div className="bg-[#faf8f5] rounded-lg p-3 hover:bg-[#f5f0eb] transition-colors group">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Next Priority:</span>
+                  <span className="text-xs font-medium text-[#6b7688] uppercase tracking-wide">Next Priority:</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                     <button
                       onClick={(e) => {
@@ -332,7 +332,7 @@ export function HomeProjectsWidget({
                         e.stopPropagation()
                         handleQuickSnooze(nextProject.id)
                       }}
-                      className="p-1 rounded text-blue-600 hover:bg-blue-100 transition-colors"
+                      className="p-1 rounded text-warm-600 hover:bg-warm-100 transition-colors"
                       title="Snooze 7 days"
                     >
                       <CalendarDays className="w-3 h-3" />
@@ -343,7 +343,7 @@ export function HomeProjectsWidget({
                           e.stopPropagation()
                           handleAddToTasks(nextProject.id)
                         }}
-                        className="p-1 rounded text-purple-600 hover:bg-purple-100 transition-colors"
+                        className="p-1 rounded text-amber-600 hover:bg-amber-100 transition-colors"
                         title="Add to Tasks"
                       >
                         <ListPlus className="w-3 h-3" />
@@ -358,11 +358,11 @@ export function HomeProjectsWidget({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {getStatusIcon(nextProject.status)}
-                      <span className="text-sm font-medium text-gray-900 truncate">
+                      <span className="text-sm font-medium text-[#314158] truncate">
                         {nextProject.title}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                    <div className="flex items-center gap-2 text-xs text-[#8e99a8] flex-wrap">
                       <div className="flex items-center gap-1">
                         {getCategoryIcon(nextProject.category)}
                         <span className="capitalize">{nextProject.category}</span>
@@ -375,14 +375,14 @@ export function HomeProjectsWidget({
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <ChevronRight className="w-4 h-4 text-[#8e99a8]" />
                 </div>
               </div>
             </div>
           )}
 
           {/* Today's Focus */}
-          <div className="border-t border-gray-100 pt-3">
+          <div className="border-t border-[#dbd6cf] pt-3">
             {urgentProjects.length > 0 ? (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -394,12 +394,12 @@ export function HomeProjectsWidget({
                 </div>
               </div>
             ) : activeProjects.length > 0 ? (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="bg-warm-50 border border-warm-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Ready to Work</span>
+                  <CheckCircle className="w-4 h-4 text-warm-600" />
+                  <span className="text-sm font-medium text-warm-800">Ready to Work</span>
                 </div>
-                <div className="text-xs text-blue-700">
+                <div className="text-xs text-warm-700">
                   {activeProjects.length} {activeProjects.length === 1 ? 'project' : 'projects'} planned and ready to start
                 </div>
               </div>
@@ -417,9 +417,9 @@ export function HomeProjectsWidget({
           </div>
 
           {/* Smart Actions */}
-          <div className="border-t border-gray-100 pt-3">
+          <div className="border-t border-[#dbd6cf] pt-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-[#6b7688]">
                 {urgentProjects.length > 0 
                   ? "Focus on urgent items first" 
                   : activeProjects.length > 0 
@@ -432,7 +432,7 @@ export function HomeProjectsWidget({
                   e.stopPropagation()
                   setEditorOpen(true)
                 }}
-                className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-xs font-medium text-warm-700 bg-warm-50 hover:bg-warm-100 rounded-lg border border-warm-200 hover:border-warm-300 transition-colors flex items-center gap-1"
               >
                 {urgentProjects.length > 0 ? (
                   <>

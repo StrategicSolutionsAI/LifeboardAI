@@ -39,21 +39,21 @@ export function TaskColumn() {
           text: "Create user flow",
           completed: false,
           priority: 'high' as const,
-          color: "bg-blue-500"
+          color: "bg-[#bb9e7b]"
         },
         {
           id: "2", 
           text: "Create onboarding pages",
           completed: false,
           priority: 'high' as const,
-          color: "bg-blue-500"
+          color: "bg-[#bb9e7b]"
         },
         {
           id: "3",
           text: "Discuss about UX issue with Nik",
           completed: false,
           priority: 'medium' as const,
-          color: "bg-gray-400"
+          color: "bg-[#b8b0a8]"
         }
       ]
     },
@@ -80,7 +80,7 @@ export function TaskColumn() {
           text: "Discuss about UX issue with Nik",
           completed: false,
           priority: 'low' as const,
-          color: "bg-blue-500"
+          color: "bg-[#bb9e7b]"
         }
       ]
     }
@@ -91,10 +91,10 @@ export function TaskColumn() {
       {/* Calendar Widget */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">{format(today, 'MMMM yyyy')}</h3>
+          <h3 className="font-semibold text-[#314158]">{format(today, 'MMMM yyyy')}</h3>
           <div className="flex items-center space-x-2">
-            <ChevronLeft className="w-4 h-4 text-gray-400" />
-            <ChevronRight className="w-4 h-4 text-gray-400" />
+            <ChevronLeft className="w-4 h-4 text-[#8e99a8]" />
+            <ChevronRight className="w-4 h-4 text-[#8e99a8]" />
           </div>
         </div>
 
@@ -105,8 +105,8 @@ export function TaskColumn() {
               key={day.date}
               className={`text-center p-2 rounded-lg transition-colors ${
                 day.active 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-[#bb9e7b] text-white' 
+                  : 'text-[#6b7688] hover:bg-[#f5f0eb]'
               }`}
             >
               <div className="text-xs font-medium">{day.date}</div>
@@ -121,9 +121,9 @@ export function TaskColumn() {
         {tasks.map((taskGroup) => (
           <Card key={taskGroup.date} className="p-4">
             <div className="mb-4">
-              <h4 className="font-semibold text-gray-900">{taskGroup.date}</h4>
-              <p className="text-sm text-gray-500">{taskGroup.dayLabel}</p>
-              <p className="text-xs text-gray-400 mt-1">TO DO LIST</p>
+              <h4 className="font-semibold text-[#314158]">{taskGroup.date}</h4>
+              <p className="text-sm text-[#8e99a8]">{taskGroup.dayLabel}</p>
+              <p className="text-xs text-[#8e99a8] mt-1">TO DO LIST</p>
             </div>
 
             <div className="space-y-3">
@@ -136,8 +136,8 @@ export function TaskColumn() {
                   <div className={`w-2 h-2 rounded-full ${task.color}`}></div>
                   <span className={`text-sm flex-1 ${
                     task.completed 
-                      ? 'line-through text-gray-500' 
-                      : 'text-gray-900'
+                      ? 'line-through text-[#8e99a8]' 
+                      : 'text-[#314158]'
                   }`}>
                     {task.text}
                   </span>

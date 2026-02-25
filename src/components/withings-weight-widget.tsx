@@ -103,7 +103,7 @@ export function WithingsWeightWidget({
     if (error || weightData?.error) return 'text-red-600'
     if (!isConnected) return 'text-yellow-600'
     if (hasData) return 'text-green-600'
-    return 'text-gray-600'
+    return 'text-[#6b7688]'
   }
 
   const getStatusIcon = () => {
@@ -179,17 +179,17 @@ export function WithingsWeightWidget({
       {goalWeight && hasData && (
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-gray-500">Current</span>
+            <span className="text-[#8e99a8]">Current</span>
             <span className="font-semibold">{currentWeight} {unit}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">Goal</span>
+            <span className="text-[#8e99a8]">Goal</span>
             <span className="font-semibold">{goalWeight} {unit}</span>
           </div>
           {progressToGoal && (
             <div className="flex justify-between">
-              <span className="text-gray-500">To Goal</span>
-              <span className="font-semibold text-blue-600">{Math.abs(progressToGoal).toFixed(1)} {unit}</span>
+              <span className="text-[#8e99a8]">To Goal</span>
+              <span className="font-semibold text-warm-600">{Math.abs(progressToGoal).toFixed(1)} {unit}</span>
             </div>
           )}
         </div>
@@ -197,14 +197,14 @@ export function WithingsWeightWidget({
 
       {/* Notification controls */}
       {unreadCount > 0 && (
-        <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+        <div className="flex items-center justify-between p-2 bg-warm-50 rounded-lg">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-blue-600" />
-            <span className="text-xs text-blue-800">{unreadCount} new notification{unreadCount !== 1 ? 's' : ''}</span>
+            <Bell className="w-4 h-4 text-warm-600" />
+            <span className="text-xs text-warm-800">{unreadCount} new notification{unreadCount !== 1 ? 's' : ''}</span>
           </div>
           <button
             onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            className="text-xs text-warm-600 hover:text-warm-800 font-medium"
           >
             {notificationsEnabled ? 'Disable' : 'Enable'}
           </button>
@@ -247,7 +247,7 @@ export function WithingsWeightWidget({
           </div>
           
           {lastFetchTime && (
-            <div className="text-xs text-gray-500 text-center">
+            <div className="text-xs text-[#8e99a8] text-center">
               Last updated: {lastFetchTime.toLocaleTimeString()}
             </div>
           )}

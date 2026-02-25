@@ -162,7 +162,7 @@ export default function OnboardingIntro() {
           </div>
         </div>
 
-        <div className="pt-4 bg-gray-50 rounded-lg p-4">
+        <div className="pt-4 bg-[#faf8f5] rounded-lg p-4">
           <p className="text-[#565E6C] text-sm">
             ⏱️ Setup takes just 2 minutes
           </p>

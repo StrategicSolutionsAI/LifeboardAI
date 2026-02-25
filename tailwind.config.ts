@@ -19,12 +19,35 @@ const config = {
     },
     extend: {
       fontFamily: {
-        sans: ['"Circular Std"', 'Circular', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        sans: ['"DM Sans"', 'Inter', 'Manrope', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      },
+      boxShadow: {
+        'warm-sm': '0px 4px 16px rgba(163, 133, 96, 0.06)',
+        'warm': '0px 6px 20px rgba(163, 133, 96, 0.1)',
+        'warm-md': '0px 6px 24px rgba(163, 133, 96, 0.12)',
+        'warm-lg': '0px 8px 30px rgba(163, 133, 96, 0.1)',
+        'warm-xl': '0px 12px 40px rgba(163, 133, 96, 0.15)',
       },
       colors: {
+        // Warm color scale (Calidora earth tones)
+        'warm': {
+          50: '#fdf8f6',
+          100: '#f2e8e5',
+          200: '#eaddd7',
+          300: '#dbd6cf',
+          400: '#bb9e7b',
+          500: '#B1916A',
+          600: '#9a7b5a',
+          700: '#7d6349',
+          800: '#5f4b38',
+          900: '#3f3127',
+          950: '#231c16',
+        },
         // Shadcn UI colors
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
+        'input-background': "var(--input-background)",
+        'switch-background': "var(--switch-background)",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -171,6 +194,7 @@ const config = {
         },
       },
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",

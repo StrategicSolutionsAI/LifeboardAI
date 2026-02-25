@@ -6,7 +6,6 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const from = requestUrl.searchParams.get('from') // login | signup
   const error = requestUrl.searchParams.get('error')
   
   
@@ -69,27 +68,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=Authentication failed', request.url))
   }
 
-  // Decide destination based on onboarding state
-  let destination: string | null = null
+  // Route only truly new users to onboarding.
+  // Existing users should always land on dashboard, even if they came from signup.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
 
-  if (from === 'signup') {
-    await supabase.from('profiles').upsert({ id: user.id, onboarded: false }).throwOnError()
+  let destination = '/dashboard'
+
+  if (!profile) {
+    await supabase.from('profiles').insert({ id: user.id, onboarded: false }).throwOnError()
     destination = '/onboarding/0'
-  } else {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('onboarded')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (!profile) {
-      await supabase.from('profiles').insert({ id: user.id }).throwOnError()
-      destination = '/onboarding/0'
-    } else if (!profile.onboarded) {
-      destination = '/onboarding/0'
-    } else {
-      destination = '/dashboard'
-    }
   }
 
   // Create the final redirect, copying cookies set earlier into the redirect response

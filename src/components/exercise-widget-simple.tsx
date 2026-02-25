@@ -357,9 +357,9 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
 
   const getProgressColor = (progress: number) => {
     if (progress >= 100) return 'bg-green-500'
-    if (progress >= 75) return 'bg-blue-500'
+    if (progress >= 75) return 'bg-[#bb9e7b]'
     if (progress >= 50) return 'bg-yellow-500'
-    return 'bg-gray-300'
+    return 'bg-[#ebe5de]'
   }
 
   // Widget view (compact)
@@ -379,7 +379,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
               <span>Workouts</span>
               <span>{completedWorkouts}/{goals.weeklyWorkouts}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-[#ebe5de] rounded-full h-2">
               <div 
                 className={`h-2 rounded-full transition-all ${getProgressColor(workoutProgress)}`}
                 style={{ width: `${workoutProgress}%` }}
@@ -392,7 +392,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
               <span>Minutes</span>
               <span>{totalMinutes}/{goals.weeklyMinutes}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-[#ebe5de] rounded-full h-2">
               <div 
                 className={`h-2 rounded-full transition-all ${getProgressColor(minutesProgress)}`}
                 style={{ width: `${minutesProgress}%` }}
@@ -403,14 +403,14 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
           {/* Streak and Today's Status */}
           <div className="pt-2 border-t space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Streak</span>
+              <span className="text-xs text-[#6b7688]">Streak</span>
               <Badge variant={currentStreak > 0 ? "default" : "outline"} className="text-xs">
                 <Zap className="h-3 w-3 mr-1" />
                 {currentStreak} day{currentStreak !== 1 ? 's' : ''}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Today</span>
+              <span className="text-xs text-[#6b7688]">Today</span>
               {todayWorkouts.length > 0 ? (
                 <Badge variant="secondary" className="text-xs">
                   <Check className="h-3 w-3 mr-1" />
@@ -426,17 +426,17 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
 
           {/* Weekly Calendar */}
           <div className="pt-2">
-            <div className="text-xs text-gray-600 mb-2">This Week</div>
+            <div className="text-xs text-[#6b7688] mb-2">This Week</div>
             <div className="flex gap-1">
               {weeklyWorkoutDays.map((day, index) => {
                 const dayName = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][index]
                 return (
                   <div key={index} className="flex-1 text-center">
-                    <div className="text-xs text-gray-500 mb-1">{dayName}</div>
+                    <div className="text-xs text-[#8e99a8] mb-1">{dayName}</div>
                     <div className={`w-6 h-6 rounded-full mx-auto flex items-center justify-center text-xs ${
                       day.hasWorkout 
                         ? 'bg-green-500 text-white' 
-                        : 'bg-gray-200 text-gray-400'
+                        : 'bg-[#ebe5de] text-[#8e99a8]'
                     }`}>
                       {day.hasWorkout ? <Check className="h-3 w-3" /> : day.date.getDate()}
                     </div>
@@ -556,9 +556,9 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{completedWorkouts}</div>
-                <div className="text-sm text-gray-600">of {goals.weeklyWorkouts} workouts</div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div className="text-2xl font-bold text-[#9a7b5a]">{completedWorkouts}</div>
+                <div className="text-sm text-[#6b7688]">of {goals.weeklyWorkouts} workouts</div>
+                <div className="w-full bg-[#ebe5de] rounded-full h-2 mt-2">
                   <div 
                     className={`h-2 rounded-full transition-all ${getProgressColor(workoutProgress)}`}
                     style={{ width: `${workoutProgress}%` }}
@@ -567,8 +567,8 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">{totalMinutes}</div>
-                <div className="text-sm text-gray-600">of {goals.weeklyMinutes} minutes</div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div className="text-sm text-[#6b7688]">of {goals.weeklyMinutes} minutes</div>
+                <div className="w-full bg-[#ebe5de] rounded-full h-2 mt-2">
                   <div 
                     className={`h-2 rounded-full transition-all ${getProgressColor(minutesProgress)}`}
                     style={{ width: `${minutesProgress}%` }}
@@ -579,13 +579,13 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                 <div className="text-2xl font-bold text-purple-600">
                   {Math.round(totalMinutes / Math.max(completedWorkouts, 1))}
                 </div>
-                <div className="text-sm text-gray-600">avg minutes/workout</div>
+                <div className="text-sm text-[#6b7688]">avg minutes/workout</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
                   {currentWeekWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0)}
                 </div>
-                <div className="text-sm text-gray-600">calories burned</div>
+                <div className="text-sm text-[#6b7688]">calories burned</div>
               </div>
             </div>
           )}
@@ -621,20 +621,20 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                     className={`p-4 rounded-lg border-2 transition-all ${
                       achievement.unlocked
                         ? 'border-yellow-300 bg-yellow-50'
-                        : 'border-gray-200 bg-gray-50 opacity-60'
+                        : 'border-[#dbd6cf] bg-[#faf8f5] opacity-60'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-full ${
-                        achievement.unlocked ? 'bg-yellow-200' : 'bg-gray-200'
+                        achievement.unlocked ? 'bg-yellow-200' : 'bg-[#ebe5de]'
                       }`}>
                         <Icon className={`h-4 w-4 ${
-                          achievement.unlocked ? 'text-yellow-600' : 'text-gray-400'
+                          achievement.unlocked ? 'text-yellow-600' : 'text-[#8e99a8]'
                         }`} />
                       </div>
                       <div>
                         <div className="font-medium text-sm">{achievement.name}</div>
-                        <div className="text-xs text-gray-600">{achievement.description}</div>
+                        <div className="text-xs text-[#6b7688]">{achievement.description}</div>
                         {achievement.unlocked && achievement.unlockedAt && (
                           <div className="text-xs text-yellow-600 mt-1">
                             Unlocked {new Date(achievement.unlockedAt).toLocaleDateString()}
@@ -672,14 +672,14 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
               {WORKOUT_TEMPLATES.map(template => (
                 <div
                   key={template.id}
-                  className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="p-4 border rounded-lg hover:bg-[#faf8f5] cursor-pointer transition-colors"
                   onClick={() => handleTemplateWorkout(template)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="font-medium">{template.name}</div>
-                      <div className="text-sm text-gray-600 mt-1">{template.description}</div>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <div className="text-sm text-[#6b7688] mt-1">{template.description}</div>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-[#8e99a8]">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {template.duration} min
@@ -695,8 +695,8 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                       </div>
                       {template.exercises && (
                         <div className="mt-2">
-                          <div className="text-xs text-gray-500 mb-1">Exercises:</div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-[#8e99a8] mb-1">Exercises:</div>
+                          <div className="text-xs text-[#6b7688]">
                             {template.exercises.join(', ')}
                           </div>
                         </div>
@@ -815,7 +815,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
         </CardHeader>
         <CardContent>
           {workouts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-[#8e99a8]">
               <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No workouts logged yet</p>
               <p className="text-sm">Start by adding your first workout above!</p>
@@ -834,7 +834,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                       <Check className="h-4 w-4 text-green-600" />
                       <div>
                         <div className="font-medium">{workout.type}</div>
-                        <div className="text-sm text-gray-600 flex items-center gap-2">
+                        <div className="text-sm text-[#6b7688] flex items-center gap-2">
                           <Clock className="h-3 w-3" />
                           {workout.duration} min
                           {workout.calories && (
@@ -846,7 +846,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[#8e99a8]">
                       {new Date(workout.date).toLocaleDateString()}
                     </div>
                   </div>

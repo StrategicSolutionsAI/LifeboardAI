@@ -354,7 +354,7 @@ export default function IntegrationsPageClient() {
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             {[...Array(6)].map((_, i) => (
-              <Card key={i}><CardHeader><div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-gray-200 rounded animate-pulse" /><div><div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-2" /><div className="h-4 w-48 bg-gray-200 rounded animate-pulse" /></div></div><div className="w-20 h-6 bg-gray-200 rounded animate-pulse" /></div></CardHeader><CardContent><div className="h-10 w-full bg-gray-200 rounded animate-pulse" /></CardContent></Card>
+              <Card key={i}><CardHeader><div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-[#ebe5de] rounded animate-pulse" /><div><div className="h-5 w-32 bg-[#ebe5de] rounded animate-pulse mb-2" /><div className="h-4 w-48 bg-[#ebe5de] rounded animate-pulse" /></div></div><div className="w-20 h-6 bg-[#ebe5de] rounded animate-pulse" /></div></CardHeader><CardContent><div className="h-10 w-full bg-[#ebe5de] rounded animate-pulse" /></CardContent></Card>
             ))}
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function IntegrationsPageClient() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
             <h1 className="text-2xl sm:text-3xl font-bold">Integrations</h1>
-            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
+            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-warm hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} aria-hidden="true" />
               <span className="relative z-10">{loading ? 'Refreshing...' : 'Refresh All'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -446,10 +446,10 @@ export default function IntegrationsPageClient() {
                   return (
                     <div
                       key={calendar.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-[#dbd6cf] bg-white px-4 py-3 shadow-sm"
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">{calendar.name}</p>
+                        <p className="text-sm font-semibold text-[#314158]">{calendar.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {eventCount} event{eventCount === 1 ? '' : 's'}
                           {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
@@ -462,7 +462,7 @@ export default function IntegrationsPageClient() {
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <label htmlFor={`calendar-bucket-${calendar.id}`} className="text-xs font-medium text-gray-600">
+                          <label htmlFor={`calendar-bucket-${calendar.id}`} className="text-xs font-medium text-[#6b7688]">
                             Bucket
                           </label>
                           <div className="relative">
@@ -479,7 +479,7 @@ export default function IntegrationsPageClient() {
                                 void handleUpdateImportBucket(calendar.id, nextValue, previousValue);
                               }}
                               disabled={isUpdatingBucket || deletingImportId === calendar.id}
-                              className="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[140px]"
+                              className="text-xs border border-[#dbd6cf] rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#bb9e7b] min-w-[140px]"
                             >
                               <option value="">Unassigned</option>
                               {bucketOptions.map((bucketOption) => (
@@ -583,9 +583,9 @@ export default function IntegrationsPageClient() {
           })}
         </div>
 
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-2">Need Help?</h3>
-          <p className="text-sm text-blue-800">If you're having trouble connecting an integration, try refreshing the page or disconnecting and reconnecting the service. Make sure you have the necessary permissions enabled in your connected apps.</p>
+        <div className="mt-8 p-4 bg-[#fdf8f6] rounded-lg border border-[#dbd6cf]">
+          <h3 className="font-semibold text-[#314158] mb-2">Need Help?</h3>
+          <p className="text-sm text-[#314158]">If you're having trouble connecting an integration, try refreshing the page or disconnecting and reconnecting the service. Make sure you have the necessary permissions enabled in your connected apps.</p>
         </div>
       </div>
     </SidebarLayout>

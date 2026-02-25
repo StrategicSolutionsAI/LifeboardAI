@@ -27,17 +27,17 @@ export default function OnboardingStep6Client() {
             <h3 className="font-semibold text-green-800 mb-2">Your Profile is Complete</h3>
             <p className="text-green-600 text-sm">We've set up your personalized dashboard based on your preferences and chosen theme.</p>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-blue-800 mb-2">AI Insights Ready</h3>
-            <p className="text-blue-600 text-sm">Our AI will start generating personalized insights as you track your data.</p>
+          <div className="bg-warm-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-warm-800 mb-2">AI Insights Ready</h3>
+            <p className="text-warm-600 text-sm">Our AI will start generating personalized insights as you track your data.</p>
           </div>
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-purple-800 mb-2">Start Tracking Today</h3>
-            <p className="text-purple-600 text-sm">Begin your journey by logging your first metrics on the dashboard.</p>
+          <div className="bg-amber-50 p-4 rounded-lg">
+            <h3 className="font-semibold text-amber-800 mb-2">Start Tracking Today</h3>
+            <p className="text-amber-600 text-sm">Begin your journey by logging your first metrics on the dashboard.</p>
           </div>
         </div>
         <div className="pt-4">
-          <p className="text-gray-600 text-sm">Remember: You can always adjust your settings, theme, and preferences from your dashboard.</p>
+          <p className="text-[#6b7688] text-sm">Remember: You can always adjust your settings, theme, and preferences from your dashboard.</p>
         </div>
       </div>
     </OnboardingLayout>

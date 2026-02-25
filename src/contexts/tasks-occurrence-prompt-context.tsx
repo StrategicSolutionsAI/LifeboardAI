@@ -106,17 +106,17 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
         onClick={() => resolve("cancel")}
       >
         <div
-          className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-gray-200"
+          className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-[#dbd6cf]"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="px-6 pt-6">
-            <h2 id="occurrence-prompt-title" className="text-lg font-semibold text-gray-900">
+            <h2 id="occurrence-prompt-title" className="text-lg font-semibold text-[#314158]">
               {title}
             </h2>
-            <p className="mt-3 text-sm text-gray-600">
+            <p className="mt-3 text-sm text-[#6b7688]">
               {actionDescription}.
             </p>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-[#6b7688]">
               Would you like to apply this change to only this occurrence on the selected date or to the entire series?
             </p>
           </div>
@@ -125,7 +125,7 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
               <button
                 type="button"
                 onClick={() => resolve("single")}
-                className="w-full rounded-lg bg-indigo-600 text-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="w-full rounded-lg bg-warm-600 text-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-warm-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm-600"
               >
                 This occurrence only
               </button>
@@ -133,14 +133,14 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
             <button
               type="button"
               onClick={() => resolve("all")}
-              className="w-full rounded-lg border border-indigo-200 bg-indigo-50/60 text-indigo-700 px-4 py-2.5 text-sm font-medium hover:bg-indigo-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="w-full rounded-lg border border-warm-200 bg-warm-50/60 text-warm-700 px-4 py-2.5 text-sm font-medium hover:bg-warm-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm-600"
             >
               All occurrences
             </button>
             <button
               type="button"
               onClick={() => resolve("cancel")}
-              className="w-full rounded-lg border border-transparent bg-white text-sm font-medium text-gray-500 hover:text-gray-700"
+              className="w-full rounded-lg border border-transparent bg-white text-sm font-medium text-[#8e99a8] hover:text-[#4a5568]"
             >
               Cancel
             </button>

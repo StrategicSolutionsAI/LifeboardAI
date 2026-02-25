@@ -27,14 +27,14 @@ export function RefinedWidgetShowcase() {
   const noopMetric = (_metricId: string) => {}
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-[#faf8f5] p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="text-4xl font-bold text-[#314158]">
             Refined Widget Design System
           </h1>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg text-[#6b7688] max-w-3xl mx-auto">
             A comprehensive, accessible, and beautifully designed widget system for health and wellness dashboards.
             Built with senior UI/UX designer principles and modern interaction patterns.
           </p>
@@ -51,32 +51,32 @@ export function RefinedWidgetShowcase() {
           <CardContent>
             <div className="grid md:grid-cols-4 gap-6">
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 bg-warm-100 rounded-lg flex items-center justify-center mx-auto">
                   <span className="text-2xl">🎯</span>
                 </div>
                 <h3 className="font-semibold">Consistency</h3>
-                <p className="text-sm text-gray-600">Unified visual language across all components</p>
+                <p className="text-sm text-[#6b7688]">Unified visual language across all components</p>
               </div>
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto">
                   <span className="text-2xl">♿</span>
                 </div>
                 <h3 className="font-semibold">Accessibility</h3>
-                <p className="text-sm text-gray-600">WCAG 2.1 AA compliant with keyboard navigation</p>
+                <p className="text-sm text-[#6b7688]">WCAG 2.1 AA compliant with keyboard navigation</p>
               </div>
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mx-auto">
                   <span className="text-2xl">✨</span>
                 </div>
                 <h3 className="font-semibold">Micro-interactions</h3>
-                <p className="text-sm text-gray-600">Subtle animations that enhance user experience</p>
+                <p className="text-sm text-[#6b7688]">Subtle animations that enhance user experience</p>
               </div>
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto">
                   <span className="text-2xl">📊</span>
                 </div>
                 <h3 className="font-semibold">Data Clarity</h3>
-                <p className="text-sm text-gray-600">Clear information hierarchy and visual indicators</p>
+                <p className="text-sm text-[#6b7688]">Clear information hierarchy and visual indicators</p>
               </div>
             </div>
           </CardContent>
@@ -196,7 +196,7 @@ export function RefinedWidgetShowcase() {
               <CardContent>
                 <div className="space-y-6">
                   {/* State Controls */}
-                  <div className="flex gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex gap-4 p-4 bg-[#faf8f5] rounded-lg">
                     <Button 
                       variant={showLoading ? "default" : "outline"}
                       onClick={() => {
@@ -326,7 +326,7 @@ export function RefinedWidgetShowcase() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold mb-3">Features</h3>
-                <ul className="space-y-1 text-sm text-gray-600">
+                <ul className="space-y-1 text-sm text-[#6b7688]">
                   <li>• TypeScript for type safety and developer experience</li>
                   <li>• Tailwind CSS for consistent utility-first styling</li>
                   <li>• Lucide React for consistent iconography</li>
@@ -337,7 +337,7 @@ export function RefinedWidgetShowcase() {
               </div>
               <div>
                 <h3 className="font-semibold mb-3">Accessibility</h3>
-                <ul className="space-y-1 text-sm text-gray-600">
+                <ul className="space-y-1 text-sm text-[#6b7688]">
                   <li>• WCAG 2.1 AA compliant color contrast</li>
                   <li>• Full keyboard navigation support</li>
                   <li>• Screen reader optimized with ARIA labels</li>
@@ -362,19 +362,19 @@ export function RefinedWidgetShowcase() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
               <div>
                 <div className="text-3xl font-bold text-green-600">60fps</div>
-                <div className="text-sm text-gray-600">Smooth animations</div>
+                <div className="text-sm text-[#6b7688]">Smooth animations</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-blue-600">100%</div>
-                <div className="text-sm text-gray-600">Keyboard accessible</div>
+                <div className="text-3xl font-bold text-warm-600">100%</div>
+                <div className="text-sm text-[#6b7688]">Keyboard accessible</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-purple-600">AAA</div>
-                <div className="text-sm text-gray-600">Color contrast</div>
+                <div className="text-3xl font-bold text-amber-600">AAA</div>
+                <div className="text-sm text-[#6b7688]">Color contrast</div>
               </div>
               <div>
                 <div className="text-3xl font-bold text-orange-600">0ms</div>
-                <div className="text-sm text-gray-600">Layout shifts</div>
+                <div className="text-sm text-[#6b7688]">Layout shifts</div>
               </div>
             </div>
           </CardContent>

@@ -69,6 +69,38 @@ const ensureTaskSource = (task: Task, fallback?: Task['source']): Task => {
 const ensureTasksSource = (tasks: Task[] | null | undefined, fallback?: Task['source']): Task[] =>
   (tasks || []).map(task => ensureTaskSource(task, fallback))
 
+const EXTERNAL_FETCH_TIMEOUT_MS = 4500
+
+const isAbortLikeError = (error: unknown): boolean => {
+  if (error instanceof DOMException && error.name === 'AbortError') return true
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return message.includes('abort') || message.includes('aborted')
+  }
+  return false
+}
+
+const isNetworkFetchError = (error: unknown): boolean => {
+  return error instanceof TypeError && error.message.includes('Failed to fetch')
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = EXTERNAL_FETCH_TIMEOUT_MS
+) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 interface TaskUpdate {
   taskId: string
   updates: Partial<Task>
@@ -82,6 +114,7 @@ export function useTasks(selectedDate?: Date) {
   const sharedFetchRef = useRef<Promise<Task[]> | null>(null)
   const promptOccurrenceDecision = useOccurrencePrompt()
   const [occurrenceExceptions, setOccurrenceExceptions] = useState<TaskOccurrenceException[]>([])
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshOccurrenceExceptions = useCallback(async () => {
     if (typeof window === 'undefined') return
@@ -210,42 +243,70 @@ export function useTasks(selectedDate?: Date) {
     }
 
     const inflight = (async () => {
+      const readSupabaseTasks = async (): Promise<Task[] | null> => {
+        try {
+          const supa = await fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
+          if (!supa.ok) return null
+          const json = await supa.json()
+          const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
+          return ensureTasksSource(supabaseTasks as Task[], 'supabase')
+        } catch {
+          return null
+        }
+      }
+
+      const readLocalTasks = (): Task[] => {
+        try {
+          if (typeof window === 'undefined') return []
+          const raw = window.localStorage.getItem('lifeboard_local_tasks')
+          const list: Task[] = raw ? JSON.parse(raw) : []
+          const normalized = ensureTasksSource(list, 'local')
+          return normalized.filter(t => !t.completed)
+        } catch {
+          return []
+        }
+      }
+
+      const fallbackToSupabaseOrLocal = async (): Promise<Task[]> => {
+        const supabaseTasks = await readSupabaseTasks()
+        if (supabaseTasks) {
+          return supabaseTasks
+        }
+        return readLocalTasks()
+      }
+
       try {
         // If we already know Todoist is not connected, skip trying it
         if (todoistConnectedRef.current === false) {
-          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
-            return ensureTasksSource(supabaseTasks as Task[], 'supabase')
-          }
-          // If Supabase also fails, try localStorage
-          if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('lifeboard_local_tasks')
-            const list: Task[] = raw ? JSON.parse(raw) : []
-            const normalized = ensureTasksSource(list, 'local')
-            return normalized.filter(t => !t.completed)
-          }
-          return []
+          return fallbackToSupabaseOrLocal()
         }
 
-        const res = await fetch('/api/integrations/todoist/tasks?all=true', {
+        const res = await fetchWithTimeout('/api/integrations/todoist/tasks?all=true', {
           credentials: 'same-origin'
         })
         if (!res.ok) {
           if (res.status === 400 || res.status === 401) {
             todoistConnectedRef.current = false
-            const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
-            if (supa.ok) {
-              const json = await supa.json()
-              const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
-              return ensureTasksSource(supabaseTasks as Task[], 'supabase')
-            }
-            return []
+            return fallbackToSupabaseOrLocal()
           }
           if (res.status >= 500 || res.status === 429) {
-            console.warn(`Upstream error fetching tasks: ${res.status} (treat as empty to avoid UI crash)`)
-            return []
+            let upstreamStatus: number | null = null
+            try {
+              const payload = await res.clone().json()
+              const reported = Number(payload?.upstreamStatus ?? payload?.status)
+              if (Number.isFinite(reported)) {
+                upstreamStatus = reported
+              }
+            } catch {}
+
+            if (upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410) {
+              todoistConnectedRef.current = false
+            }
+
+            console.warn(
+              `Upstream error fetching tasks: ${res.status}${upstreamStatus ? ` (upstream ${upstreamStatus})` : ''}. Falling back to Supabase/local.`
+            )
+            return fallbackToSupabaseOrLocal()
           }
           throw new Error(`Failed to fetch tasks: ${res.status}`)
         }
@@ -257,7 +318,7 @@ export function useTasks(selectedDate?: Date) {
         // When Todoist is connected, also fetch Supabase tasks and merge them
         let supabaseTasks: Task[] = []
         try {
-          const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
+          const supa = await fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
           if (supa.ok) {
             const json = await supa.json()
             const supabaseRaw = Array.isArray(json) ? json : (json.tasks ?? [])
@@ -282,25 +343,9 @@ export function useTasks(selectedDate?: Date) {
         
         return Array.from(taskMap.values())
       } catch (error) {
-        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        if (isNetworkFetchError(error) || isAbortLikeError(error)) {
           todoistConnectedRef.current = false
-          try {
-            const supa = await fetch('/api/tasks?all=true', { credentials: 'same-origin' })
-            if (supa.ok) {
-              const json = await supa.json()
-              const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])
-              return ensureTasksSource(supabaseTasks as Task[], 'supabase')
-            }
-          } catch {}
-          try {
-            if (typeof window !== 'undefined') {
-              const raw = window.localStorage.getItem('lifeboard_local_tasks')
-              const list: Task[] = raw ? JSON.parse(raw) : []
-              const normalized = ensureTasksSource(list, 'local')
-              return normalized.filter(t => !t.completed)
-            }
-          } catch {}
-          return []
+          return fallbackToSupabaseOrLocal()
         }
         throw error
       } finally {
@@ -359,9 +404,29 @@ export function useTasks(selectedDate?: Date) {
     updateOptimistically: updateAllOptimistically,
     refetch: refetchAll
   } = useDataCache<Task[]>(allCacheKey, allTasksFetcher, {
-    ttl: 2 * 60 * 1000, // 2 minutes - shorter cache for Master List
+    ttl: 5 * 60 * 1000, // 5 minutes
     prefetch: false // Don't prefetch to avoid immediate errors on mount
   })
+
+  const scheduleRefetch = useCallback((timestamp?: number, delayMs = 120) => {
+    if (typeof timestamp === 'number') {
+      if (timestamp <= lastSeenUpdateRef.current) return
+      lastSeenUpdateRef.current = timestamp
+    } else {
+      lastSeenUpdateRef.current = Date.now()
+    }
+
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+    }
+    refreshTimerRef.current = setTimeout(() => {
+      // Force a fresh read after writes so stale in-flight fetches don't clobber optimistic state.
+      sharedFetchRef.current = null
+      try { refetchDaily() } catch {}
+      try { refetchAll() } catch {}
+      refreshTimerRef.current = null
+    }, delayMs)
+  }, [refetchDaily, refetchAll])
   
   // Optimistic task creation
   const createTask = useCallback(async (
@@ -468,8 +533,19 @@ export function useTasks(selectedDate?: Date) {
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');
         console.error('❌ API request failed:', { status: res.status, statusText: res.statusText, errorText });
+        let upstreamStatus: number | null = null
+        if (res.status === 502 && errorText) {
+          try {
+            const parsed = JSON.parse(errorText)
+            const reported = Number(parsed?.upstreamStatus ?? parsed?.status)
+            if (Number.isFinite(reported)) {
+              upstreamStatus = reported
+            }
+          } catch {}
+        }
+        const todoistAuthRevoked = upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410
         // If Todoist not connected or auth missing, use Supabase fallback
-        if (res.status === 400 || res.status === 401) {
+        if (res.status === 400 || res.status === 401 || todoistAuthRevoked) {
           todoistConnectedRef.current = false
           const alt = await fetch('/api/tasks', {
             method: 'POST',
@@ -495,6 +571,7 @@ export function useTasks(selectedDate?: Date) {
             updateAllOptimistically(current => [...(current || []), task as any])
             // Announce the task update to other components
             if (typeof window !== 'undefined') {
+              sharedFetchRef.current = null
               const timestamp = Date.now()
               window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
               window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
@@ -508,6 +585,7 @@ export function useTasks(selectedDate?: Date) {
             updateAllOptimistically(current => [...(current || []), local as any])
             // Announce the task update to other components
             if (typeof window !== 'undefined') {
+              sharedFetchRef.current = null
               const timestamp = Date.now()
               window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
               window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
@@ -580,6 +658,7 @@ export function useTasks(selectedDate?: Date) {
       
       // Announce the task update to other components
       if (typeof window !== 'undefined') {
+        sharedFetchRef.current = null
         const timestamp = Date.now()
         window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
         window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
@@ -603,6 +682,7 @@ export function useTasks(selectedDate?: Date) {
           updateAllOptimistically(current => [...(current || []), task as any])
           // Announce the task update to other components
           if (typeof window !== 'undefined') {
+            sharedFetchRef.current = null
             const timestamp = Date.now()
             window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
             window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
@@ -616,6 +696,7 @@ export function useTasks(selectedDate?: Date) {
         updateAllOptimistically(current => [...(current || []), local as any])
         // Announce the task update to other components
         if (typeof window !== 'undefined') {
+          sharedFetchRef.current = null
           const timestamp = Date.now()
           window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
           window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
@@ -633,41 +714,35 @@ export function useTasks(selectedDate?: Date) {
       const stored = window.localStorage.getItem('lifeboard:last-tasks-update')
       if (stored) {
         const ts = Number(stored)
-        if (!Number.isNaN(ts) && ts > lastSeenUpdateRef.current) {
-          lastSeenUpdateRef.current = ts
-          try { refetchDaily() } catch {}
-          try { refetchAll() } catch {}
+        if (!Number.isNaN(ts)) {
+          scheduleRefetch(ts, 0)
         }
       }
     } catch {}
-  }, [refetchDaily, refetchAll])
+  }, [scheduleRefetch])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
+    }
+  }, [])
 
   // React to global refresh events (e.g., chat-created tasks) and storage sync
   useEffect(() => {
-    function triggerRefresh(ts?: number) {
-      if (typeof ts === 'number') {
-        if (ts <= lastSeenUpdateRef.current) {
-          return
-        }
-        lastSeenUpdateRef.current = ts
-      } else {
-        lastSeenUpdateRef.current = Date.now()
-      }
-      try { refetchDaily() } catch {}
-      try { refetchAll() } catch {}
-    }
-
     function onTasksUpdated(event: Event) {
       const custom = event as CustomEvent<{ timestamp?: number }>
       const ts = typeof custom.detail?.timestamp === 'number' ? custom.detail?.timestamp : Date.now()
-      triggerRefresh(ts)
+      scheduleRefetch(ts)
     }
 
     function onStorage(event: StorageEvent) {
       if (event.key === 'lifeboard:last-tasks-update' && event.newValue) {
         const ts = Number(event.newValue)
         if (!Number.isNaN(ts)) {
-          triggerRefresh(ts)
+          scheduleRefetch(ts)
         }
       }
     }
@@ -682,7 +757,7 @@ export function useTasks(selectedDate?: Date) {
         window.removeEventListener('storage', onStorage)
       }
     }
-  }, [refetchDaily, refetchAll])
+  }, [scheduleRefetch])
   
   // Optimistic task toggle
   const toggleTaskCompletion = useCallback(async (taskId: string) => {

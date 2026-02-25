@@ -146,61 +146,166 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No messages' }, { status: 400 })
     }
 
-    // Fetch user preferences to give Claude context about tabs and widgets
+    // Fetch comprehensive user context
     const prefs = await getUserPreferencesServer()
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+    const today = new Date().toISOString().split('T')[0]
 
     let systemContext = ''
-if (prefs) {
-  // Gather widget metadata
-  const bucketSummary = Object.entries(prefs.widgets_by_bucket).map(([b, w]: [string, any[]]) => `${b}: ${w.map(x => x.name || x.type || 'widget').join(', ')}`).join('; ')
+    if (prefs) {
+      // Gather widget metadata
+      const bucketSummary = Object.entries(prefs.widgets_by_bucket).map(([b, w]: [string, any[]]) => `${b}: ${w.map(x => x.name || x.type || 'widget').join(', ')}`).join('; ')
 
-  // Map to hold dynamic data values we can fetch quickly
-  const dynamicData: Record<string, string | number> = {}
+      // Map to hold comprehensive app data
+      const contextData: {
+        tasks?: any[]
+        calendar?: any[]
+        shopping?: any[]
+        steps?: number
+      } = {}
 
-  // Detect a steps widget and its data source
-  let stepsDataSource: 'fitbit' | 'googlefit' | null = null
-  for (const widgets of Object.values(prefs.widgets_by_bucket)) {
-    for (const w of widgets as any[]) {
-      if (w.id === 'steps') {
-        const ds = (w as any).dataSource ?? 'fitbit'
-        stepsDataSource = ds === 'googlefit' ? 'googlefit' : 'fitbit'
-        break
+      // Fetch tasks for today and upcoming
+      try {
+        const tasksRes = await fetch(`${origin}/api/tasks?all=true&includeCompleted=false`, {
+          headers: { cookie: req.headers.get('cookie') || '' },
+          cache: 'no-store'
+        })
+        if (tasksRes.ok) {
+          const tasksJson = await tasksRes.json()
+          contextData.tasks = tasksJson.tasks || []
+        }
+      } catch (err) {
+        console.error('Failed fetching tasks for chat context', err)
       }
-    }
-    if (stepsDataSource) break
-  }
 
-  if (stepsDataSource) {
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const metricsUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/api/integrations/${stepsDataSource}/metrics?date=${today}`
-      const metricsRes = await fetch(metricsUrl, {
-        headers: {
-          cookie: req.headers.get('cookie') || ''
-        },
-        cache: 'no-store'
-      })
-      if (metricsRes.ok) {
-        const metricsJson = await metricsRes.json()
-        if (typeof metricsJson.steps === 'number') {
-          dynamicData['daily_steps'] = metricsJson.steps
+      // Fetch calendar events
+      try {
+        const supabase = supabaseServer()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: events } = await supabase
+            .from('calendar_events')
+            .select('id, title, description, start_date, end_date, hour_slot, all_day, bucket')
+            .eq('user_id', user.id)
+            .gte('start_date', today)
+            .order('start_date', { ascending: true })
+            .limit(20)
+          if (events) contextData.calendar = events
+        }
+      } catch (err) {
+        console.error('Failed fetching calendar for chat context', err)
+      }
+
+      // Fetch shopping list
+      try {
+        const shoppingRes = await fetch(`${origin}/api/shopping-list`, {
+          headers: { cookie: req.headers.get('cookie') || '' },
+          cache: 'no-store'
+        })
+        if (shoppingRes.ok) {
+          const shoppingJson = await shoppingRes.json()
+          contextData.shopping = shoppingJson.items || []
+        }
+      } catch (err) {
+        console.error('Failed fetching shopping list for chat context', err)
+      }
+
+      // Detect a steps widget and its data source
+      let stepsDataSource: 'fitbit' | 'googlefit' | null = null
+      for (const widgets of Object.values(prefs.widgets_by_bucket)) {
+        for (const w of widgets as any[]) {
+          if (w.id === 'steps') {
+            const ds = (w as any).dataSource ?? 'fitbit'
+            stepsDataSource = ds === 'googlefit' ? 'googlefit' : 'fitbit'
+            break
+          }
+        }
+        if (stepsDataSource) break
+      }
+
+      if (stepsDataSource) {
+        try {
+          const metricsUrl = `${origin}/api/integrations/${stepsDataSource}/metrics?date=${today}`
+          const metricsRes = await fetch(metricsUrl, {
+            headers: { cookie: req.headers.get('cookie') || '' },
+            cache: 'no-store'
+          })
+          if (metricsRes.ok) {
+            const metricsJson = await metricsRes.json()
+            if (typeof metricsJson.steps === 'number') {
+              contextData.steps = metricsJson.steps
+            }
+          }
+        } catch (err) {
+          console.error(`Failed fetching ${stepsDataSource} metrics for chat context`, err)
         }
       }
-    } catch (err) {
-      console.error(`Failed fetching ${stepsDataSource} metrics for chat context`, err)
+
+      // Build comprehensive context string
+      const contextParts = [
+        `Life buckets: ${prefs.life_buckets.join(', ')}`,
+        `Widgets: ${bucketSummary}`
+      ]
+
+      if (contextData.tasks && contextData.tasks.length > 0) {
+        const taskSummary = contextData.tasks
+          .slice(0, 15)
+          .map((t: any) => `- ${t.content}${t.due?.date ? ` (due: ${t.due.date})` : ''}${t.bucket ? ` [${t.bucket}]` : ''}`)
+          .join('\n')
+        contextParts.push(`\n\nCurrent Tasks (${contextData.tasks.length}):\n${taskSummary}${contextData.tasks.length > 15 ? '\n... and more' : ''}`)
+      }
+
+      if (contextData.calendar && contextData.calendar.length > 0) {
+        const calSummary = contextData.calendar
+          .slice(0, 10)
+          .map((e: any) => `- ${e.title}${e.start_date ? ` (${e.start_date})` : ''}${e.bucket ? ` [${e.bucket}]` : ''}`)
+          .join('\n')
+        contextParts.push(`\n\nUpcoming Calendar Events (${contextData.calendar.length}):\n${calSummary}${contextData.calendar.length > 10 ? '\n... and more' : ''}`)
+      }
+
+      if (contextData.shopping && contextData.shopping.length > 0) {
+        const shopSummary = contextData.shopping
+          .slice(0, 10)
+          .map((i: any) => `- ${i.name}${i.quantity ? ` (${i.quantity})` : ''}${i.bucket ? ` [${i.bucket}]` : ''}`)
+          .join('\n')
+        contextParts.push(`\n\nShopping List (${contextData.shopping.length}):\n${shopSummary}${contextData.shopping.length > 10 ? '\n... and more' : ''}`)
+      }
+
+      if (contextData.steps !== undefined) {
+        contextParts.push(`\n\nToday's Steps: ${contextData.steps}`)
+      }
+
+      systemContext = `System: ${contextParts.join('\n')}`
     }
-  }
 
-  const dynamicString = Object.keys(dynamicData).length > 0 ? ` Current data: ${Object.entries(dynamicData).map(([k,v]) => `${k}: ${v}`).join(', ')}.` : ''
-
-  systemContext = `System: The user has the following life buckets (tabs): ${prefs.life_buckets.join(', ')}. Widgets per bucket: ${bucketSummary}.${dynamicString}`
-}
-
-    // Instruction to optionally emit a command block for task creation
+    // Enhanced instruction with full app context awareness
     const todayIso = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
     const currentYear = todayIso.slice(0,4)
-    const lifeboardInstruction = `You are embedded in Lifeboard. Today's date is ${todayIso}. If the user asks to add/create a task (e.g., "add a task to call John tomorrow at 3pm in Work"), include ONE command block in addition to your normal reply, exactly in this format on a single line: [LIFEBOARD_CMD]{"action":"create_task","content":"<task text>","due_date":"YYYY-MM-DD","hour_slot":<0-23 optional>,"bucket":"<optional bucket name>"}[/LIFEBOARD_CMD].
-Normalize natural dates to the user's local timezone and ALWAYS use year ${currentYear} for due_date unless the user explicitly says a different year. If a time is given, convert it to an integer hour_slot from 0 (12am) to 23 (11pm). If no date is specified but they say "today" or similar, use today's date. If a bucket/category is clearly implied (e.g., "Work", "Personal"), include it in bucket. Do not include the word TASK in content. Keep your normal reply natural and separate from the command block.`
+    const lifeboardInstruction = `You are Lifeboard's AI assistant with full access to the user's dashboard. Today's date is ${todayIso}.
+
+CONTEXT AWARENESS:
+- You can see all tasks, calendar events, shopping lists, and dashboard widgets
+- Reference specific items when answering questions (e.g., "I see you have 'Call dentist' scheduled for tomorrow")
+- Provide personalized insights based on their actual data
+- Help them understand patterns and prioritize work
+
+TASK CREATION:
+When the user asks to add/create a task, include ONE command block in addition to your natural reply:
+[LIFEBOARD_CMD]{"action":"create_task","content":"<task text>","due_date":"YYYY-MM-DD","hour_slot":<0-23 optional>,"bucket":"<optional bucket name>"}[/LIFEBOARD_CMD]
+
+Rules:
+- Normalize dates to user's local timezone, use year ${currentYear} unless specified
+- Convert times to hour_slot (0=12am to 23=11pm)
+- Infer bucket from context if mentioned (Work, Personal, Health, etc.)
+- Do not include the word "TASK" in content
+- Keep your natural reply separate from the command block
+
+CAPABILITIES:
+- Answer questions about their schedule, tasks, and shopping list
+- Provide summaries and insights
+- Help prioritize and organize
+- Suggest optimizations based on their data
+- Be conversational and helpful`
 
     // Use GPT-5 Pro via Replicate
     const gpt5Messages = [
@@ -251,8 +356,6 @@ Normalize natural dates to the user's local timezone and ALWAYS use year ${curre
     // Allow command blocks that span multiple lines
     const cmdMatch = (process.env.LIFEBOARD_TASK_CMDS === 'false') ? null : reply.match(/\[LIFEBOARD_CMD\]([\s\S]*?)\[\/LIFEBOARD_CMD\]/)
     let createdTask: any | undefined
-    // Helper to resolve origin for internal fetches
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
 
     // Fallback parser for natural language like "add a task to call John today at 3pm"
     const parseTaskFromText = (text: string): { content: string; due_date: string | null; hour_slot?: number; bucket?: string } | null => {

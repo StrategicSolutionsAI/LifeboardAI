@@ -269,8 +269,13 @@ export async function GET(request: NextRequest) {
       throw err;
     }
 
-    clearTodoistPendingFetch(user.id);
-    writeTodoistTaskCache(user.id, enhancedTasks);
+    // Avoid repopulating cache with stale data from an outdated in-flight request.
+    // If another request has replaced/cleared this pending promise (e.g. after create/update),
+    // skip cache writes from this older fetch.
+    if (getTodoistPendingFetch(user.id) === fetchPromise) {
+      clearTodoistPendingFetch(user.id);
+      writeTodoistTaskCache(user.id, enhancedTasks);
+    }
 
     return respondWithTasks(enhancedTasks);
   } catch (err) {

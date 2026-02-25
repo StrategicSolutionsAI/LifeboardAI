@@ -123,10 +123,10 @@ export function WeightTrackingDashboard({
         {/* Current Weight */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Current Weight</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#6b7688]">Current Weight</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-[#314158]">
               {formatWeight(currentWeight || historyData?.stats.latest || null)}
             </div>
             {trend && (
@@ -143,16 +143,16 @@ export function WeightTrackingDashboard({
         {/* Goal Progress */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
+            <CardTitle className="text-sm font-medium text-[#6b7688] flex items-center gap-1">
               <Target className="w-4 h-4" />
               Goal Progress
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-[#314158]">
               {totalProgress !== null ? `${Math.round(totalProgress)}%` : '--'}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-[#8e99a8] mt-1">
               {progressToGoal !== null 
                 ? `${Math.abs(progressToGoal).toFixed(1)} ${unit} ${progressToGoal > 0 ? 'to go' : 'past goal'}`
                 : 'No goal set'
@@ -164,16 +164,16 @@ export function WeightTrackingDashboard({
         {/* Total Change */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Change</CardTitle>
+            <CardTitle className="text-sm font-medium text-[#6b7688]">Total Change</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-[#314158]">
               {weightChange !== null 
                 ? `${weightChange > 0 ? '+' : ''}${formatWeight(Math.abs(weightChange))}`
                 : '--'
               }
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-[#8e99a8] mt-1">
               Last {selectedPeriod} days
             </div>
           </CardContent>
@@ -182,16 +182,16 @@ export function WeightTrackingDashboard({
         {/* Measurements Count */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-1">
+            <CardTitle className="text-sm font-medium text-[#6b7688] flex items-center gap-1">
               <BarChart3 className="w-4 h-4" />
               Measurements
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-[#314158]">
               {historyData?.stats.count || 0}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-[#8e99a8] mt-1">
               Last {selectedPeriod} days
             </div>
           </CardContent>
@@ -221,7 +221,7 @@ export function WeightTrackingDashboard({
         <CardContent>
           {historyLoading ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">Loading weight history...</div>
+              <div className="text-[#8e99a8]">Loading weight history...</div>
             </div>
           ) : historyError ? (
             <div className="h-64 flex items-center justify-center">
@@ -229,7 +229,7 @@ export function WeightTrackingDashboard({
             </div>
           ) : !historyData?.measurements.length ? (
             <div className="h-64 flex items-center justify-center">
-              <div className="text-gray-500">No weight measurements found</div>
+              <div className="text-[#8e99a8]">No weight measurements found</div>
             </div>
           ) : (
             <div className="h-64 relative">
@@ -244,11 +244,11 @@ export function WeightTrackingDashboard({
                   return (
                     <div key={measurement.id} className="flex flex-col items-center">
                       <div
-                        className="w-8 bg-blue-500 rounded-t"
+                        className="w-8 bg-[#bb9e7b] rounded-t"
                         style={{ height: `${height}px` }}
                         title={`${formatWeight(weight)} on ${new Date(measurement.measuredAt).toLocaleDateString()}`}
                       />
-                      <div className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-left">
+                      <div className="text-xs text-[#8e99a8] mt-2 transform -rotate-45 origin-left">
                         {new Date(measurement.measuredAt).toLocaleDateString()}
                       </div>
                     </div>
@@ -286,16 +286,16 @@ export function WeightTrackingDashboard({
           <CardContent>
             <div className="space-y-3">
               {historyData?.measurements?.slice(0, 5).map((measurement) => (
-                <div key={measurement.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div key={measurement.id} className="flex items-center justify-between py-2 border-b border-[#dbd6cf] last:border-0">
                   <div>
                     <div className="font-medium">
                       {formatWeight(unit === 'kg' ? measurement.weightKg : measurement.weightLbs)}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-[#8e99a8]">
                       {new Date(measurement.measuredAt).toLocaleDateString()} at {new Date(measurement.measuredAt).toLocaleTimeString()}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400 capitalize">
+                  <div className="text-xs text-[#8e99a8] capitalize">
                     {measurement.source}
                   </div>
                 </div>

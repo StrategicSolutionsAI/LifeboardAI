@@ -6,12 +6,12 @@ import * as Icons from "lucide-react";
 
 // Local colour utility (same as widget-library)
 const colorClassMap: Record<string, string> = {
-  blue: "bg-blue-500",
+  blue: "bg-warm-500",
   green: "bg-green-500",
   red: "bg-red-500",
   orange: "bg-orange-500",
-  purple: "bg-purple-500",
-  indigo: "bg-indigo-500",
+  purple: "bg-amber-500",
+  indigo: "bg-warm-500",
   amber: "bg-amber-500",
   teal: "bg-teal-500",
   rose: "bg-rose-500",
@@ -103,7 +103,7 @@ export function WidgetPreview({
             <span className="text-sm font-medium truncate">{widget.birthdayData.friendName}</span>
           </div>
           <div className="mt-1 pl-8">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#8e99a8]">
               {widget.birthdayData.birthDate ? new Date(widget.birthdayData.birthDate).toLocaleDateString() : 'Birthday not set'}
             </p>
           </div>
@@ -125,7 +125,7 @@ export function WidgetPreview({
             <span className="text-sm font-medium truncate">{widget.eventData.eventName}</span>
           </div>
           <div className="mt-1 pl-8">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#8e99a8]">
               {widget.eventData.eventDate ? new Date(widget.eventData.eventDate).toLocaleDateString() : 'Event date not set'}
             </p>
           </div>
@@ -147,7 +147,7 @@ export function WidgetPreview({
             <span className="text-sm font-medium truncate">{widget.holidayData.holidayName}</span>
           </div>
           <div className="mt-1 pl-8">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-[#8e99a8]">
               {widget.holidayData.holidayDate ? new Date(widget.holidayData.holidayDate).toLocaleDateString() : 'Date not set'}
             </p>
           </div>
@@ -183,15 +183,15 @@ export function WidgetPreview({
           {/* Empty states for social widgets */}
           {widget.id === 'birthdays' && widget.birthdayData ? (
             <div className="mt-1">
-              <p className="text-xs text-gray-500">Click to add birthday</p>
+              <p className="text-xs text-[#8e99a8]">Click to add birthday</p>
             </div>
           ) : widget.id === 'social_events' && widget.eventData ? (
             <div className="mt-1">
-              <p className="text-xs text-gray-500">Click to add event</p>
+              <p className="text-xs text-[#8e99a8]">Click to add event</p>
             </div>
           ) : widget.id === 'holidays' && widget.holidayData ? (
             <div className="mt-1">
-              <p className="text-xs text-gray-500">Click to add holiday</p>
+              <p className="text-xs text-[#8e99a8]">Click to add holiday</p>
             </div>
           ) : widget.id === 'quit_habit' && widget.quitHabitData ? (
             <div className="mt-1">
@@ -199,13 +199,13 @@ export function WidgetPreview({
                 <div className="space-y-1">
                   <div className="flex items-center gap-1">
                     <span className="text-xs">🚫</span>
-                    <p className="text-xs font-medium text-gray-700">
+                    <p className="text-xs font-medium text-[#4a5568]">
                       Quitting {widget.quitHabitData.habitName}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs">📅</span>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[#8e99a8]">
                       Since {new Date(widget.quitHabitData.quitDate).toLocaleDateString()}
                     </p>
                   </div>
@@ -220,7 +220,7 @@ export function WidgetPreview({
                   {widget.quitHabitData.costPerDay && widget.quitHabitData.costPerDay > 0 && (
                     <div className="flex items-center gap-1">
                       <span className="text-xs">💰</span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[#8e99a8]">
                         Daily savings: {widget.quitHabitData.currency || '$'}{widget.quitHabitData.costPerDay.toFixed(2)}
                       </p>
                     </div>
@@ -260,7 +260,7 @@ export function WidgetPreview({
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">Click to set up habit tracking</p>
+                <p className="text-xs text-[#8e99a8]">Click to set up habit tracking</p>
               )}
             </div>
           ) : widget.id === 'weight' && widget.weightData ? (
@@ -269,11 +269,11 @@ export function WidgetPreview({
                 <div className="space-y-1">
                   <div className="flex items-center gap-1">
                     <span className="text-xs">⚖️</span>
-                    <p className="text-xs font-medium text-gray-700">
+                    <p className="text-xs font-medium text-[#4a5568]">
                       Current Weight
                     </p>
                   </div>
-                  <p className="text-lg font-bold text-purple-600">
+                  <p className="text-lg font-bold text-amber-600">
                     {widget.weightData.currentWeight} {widget.weightData.unit || widget.unit || 'lbs'}
                   </p>
                   
@@ -285,7 +285,7 @@ export function WidgetPreview({
                           ? 'text-green-600' 
                           : widget.weightData.currentWeight > widget.weightData.startingWeight 
                           ? 'text-orange-600' 
-                          : 'text-gray-600'
+                          : 'text-[#6b7688]'
                       }`}>
                         {widget.weightData.currentWeight < widget.weightData.startingWeight ? 'Lost' : 
                          widget.weightData.currentWeight > widget.weightData.startingWeight ? 'Gained' : 'No change'}: {Math.abs(widget.weightData.currentWeight - widget.weightData.startingWeight).toFixed(1)} {widget.weightData.unit || widget.unit || 'lbs'}
@@ -296,7 +296,7 @@ export function WidgetPreview({
                   {widget.weightData.goalWeight && (
                     <div className="flex items-center gap-1">
                       <span className="text-xs">🎯</span>
-                      <p className="text-xs text-blue-600">
+                      <p className="text-xs text-warm-600">
                         Goal: {widget.weightData.goalWeight} {widget.weightData.unit || widget.unit || 'lbs'}
                       </p>
                     </div>
@@ -305,7 +305,7 @@ export function WidgetPreview({
                   {widget.weightData.entries && widget.weightData.entries.length > 0 && (
                     <div className="flex items-center gap-1">
                       <span className="text-xs">📊</span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[#8e99a8]">
                         {widget.weightData.entries.length} entries logged
                       </p>
                     </div>
@@ -341,14 +341,14 @@ export function WidgetPreview({
                           alert(`✅ Weight logged: ${weight} ${widget.weightData?.unit || widget.unit || 'lbs'}`);
                         }
                       }}
-                      className="w-full mt-2 px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium border border-purple-200 hover:bg-purple-200 transition-colors"
+                      className="w-full mt-2 px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium border border-purple-200 hover:bg-amber-200 transition-colors"
                     >
                       📝 Log Weight
                     </button>
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">Click to set up weight tracking</p>
+                <p className="text-xs text-[#8e99a8]">Click to set up weight tracking</p>
               )}
             </div>
           ) : null}
@@ -363,42 +363,42 @@ export function WidgetPreview({
               <span className="text-sm">
                 {['😢', '😕', '😐', '😊', '😁'][widget.moodData.currentMood - 1]}
               </span>
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-[#6b7688]">
                 {['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'][widget.moodData.currentMood - 1]}
               </span>
             </div>
           ) : (
-            <p className="text-xs text-gray-500">Tap to log mood</p>
+            <p className="text-xs text-[#8e99a8]">Tap to log mood</p>
           )}
         </div>
       ) : widget.id === 'journal' && widget.journalData ? (
         <div className="mt-1">
           {widget.journalData.todaysEntry ? (
             <>
-              <p className="text-xs text-gray-700 truncate">
+              <p className="text-xs text-[#4a5568] truncate">
                 {widget.journalData.todaysEntry.slice(0, 50)}...
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[#8e99a8]">
                 {widget.journalData.todaysEntry.split(' ').length} words
               </p>
             </>
           ) : (
-            <p className="text-xs text-gray-500">No entry today</p>
+            <p className="text-xs text-[#8e99a8]">No entry today</p>
           )}
         </div>
       ) : widget.id === 'gratitude' && widget.gratitudeData ? (
         <div className="mt-1">
           {widget.gratitudeData.gratitudeItems && widget.gratitudeData.gratitudeItems.length > 0 && widget.gratitudeData.gratitudeItems[0] ? (
             <>
-              <p className="text-xs text-gray-700 truncate">
+              <p className="text-xs text-[#4a5568] truncate">
                 {widget.gratitudeData.gratitudeItems[0]}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[#8e99a8]">
                 {widget.gratitudeData.gratitudeItems.filter(item => item.trim()).length} items
               </p>
             </>
           ) : (
-            <p className="text-xs text-gray-500">What are you grateful for?</p>
+            <p className="text-xs text-[#8e99a8]">What are you grateful for?</p>
           )}
         </div>
       ) : null}

@@ -168,73 +168,72 @@ export default function IntegratedCalendar() {
   const weekDays = getWeekDays(anchorDate);
 
   return (
-    <div className={`w-full max-w-none mx-4 bg-white/98 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/70 overflow-hidden`}>
+    <div className={`w-full max-w-none mx-4 bg-white/98 backdrop-blur-md rounded-2xl shadow-warm-lg border border-[#dbd6cf] overflow-hidden`}>
       {/* Enhanced Header */}
-      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80 flex-wrap gap-4">
+      <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-[#faf8f5] to-white border-b border-[#dbd6cf] flex-wrap gap-4">
         <div className="flex items-center space-x-3">
-          <button 
-            onClick={gotoPrev} 
-            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+          <button
+            onClick={gotoPrev}
+            className="p-2.5 rounded-xl hover:bg-[rgba(183,148,106,0.08)]/80 text-[#6b7688] hover:text-[#314158] transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
             aria-label="Previous period"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          
-          <button 
-            onClick={gotoToday} 
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+
+          <button
+            onClick={gotoToday}
+            className="px-4 py-2 text-sm font-medium text-[#6b7688] hover:text-[#314158] bg-white border border-[#dbd6cf] rounded-lg hover:bg-[#faf8f5] transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
           >
             Today
           </button>
-          
-          <button 
-            onClick={gotoNext} 
-            className="p-2.5 rounded-xl hover:bg-gray-100/80 text-gray-600 hover:text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+
+          <button
+            onClick={gotoNext}
+            className="p-2.5 rounded-xl hover:bg-[rgba(183,148,106,0.08)]/80 text-[#6b7688] hover:text-[#314158] transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
             aria-label="Next period"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          
-          <h2 className="ml-4 text-2xl font-bold text-gray-900 tracking-tight whitespace-nowrap">
+
+          <h2 className="ml-4 text-2xl font-bold text-[#314158] tracking-tight whitespace-nowrap">
             {view === "month" && format(anchorDate, "MMMM yyyy")}
             {view === "week" && `${format(weekDays[0], "MMM d")} – ${format(weekDays[6], "MMM d, yyyy")}`}
             {view === "day" && format(anchorDate, "MMMM d, yyyy")}
           </h2>
         </div>
-        
+
         <div className="flex items-center space-x-4 ml-auto">
-          <div className="flex items-center bg-gray-100/80 rounded-xl p-1 border border-gray-200/60">
+          <div className="flex items-center bg-[rgba(183,148,106,0.08)]/80 rounded-xl p-1 border border-[#dbd6cf]">
             {[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }, { value: 'day', label: 'Day' }].map((option) => (
               <button
                 key={option.value}
                 onClick={() => setView(option.value as ViewMode)}
-                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  view === option.value
-                    ? 'bg-white shadow-md text-blue-700 border border-blue-200/50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                }`}
+                className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${view === option.value
+                    ? 'bg-white shadow-warm text-[#314158] border border-[#dbd6cf]'
+                    : 'text-[#6b7688] hover:text-[#314158] hover:bg-white/50'
+                  }`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setRefreshSeq(s => s + 1)}
-              className="flex items-center space-x-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="flex items-center space-x-2 bg-white border border-[#dbd6cf] hover:bg-[#faf8f5] text-[#4a5568] text-sm font-semibold px-3 py-2 rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
               title="Refresh"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5"/></svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5" /></svg>
               <span>Refresh</span>
             </button>
             <button
               onClick={() => alert("Add event coming soon")}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="flex items-center space-x-2 bg-[#bb9e7b] hover:bg-[#9a7b5a] text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-[0px_4px_16px_rgba(163,133,96,0.06)] hover:shadow-warm transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
             >
               <Plus size={16} />
               <span>Add event</span>
@@ -247,24 +246,24 @@ export default function IntegratedCalendar() {
       {view === "month" && (
         <div className="p-6">
           {/* Enhanced Week Days Header */}
-          <div className="grid grid-cols-7 bg-gray-50/80 rounded-t-xl border-b border-gray-200/60">
+          <div className="grid grid-cols-7 bg-[#faf8f5]/80 rounded-t-xl border-b border-[#dbd6cf]/60">
             {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
               <div key={day} className="px-4 py-3 text-center">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <div className="text-xs font-semibold text-[#8e99a8] uppercase tracking-wide">
                   {day.slice(0, 3)}
                 </div>
               </div>
             ))}
           </div>
-          
+
           {/* Enhanced Month Grid */}
-          <div className="grid grid-cols-7 gap-1 bg-gray-100/50 rounded-b-xl overflow-hidden p-1">
+          <div className="grid grid-cols-7 gap-1 bg-[rgba(183,148,106,0.08)]/50 rounded-b-xl overflow-hidden p-1">
             {monthMatrix.flat().map((day) => {
               const dayStr = day.toISOString().slice(0, 10);
               const dayEvents = eventsByDate[dayStr] ?? [];
               const isCurrentMonth = isSameMonth(day, anchorDate);
               const isToday = isSameDay(day, today);
-              
+
               return (
                 <div
                   key={dayStr}
@@ -272,33 +271,30 @@ export default function IntegratedCalendar() {
                   className={`
                     aspect-square cursor-pointer flex flex-col items-start justify-start p-3 
                     transition-all duration-200 transform hover:scale-[1.02] rounded-xl
-                    ${
-                      isCurrentMonth 
-                        ? "bg-white shadow-sm border border-gray-200/60 hover:shadow-md" 
-                        : "bg-gray-50/80 text-gray-400 border border-gray-100/50"
+                    ${isCurrentMonth
+                      ? "bg-white shadow-[0px_4px_16px_rgba(163,133,96,0.06)] border border-[#dbd6cf] hover:shadow-warm"
+                      : "bg-[#faf8f5]/80 text-[#8e99a8]/70 border border-[#dbd6cf]/50"
                     } 
-                    ${
-                      isToday 
-                        ? "ring-2 ring-blue-500/50 bg-blue-50/80 border-blue-200" 
-                        : ""
+                    ${isToday
+                      ? "ring-2 ring-[#bb9e7b]/50 bg-[#fdf8f6] border-[#bb9e7b]"
+                      : ""
                     }
                   `}
                 >
                   {/* Enhanced Date Header */}
                   <div className="flex items-center justify-between w-full mb-2">
-                    <span className={`font-bold text-lg ${
-                      isToday ? 'text-blue-700' : 
-                      isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                    }`}>
+                    <span className={`font-bold text-lg ${isToday ? 'text-[#9a7b5a]' :
+                        isCurrentMonth ? 'text-[#314158]' : 'text-[#8e99a8]/70'
+                      }`}>
                       {format(day, "d")}
                     </span>
                     {dayEvents.length > 0 && (
-                      <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-semibold text-[#8e99a8] bg-[rgba(183,148,106,0.08)] px-2 py-0.5 rounded-full">
                         {dayEvents.length}
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Enhanced Event Indicators */}
                   {dayEvents.length > 0 && (
                     <div className="w-full space-y-1">
@@ -306,20 +302,20 @@ export default function IntegratedCalendar() {
                         const getEventBarStyle = (source: string) => {
                           switch (source) {
                             case 'google':
-                              return 'bg-blue-400 border-blue-500';
+                              return 'bg-[#bb9e7b] border-[#bb9e7b]';
                             case 'todoist':
                               return 'bg-purple-400 border-purple-500';
                             default:
                               return 'bg-emerald-400 border-emerald-500';
                           }
                         };
-                        
+
                         return (
                           <div key={i} className={`h-2 rounded-full shadow-sm border ${getEventBarStyle(ev.source)}`} />
                         );
                       })}
                       {dayEvents.length > 2 && (
-                        <div className="text-xs text-gray-600 font-semibold bg-gray-200/80 px-2 py-1 rounded-full text-center">
+                        <div className="text-xs text-[#6b7688] font-semibold bg-[#ebe5de]/80 px-2 py-1 rounded-full text-center">
                           +{dayEvents.length - 2}
                         </div>
                       )}
@@ -334,47 +330,44 @@ export default function IntegratedCalendar() {
 
       {view === "week" && (
         <div className="mx-6 mb-6">
-          <div className="border border-gray-200/60 rounded-2xl overflow-hidden shadow-lg">
+          <div className="border border-[#dbd6cf] rounded-2xl overflow-hidden shadow-warm-lg">
             {/* Enhanced Week Header */}
-            <div className="grid grid-cols-7 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+            <div className="grid grid-cols-7 bg-gradient-to-r from-[#faf8f5] to-white border-b border-[#dbd6cf]">
               {weekDays.map((d) => {
                 const isToday = isSameDay(d, today);
                 return (
-                  <div key={d.toISOString()} className={`py-4 text-center border-r border-gray-200/60 last:border-r-0 ${
-                    isToday ? 'bg-blue-50/80 border-blue-200/60' : ''
-                  }`}>
-                    <div className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  <div key={d.toISOString()} className={`py-4 text-center border-r border-[#dbd6cf]/60 last:border-r-0 ${isToday ? 'bg-[#fdf8f6]/80 border-[#dbd6cf]/60' : ''
+                    }`}>
+                    <div className="text-sm font-semibold text-[#4a5568] uppercase tracking-wide">
                       {format(d, "EEE")}
                     </div>
-                    <div className={`text-xl font-bold mt-1 ${
-                      isToday ? 'text-blue-700' : 'text-gray-900'
-                    }`}>
+                    <div className={`text-xl font-bold mt-1 ${isToday ? 'text-[#9a7b5a]' : 'text-[#314158]'
+                      }`}>
                       {format(d, "d")}
                     </div>
                   </div>
                 );
               })}
             </div>
-            
+
             {/* Enhanced Week Content */}
-            <div className="grid grid-cols-7 gap-6 p-6 bg-gray-50/30 h-[650px]">
+            <div className="grid grid-cols-7 gap-6 p-6 bg-[#faf8f5]/30 h-[650px]">
               {weekDays.map((d) => {
                 const dateStr = d.toISOString().slice(0, 10);
                 const dayEvents = eventsByDate[dateStr] ?? [];
                 const isToday = isSameDay(d, today);
-                
+
                 return (
-                  <div key={dateStr} className={`h-full bg-white rounded-xl p-4 shadow-sm border border-gray-200/60 flex flex-col ${
-                    isToday ? 'ring-2 ring-blue-500/30 bg-blue-50/20' : ''
-                  }`}>
+                  <div key={dateStr} className={`h-full bg-white rounded-xl p-4 shadow-sm border border-[#dbd6cf] flex flex-col ${isToday ? 'ring-2 ring-[#bb9e7b]/30 bg-[#fdf8f6]/20' : ''
+                    }`}>
                     <div className="space-y-2">
                       {dayEvents.map((ev, i) => {
                         const getEventStyle = (source: string) => {
                           switch (source) {
                             case 'google':
                               return {
-                                container: 'bg-blue-100/80 border border-blue-200 text-blue-800',
-                                time: 'text-blue-600'
+                                container: 'bg-[#f5ede4]/80 border border-[#dbd6cf] text-[#7a6248]',
+                                time: 'text-[#9a7b5a]'
                               };
                             case 'todoist':
                               return {
@@ -388,10 +381,10 @@ export default function IntegratedCalendar() {
                               };
                           }
                         };
-                        
+
                         const styles = getEventStyle(ev.source);
                         const timeDisplay = ev.time ? format(new Date(ev.time), 'h:mm a') : '';
-                        
+
                         return (
                           <div
                             key={i}
@@ -419,28 +412,28 @@ export default function IntegratedCalendar() {
 
       {view === "day" && (
         <div className="mx-6 mb-6">
-          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden">
-            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200/80">
+          <div className="bg-white rounded-2xl border border-[#dbd6cf] shadow-warm-lg overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-[#faf8f5] to-white border-b border-[#dbd6cf]">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
+                  <h3 className="text-2xl font-bold text-[#314158] tracking-tight">
                     {format(anchorDate, "EEEE, MMMM d, yyyy")}
                   </h3>
-                  <p className="text-sm text-gray-600 mt-2 font-medium">
+                  <p className="text-sm text-[#6b7688] mt-2 font-medium">
                     Plan your day with precision scheduling
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
-                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  className="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-[#bb9e7b] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-[#9a7b5a] focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
                 >
                   <Plus size={16} />
                   <span>Add task</span>
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6">
               <DragDropContext
                 onDragStart={() => setIsDragging(true)}
@@ -482,22 +475,22 @@ export default function IntegratedCalendar() {
           onClick={() => setSelectedDate(null)}
         >
           <div
-            className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 overflow-hidden"
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-[#dbd6cf] overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+            <div className="px-6 py-5 bg-gradient-to-r from-[#faf8f5] to-white border-b border-[#dbd6cf]">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-xl font-bold text-[#314158]">
                     {format(new Date(selectedDate), "MMMM d, yyyy")}
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-[#6b7688] mt-1">
                     {format(new Date(selectedDate), "EEEE")}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedDate(null)}
-                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="p-2 rounded-xl text-[#8e99a8]/70 hover:text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)] transition-all duration-200 focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]"
                   aria-label="Close modal"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,7 +499,7 @@ export default function IntegratedCalendar() {
                 </button>
               </div>
             </div>
-            
+
             <div className="px-6 py-4 max-h-96 overflow-y-auto">
               <div className="space-y-3">
                 {(eventsByDate[selectedDate] ?? []).map((ev, idx) => {
@@ -514,9 +507,9 @@ export default function IntegratedCalendar() {
                     switch (source) {
                       case 'google':
                         return {
-                          container: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
-                          dot: 'bg-blue-500',
-                          badge: 'bg-blue-100 text-blue-700 border-blue-200'
+                          container: 'bg-[#fdf8f6] border-[#dbd6cf] hover:bg-[#f5ede4]',
+                          dot: 'bg-[#fdf8f6]0',
+                          badge: 'bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]'
                         };
                       case 'todoist':
                         return {
@@ -532,7 +525,7 @@ export default function IntegratedCalendar() {
                         };
                     }
                   };
-                  
+
                   const getSourceLabel = (source: string) => {
                     switch (source) {
                       case 'google':
@@ -543,21 +536,21 @@ export default function IntegratedCalendar() {
                         return source;
                     }
                   };
-                  
+
                   const styles = getEventStyle(ev.source);
-                  
+
                   return (
                     <div key={idx} className={`p-4 rounded-xl border transition-all duration-200 ${styles.container}`}>
                       <div className="flex items-start space-x-3">
                         <div className={`w-3 h-3 rounded-full mt-1 ring-2 ring-white shadow-sm ${styles.dot}`} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 mb-2">{ev.title}</p>
+                          <p className="text-sm font-semibold text-[#314158] mb-2">{ev.title}</p>
                           <div className="flex items-center flex-wrap gap-2">
                             <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${styles.badge}`}>
                               {getSourceLabel(ev.source)}
                             </span>
                             {ev.time && (
-                              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
+                              <span className="text-xs font-medium text-[#6b7688] bg-[rgba(183,148,106,0.08)] px-2.5 py-1 rounded-full">
                                 {ev.allDay ? "All day" : format(new Date(ev.time), "h:mm a")}
                               </span>
                             )}
@@ -569,11 +562,11 @@ export default function IntegratedCalendar() {
                 })}
                 {(eventsByDate[selectedDate]?.length ?? 0) === 0 && (
                   <div className="text-center py-8">
-                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-12 h-12 text-[#b8b0a8] mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <p className="text-sm text-gray-500 font-medium">No events scheduled</p>
-                    <p className="text-xs text-gray-400 mt-1">This day is completely free</p>
+                    <p className="text-sm text-[#8e99a8] font-medium">No events scheduled</p>
+                    <p className="text-xs text-[#8e99a8]/70 mt-1">This day is completely free</p>
                   </div>
                 )}
               </div>

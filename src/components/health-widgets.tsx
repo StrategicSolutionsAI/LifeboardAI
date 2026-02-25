@@ -59,8 +59,8 @@ export function HealthWidgets() {
       value: "40",
       unit: "oz",
       icon: Droplets,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100"
+      color: "text-[#9a7b5a]",
+      bgColor: "bg-[#f5ede4]"
     },
     {
       id: "exercise",
@@ -134,10 +134,10 @@ export function HealthWidgets() {
             <Card key={metric.id} className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">{metric.title}</p>
+                  <p className="text-xs font-medium text-[#8e99a8] mb-1">{metric.title}</p>
                   <div className="flex items-baseline space-x-1">
-                    <span className="text-lg font-semibold text-gray-900">{metric.value}</span>
-                    {metric.unit && <span className="text-xs text-gray-500">{metric.unit}</span>}
+                    <span className="text-lg font-semibold text-[#314158]">{metric.value}</span>
+                    {metric.unit && <span className="text-xs text-[#8e99a8]">{metric.unit}</span>}
                   </div>
                 </div>
                 <div className={`w-10 h-10 rounded-lg ${metric.bgColor} flex items-center justify-center`}>
@@ -150,15 +150,15 @@ export function HealthWidgets() {
       </div>
 
       {/* Sub Navigation */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="flex border-b border-gray-200">
+      <div className="bg-white rounded-lg border border-[#dbd6cf]">
+        <div className="flex border-b border-[#dbd6cf]">
           {subTabs.map((tab) => (
             <button
               key={tab.id}
               className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                 tab.active
-                  ? 'border-blue-600 text-blue-600 bg-blue-50'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-[#bb9e7b] text-[#9a7b5a] bg-[#fdf8f6]'
+                  : 'border-transparent text-[#8e99a8] hover:text-[#4a5568]'
               }`}
             >
               {tab.name}
@@ -170,11 +170,11 @@ export function HealthWidgets() {
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">View</span>
-              <span className="text-sm font-medium text-gray-900">4,783</span>
+              <span className="text-sm text-[#8e99a8]">View</span>
+              <span className="text-sm font-medium text-[#314158]">4,783</span>
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             </div>
-            <select aria-label="Time range" className="text-sm text-gray-600 border-none bg-transparent">
+            <select aria-label="Time range" className="text-sm text-[#6b7688] border-none bg-transparent">
               <option>Yearly</option>
               <option>Monthly</option>
               <option>Weekly</option>
@@ -182,14 +182,14 @@ export function HealthWidgets() {
           </div>
 
           {/* Chart Placeholder */}
-          <div className="h-64 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg flex items-center justify-center relative overflow-hidden">
+          <div className="h-64 bg-gradient-to-br from-[#fdf8f6] to-purple-50 rounded-lg flex items-center justify-center relative overflow-hidden">
             {/* Simulated Chart Background */}
             <div className="absolute inset-0">
               <svg viewBox="0 0 400 200" className="w-full h-full">
                 {/* Grid Lines */}
                 <defs>
                   <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" strokeWidth="1"/>
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ebe5de" strokeWidth="1"/>
                   </pattern>
                 </defs>
                 <rect width="100%" height="100%" fill="url(#grid)" />
@@ -198,7 +198,7 @@ export function HealthWidgets() {
                 <path
                   d="M 40 160 Q 80 140 120 120 T 200 100 T 280 80 Q 320 70 360 60"
                   fill="none"
-                  stroke="#3b82f6"
+                  stroke="#bb9e7b"
                   strokeWidth="3"
                   strokeLinecap="round"
                 />
@@ -206,25 +206,25 @@ export function HealthWidgets() {
                 {/* Area under curve */}
                 <path
                   d="M 40 160 Q 80 140 120 120 T 200 100 T 280 80 Q 320 70 360 60 L 360 200 L 40 200 Z"
-                  fill="url(#blueGradient)"
+                  fill="url(#warmGradient)"
                   opacity="0.2"
                 />
                 
                 <defs>
-                  <linearGradient id="blueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{stopColor:"#3b82f6", stopOpacity:0.4}} />
-                    <stop offset="100%" style={{stopColor:"#3b82f6", stopOpacity:0.1}} />
+                  <linearGradient id="warmGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style={{stopColor:"#bb9e7b", stopOpacity:0.4}} />
+                    <stop offset="100%" style={{stopColor:"#bb9e7b", stopOpacity:0.1}} />
                   </linearGradient>
                 </defs>
 
                 {/* Data Point */}
-                <circle cx="200" cy="100" r="4" fill="#3b82f6" />
-                <circle cx="200" cy="100" r="8" fill="#3b82f6" opacity="0.2" />
+                <circle cx="200" cy="100" r="4" fill="#bb9e7b" />
+                <circle cx="200" cy="100" r="8" fill="#bb9e7b" opacity="0.2" />
               </svg>
             </div>
 
             {/* Month Labels */}
-            <div className="absolute bottom-4 left-6 right-6 flex justify-between text-xs text-gray-400">
+            <div className="absolute bottom-4 left-6 right-6 flex justify-between text-xs text-[#8e99a8]">
               <span>Jan</span>
               <span>Feb</span>
               <span>Mar</span>
@@ -240,7 +240,7 @@ export function HealthWidgets() {
             </div>
 
             {/* Y-axis labels */}
-            <div className="absolute left-2 top-4 bottom-4 flex flex-col justify-between text-xs text-gray-400">
+            <div className="absolute left-2 top-4 bottom-4 flex flex-col justify-between text-xs text-[#8e99a8]">
               <span>10k</span>
               <span>8k</span>
               <span>6k</span>
@@ -251,41 +251,41 @@ export function HealthWidgets() {
           </div>
 
           {/* Chart Stats */}
-          <div className="grid grid-cols-5 gap-4 mt-6 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-5 gap-4 mt-6 pt-6 border-t border-[#dbd6cf]">
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">STARTING WEIGHT</p>
-              <p className="text-sm font-semibold text-gray-900">155 lbs</p>
+              <p className="text-xs text-[#8e99a8] mb-1">STARTING WEIGHT</p>
+              <p className="text-sm font-semibold text-[#314158]">155 lbs</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">CURRENT WEIGHT</p>
-              <p className="text-sm font-semibold text-gray-900">150 lbs</p>
+              <p className="text-xs text-[#8e99a8] mb-1">CURRENT WEIGHT</p>
+              <p className="text-sm font-semibold text-[#314158]">150 lbs</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">GOAL WEIGHT</p>
-              <p className="text-sm font-semibold text-gray-900">145 lbs</p>
+              <p className="text-xs text-[#8e99a8] mb-1">GOAL WEIGHT</p>
+              <p className="text-sm font-semibold text-[#314158]">145 lbs</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">WEIGHT LOSS</p>
-              <p className="text-sm font-semibold text-gray-900">-5 lbs</p>
+              <p className="text-xs text-[#8e99a8] mb-1">WEIGHT LOSS</p>
+              <p className="text-sm font-semibold text-[#314158]">-5 lbs</p>
             </div>
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">GOAL DATE</p>
-              <p className="text-sm font-semibold text-gray-900">February 3, 2024</p>
+              <p className="text-xs text-[#8e99a8] mb-1">GOAL DATE</p>
+              <p className="text-sm font-semibold text-[#314158]">February 3, 2024</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Chat/Input Area */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-white rounded-lg border border-[#dbd6cf] p-4">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+          <div className="w-8 h-8 bg-[#bb9e7b] rounded-full flex items-center justify-center text-white text-sm font-medium">
             AI
           </div>
-          <div className="flex-1 bg-gray-50 rounded-lg px-4 py-2 text-sm text-gray-500">
+          <div className="flex-1 bg-[#faf8f5] rounded-lg px-4 py-2 text-sm text-[#8e99a8]">
             Ask me anything
           </div>
-          <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+          <Button size="sm" className="bg-[#bb9e7b] hover:bg-[#9a7b5a]">
             ADD TASK
           </Button>
         </div>
@@ -294,13 +294,13 @@ export function HealthWidgets() {
       {/* Add Widget Card */}
       <Sheet open={isWidgetLibraryOpen} onOpenChange={setIsWidgetLibraryOpen}>
         <SheetTrigger asChild>
-          <Card className="border-2 border-dashed border-gray-300 hover:border-blue-500 cursor-pointer transition-colors group">
+          <Card className="border-2 border-dashed border-[#dbd6cf] hover:border-[#bb9e7b] cursor-pointer transition-colors group">
             <CardContent className="flex flex-col items-center justify-center p-8 min-h-[200px]">
-              <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mb-4 transition-colors">
-                <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+              <div className="w-12 h-12 rounded-full bg-[#f5f0eb] group-hover:bg-[#f5ede4] flex items-center justify-center mb-4 transition-colors">
+                <Plus className="w-6 h-6 text-[#8e99a8] group-hover:text-[#9a7b5a] transition-colors" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Add Widget</h3>
-              <p className="text-sm text-gray-500 text-center">
+              <h3 className="font-semibold text-[#314158] mb-2">Add Widget</h3>
+              <p className="text-sm text-[#8e99a8] text-center">
                 Choose from our library of widgets to track what matters most
               </p>
             </CardContent>
@@ -321,7 +321,7 @@ export function HealthWidgets() {
       <Sheet open={nutritionModalOpen} onOpenChange={setNutritionModalOpen}>
         <SheetContent side="right" className="w-[600px] sm:w-[700px] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="text-indigo-950">Daily Nutrition Tracker</SheetTitle>
+            <SheetTitle className="text-[#314158]">Daily Nutrition Tracker</SheetTitle>
             <SheetDescription>
               Track your daily meals and nutrition goals
             </SheetDescription>

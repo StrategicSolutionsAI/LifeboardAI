@@ -92,7 +92,7 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
         </CardHeader>
         <CardContent className="p-5">
           {isLoading ? (
-            <p className="text-sm text-gray-500">Loading integrations...</p>
+            <p className="text-sm text-[#8e99a8]">Loading integrations...</p>
           ) : (
             <div className="space-y-6">
               {/* Google Calendar Integration */}
@@ -109,8 +109,8 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
                 {hasGoogleCalendar ? (
                   <CalendarEvents maxEvents={3} />
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-500 mb-3">Connect your Google Calendar to sync events</p>
+                  <div className="flex flex-col items-center justify-center p-6 bg-[#faf8f5] rounded-md">
+                    <p className="text-sm text-[#8e99a8] mb-3">Connect your Google Calendar to sync events</p>
                     <Button 
                       onClick={connectGoogleCalendar}
                       className="bg-[#5271F8] hover:bg-[#4060E8] text-white"
@@ -136,11 +136,11 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
                 </div>
 
                 {hasWithings ? (
-                  <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-md">
+                  <div className="flex flex-col items-center justify-center p-6 bg-[#faf8f5] rounded-md">
                     {withingsWeight ? (
-                      <p className="text-sm text-gray-700">Latest weight: <span className="font-medium">{withingsWeight} lbs</span></p>
+                      <p className="text-sm text-[#4a5568]">Latest weight: <span className="font-medium">{withingsWeight} lbs</span></p>
                     ) : (
-                      <p className="text-sm text-gray-500">Fetching latest weight...</p>
+                      <p className="text-sm text-[#8e99a8]">Fetching latest weight...</p>
                     )}
                     <Button 
                       onClick={() => {
@@ -163,8 +163,8 @@ export function ConnectedIntegrations({ className }: ConnectedIntegrationsProps)
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-500 mb-3">Connect your Withings smart scale to see weight data</p>
+                  <div className="flex flex-col items-center justify-center p-6 bg-[#faf8f5] rounded-md">
+                    <p className="text-sm text-[#8e99a8] mb-3">Connect your Withings smart scale to see weight data</p>
                     <Button 
                       onClick={connectWithings}
                       className="bg-[#5271F8] hover:bg-[#4060E8] text-white"

@@ -191,7 +191,7 @@ export default function WidgetTrendChart({
   }
 
   return (
-    <Card className="w-full max-w-md hover:shadow-md transition-shadow">
+    <Card className="w-full max-w-md hover:shadow-warm transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium">{name}</CardTitle>
@@ -232,7 +232,7 @@ export default function WidgetTrendChart({
             </Badge>
           )}
           {analysis.trend === 'stable' && (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5">
+            <Badge variant="secondary" className="bg-[#f5ede4] text-[#9a7b5a] text-xs px-1.5 py-0.5">
               <Minus className="w-2.5 h-2.5 mr-1" />
               Stable
             </Badge>

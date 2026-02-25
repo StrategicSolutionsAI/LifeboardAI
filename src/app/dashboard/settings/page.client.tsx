@@ -1,13 +1,123 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square, ChevronDown, X } from 'lucide-react'
 import { ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 import { SidebarLayout } from '@/components/sidebar-layout'
 import { getUserPreferencesClient, saveUserPreferences, UserPreferences } from '@/lib/user-preferences'
 import { invalidateBucketColorCache } from '@/lib/bucket-colors'
+
+/** Curated palette from the Calidoraplanner-codex design system */
+const PALETTE_COLORS = [
+  { hex: '#B1916A', label: 'Warm Brown' },
+  { hex: '#bb9e7b', label: 'Calidora Sand' },
+  { hex: '#dbd6cf', label: 'Warm Border' },
+  { hex: '#C4A44E', label: 'Golden' },
+  { hex: '#d97706', label: 'Amber' },
+  { hex: '#7d6349', label: 'Cedar' },
+  { hex: '#48B882', label: 'Green' },
+  { hex: '#4AADE0', label: 'Sky Blue' },
+  { hex: '#596881', label: 'Slate' },
+  { hex: '#8B7FD4', label: 'Plum' },
+  { hex: '#D07AA4', label: 'Rose' },
+  { hex: '#d62a9a', label: 'Magenta' },
+  { hex: '#030213', label: 'Navy' },
+  { hex: '#314158', label: 'Dark Slate' },
+  { hex: '#8e99a8', label: 'Muted Gray' },
+  { hex: '#faf8f5', label: 'Warm White' },
+]
+
+function PaletteSwatches({ value, onSelect }: { value: string; onSelect: (hex: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {PALETTE_COLORS.map(({ hex, label }) => (
+        <button
+          key={hex}
+          type="button"
+          title={`${label} (${hex})`}
+          onClick={() => onSelect(hex)}
+          className={cn(
+            'w-6 h-6 rounded-full border-2 transition-all hover:scale-110',
+            value.toLowerCase() === hex.toLowerCase()
+              ? 'border-theme-primary ring-2 ring-theme-primary/30 scale-110'
+              : 'border-[#dbd6cf] hover:border-[#b7946a]'
+          )}
+          style={{ backgroundColor: hex }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** Compact popover for picking a bucket color from the palette */
+function BucketColorPicker({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-3 py-2 border border-[#dbd6cf] rounded-lg bg-white hover:bg-[#faf8f5] transition-colors"
+      >
+        <div className="w-6 h-6 rounded-full border border-[#dbd6cf]" style={{ backgroundColor: value }} />
+        <span className="text-xs font-mono text-[#596881] uppercase">{value}</span>
+        <ChevronDown className={cn("w-3.5 h-3.5 text-[#8e99a8] transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-50 bg-white rounded-xl border border-[#dbd6cf] shadow-[0px_8px_24px_rgba(163,133,96,0.12)] p-3 w-[220px]">
+          <p className="text-[11px] font-medium text-[#8e99a8] uppercase tracking-wider mb-2">Pick a Color</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {PALETTE_COLORS.map(({ hex, label }) => (
+              <button
+                key={hex}
+                type="button"
+                title={`${label} (${hex})`}
+                onClick={() => { onChange(hex); setOpen(false) }}
+                className={cn(
+                  'w-7 h-7 rounded-full border-2 transition-all hover:scale-110',
+                  value.toLowerCase() === hex.toLowerCase()
+                    ? 'border-theme-primary ring-2 ring-theme-primary/30 scale-110'
+                    : 'border-[#dbd6cf] hover:border-[#b7946a]'
+                )}
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2 items-center border-t border-[#dbd6cf]/50 pt-2">
+            <input
+              type="color"
+              value={value}
+              onChange={(e) => { onChange(e.target.value) }}
+              className="w-8 h-8 border border-[#dbd6cf] rounded cursor-pointer shrink-0"
+              title="Choose a custom color"
+            />
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#6B7280"
+              className="flex-1 px-2 py-1 text-xs font-mono border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function SettingsPageClient() {
   const [mounted, setMounted] = useState(false)
@@ -46,7 +156,7 @@ export default function SettingsPageClient() {
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
   const [editingTheme, setEditingTheme] = useState<ThemeColor | null>(null)
   const [customThemeName, setCustomThemeName] = useState('')
-  const [customPrimary, setCustomPrimary] = useState('#8491FF')
+  const [customPrimary, setCustomPrimary] = useState('#B1916A')
   const [customSecondary, setCustomSecondary] = useState('#9CA3FF')
   const [customAccent, setCustomAccent] = useState('#B4BAFF')
   const [allThemes, setAllThemes] = useState<ThemeColor[]>(getAllThemes())
@@ -93,7 +203,7 @@ export default function SettingsPageClient() {
 
   const resetForm = () => {
     setCustomThemeName('')
-    setCustomPrimary('#8491FF')
+    setCustomPrimary('#B1916A')
     setCustomSecondary('#9CA3FF')
     setCustomAccent('#B4BAFF')
     setShowCustomColorForm(false)
@@ -138,232 +248,239 @@ export default function SettingsPageClient() {
   return (
     <SidebarLayout>
       <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
+        {/* ── Page header ─────────────────────────────────── */}
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <Settings className="w-6 h-6 text-gray-600" />
+          <Settings className="w-6 h-6 text-[#8e99a8]" />
           <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
         </div>
 
         <div className="space-y-8">
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
+
+          {/* ── Account ────────────────────────────────────── */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-[0px_4px_16px_rgba(163,133,96,0.06)] border border-[#dbd6cf]">
             <h2 className="text-xl font-semibold mb-4">Account Settings</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-4 bg-[#faf8f5] rounded-lg">
                 <div>
                   <h3 className="font-medium">Profile Information</h3>
-                  <p className="text-sm text-gray-500">Update your name, email, and other account details</p>
+                  <p className="text-sm text-[#8e99a8]">Update your name, email, and other account details</p>
                 </div>
-                <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md">Edit Profile</button>
+                <button className="px-4 py-2 text-sm font-medium text-warm-600 hover:bg-warm-50 rounded-md transition-colors">Edit Profile</button>
               </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-[#faf8f5] rounded-lg">
                 <div>
                   <h3 className="font-medium">Change Password</h3>
-                  <p className="text-sm text-gray-500">Update your account password</p>
+                  <p className="text-sm text-[#8e99a8]">Update your account password</p>
                 </div>
-                <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md">Change Password</button>
+                <button className="px-4 py-2 text-sm font-medium text-warm-600 hover:bg-warm-50 rounded-md transition-colors">Change Password</button>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
+          {/* ── Appearance ─────────────────────────────────── */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-[0px_4px_16px_rgba(163,133,96,0.06)] border border-[#dbd6cf]">
             <div className="flex items-center gap-3 mb-6">
-              <Palette className="w-5 h-5 text-gray-600" />
+              <Palette className="w-5 h-5 text-[#8e99a8]" />
               <div>
                 <h2 className="text-xl font-semibold">Appearance</h2>
-                <p className="text-gray-500">Customize your theme and color preferences</p>
+                <p className="text-[#8e99a8] text-sm">Customize your theme and color preferences</p>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium mb-4">Theme Colors</h3>
-                <p className="text-sm text-gray-500 mb-4">Choose a color scheme that matches your style</p>
+            {/* ── Theme grid (compact 2-col) ── */}
+            <div>
+              <h3 className="text-sm font-medium text-[#314158] uppercase tracking-wider mb-3">Theme Colors</h3>
 
-                <div className="grid grid-cols-1 gap-3">
-                  {allThemes.map((colorTheme) => (
-                    <div
-                      key={colorTheme.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setTheme(colorTheme)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setTheme(colorTheme) } }}
-                      className={cn(
-                        "w-full p-4 rounded-lg border-2 transition-all text-left cursor-pointer",
-                        theme.id === colorTheme.id
-                          ? "border-theme-primary bg-theme-primary bg-opacity-10"
-                          : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {allThemes.map((colorTheme) => (
+                  <div
+                    key={colorTheme.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setTheme(colorTheme)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setTheme(colorTheme) } }}
+                    className={cn(
+                      "group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer",
+                      theme.id === colorTheme.id
+                        ? "border-theme-primary bg-[rgba(183,148,106,0.06)]"
+                        : "border-transparent bg-[#faf8f5] hover:border-[#dbd6cf]"
+                    )}
+                  >
+                    {/* Color dots stacked */}
+                    <div className="flex gap-0.5 shrink-0">
+                      <div className="w-5 h-5 rounded-full border border-[#dbd6cf]" style={{ backgroundColor: colorTheme.primary }} />
+                      <div className="w-5 h-5 rounded-full border border-[#dbd6cf]" style={{ backgroundColor: colorTheme.secondary }} />
+                      <div className="w-5 h-5 rounded-full border border-[#dbd6cf]" style={{ backgroundColor: colorTheme.accent }} />
+                    </div>
+
+                    {/* Label */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium text-[#171A1F] truncate">{colorTheme.name}</span>
+                        {colorTheme.isCustom && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-100 rounded-full leading-none">Custom</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#8e99a8] truncate">{colorTheme.description}</p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {colorTheme.isCustom && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditTheme(colorTheme) }} className="p-1 text-warm-400 hover:text-warm-700 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteCustomTheme(colorTheme.id) }} className="p-1 text-red-400 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex gap-1">
-                            <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: colorTheme.primary }} />
-                            <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: colorTheme.secondary }} />
-                            <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: colorTheme.accent }} />
-                          </div>
-                          <div>
-                            <h4 className="text-[16px] font-medium text-[#171A1F]">
-                              {colorTheme.name}
-                              {colorTheme.isCustom && (
-                                <span className="ml-2 px-2 py-0.5 text-xs font-medium text-purple-600 bg-purple-100 rounded-full">Custom</span>
-                              )}
-                            </h4>
-                            <p className="text-[14px] text-[#6B7280]">{colorTheme.description}</p>
-                          </div>
+                      {theme.id === colorTheme.id && (
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-theme-primary">
+                          <Check className="w-3 h-3 text-white" />
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          {colorTheme.isCustom && (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); handleEditTheme(colorTheme) }} className="p-1 text-blue-500 hover:text-blue-700" title="Edit custom theme">
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteCustomTheme(colorTheme.id) }} className="p-1 text-red-500 hover:text-red-700" title="Delete custom theme">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          {theme.id === colorTheme.id && (
-                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-theme-primary">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <button onClick={() => setShowCustomColorForm(!showCustomColorForm)} className="w-full p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-theme-primary transition-all text-left bg-gray-50 hover:bg-gray-100">
-                    <div className="flex items-center justify-center gap-2 text-gray-600 hover:text-theme-primary">
-                      <Plus className="w-5 h-5" />
-                      <span className="font-medium">Create Custom Theme</span>
-                    </div>
-                  </button>
-                </div>
-
-                {showCustomColorForm && (
-                  <div className="mt-6 p-4 sm:p-6 bg-gray-50 rounded-lg border">
-                    <h4 className="text-lg font-medium mb-4">{editingTheme ? 'Edit Custom Theme' : 'Create Custom Theme'}</h4>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Theme Name</label>
-                        <input type="text" value={customThemeName} onChange={(e) => setCustomThemeName(e.target.value)} placeholder="My Awesome Theme" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent" />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Primary Color</label>
-                          <div className="flex gap-2 items-center">
-                            <input type="color" title="Choose primary color" value={customPrimary} onChange={(e) => setCustomPrimary(e.target.value)} className="w-12 h-10 border border-gray-300 rounded cursor-pointer" />
-                            <input type="text" placeholder="#8491FF" value={customPrimary} onChange={(e) => setCustomPrimary(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Color</label>
-                          <div className="flex gap-2 items-center">
-                            <input type="color" title="Choose secondary color" value={customSecondary} onChange={(e) => setCustomSecondary(e.target.value)} className="w-12 h-10 border border-gray-300 rounded cursor-pointer" />
-                            <input type="text" placeholder="#9CA3FF" value={customSecondary} onChange={(e) => setCustomSecondary(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Accent Color</label>
-                          <div className="flex gap-2 items-center">
-                            <input type="color" title="Choose accent color" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} className="w-12 h-10 border border-gray-300 rounded cursor-pointer" />
-                            <input type="text" placeholder="#B4BAFF" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 p-4 bg-white rounded-lg border">
-                        <h5 className="text-sm font-medium text-gray-700 mb-3">Preview</h5>
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: customPrimary }}>Primary</div>
-                          <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: customSecondary }}>Secondary</div>
-                          <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: customAccent }}>Accent</div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3 pt-4">
-                        <button onClick={handleFormSubmit} disabled={!customThemeName.trim()} className="px-4 py-2 bg-theme-primary text-white rounded-md hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                          {editingTheme ? 'Update Theme' : 'Create Theme'}
-                        </button>
-                        <button onClick={resetForm} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">Cancel</button>
-                      </div>
+                      )}
                     </div>
                   </div>
-                )}
+                ))}
+              </div>
 
-                <div className="flex flex-col gap-3 mt-6 p-4 bg-[#F9FAFB] rounded-lg border">
-                  <h4 className="text-[16px] font-medium text-[#171A1F]">Preview</h4>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: theme.primary }}>Primary Button</div>
-                    <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: theme.secondary }}>Secondary</div>
-                    <div className="px-4 py-2 rounded-full text-white text-sm font-medium" style={{ backgroundColor: theme.accent }}>Accent</div>
+              {/* Create Custom Theme trigger */}
+              <button
+                onClick={() => setShowCustomColorForm(!showCustomColorForm)}
+                className={cn(
+                  "w-full mt-3 p-3 rounded-lg border-2 border-dashed transition-all text-center",
+                  showCustomColorForm
+                    ? "border-theme-primary bg-[rgba(183,148,106,0.06)]"
+                    : "border-[#dbd6cf] hover:border-theme-primary bg-[#faf8f5] hover:bg-[rgba(183,148,106,0.06)]"
+                )}
+              >
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  {showCustomColorForm ? <X className="w-4 h-4 text-theme-primary" /> : <Plus className="w-4 h-4 text-[#8e99a8]" />}
+                  <span className={cn("font-medium", showCustomColorForm ? "text-theme-primary" : "text-[#8e99a8]")}>
+                    {showCustomColorForm ? 'Close' : 'Create Custom Theme'}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {/* ── Custom theme form ── */}
+            {showCustomColorForm && (
+              <div className="mt-4 p-4 sm:p-5 bg-[#faf8f5] rounded-lg border border-[#dbd6cf]">
+                <h4 className="text-base font-medium mb-4">{editingTheme ? 'Edit Custom Theme' : 'Create Custom Theme'}</h4>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#314158] mb-1.5">Theme Name</label>
+                    <input type="text" value={customThemeName} onChange={(e) => setCustomThemeName(e.target.value)} placeholder="My Awesome Theme" className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent bg-white" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[#314158] mb-1.5">Primary Color</label>
+                      <div className="flex gap-2 items-center">
+                        <input type="color" title="Choose primary color" value={customPrimary} onChange={(e) => setCustomPrimary(e.target.value)} className="w-10 h-9 border border-[#dbd6cf] rounded cursor-pointer" />
+                        <input type="text" placeholder="#B1916A" value={customPrimary} onChange={(e) => setCustomPrimary(e.target.value)} className="flex-1 px-3 py-1.5 text-sm border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent bg-white font-mono" />
+                      </div>
+                      <PaletteSwatches value={customPrimary} onSelect={setCustomPrimary} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#314158] mb-1.5">Secondary Color</label>
+                      <div className="flex gap-2 items-center">
+                        <input type="color" title="Choose secondary color" value={customSecondary} onChange={(e) => setCustomSecondary(e.target.value)} className="w-10 h-9 border border-[#dbd6cf] rounded cursor-pointer" />
+                        <input type="text" placeholder="#9CA3FF" value={customSecondary} onChange={(e) => setCustomSecondary(e.target.value)} className="flex-1 px-3 py-1.5 text-sm border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent bg-white font-mono" />
+                      </div>
+                      <PaletteSwatches value={customSecondary} onSelect={setCustomSecondary} />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#314158] mb-1.5">Accent Color</label>
+                      <div className="flex gap-2 items-center">
+                        <input type="color" title="Choose accent color" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} className="w-10 h-9 border border-[#dbd6cf] rounded cursor-pointer" />
+                        <input type="text" placeholder="#B4BAFF" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} className="flex-1 px-3 py-1.5 text-sm border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent bg-white font-mono" />
+                      </div>
+                      <PaletteSwatches value={customAccent} onSelect={setCustomAccent} />
+                    </div>
+                  </div>
+
+                  {/* Live preview */}
+                  <div className="p-3 bg-white rounded-lg border border-[#dbd6cf]/50">
+                    <p className="text-xs font-medium text-[#8e99a8] uppercase tracking-wider mb-2">Preview</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="px-3 py-1.5 rounded-full text-white text-xs font-medium" style={{ backgroundColor: customPrimary }}>Primary</div>
+                      <div className="px-3 py-1.5 rounded-full text-white text-xs font-medium" style={{ backgroundColor: customSecondary }}>Secondary</div>
+                      <div className="px-3 py-1.5 rounded-full text-white text-xs font-medium" style={{ backgroundColor: customAccent }}>Accent</div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={handleFormSubmit} disabled={!customThemeName.trim()} className="px-4 py-2 text-sm bg-theme-primary text-white rounded-md hover:bg-theme-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      {editingTheme ? 'Update Theme' : 'Create Theme'}
+                    </button>
+                    <button onClick={resetForm} className="px-4 py-2 text-sm border border-[#dbd6cf] text-[#314158] rounded-md hover:bg-white transition-colors">Cancel</button>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* ── Active theme preview (only shown when custom form is closed) ── */}
+            {!showCustomColorForm && (
+              <div className="flex items-center gap-3 mt-4 p-3 bg-[#faf8f5] rounded-lg border border-[#dbd6cf]/50">
+                <span className="text-xs font-medium text-[#8e99a8] uppercase tracking-wider shrink-0">Active:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="px-3 py-1 rounded-full text-white text-xs font-medium" style={{ backgroundColor: theme.primary }}>Primary</div>
+                  <div className="px-3 py-1 rounded-full text-white text-xs font-medium" style={{ backgroundColor: theme.secondary }}>Secondary</div>
+                  <div className="px-3 py-1 rounded-full text-white text-xs font-medium" style={{ backgroundColor: theme.accent }}>Accent</div>
+                </div>
+                <span className="text-xs text-[#596881] ml-auto hidden sm:block">{theme.name}</span>
+              </div>
+            )}
           </div>
 
+          {/* ── Bucket Colors ──────────────────────────────── */}
           {((userPreferences && userPreferences.life_buckets.length > 0) || true) && (
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
-              <div className="flex items-center gap-3 mb-6">
-                <Square className="w-5 h-5 text-gray-600" />
+            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-[0px_4px_16px_rgba(163,133,96,0.06)] border border-[#dbd6cf]">
+              <div className="flex items-center gap-3 mb-5">
+                <Square className="w-5 h-5 text-[#8e99a8]" />
                 <div>
                   <h2 className="text-xl font-semibold">Bucket Colors</h2>
-                  <p className="text-gray-500">Customize the colors for your life buckets</p>
+                  <p className="text-sm text-[#8e99a8]">Customize the colors for your life buckets</p>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {(userPreferences?.life_buckets || ['Health', 'Work', 'Personal', 'Finance']).map((bucket) => (
-                  <div key={bucket} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div key={bucket} className="flex items-center justify-between p-3 bg-[#faf8f5] rounded-lg">
                     <div className="flex items-center gap-3">
                       <div
-                        className="w-6 h-6 rounded-full border border-gray-200"
+                        className="w-4 h-4 rounded-full shrink-0"
                         style={{ backgroundColor: bucketColors[bucket] || getDefaultBucketColor() }}
                       />
-                      <div>
-                        <h3 className="font-medium">{bucket}</h3>
-                        <p className="text-sm text-gray-500">Change the color for this bucket</p>
-                      </div>
+                      <span className="font-medium text-sm">{bucket}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={bucketColors[bucket] || getDefaultBucketColor()}
-                        onChange={(e) => handleBucketColorChange(bucket, e.target.value)}
-                        className="w-10 h-10 border border-gray-300 rounded cursor-pointer"
-                        title={`Choose color for ${bucket}`}
-                      />
-                      <input
-                        type="text"
-                        value={bucketColors[bucket] || getDefaultBucketColor()}
-                        onChange={(e) => handleBucketColorChange(bucket, e.target.value)}
-                        placeholder="#6B7280"
-                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent"
-                      />
-                    </div>
+                    <BucketColorPicker
+                      value={bucketColors[bucket] || getDefaultBucketColor()}
+                      onChange={(hex) => handleBucketColorChange(bucket, hex)}
+                    />
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border">
+          {/* ── Advanced / Danger Zone ─────────────────────── */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-[0px_4px_16px_rgba(163,133,96,0.06)] border border-[#dbd6cf]">
             <h2 className="text-xl font-semibold mb-4">Advanced Settings</h2>
-            <div className="space-y-4">
-              <div className="flex items-start p-4 bg-yellow-50 border border-yellow-100 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
-                <div>
-                  <h3 className="font-medium text-yellow-800">Danger Zone</h3>
-                  <p className="text-sm text-yellow-700 mb-3">These actions are irreversible. Please proceed with caution.</p>
-                  <div className="flex gap-3">
-                    <button className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-md transition-colors">Delete Account</button>
-                    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 rounded-md transition-colors">Export Data</button>
-                  </div>
+            <div className="flex items-start p-4 bg-yellow-50 border border-yellow-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h3 className="font-medium text-yellow-800">Danger Zone</h3>
+                <p className="text-sm text-yellow-700 mb-3">These actions are irreversible. Please proceed with caution.</p>
+                <div className="flex gap-3">
+                  <button className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-md transition-colors">Delete Account</button>
+                  <button className="px-4 py-2 text-sm font-medium text-[#314158] border border-[#dbd6cf] hover:bg-[#faf8f5] rounded-md transition-colors">Export Data</button>
                 </div>
               </div>
             </div>

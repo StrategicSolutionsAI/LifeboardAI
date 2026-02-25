@@ -39,7 +39,7 @@ export function GoogleCalendarStatus({ userId }: GoogleCalendarStatusProps) {
         <><CheckCircle className="h-4 w-4 text-green-500" /> <span className="text-green-600">Connected</span></>
       )}
       {status === 'disconnected' && (
-        <><XCircle className="h-4 w-4 text-gray-400" /> <span className="text-gray-500">Not connected</span></>
+        <><XCircle className="h-4 w-4 text-[#8e99a8]" /> <span className="text-[#8e99a8]">Not connected</span></>
       )}
     </div>
   );

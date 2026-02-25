@@ -570,13 +570,13 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
       >
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Schedule task</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-[#314158]">Schedule task</h3>
+            <p className="text-sm text-[#8e99a8] mt-1">
               {activePlannerDate} · {addModalSlot}
             </p>
           </div>
           <button
-            className="text-gray-400 hover:text-gray-600"
+            className="text-[#8e99a8]/70 hover:text-[#6b7688]"
             onClick={handleCancelCreation}
             aria-label="Close"
           >
@@ -591,12 +591,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           }}
           className="space-y-3"
         >
-          <label className="block text-xs text-gray-600 font-medium">
+          <label className="block text-xs text-[#6b7688] font-medium">
             <span className="block mb-1 uppercase tracking-wide">Start time</span>
             <select
               value={newTaskStart || addModalSlot || ''}
               onChange={(e) => setNewTaskStart(e.target.value)}
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
             >
               {TIME_SLOTS.map((slot) => (
                 <option key={slot} value={slot}>{slot}</option>
@@ -606,12 +606,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
 
           <div className="flex flex-col sm:flex-row gap-2">
             {availableBuckets.length > 0 && (
-              <label className="flex-1 text-xs text-gray-600 font-medium">
+              <label className="flex-1 text-xs text-[#6b7688] font-medium">
                 <span className="block mb-1 uppercase tracking-wide">Bucket</span>
                 <select
                   value={taskBucket}
                   onChange={(e) => setTaskBucket(e.target.value)}
-                  className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
                 >
                   {availableBuckets.map((bucket) => (
                     <option key={bucket} value={bucket}>{bucket}</option>
@@ -619,12 +619,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                 </select>
               </label>
             )}
-            <label className="w-full sm:w-40 text-xs text-gray-600 font-medium">
+            <label className="w-full sm:w-40 text-xs text-[#6b7688] font-medium">
               <span className="block mb-1 uppercase tracking-wide">Duration</span>
               <select
                 value={newTaskDuration}
                 onChange={(e) => setNewTaskDuration(parseInt(e.target.value, 10))}
-                className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
               >
                 {[15, 30, 45, 60, 90, 120].map((minutes) => (
                   <option key={minutes} value={minutes}>{minutes} min</option>
@@ -633,12 +633,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             </label>
           </div>
 
-          <label className="block text-xs text-gray-600 font-medium">
+          <label className="block text-xs text-[#6b7688] font-medium">
             <span className="block mb-1 uppercase tracking-wide">Repeat</span>
             <select
               value={newTaskRepeat}
               onChange={(e) => setNewTaskRepeat(e.target.value as RepeatOption)}
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
             >
               {REPEAT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -646,7 +646,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             </select>
           </label>
 
-          <label className="block text-xs text-gray-600 font-medium">
+          <label className="block text-xs text-[#6b7688] font-medium">
             <span className="block mb-1 uppercase tracking-wide">Task</span>
             <input
               type="text"
@@ -660,14 +660,14 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
               }}
               autoFocus
               placeholder="What needs to be done?"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded border border-[#dbd6cf] px-3 py-2 text-sm focus:border-[#bb9e7b] focus:outline-none"
             />
           </label>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+              className="px-3 py-1.5 text-sm text-[#6b7688] hover:text-gray-800"
               onClick={handleCancelCreation}
             >
               Cancel
@@ -675,7 +675,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             <button
               type="submit"
               disabled={!newTaskContent.trim() || isCreatingTask}
-              className="px-4 py-1.5 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-1.5 text-sm rounded bg-[#bb9e7b] text-white hover:bg-[#9a7b5a] disabled:opacity-50"
             >
               {isCreatingTask ? 'Adding…' : 'Add task'}
             </button>
@@ -700,12 +700,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
             {(provided, snapshot) => (
               <div
-                className={`relative flex items-start gap-4 border-gray-200 transition-colors h-[17px] group ${
+                className={`relative flex items-start gap-4 border-[#dbd6cf] transition-colors h-[17px] group ${
                   isMainHour 
                     ? 'border-t' 
-                    : hasTask ? 'group-hover:border-t group-hover:border-dashed group-hover:border-gray-300' : ''
+                    : hasTask ? 'group-hover:border-t group-hover:border-dashed group-hover:border-[#dbd6cf]' : ''
                 } ${index === 0 ? 'border-t-0' : ''} ${
-                  snapshot.isDraggingOver ? 'bg-indigo-50 border-indigo-200' : isCurrentSlot ? 'bg-indigo-50/70 border-indigo-100' : ''
+                  snapshot.isDraggingOver ? 'bg-[#fdf8f6] border-[#dbd6cf]' : isCurrentSlot ? 'bg-[#fdf8f6]/70 border-[#dbd6cf]/60' : ''
                 }`}
                 style={{ minHeight: SLOT_HEIGHT }}
                 onMouseEnter={() => handleSlotHover(timeSlot, true)}
@@ -715,11 +715,11 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                 <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
                   {isMainHour ? (
                     <>
-                      <span className={`text-sm font-medium leading-none ${timeSlot === currentHourDisplay ? 'text-indigo-600' : 'text-gray-900'}`}>
+                      <span className={`text-sm font-medium leading-none ${timeSlot === currentHourDisplay ? 'text-[#bb9e7b]' : 'text-[#314158]'}`}>
                         {timeSlot}
                       </span>
                       {timeSlot === currentHourDisplay ? (
-                        <span className="mt-0.5 inline-flex items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                        <span className="mt-0.5 inline-flex items-center rounded-full bg-[rgba(183,148,106,0.12)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#9a7b5a]">
                           Now
                         </span>
                       ) : (
@@ -743,11 +743,11 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   {effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) && (
                     <>
                       <div
-                        className="pointer-events-none absolute inset-0 rounded-lg border border-indigo-300/70 bg-indigo-50/60"
+                        className="pointer-events-none absolute inset-0 rounded-lg border border-[#dbd6cf]/70 bg-[#fdf8f6]/60"
                         style={{ zIndex: 0 }}
                       />
                       <div
-                        className="pointer-events-none absolute right-0 top-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-500"
+                        className="pointer-events-none absolute right-0 top-2 text-[11px] font-semibold uppercase tracking-wide text-[#bb9e7b]"
                         style={{ zIndex: 0 }}
                       >
                         {timeSlot}
@@ -806,13 +806,13 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                           }}
                           aria-label={`${t.content}. ${timeSlot} to ${endTime}`}
                           className={`group relative flex items-start gap-3 px-4 py-3 
-                            bg-white border border-gray-200 
-                            shadow-sm hover:shadow-md 
+                            bg-white border border-[#dbd6cf] 
+                            shadow-sm hover:shadow-warm 
                             rounded-xl transition-all duration-200 
                             cursor-grab active:cursor-grabbing
-                            hover:border-indigo-400 hover:bg-gray-50
-                            ${isDraggingNow ? 'shadow-lg rotate-1 scale-105 border-indigo-500 cursor-grabbing' : ''}
-                            ${resizingTask?.taskId === t.id ? 'ring-2 ring-indigo-200' : ''}
+                            hover:border-[#bb9e7b] hover:bg-[#faf8f5]
+                            ${isDraggingNow ? 'shadow-warm-lg rotate-1 scale-105 border-[#bb9e7b] cursor-grabbing' : ''}
+                            ${resizingTask?.taskId === t.id ? 'ring-2 ring-[#dbd6cf]' : ''}
                           `}
                         >
                           <div
@@ -843,7 +843,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                           >
                             {/* Enhanced status indicator with brand colors */}
                             <div className="flex-shrink-0 mt-1">
-                              <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full ring-2 ring-indigo-200" />
+                              <div className="w-2.5 h-2.5 bg-[#fdf8f6]0 rounded-full ring-2 ring-[#dbd6cf]" />
                             </div>
                             
                             <div className="flex flex-col w-full justify-center min-w-0">
@@ -851,9 +851,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               {taskDuration >= 45 ? (
                                 // Tall tasks: time on top, title below
                                 <>
-                                  <div className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 leading-tight tracking-wide">
+                                  <div className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-[#bb9e7b] leading-tight tracking-wide">
                                     <span>{timeSlot}</span>
-                                    <span className="text-[11px] font-medium text-gray-500">– {endTime}</span>
+                                    <span className="text-[11px] font-medium text-[#8e99a8]">– {endTime}</span>
                                   </div>
                                   {editingTaskId === t.id.toString() ? (
                                     <input
@@ -871,12 +871,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                       }}
                                       onBlur={handleSaveEdit}
                                       autoFocus
-                                      className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 w-full focus:outline-none focus:border-indigo-500"
+                                      className="font-semibold text-[#314158] text-sm leading-tight bg-white border border-[#dbd6cf] rounded px-1 py-0.5 w-full focus:outline-none focus:border-[#bb9e7b]"
                                       data-no-drag="true"
                                     />
                                   ) : (
                                     <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                      className="font-semibold text-[#314158] truncate text-sm leading-tight cursor-pointer hover:bg-[rgba(183,148,106,0.08)] rounded px-1 py-0.5 -mx-1 -my-0.5"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const taskId = t.id.toString();
@@ -904,9 +904,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               ) : (
                                 // Short tasks: time and title on same row
                                 <div className="flex items-center gap-2 w-full">
-                                  <div className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 leading-tight tracking-wide flex-shrink-0">
+                                  <div className="inline-flex items-center gap-1 text-xs font-medium text-[#bb9e7b] leading-tight tracking-wide flex-shrink-0">
                                     <span>{timeSlot}</span>
-                                    <span className="text-[11px] font-medium text-gray-500">– {endTime}</span>
+                                    <span className="text-[11px] font-medium text-[#8e99a8]">– {endTime}</span>
                                   </div>
                                   {editingTaskId === t.id.toString() ? (
                                     <input
@@ -924,12 +924,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                       }}
                                       onBlur={handleSaveEdit}
                                       autoFocus
-                                      className="font-semibold text-gray-900 text-sm leading-tight bg-white border border-indigo-300 rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-indigo-500"
+                                      className="font-semibold text-[#314158] text-sm leading-tight bg-white border border-[#dbd6cf] rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-[#bb9e7b]"
                                       data-no-drag="true"
                                     />
                                   ) : (
                                     <div 
-                                      className="font-semibold text-gray-900 truncate text-sm leading-tight flex-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                      className="font-semibold text-[#314158] truncate text-sm leading-tight flex-1 cursor-pointer hover:bg-[rgba(183,148,106,0.08)] rounded px-1 py-0.5 -mx-1 -my-0.5"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const taskId = t.id.toString();
@@ -980,18 +980,18 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               <div
                                 onMouseDown={(e) => startResize(e, timeSlot, t.id)}
                                 className="h-3 w-10 cursor-ns-resize 
-                                  bg-indigo-200 hover:bg-indigo-400 
+                                  bg-[#dbd6cf] hover:bg-[#bb9e7b] 
                                   rounded-full transition-all duration-200
                                   opacity-60 group-hover:opacity-100 hover:scale-110
                                   flex items-center justify-center shadow-sm"
                                 data-no-drag="true"
                               >
-                                <div className="w-3 h-0.5 bg-indigo-600 rounded-full" />
+                                <div className="w-3 h-0.5 bg-[#bb9e7b] rounded-full" />
                               </div>
                             </div>
                           )}
                           {isResizing && (
-                            <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white shadow-lg">
+                            <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 rounded-md bg-[#bb9e7b] px-2 py-1 text-[11px] font-semibold text-white shadow-warm-lg">
                               Ends {endTime}
                             </div>
                           )}
@@ -1013,7 +1013,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   >
                     <div className="w-16 shrink-0" />
                     <div className="flex items-center flex-1">
-                      <div className="w-3 h-3 bg-theme-primary rounded-full shadow-lg 
+                      <div className="w-3 h-3 bg-theme-primary rounded-full shadow-warm-lg 
                         ring-2 ring-blue-200 animate-pulse" />
                       <div className="flex-1 h-0.5 bg-theme-primary shadow-sm" />
                       <div className="px-2 py-1 bg-theme-primary text-white 

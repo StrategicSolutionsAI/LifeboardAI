@@ -61,8 +61,8 @@ const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> 
   green: "bg-green-500",
   red: "bg-red-500",
   orange: "bg-orange-500",
-  purple: "bg-purple-500",
-  indigo: "bg-indigo-500",
+  purple: "bg-amber-500",
+  indigo: "bg-warm-500",
   amber: "bg-amber-500",
   teal: "bg-teal-500",
   rose: "bg-rose-500",
@@ -73,7 +73,7 @@ const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> 
   violet: "bg-violet-500",
   lime: "bg-lime-500",
   fuchsia: "bg-fuchsia-500",
-  gray: "bg-gray-500",
+  gray: "bg-[#faf8f5]0",
   slate: "bg-slate-500",
   stone: "bg-stone-500",
 };
@@ -764,10 +764,10 @@ function ShoppingListLayout() {
           <p className="text-sm font-medium uppercase text-theme-primary">
             Shopping
           </p>
-          <h1 className="text-3xl font-semibold text-gray-900">
+          <h1 className="text-3xl font-semibold text-[#314158]">
             Shopping list
           </h1>
-          <p className="text-base text-gray-600">
+          <p className="text-base text-[#596881]">
             One streamlined list for everything you need, tagged with the same
             life buckets that organize your dashboard.
           </p>
@@ -776,14 +776,14 @@ function ShoppingListLayout() {
         <Card className="border-none bg-white shadow-sm">
           <CardHeader className="gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-xl font-semibold text-gray-900">
+              <CardTitle className="text-xl font-semibold text-[#314158]">
                 Quick add
               </CardTitle>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[#8e99a8]">
                 Capture an item and optionally tag it with a bucket.
               </p>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-[#8e99a8]">
               {loadingItems ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-theme-primary" />
@@ -791,7 +791,7 @@ function ShoppingListLayout() {
                 </span>
               ) : (
                 <>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-[#314158]">
                     {totalOpen}
                   </span>{" "}
                   items open
@@ -812,7 +812,7 @@ function ShoppingListLayout() {
               />
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                     Bucket
                   </label>
                   <select
@@ -822,7 +822,7 @@ function ShoppingListLayout() {
                         event.target.value === "" ? null : event.target.value,
                       )
                     }
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                    className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                     disabled={isCreating}
                   >
                     <option value="">Unsorted</option>
@@ -834,7 +834,7 @@ function ShoppingListLayout() {
                   </select>
                 </div>
                 <div className="flex-1">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                     Quantity
                   </label>
                   <Input
@@ -880,7 +880,7 @@ function ShoppingListLayout() {
               "h-9 rounded-full px-4 text-sm",
               selectedBucket === "all"
                 ? "bg-theme-primary text-white hover:bg-theme-primary/90"
-                : "border border-gray-200 bg-white text-gray-700",
+                : "border border-[#dbd6cf] bg-white text-[#4a5568]",
             )}
           >
             All items
@@ -904,7 +904,7 @@ function ShoppingListLayout() {
                   "h-9 rounded-full px-4 text-sm",
                   isActive
                     ? "text-white"
-                    : "border border-gray-200 bg-white text-gray-700",
+                    : "border border-[#dbd6cf] bg-white text-[#4a5568]",
                 )}
                 style={
                   isActive
@@ -918,18 +918,18 @@ function ShoppingListLayout() {
           })}
         </div>
 
-        <Card className="border border-gray-100 bg-white shadow-sm">
+        <Card className="border border-[#dbd6cf]/60 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold text-gray-900">
+            <CardTitle className="text-lg font-semibold text-[#314158]">
               Items
             </CardTitle>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-[#8e99a8]">
               {filteredItems.length} shown
             </span>
           </CardHeader>
           <CardContent className="space-y-3">
             {filteredItems.length === 0 ? (
-              <div className="rounded-md border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+              <div className="rounded-md border border-dashed border-[#dbd6cf] p-6 text-center text-sm text-[#8e99a8]">
                 {selectedBucket === "all"
                   ? "Add your first item to get started."
                   : "No items in this bucket yet."}
@@ -946,7 +946,7 @@ function ShoppingListLayout() {
                 return (
                   <div
                     key={item.id}
-                    className="flex items-start justify-between rounded-lg border border-gray-100 bg-gray-50 p-3 hover:border-gray-200"
+                    className="flex items-start justify-between rounded-lg border border-[#dbd6cf]/60 bg-[#faf8f5] p-3 hover:border-[#dbd6cf]"
                   >
                     <div className="flex items-start gap-3">
                       <Checkbox
@@ -956,12 +956,12 @@ function ShoppingListLayout() {
                       />
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-[#314158]">
                             {item.name}
                           </p>
                           {renderBucketBadge(item.bucket)}
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-[#8e99a8]">
                           {item.quantity && (
                             <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
                               Qty: {item.quantity}
@@ -970,7 +970,7 @@ function ShoppingListLayout() {
                           {item.neededBy && (
                             <span>Needed by {item.neededBy}</span>
                           )}
-                          <span className="flex items-center gap-1 text-xs text-gray-400">
+                          <span className="flex items-center gap-1 text-xs text-[#8e99a8]/70">
                             <span
                               className="inline-flex h-2 w-2 rounded-full"
                               style={{ backgroundColor: color }}
@@ -987,13 +987,13 @@ function ShoppingListLayout() {
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {item.calendarEventId && (
-                            <Badge className="flex items-center gap-1 bg-blue-50 text-blue-700">
+                            <Badge className="flex items-center gap-1 bg-warm-50 text-warm-700">
                               <CalendarPlus className="h-3 w-3" />
                               Event linked
                             </Badge>
                           )}
                           {item.widgetInstanceId && (
-                            <Badge className="flex items-center gap-1 bg-purple-50 text-purple-700">
+                            <Badge className="flex items-center gap-1 bg-amber-50 text-amber-700">
                               <LayoutGrid className="h-3 w-3" />
                               Widget added
                             </Badge>
@@ -1006,7 +1006,7 @@ function ShoppingListLayout() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-gray-400 hover:text-theme-primary"
+                        className="text-[#8e99a8]/70 hover:text-theme-primary"
                         onClick={() => handleOpenConvert(item)}
                         aria-label={`Edit ${item.name}`}
                         title={
@@ -1021,7 +1021,7 @@ function ShoppingListLayout() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-gray-400 hover:text-red-500"
+                        className="text-[#8e99a8]/70 hover:text-red-500"
                         onClick={() => handleDelete(item)}
                         aria-label={`Delete ${item.name}`}
                       >
@@ -1053,9 +1053,9 @@ function ShoppingListLayout() {
           </SheetHeader>
           {convertItem && (
             <form onSubmit={handleConvertSubmit} className="mt-6 space-y-6">
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+              <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                     Item name
                   </label>
                   <Input
@@ -1066,7 +1066,7 @@ function ShoppingListLayout() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                       Quantity
                     </label>
                     <Input
@@ -1076,7 +1076,7 @@ function ShoppingListLayout() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                       Needed by
                     </label>
                     <Input
@@ -1087,13 +1087,13 @@ function ShoppingListLayout() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                     Bucket
                   </label>
                   <select
                     value={itemBucket}
                     onChange={(event) => setItemBucket(event.target.value)}
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                    className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                   >
                     <option value="">Unsorted</option>
                     {bucketFilters
@@ -1106,14 +1106,14 @@ function ShoppingListLayout() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                     Notes
                   </label>
                   <textarea
                     value={itemNotes}
                     onChange={(e) => setItemNotes(e.target.value)}
                     rows={3}
-                    className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                    className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                     placeholder="Optional details or reminders"
                   />
                 </div>
@@ -1128,26 +1128,26 @@ function ShoppingListLayout() {
                     }
                     disabled={Boolean(convertItem.calendarEventId)}
                   />
-                  <label htmlFor="convert-event" className="text-sm font-medium text-gray-800">
+                  <label htmlFor="convert-event" className="text-sm font-medium text-[#314158]">
                     Create calendar event
                   </label>
                 </div>
                 {convertItem.calendarEventId && (
-                  <p className="pl-7 text-xs text-gray-500">
+                  <p className="pl-7 text-xs text-[#8e99a8]">
                     This item already links to a calendar event.
                   </p>
                 )}
 
                 {(convertItem.calendarEventId || convertCreateEvent) && (
-                  <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Bucket
                       </label>
                       <select
                         value={eventBucket}
                         onChange={(e) => setEventBucket(e.target.value)}
-                        className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                        className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                       >
                         {widgetBucketOptions.map((bucket) => (
                           <option key={bucket} value={bucket}>
@@ -1158,7 +1158,7 @@ function ShoppingListLayout() {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                           Date
                         </label>
                         <Input
@@ -1168,7 +1168,7 @@ function ShoppingListLayout() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                           Time
                         </label>
                         <Input
@@ -1198,14 +1198,14 @@ function ShoppingListLayout() {
                       />
                       <label
                         htmlFor="event-all-day"
-                        className="text-sm text-gray-700"
+                        className="text-sm text-[#4a5568]"
                       >
                         Treat as all-day event
                       </label>
                     </div>
                     {!eventAllDay && (
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                           Duration (minutes)
                         </label>
                         <Input
@@ -1231,20 +1231,20 @@ function ShoppingListLayout() {
                     }
                     disabled={Boolean(convertItem.widgetInstanceId)}
                   />
-                  <label htmlFor="convert-widget" className="text-sm font-medium text-gray-800">
+                  <label htmlFor="convert-widget" className="text-sm font-medium text-[#314158]">
                     Create dashboard widget
                   </label>
                 </div>
                 {convertItem.widgetInstanceId && (
-                  <p className="pl-7 text-xs text-gray-500">
+                  <p className="pl-7 text-xs text-[#8e99a8]">
                     This item already has a dashboard widget.
                   </p>
                 )}
 
                 {(convertItem.widgetInstanceId || convertCreateWidget) && (
-                  <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Widget name
                       </label>
                       <Input
@@ -1254,13 +1254,13 @@ function ShoppingListLayout() {
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Bucket
                       </label>
                       <select
                         value={widgetBucket}
                         onChange={(event) => setWidgetBucket(event.target.value)}
-                        className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                        className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                       >
                         {widgetBucketOptions.length === 0 ? (
                           <option value="">No buckets available</option>
@@ -1274,7 +1274,7 @@ function ShoppingListLayout() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Daily target
                       </label>
                       <div className="flex items-center gap-3">
@@ -1290,7 +1290,7 @@ function ShoppingListLayout() {
                         >
                           -
                         </Button>
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <div className="flex items-center gap-2 text-sm text-[#4a5568]">
                           <span className="min-w-[24px] text-center text-base font-semibold">
                             {widgetTarget}
                           </span>
@@ -1309,7 +1309,7 @@ function ShoppingListLayout() {
                       </div>
                     </div>
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Colour
                       </label>
                       <div className="grid grid-cols-6 gap-2">
@@ -1321,7 +1321,7 @@ function ShoppingListLayout() {
                             onClick={() => setWidgetColor(color)}
                             className={`h-8 w-8 rounded-full border-2 transition ${WIDGET_COLOR_CLASS[color]} ${
                               widgetColor === color
-                                ? "ring-2 ring-offset-2 ring-indigo-500 border-white"
+                                ? "ring-2 ring-offset-2 ring-warm-500 border-white"
                                 : "border-white"
                             }`}
                           />
@@ -1329,7 +1329,7 @@ function ShoppingListLayout() {
                       </div>
                     </div>
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
                         Schedule
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -1346,8 +1346,8 @@ function ShoppingListLayout() {
                             }
                             className={`h-8 w-8 rounded-full border text-xs font-semibold transition ${
                               widgetSchedule[index]
-                                ? "bg-indigo-500 text-white border-indigo-500"
-                                : "bg-white text-gray-600 border-gray-200"
+                                ? "bg-warm-500 text-white border-warm-500"
+                                : "bg-white text-[#6b7688] border-[#dbd6cf]"
                             }`}
                           >
                             {day}
@@ -1359,7 +1359,7 @@ function ShoppingListLayout() {
                 )}
               </div>
 
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+              <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
                 <div className="flex items-start gap-2">
                   <Checkbox
                     id="convert-task"
@@ -1367,16 +1367,16 @@ function ShoppingListLayout() {
                     onCheckedChange={(checked) => setTaskEnabled(Boolean(checked))}
                   />
                   <div>
-                    <label htmlFor="convert-task" className="text-sm font-medium text-gray-800">
+                    <label htmlFor="convert-task" className="text-sm font-medium text-[#314158]">
                       Mirror as task
                     </label>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[#8e99a8]">
                       Adds this item to your Tasks view and keeps it in sync with widget updates.
                     </p>
                   </div>
                 </div>
                 {convertItem.taskId && (
-                  <p className="pl-7 text-xs text-gray-500">
+                  <p className="pl-7 text-xs text-[#8e99a8]">
                     Linked task ID:{" "}
                     <span className="font-mono">{convertItem.taskId}</span>
                   </p>

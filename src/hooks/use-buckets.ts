@@ -1,84 +1,151 @@
-import { useState, useEffect } from 'react';
-import { getUserPreferencesClient, saveUserPreferences } from '@/lib/user-preferences';
+import { useEffect, useState } from 'react';
+import { getUserPreferencesClient } from '@/lib/user-preferences';
+
+const DEFAULT_BUCKETS = ['Health', 'Work', 'Personal', 'Finance'];
+const BUCKETS_CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface BucketSnapshot {
+  buckets: string[];
+  activeBucket: string;
+  timestamp: number;
+}
+
+let bucketsSnapshot: BucketSnapshot | null = null;
+let inFlightBucketsRequest: Promise<BucketSnapshot> | null = null;
+
+function normalizeBuckets(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  const normalized = values
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value.length > 0);
+  return Array.from(new Set(normalized));
+}
+
+function readLocalSnapshot(): BucketSnapshot {
+  if (typeof window === 'undefined') {
+    return {
+      buckets: DEFAULT_BUCKETS,
+      activeBucket: DEFAULT_BUCKETS[0],
+      timestamp: Date.now(),
+    };
+  }
+
+  let parsedRaw: unknown = [];
+  try {
+    parsedRaw = JSON.parse(localStorage.getItem('life_buckets') || '[]');
+  } catch (error) {
+    parsedRaw = [];
+  }
+  const parsedBuckets = normalizeBuckets(parsedRaw);
+  const buckets = parsedBuckets.length > 0 ? parsedBuckets : DEFAULT_BUCKETS;
+  const storedActive = localStorage.getItem('active_bucket');
+  const activeBucket = storedActive && buckets.includes(storedActive)
+    ? storedActive
+    : buckets[0];
+
+  return { buckets, activeBucket, timestamp: Date.now() };
+}
+
+function writeLocalBuckets(snapshot: BucketSnapshot) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('life_buckets', JSON.stringify(snapshot.buckets));
+  if (snapshot.activeBucket) {
+    localStorage.setItem('active_bucket', snapshot.activeBucket);
+  }
+}
+
+async function fetchBucketsSnapshot(force = false): Promise<BucketSnapshot> {
+  const now = Date.now();
+  if (!force && bucketsSnapshot && now - bucketsSnapshot.timestamp < BUCKETS_CACHE_TTL_MS) {
+    return bucketsSnapshot;
+  }
+
+  if (inFlightBucketsRequest) {
+    return inFlightBucketsRequest;
+  }
+
+  inFlightBucketsRequest = (async () => {
+    const localSnapshot = readLocalSnapshot();
+
+    try {
+      const prefs = await getUserPreferencesClient();
+      const remoteBuckets = normalizeBuckets(prefs?.life_buckets ?? []);
+
+      const mergedBuckets = remoteBuckets.length > 0
+        ? Array.from(new Set([...localSnapshot.buckets, ...remoteBuckets]))
+        : localSnapshot.buckets;
+
+      const activeBucket = mergedBuckets.includes(localSnapshot.activeBucket)
+        ? localSnapshot.activeBucket
+        : mergedBuckets[0];
+
+      const nextSnapshot: BucketSnapshot = {
+        buckets: mergedBuckets.length > 0 ? mergedBuckets : DEFAULT_BUCKETS,
+        activeBucket: activeBucket || DEFAULT_BUCKETS[0],
+        timestamp: Date.now(),
+      };
+
+      bucketsSnapshot = nextSnapshot;
+      writeLocalBuckets(nextSnapshot);
+      return nextSnapshot;
+    } catch (error) {
+      console.error('Error loading buckets:', error);
+      bucketsSnapshot = localSnapshot;
+      return localSnapshot;
+    } finally {
+      inFlightBucketsRequest = null;
+    }
+  })();
+
+  return inFlightBucketsRequest;
+}
 
 export function useBuckets() {
-  const [buckets, setBuckets] = useState<string[]>(['Health', 'Work', 'Personal', 'Finance']);
-  const [activeBucket, setActiveBucket] = useState<string>('Health');
-  const [loading, setLoading] = useState(true);
+  const initialSnapshot = bucketsSnapshot ?? readLocalSnapshot();
+  const [buckets, setBuckets] = useState<string[]>(initialSnapshot.buckets);
+  const [activeBucket, setActiveBucket] = useState<string>(initialSnapshot.activeBucket);
+  const [loading, setLoading] = useState(!bucketsSnapshot);
 
   useEffect(() => {
-    const loadBuckets = async () => {
-      try {
-        // Load from localStorage first for fast access
-        const localBuckets = typeof window !== 'undefined' 
-          ? localStorage.getItem('life_buckets')
-          : null;
-        
-        const localActiveBucket = typeof window !== 'undefined'
-          ? localStorage.getItem('active_bucket')
-          : null;
+    let mounted = true;
 
-        if (localBuckets) {
-          const parsed = JSON.parse(localBuckets);
-          setBuckets(parsed);
-          if (localActiveBucket && parsed.includes(localActiveBucket)) {
-            setActiveBucket(localActiveBucket);
-          } else if (parsed.length > 0) {
-            setActiveBucket(parsed[0]);
-          }
-        }
+    const applySnapshot = (snapshot: BucketSnapshot) => {
+      if (!mounted) return;
+      setBuckets(snapshot.buckets);
+      setActiveBucket(snapshot.activeBucket);
+      setLoading(false);
+    };
 
-        // Then load from Supabase (source of truth)
-        const prefs = await getUserPreferencesClient();
-        if (prefs?.life_buckets && prefs.life_buckets.length > 0) {
-          const localList: string[] = (localBuckets ? JSON.parse(localBuckets) : []) || [];
-          const serverList: string[] = prefs.life_buckets || [];
-          const union = Array.from(new Set([...(Array.isArray(localList) ? localList : []), ...serverList]));
+    // Instant hydration from local storage
+    applySnapshot(readLocalSnapshot());
 
-          // Use the union in UI
-          setBuckets(union);
-          const initialActive = localActiveBucket && union.includes(localActiveBucket)
-            ? localActiveBucket
-            : union[0];
-          if (initialActive) setActiveBucket(initialActive);
+    fetchBucketsSnapshot()
+      .then(applySnapshot)
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
 
-          // Persist union back to localStorage and Supabase if it adds anything new
-          if (union.length !== serverList.length) {
-            try {
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('life_buckets', JSON.stringify(union));
-                window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
-              }
-              await saveUserPreferences({ ...prefs, life_buckets: union });
-            } catch (e) {
-              console.error('Failed to persist merged buckets', e);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading buckets:', error);
-      } finally {
-        setLoading(false);
+    const syncFromStorage = () => {
+      const snapshot = readLocalSnapshot();
+      bucketsSnapshot = snapshot;
+      applySnapshot(snapshot);
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'life_buckets' || event.key === 'active_bucket') {
+        syncFromStorage();
       }
     };
 
-    loadBuckets();
-
-    // React to broadcast events from dashboard/settings and cross-tab storage changes
-    const onBucketsChanged = () => {
-      // Quickly reload; keep UX snappy
-      loadBuckets();
-    };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'life_buckets') loadBuckets();
-    };
     if (typeof window !== 'undefined') {
-      window.addEventListener('lifeBucketsChanged', onBucketsChanged);
+      window.addEventListener('lifeBucketsChanged', syncFromStorage);
       window.addEventListener('storage', onStorage);
     }
+
     return () => {
+      mounted = false;
       if (typeof window !== 'undefined') {
-        window.removeEventListener('lifeBucketsChanged', onBucketsChanged);
+        window.removeEventListener('lifeBucketsChanged', syncFromStorage);
         window.removeEventListener('storage', onStorage);
       }
     };

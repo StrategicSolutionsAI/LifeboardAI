@@ -48,6 +48,34 @@ export async function emailLogin(formData: FormData): Promise<void> {
   if (error) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`)
   }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    redirect('/login?error=Unable to load account profile')
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profileError) {
+    redirect(`/login?error=${encodeURIComponent(profileError.message)}`)
+  }
+
+  if (!profile) {
+    const { error: createProfileError } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, onboarded: false })
+
+    if (createProfileError) {
+      redirect(`/login?error=${encodeURIComponent(createProfileError.message)}`)
+    }
+
+    redirect('/onboarding/0')
+  }
+
   redirect('/dashboard')
 }
 

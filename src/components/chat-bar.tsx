@@ -1285,8 +1285,8 @@ export function ChatBar() {
         <div className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[70vh] md:h-96 relative">
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b">
-            <div className="flex items-center gap-2 font-medium text-sm text-gray-700">
-              <MessageSquare className="w-4 h-4 text-indigo-500" /> Chat
+            <div className="flex items-center gap-2 font-medium text-sm text-[#4a5568]">
+              <MessageSquare className="w-4 h-4 text-[#bb9e7b]" /> Chat
               {isVoiceMode && (
                 <span
                   className={`ml-2 text-[11px] leading-5 inline-flex items-center gap-1 rounded-full px-2 border ${
@@ -1302,21 +1302,21 @@ export function ChatBar() {
               )}
             </div>
             <button onClick={handleCloseChat} aria-label="Close chat">
-              <X className="w-4 h-4 text-gray-500" />
+              <X className="w-4 h-4 text-[#8e99a8]" />
             </button>
           </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
             {messages.length === 0 && (
-              <div className="bg-indigo-50 text-indigo-900 rounded-lg p-3 text-xs space-y-2">
-                <div className="font-medium text-indigo-800">Try asking:</div>
+              <div className="bg-[#fdf8f6] text-[#314158] rounded-lg p-3 text-xs space-y-2">
+                <div className="font-medium text-[#314158]">Try asking:</div>
                 <div className="flex flex-wrap gap-2">
                   {quickPrompts.map(prompt => (
                     <button
                       key={prompt}
                       onClick={() => handleQuickPrompt(prompt)}
-                      className="px-2 py-1 rounded-full bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+                      className="px-2 py-1 rounded-full bg-white text-[#9a7b5a] border border-[#dbd6cf] hover:bg-[#f5ede4] transition"
                     >
                       {prompt}
                     </button>
@@ -1328,7 +1328,7 @@ export function ChatBar() {
               <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
                 <div
                   className={`inline-block rounded-lg px-3 py-2 whitespace-pre-wrap max-w-[80%] ${
-                    m.role === "user" ? "bg-indigo-500 text-white" : "bg-gray-100 text-gray-800"
+                    m.role === "user" ? "bg-[#bb9e7b] text-white" : "bg-[rgba(183,148,106,0.08)] text-[#314158]"
                   }`}
                 >
                   {m.content}
@@ -1341,12 +1341,12 @@ export function ChatBar() {
                     </div>
                   )}
                   {m.createdTask && m.role === 'assistant' && (
-                    <div className="mt-2 border border-gray-200 rounded-md bg-white text-gray-800 p-2">
+                    <div className="mt-2 border border-[#dbd6cf] rounded-md bg-white text-[#314158] p-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs">
                           <div className="font-medium">{m.createdTask.content || 'New task'}</div>
                           {m.createdTask.due?.date && (
-                            <div className="text-gray-500">Due {m.createdTask.due.date}</div>
+                            <div className="text-[#8e99a8]">Due {m.createdTask.due.date}</div>
                           )}
                         </div>
                         {!m.createdTask.completed ? (
@@ -1383,14 +1383,14 @@ export function ChatBar() {
             ))}
             {isProcessing && (
               <div className="text-left">
-                <div className="inline-block rounded-lg px-3 py-2 bg-gray-100 text-gray-800">
+                <div className="inline-block rounded-lg px-3 py-2 bg-[rgba(183,148,106,0.08)] text-[#314158]">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                     </div>
-                    <span className="text-xs text-gray-500">Thinking...</span>
+                    <span className="text-xs text-[#8e99a8]">Thinking...</span>
                   </div>
                 </div>
               </div>
@@ -1402,7 +1402,7 @@ export function ChatBar() {
           <div className="border-t flex items-center gap-2 px-3 py-2 relative">
             <input
               type="text"
-              className="flex-1 text-sm outline-none placeholder-gray-400"
+              className="flex-1 text-sm outline-none placeholder-[#8e99a8]"
               placeholder={
                 isVoiceMode
                   ? (isSpeaking ? "AI is speaking…" :
@@ -1421,7 +1421,7 @@ export function ChatBar() {
             {/* Settings Toggle */}
             <button
               onClick={() => setShowSettings(s => !s)}
-              className="text-gray-400 hover:text-indigo-500"
+              className="text-[#8e99a8]/70 hover:text-[#9a7b5a]"
               aria-label="TTS settings"
               title="Voice settings"
             >
@@ -1441,7 +1441,7 @@ export function ChatBar() {
                   return next
                 })
               }}
-              className={`transition-colors ${speakReplies ? 'text-indigo-600 bg-indigo-50 rounded-full p-1' : 'text-gray-400 hover:text-indigo-500'}`}
+              className={`transition-colors ${speakReplies ? 'text-[#9a7b5a] bg-[#fdf8f6] rounded-full p-1' : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'}`}
               aria-label={speakReplies ? 'Mute spoken replies' : 'Enable spoken replies'}
               title={speakReplies ? 'Spoken replies on' : 'Spoken replies off'}
             >
@@ -1454,20 +1454,20 @@ export function ChatBar() {
               className={`transition-colors ${
                 isVoiceMode 
                   ? 'text-green-500 bg-green-50 rounded-full p-1' 
-                  : 'text-gray-400 hover:text-indigo-500'
+                  : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'
               }`}
               aria-label={isVoiceMode ? "Exit voice mode" : "Start voice conversation"}
             >
               {isVoiceMode ? (
                 <div className="flex items-center gap-1">
                   {isSpeaking ? (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-pulse"></div>
                   ) : isProcessing ? (
                     <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                   ) : isRecording ? (
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   ) : (
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-[#b8b0a8] rounded-full"></div>
                   )}
                   <Mic className="w-4 h-4" />
                 </div>
@@ -1475,7 +1475,7 @@ export function ChatBar() {
                 <Mic className="w-4 h-4" />
               )}
             </button>
-            <button onClick={handleSend} className="text-indigo-500" aria-label="Send message">
+            <button onClick={handleSend} className="text-[#bb9e7b]" aria-label="Send message">
               <Send className="w-4 h-4" />
             </button>
           </div>
@@ -1485,9 +1485,9 @@ export function ChatBar() {
 
           {/* Settings Panel */}
           {showSettings && (
-            <div className="absolute bottom-14 right-3 bg-white border shadow-lg rounded-md p-3 w-64 z-50">
-              <div className="text-xs font-medium text-gray-700 mb-2">Voice Settings</div>
-              <label className="flex items-center justify-between mb-3 text-xs text-gray-700">
+            <div className="absolute bottom-14 right-3 bg-white border shadow-warm-lg rounded-md p-3 w-64 z-50">
+              <div className="text-xs font-medium text-[#4a5568] mb-2">Voice Settings</div>
+              <label className="flex items-center justify-between mb-3 text-xs text-[#4a5568]">
                 <span>Realtime voice (beta)</span>
                 <input
                   type="checkbox"
@@ -1498,13 +1498,13 @@ export function ChatBar() {
               <div className="mb-3">
                 <button
                   onClick={() => enumerateAudioDevices(true)}
-                  className="text-[11px] text-gray-600 hover:text-gray-900 underline"
+                  className="text-[11px] text-[#6b7688] hover:text-[#314158] underline"
                 >
                   {isEnumerating ? 'Detecting devices…' : 'Detect audio devices'}
                 </button>
               </div>
               <label className="block mb-2">
-                <span className="text-xs text-gray-500">Voice</span>
+                <span className="text-xs text-[#8e99a8]">Voice</span>
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice(e.target.value)}
@@ -1516,7 +1516,7 @@ export function ChatBar() {
                 </select>
               </label>
               <label className="block mb-2">
-                <span className="text-xs text-gray-500">Microphone</span>
+                <span className="text-xs text-[#8e99a8]">Microphone</span>
                 <select
                   value={micDeviceId}
                   onChange={(e) => setMicDeviceId(e.target.value)}
@@ -1532,7 +1532,7 @@ export function ChatBar() {
                 )}
               </label>
               <label className="block mb-3">
-                <span className="text-xs text-gray-500">Speaker</span>
+                <span className="text-xs text-[#8e99a8]">Speaker</span>
                 <select
                   value={speakerDeviceId}
                   onChange={(e) => setSpeakerDeviceId(e.target.value)}
@@ -1554,14 +1554,14 @@ export function ChatBar() {
                         await a.play()
                       } catch (e) { console.warn('Test beep failed', e) }
                     }}
-                    className="text-[11px] px-2 py-1 rounded border hover:bg-gray-50"
+                    className="text-[11px] px-2 py-1 rounded border hover:bg-[#faf8f5]"
                   >
                     Test beep
                   </button>
                 </div>
               </label>
               <label className="block">
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-[#8e99a8]">
                   <span>Speaking rate</span>
                   <span>{ttsRate.toFixed(2)}×</span>
                 </div>
@@ -1576,17 +1576,17 @@ export function ChatBar() {
                 />
               </label>
               <div className="mt-3 border-t pt-2">
-                <div className="text-[10px] text-gray-500">Debug</div>
-                <div className="text-[10px] text-gray-500">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
+                <div className="text-[10px] text-[#8e99a8]">Debug</div>
+                <div className="text-[10px] text-[#8e99a8]">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
                 {isRealtimeActive && (
-                  <div className="text-[10px] text-gray-500">
+                  <div className="text-[10px] text-[#8e99a8]">
                     conn:{rtConnState || '—'} ice:{rtIceState || '—'} gather:{rtGatheringState || '—'}
                   </div>
                 )}
                 <div className="mt-2 flex items-center gap-2">
                   <button
                     onClick={reconnectRealtime}
-                    className={`text-xs px-2 py-1 rounded border ${rtReconnecting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                    className={`text-xs px-2 py-1 rounded border ${rtReconnecting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#faf8f5]'}`}
                     disabled={rtReconnecting}
                   >
                     {rtReconnecting ? 'Reconnecting…' : 'Reconnect Realtime'}
@@ -1599,10 +1599,10 @@ export function ChatBar() {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 bg-white shadow-md rounded-full pl-3 pr-4 py-2 hover:shadow-lg"
+          className="flex items-center gap-2 bg-white shadow-warm rounded-full pl-3 pr-4 py-2 hover:shadow-warm-lg"
         >
-          <MessageSquare className="w-5 h-5 text-indigo-500" />
-          <span className="text-sm text-gray-500">Ask me anything</span>
+          <MessageSquare className="w-5 h-5 text-[#bb9e7b]" />
+          <span className="text-sm text-[#8e99a8]">Ask me anything</span>
         </button>
       )}
     </div>

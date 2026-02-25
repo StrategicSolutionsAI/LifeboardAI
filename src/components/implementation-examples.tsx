@@ -110,7 +110,7 @@ export function WidgetHeaderExample() {
   return (
     <div className="flex items-center justify-between p-4 border-b">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+        <div className="w-8 h-8 bg-[#f5ede4] rounded-lg flex items-center justify-center">
           📊
         </div>
         <h3 className="font-medium">Weight Tracking</h3>
@@ -157,7 +157,7 @@ export function DashboardRefreshCardExample() {
   }
   
   return (
-    <div className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative hover:bg-gray-50 hover:shadow-md transition-all">
+    <div className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative hover:bg-[#faf8f5] hover:shadow-warm transition-all">
       <EnhancedRefreshButton
         onRefresh={fetchIntegrationsData}
         variant="ghost"
@@ -168,7 +168,7 @@ export function DashboardRefreshCardExample() {
         label="Refresh"
         className="w-full h-auto p-0 hover:bg-transparent"
       />
-      <p className="mt-2 text-xs text-gray-500">Sync integrations</p>
+      <p className="mt-2 text-xs text-[#8e99a8]">Sync integrations</p>
     </div>
   )
 }
@@ -195,7 +195,7 @@ export function AdvancedWidgetExample() {
   }
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white rounded-lg border border-[#dbd6cf] p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-medium">Advanced Widget</h3>
         
@@ -213,7 +213,7 @@ export function AdvancedWidgetExample() {
         />
       </div>
       
-      <div className="text-gray-600">
+      <div className="text-[#6b7688]">
         Widget content here...
       </div>
     </div>
@@ -235,9 +235,9 @@ export function TaskboardRefreshExample() {
   }
   
   return (
-    <div className="w-48 rounded-xl border border-gray-100 bg-white p-4 shadow-sm relative transition-all">
+    <div className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative transition-all">
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-indigo-500/90 shadow-sm">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#bb9e7b]/90 shadow-sm">
           <EnhancedRefreshButton
             onRefresh={fetchIntegrationsData}
             variant="ghost"
@@ -249,7 +249,7 @@ export function TaskboardRefreshExample() {
         </div>
         <span className="text-sm font-medium">Refresh</span>
       </div>
-      <p className="text-xs text-gray-500">Sync integrations</p>
+      <p className="text-xs text-[#8e99a8]">Sync integrations</p>
     </div>
   )
 }

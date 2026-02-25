@@ -12,42 +12,42 @@ export const themeColors: ThemeColor[] = [
   {
     id: "lifeboard",
     name: "LifeboardAI",
-    primary: "#8491FF",
-    secondary: "#9CA3FF", 
-    accent: "#B4BAFF",
-    description: "Official LifeboardAI brand theme"
+    primary: "#B1916A",
+    secondary: "#bb9e7b",
+    accent: "#dbd6cf",
+    description: "Official LifeboardAI warm theme"
   },
   {
-    id: "indigo",
-    name: "Indigo Wave",
-    primary: "#4f46e5",
-    secondary: "#6366f1", 
-    accent: "#818cf8",
-    description: "Classic professional blue"
+    id: "sand",
+    name: "Desert Sand",
+    primary: "#C4A44E",
+    secondary: "#d4b85a",
+    accent: "#e8d48a",
+    description: "Golden and warm"
   },
   {
     id: "emerald",
     name: "Forest Green",
-    primary: "#059669",
-    secondary: "#10b981",
-    accent: "#34d399",
+    primary: "#48B882",
+    secondary: "#5cc998",
+    accent: "#8fddb8",
     description: "Fresh and natural"
   },
   {
-    id: "purple",
-    name: "Royal Purple",
-    primary: "#7c3aed",
-    secondary: "#8b5cf6",
-    accent: "#a78bfa",
-    description: "Creative and bold"
+    id: "slate",
+    name: "Slate Blue",
+    primary: "#596881",
+    secondary: "#7089a8",
+    accent: "#9ab0c8",
+    description: "Professional and calm"
   },
   {
     id: "rose",
-    name: "Sunset Rose",
-    primary: "#e11d48",
-    secondary: "#f43f5e",
-    accent: "#fb7185",
-    description: "Warm and energetic"
+    name: "Dusty Rose",
+    primary: "#D07AA4",
+    secondary: "#e091b8",
+    accent: "#f0b8d4",
+    description: "Soft and elegant"
   },
   {
     id: "amber",
@@ -60,26 +60,26 @@ export const themeColors: ThemeColor[] = [
   {
     id: "teal",
     name: "Ocean Breeze",
-    primary: "#0d9488",
-    secondary: "#14b8a6",
-    accent: "#5eead4",
+    primary: "#4eb8ad",
+    secondary: "#37958c",
+    accent: "#7dd4cb",
     description: "Calm and focused"
   },
   {
-    id: "orange",
-    name: "Citrus Burst",
-    primary: "#ea580c",
-    secondary: "#f97316",
-    accent: "#fb923c",
-    description: "Vibrant and fun"
+    id: "plum",
+    name: "Royal Plum",
+    primary: "#8B7FD4",
+    secondary: "#7f43ea",
+    accent: "#b8a8e8",
+    description: "Creative and bold"
   },
   {
-    id: "violet",
-    name: "Lavender Dream",
-    primary: "#7c2d12",
-    secondary: "#a21caf",
-    accent: "#c084fc",
-    description: "Elegant and sophisticated"
+    id: "cedar",
+    name: "Cedar Wood",
+    primary: "#7d6349",
+    secondary: "#9a7b5a",
+    accent: "#c4a87a",
+    description: "Earthy and grounded"
   }
 ]
 

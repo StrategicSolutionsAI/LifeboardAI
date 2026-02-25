@@ -1,6 +1,5 @@
 "use client";
-import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import React, { useId } from 'react';
 import { WidgetInstance } from '@/types/widgets';
 
 interface WidgetSelectorProps {
@@ -18,74 +17,38 @@ export default function WidgetSelector({
   showAllOption = true,
   className = ""
 }: WidgetSelectorProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-
-  const selectedWidgetData = selectedWidget === 'all' 
-    ? null 
-    : widgets.find(w => w.instanceId === selectedWidget);
-
-  const displayText = selectedWidget === 'all' 
-    ? 'All Widgets' 
-    : selectedWidgetData?.name || 'Select Widget';
+  const selectorId = useId();
+  const labelId = `${selectorId}-label`;
 
   return (
     <div className={`relative ${className}`}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+      <label id={labelId} htmlFor={selectorId} className="sr-only">
+        Select widget
+      </label>
+      <select
+        id={selectorId}
+        aria-labelledby={labelId}
+        value={selectedWidget}
+        onChange={(event) => {
+          const next = event.target.value;
+          onWidgetChange(next === 'all' ? 'all' : next);
+        }}
+        className="w-full rounded-md border border-[#dbd6cf] bg-white px-3 py-2 text-sm text-[#314158] shadow-sm focus:border-warm-500 focus:outline-none focus:ring-2 focus:ring-warm-500"
       >
-        <span className="truncate">{displayText}</span>
-        <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* Dropdown */}
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto top-full left-0">
-            {showAllOption && (
-              <button
-                onClick={() => {
-                  onWidgetChange('all');
-                  setIsOpen(false);
-                }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                  selectedWidget === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-900'
-                }`}
-              >
-                All Widgets
-              </button>
-            )}
-            
-            {widgets.map((widget) => (
-              <button
-                key={widget.instanceId}
-                onClick={() => {
-                  onWidgetChange(widget.instanceId);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center ${
-                  selectedWidget === widget.instanceId ? 'bg-indigo-50 text-indigo-700' : 'text-gray-900'
-                }`}
-              >
-                <span className="mr-2">{typeof widget.icon === 'string' ? widget.icon : '📊'}</span>
-                <span className="truncate">{widget.name}</span>
-              </button>
-            ))}
-            
-            {widgets.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-500">
-                No widgets available
-              </div>
-            )}
-          </div>
-        </>
-      )}
+        {showAllOption && (
+          <option value="all">All Widgets</option>
+        )}
+        {widgets.map((widget) => (
+          <option key={widget.instanceId} value={widget.instanceId}>
+            {widget.name}
+          </option>
+        ))}
+        {widgets.length === 0 && !showAllOption && (
+          <option value="" disabled>
+            No widgets available
+          </option>
+        )}
+      </select>
     </div>
   );
 }
