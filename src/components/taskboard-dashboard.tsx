@@ -6,7 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
-import { getUserPreferencesClient, saveUserPreferences } from "@/lib/user-preferences";
+import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
 import { format, addDays, isSameDay, parseISO, formatDistanceToNow } from 'date-fns';
 import {
@@ -302,96 +302,26 @@ const getIconComponent = (name: string): LucideIcon | null => {
   return iconMap[name] || null
 }
 
-// Default colors for widget templates (mapped to Calidora palette)
-const templateColors: Record<string, string> = {
-  water: "blue",
-  calories: "orange",
-  steps: "green",
-  weight: "purple",
-  heartrate: "pink",
-  sleep: "purple",
-  exercise: "teal",
-  caffeine: "gold",
-  chores: "gold",
-  nutrition: "green",
+// Helper to parse hex color to RGB components
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+  const clean = hex.replace('#', '');
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
 };
 
-const getTemplateColor = (id: string): string | null => {
-  return templateColors[id] || null;
+// Generate widget color styles from a bucket's hex color
+const getWidgetColorStyles = (hex: string) => {
+  const { r, g, b } = hexToRgb(hex);
+  return {
+    solid: hex,
+    text: hex,
+    tint: `rgba(${r}, ${g}, ${b}, 0.08)`,
+    iconTint: `rgba(${r}, ${g}, ${b}, 0.15)`,
+  };
 };
-
-// Calidora-aligned color palette for widgets
-// Solid background classes (used for icon containers & badges)
-const BG_COLOR_CLASSES: Record<string, string> = {
-  tan: 'bg-[#B1916A]',
-  green: 'bg-[#48B882]',
-  blue: 'bg-[#4AADE0]',
-  purple: 'bg-[#8B7FD4]',
-  pink: 'bg-[#D07AA4]',
-  gold: 'bg-[#C4A44E]',
-  orange: 'bg-[#E28A5D]',
-  teal: 'bg-[#5E9B8C]',
-  slate: 'bg-[#8e99a8]',
-  stone: 'bg-[#b8b0a8]',
-};
-
-// Text color classes to match widget icon color
-const TEXT_COLOR_CLASSES: Record<string, string> = {
-  tan: 'text-[#B1916A]',
-  green: 'text-[#48B882]',
-  blue: 'text-[#4AADE0]',
-  purple: 'text-[#8B7FD4]',
-  pink: 'text-[#D07AA4]',
-  gold: 'text-[#C4A44E]',
-  orange: 'text-[#E28A5D]',
-  teal: 'text-[#5E9B8C]',
-  slate: 'text-[#8e99a8]',
-  stone: 'text-[#b8b0a8]',
-};
-
-// Light tint classes (8% opacity, used for card backgrounds when goal met)
-const BG_TINT_CLASSES: Record<string, string> = {
-  tan: 'bg-[rgba(177,145,106,0.08)]',
-  green: 'bg-[rgba(72,184,130,0.08)]',
-  blue: 'bg-[rgba(74,173,224,0.08)]',
-  purple: 'bg-[rgba(139,127,212,0.08)]',
-  pink: 'bg-[rgba(208,122,164,0.08)]',
-  gold: 'bg-[rgba(196,164,78,0.08)]',
-  orange: 'bg-[rgba(226,138,93,0.08)]',
-  teal: 'bg-[rgba(94,155,140,0.08)]',
-  slate: 'bg-[rgba(142,153,168,0.08)]',
-  stone: 'bg-[rgba(184,176,168,0.08)]',
-};
-
-// Icon container tint classes (15% opacity — transparent colored bg for icon containers)
-const BG_ICON_TINT_CLASSES: Record<string, string> = {
-  tan: 'bg-[rgba(177,145,106,0.15)]',
-  green: 'bg-[rgba(72,184,130,0.15)]',
-  blue: 'bg-[rgba(74,173,224,0.15)]',
-  purple: 'bg-[rgba(139,127,212,0.15)]',
-  pink: 'bg-[rgba(208,122,164,0.15)]',
-  gold: 'bg-[rgba(196,164,78,0.15)]',
-  orange: 'bg-[rgba(226,138,93,0.15)]',
-  teal: 'bg-[rgba(94,155,140,0.15)]',
-  slate: 'bg-[rgba(142,153,168,0.15)]',
-  stone: 'bg-[rgba(184,176,168,0.15)]',
-};
-
-// Display labels for the color picker
-const WIDGET_COLOR_LABELS: Record<string, string> = {
-  tan: 'Tan',
-  green: 'Green',
-  blue: 'Blue',
-  purple: 'Purple',
-  pink: 'Pink',
-  gold: 'Gold',
-  orange: 'Orange',
-  teal: 'Teal',
-  slate: 'Slate',
-  stone: 'Stone',
-};
-
-const WIDGET_COLOR_OPTIONS = Object.keys(BG_COLOR_CLASSES);
 
 const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
   progress: "bg-[#4AADE0]",
@@ -439,10 +369,24 @@ interface UndoState {
  */
 const debounce = (func: (...args: any[]) => void, delay: number) => {
   let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: any[]) => {
+  let lastArgs: any[] | null = null;
+  const debounced = (...args: any[]) => {
+    lastArgs = args;
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(this, args), delay);
+    timeoutId = setTimeout(() => {
+      lastArgs = null;
+      func.apply(null, args);
+    }, delay);
   };
+  debounced.flush = () => {
+    if (lastArgs !== null) {
+      clearTimeout(timeoutId);
+      const args = lastArgs;
+      lastArgs = null;
+      func.apply(null, args);
+    }
+  };
+  return debounced;
 };
 
 // -----------------------------------------------------------------------------
@@ -487,15 +431,13 @@ function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstanc
       if (template) {
         // Check if widget needs migration
         const needsNameUpdate = widget.name !== template.name;
-        const needsColorUpdate = (widget.color || '') !== template.color;
         const needsIconUpdate = widget.icon !== template.icon;
 
-        if (needsNameUpdate || needsColorUpdate || needsIconUpdate) {
+        if (needsNameUpdate || needsIconUpdate) {
           // Update widget with template data
           migratedWidgets[bucketName][index] = {
             ...widget,
             name: template.name,
-            color: template.color || 'gray',
             icon: template.icon
           };
           hasChanges = true;
@@ -1069,13 +1011,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const debouncedSaveBucketsToSupabase = useRef(
     debounce(async (ordered: string[]) => {
       try {
-        const prefs = await getUserPreferencesClient();
-        if (prefs) {
-          await saveUserPreferences({
-            ...prefs,
-            life_buckets: ordered,
-          });
-        }
+        await updateUserPreferenceFields({ life_buckets: ordered });
       } catch (err) {
         console.error('Failed to save bucket order to Supabase', err);
       }
@@ -2022,39 +1958,37 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Centralized function to save widgets, including to localStorage
   const saveWidgets = async (widgetsToSave: Record<string, WidgetInstance[]>, progressToSave?: Record<string, ProgressEntry>) => {
-    // Always fetch the current user from Supabase to avoid race conditions
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) {
-      return;
-    }
+    const widgetCount = Object.values(widgetsToSave).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
 
-    // Save to localStorage immediately (no async needed)
+    // Save to localStorage FIRST — synchronous, no auth dependency
     if (typeof window !== 'undefined') {
-      const dataToSave = {
-        widgets: widgetsToSave,
-        savedAt: new Date().toISOString()
-      };
-      localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-      Object.entries(widgetsToSave).forEach(([bucket, widgets]) => {
-      });
-
-      // Verify save by reading back
-      const savedData = localStorage.getItem('widgets_by_bucket');
-      const verified = JSON.parse(savedData!);
+      try {
+        const dataToSave = {
+          widgets: widgetsToSave,
+          savedAt: new Date().toISOString()
+        };
+        localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+      } catch (lsErr) {
+        console.error('[saveWidgets] localStorage.setItem FAILED:', lsErr);
+      }
     }
 
-    // Save to Supabase
+    // Then save only the widget-related columns to Supabase.
+    // Using a targeted update avoids race conditions where a concurrent
+    // full-row upsert (e.g. bucket reorder) overwrites the new widgets.
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        const savedPrefs = await saveUserPreferences({
-          ...prefs,
-          widgets_by_bucket: widgetsToSave,
-          progress_by_widget: progressToSave || progressByWidgetRef.current, // Include current progress
-        });
+      const fields: Record<string, any> = { widgets_by_bucket: widgetsToSave };
+      if (progressToSave && Object.keys(progressToSave).length > 0) {
+        fields.progress_by_widget = progressToSave;
+      } else if (progressByWidgetRef.current && Object.keys(progressByWidgetRef.current).length > 0) {
+        fields.progress_by_widget = progressByWidgetRef.current;
+      }
+      const ok = await updateUserPreferenceFields(fields);
+      if (!ok) {
+        console.error('[saveWidgets] Supabase save returned false for', widgetCount, 'widgets');
       }
     } catch (err) {
-      console.error('Failed to save widgets to preferences', err);
+      console.error('[saveWidgets] Supabase save exception:', err);
     }
   };
 
@@ -2073,6 +2007,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     setIsSigningOut(true);
 
     try {
+      // Flush any pending debounced saves before logging out
+      debouncedSaveToSupabase.flush?.();
+
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: {
@@ -2123,17 +2060,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
 
-    // Save to Supabase for persistence
+    // Save to Supabase for persistence — targeted update to avoid race conditions
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        const mergedColors = { ...(prefs.bucket_colors || {}), [name]: colorToUse } as Record<string, string>;
-        await saveUserPreferences({
-          ...prefs,
-          life_buckets: updated,
-          bucket_colors: mergedColors,
-        });
-      }
+      const mergedColors = { ...bucketColors, [name]: colorToUse } as Record<string, string>;
+      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: mergedColors });
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
@@ -2153,26 +2083,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        // Auto-assign suggested color if missing
-        const existing = (bucketColors[trimmed] || (prefs.bucket_colors || {})[trimmed]);
-        const colorToUse = existing || getSuggestedColorForBucket(trimmed);
-        const nextColors = { ...(prefs.bucket_colors || {}), [trimmed]: colorToUse } as Record<string, string>;
-        setBucketColors(prev => ({ ...nextColors }));
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
-        }
-        // Broadcast
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
-        }
-        await saveUserPreferences({
-          ...prefs,
-          life_buckets: updated,
-          bucket_colors: nextColors,
-        });
+      // Auto-assign suggested color if missing
+      const existing = bucketColors[trimmed];
+      const colorToUse = existing || getSuggestedColorForBucket(trimmed);
+      const nextColors = { ...bucketColors, [trimmed]: colorToUse } as Record<string, string>;
+      setBucketColors(prev => ({ ...nextColors }));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
       }
+      // Broadcast
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
+      }
+      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: nextColors });
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
@@ -2191,15 +2114,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
 
-    // Save to Supabase for persistence
+    // Save to Supabase for persistence — targeted update
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        await saveUserPreferences({
-          ...prefs,
-          life_buckets: updated
-        });
-      }
+      await updateUserPreferenceFields({ life_buckets: updated });
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
@@ -2232,13 +2149,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           }
 
           try {
-            const prefs = await getUserPreferencesClient();
-            if (prefs) {
-              await saveUserPreferences({
-                ...prefs,
-                life_buckets: previousBuckets,
-              });
-            }
+            await updateUserPreferenceFields({ life_buckets: previousBuckets });
           } catch (err) {
             console.error("Failed to restore bucket after undo:", err);
           }
@@ -2252,21 +2163,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     setBucketColors(prev => ({ ...prev, [bucket]: colorHex }));
 
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        const nextColors = { ...(prefs.bucket_colors || {}), [bucket]: colorHex } as Record<string, string>;
-        await saveUserPreferences({
-          ...prefs,
-          bucket_colors: nextColors,
-        });
-        // Persist locally as well
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
-        }
-        // Notify any listeners that colors changed
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
-        }
+      const nextColors = { ...bucketColors, [bucket]: colorHex } as Record<string, string>;
+      await updateUserPreferenceFields({ bucket_colors: nextColors });
+      // Persist locally as well
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bucket_colors', JSON.stringify(nextColors));
+      }
+      // Notify any listeners that colors changed
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
       }
     } catch (err) {
       console.error('Failed to save bucket color to Supabase:', err);
@@ -2335,16 +2240,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       setWidgetsByBucket(updatedWidgetsByBucket);
     }
 
-    // Save to Supabase
+    // Save to Supabase — targeted update
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        await saveUserPreferences({
-          ...prefs,
-          life_buckets: updated,
-          bucket_colors: updatedColors,
-        });
-      }
+      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: updatedColors });
     } catch (err) {
       console.error('Failed to save bucket rename to Supabase:', err);
     }
@@ -2399,27 +2297,26 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
-    // Save to Supabase
+    // Save to Supabase — targeted update
     try {
-      const prefs = await getUserPreferencesClient();
-      if (prefs) {
-        await saveUserPreferences({
-          ...prefs,
-          life_buckets: latestBuckets,
-        });
-      }
+      await updateUserPreferenceFields({ life_buckets: latestBuckets });
     } catch (err) {
       console.error('Failed to save bucket order to Supabase:', err);
     }
   };
 
+  const loadWidgetsInProgress = useRef(false);
+
   async function loadWidgets() {
+    // Guard against concurrent calls (getUser + onAuthStateChange both trigger this)
+    if (loadWidgetsInProgress.current) return;
+    loadWidgetsInProgress.current = true;
 
     setIsWidgetLoadComplete(false);
 
     // First try to load from localStorage for immediate display
     let loadedFromLocal = false;
-    let localWidgets = {};
+    let localWidgets: Record<string, WidgetInstance[]> = {};
     let localSavedAt: string | null = null;
 
     if (typeof window !== 'undefined') {
@@ -2433,105 +2330,113 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           if (parsed.widgets && parsed.savedAt) {
             localWidgets = parsed.widgets;
             localSavedAt = parsed.savedAt;
-          } else {
+          } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
             localWidgets = parsed;
           }
 
+          const localCount = Object.values(localWidgets).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+          console.log('[loadWidgets] localStorage:', localCount, 'widgets across', Object.keys(localWidgets).length, 'buckets');
 
-          // Count widgets per bucket
-          Object.entries(localWidgets).forEach(([bucket, widgets]) => {
-          });
-
-          setWidgetsByBucket(localWidgets);
-          loadedFromLocal = true;
+          if (localCount > 0) {
+            setWidgetsByBucket(localWidgets);
+            loadedFromLocal = true;
+          }
         } else {
+          console.log('[loadWidgets] No widgets in localStorage');
         }
       } catch (e) {
         console.error('Failed to parse stored widgets', e);
       }
     }
 
-    // Always try to load from Supabase (source of truth)
+    // Always try to load from Supabase
     try {
       const prefs = await getUserPreferencesClient();
 
-      if (prefs?.widgets_by_bucket && Object.keys(prefs.widgets_by_bucket).length > 0) {
-        const supabaseUpdatedAt = prefs.updated_at ? Date.parse(prefs.updated_at) : 0;
-        const localUpdatedAt = localSavedAt ? Date.parse(localSavedAt) : 0;
-        const supabaseWidgetsStr = JSON.stringify(prefs.widgets_by_bucket ?? {});
-        const localWidgetsStr = JSON.stringify(localWidgets ?? {});
+      const supabaseWidgets: Record<string, WidgetInstance[]> = prefs?.widgets_by_bucket ?? {};
+      const sbCount = Object.values(supabaseWidgets).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+      const hasSupabase = sbCount > 0;
+      const localCount = Object.values(localWidgets).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+      const hasLocal = loadedFromLocal && localCount > 0;
 
-        const dataIsDifferent = supabaseWidgetsStr !== localWidgetsStr;
+      console.log('[loadWidgets] Supabase:', sbCount, 'widgets | Local:', localCount, 'widgets');
 
-        if (dataIsDifferent && localUpdatedAt > supabaseUpdatedAt) {
-          // Local copy is newer – promote it to Supabase and keep it
-          const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
-          setWidgetsByBucket(migratedLocalWidgets);
+      if (hasSupabase || hasLocal) {
+        // Merge strategy: combine widgets from both sources by instanceId
+        // so that newly-added local widgets are never lost even when the
+        // async Supabase save didn't complete before a page refresh.
+        const merged: Record<string, WidgetInstance[]> = {};
+        const allBucketKeys = Array.from(new Set([
+          ...Object.keys(supabaseWidgets),
+          ...Object.keys(localWidgets),
+        ]));
+        let mergedDiffersFromSupabase = false;
 
-          if (prefs) {
-            await saveUserPreferences({
-              ...prefs,
-              widgets_by_bucket: migratedLocalWidgets,
-            });
+        for (const bucket of allBucketKeys) {
+          const sbList: WidgetInstance[] = supabaseWidgets[bucket] ?? [];
+          const localList: WidgetInstance[] = localWidgets[bucket] ?? [];
+
+          // Index by instanceId for fast lookup
+          const byId = new Map<string, WidgetInstance>();
+          // Supabase widgets go in first (baseline)
+          for (const w of sbList) {
+            if (w && w.instanceId) byId.set(w.instanceId, w);
+          }
+          // Local widgets override / add — local state is always the
+          // most-recently-edited copy on this device
+          for (const w of localList) {
+            if (w && w.instanceId) byId.set(w.instanceId, w);
           }
 
-          if (typeof window !== 'undefined') {
-            const dataToSave = {
-              widgets: migratedLocalWidgets,
-              savedAt: new Date().toISOString(),
-            };
-            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+          merged[bucket] = Array.from(byId.values());
+          if (merged[bucket].length !== sbList.length) {
+            mergedDiffersFromSupabase = true;
           }
-        } else if (dataIsDifferent) {
-          // Supabase copy is newer – adopt it locally
-          const migratedWidgets = migrateWidgetsToTemplates(prefs.widgets_by_bucket);
-          setWidgetsByBucket(migratedWidgets);
+        }
 
-          // --- NEW: ensure bucket list includes any bucket keys from widgets ---
-          const widgetBuckets = Object.keys(prefs.widgets_by_bucket);
-          setBuckets(prev => {
-            const merged = Array.from(new Set([...prev, ...widgetBuckets]));
-            if (merged.length !== prev.length) {
-              // Persist merged buckets to localStorage
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('life_buckets', JSON.stringify(merged));
-              }
-              // Persist merged buckets to Supabase
-              saveUserPreferences({
-                ...prefs,
-                life_buckets: merged
-              });
+        const mergedCount = Object.values(merged).reduce((sum, arr) => sum + arr.length, 0);
+        console.log('[loadWidgets] Merged:', mergedCount, 'widgets | differsFromSupabase:', mergedDiffersFromSupabase);
+
+        // Safety: merged should never have fewer widgets than either source
+        if (mergedCount < localCount || mergedCount < sbCount) {
+          console.error('[loadWidgets] MERGE ERROR: merged has FEWER widgets than source!',
+            { mergedCount, localCount, sbCount });
+        }
+
+        const migratedMerged = migrateWidgetsToTemplates(merged);
+        setWidgetsByBucket(migratedMerged);
+        widgetsByBucketRef.current = migratedMerged;
+
+        // Ensure bucket list includes any bucket keys from widgets
+        const widgetBuckets = Object.keys(migratedMerged);
+        setBuckets(prev => {
+          const mergedBuckets = Array.from(new Set([...prev, ...widgetBuckets]));
+          if (mergedBuckets.length !== prev.length) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('life_buckets', JSON.stringify(mergedBuckets));
             }
-            return merged;
-          });
-
-          if (typeof window !== 'undefined') {
-            const dataToSave = {
-              widgets: migratedWidgets,
-              savedAt: new Date().toISOString(),
-            };
-            localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
+            updateUserPreferenceFields({ life_buckets: mergedBuckets });
           }
-        } else {
-        }
-      } else if (loadedFromLocal && Object.keys(localWidgets).length > 0) {
+          return mergedBuckets;
+        });
 
-        // Migrate local widgets before saving to Supabase
-        const migratedLocalWidgets = migrateWidgetsToTemplates(localWidgets);
-        setWidgetsByBucket(migratedLocalWidgets);
-
-        if (prefs) {
-          await saveUserPreferences({
-            ...prefs,
-            widgets_by_bucket: migratedLocalWidgets
-          });
+        // Persist merged result
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('widgets_by_bucket', JSON.stringify({
+            widgets: migratedMerged,
+            savedAt: new Date().toISOString(),
+          }));
         }
-      } else {
+        // If the merge added local-only widgets, push them to Supabase
+        if (mergedDiffersFromSupabase) {
+          await updateUserPreferenceFields({ widgets_by_bucket: migratedMerged });
+        }
       }
     } catch (err) {
       console.error('Failed to load widgets from preferences', err);
     } finally {
       setIsWidgetLoadComplete(true);
+      loadWidgetsInProgress.current = false;
     }
   }
 
@@ -2657,6 +2562,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     debouncedSaveToSupabase();
   }, [progressByWidget, isWidgetLoadComplete, user, debouncedSaveToSupabase]);
 
+  // Flush debounced saves before page unload so widgets aren't lost on refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      debouncedSaveToSupabase.flush?.();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [debouncedSaveToSupabase]);
+
   async function loadBuckets(options?: { fetchFromSupabase?: boolean }) {
     const shouldFetchFromSupabase = options?.fetchFromSupabase ?? true;
     let loadedFromLocal = false;
@@ -2736,26 +2652,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               ...(prefs.bucket_colors || {}),
               ...(localBucketColors || {}),
             } as Record<string, string>;
-            await saveUserPreferences({
-              ...prefs,
-              life_buckets: merged,
-              bucket_colors: mergedColors,
-            });
+            await updateUserPreferenceFields({ life_buckets: merged, bucket_colors: mergedColors });
           }
         }
       } else {
         if (loadedFromLocal && localBuckets.length) {
-          if (prefs) {
-            const mergedColors = {
-              ...(prefs.bucket_colors || {}),
-              ...(localBucketColors || {}),
-            } as Record<string, string>;
-            await saveUserPreferences({
-              ...prefs,
-              life_buckets: localBuckets,
-              bucket_colors: mergedColors,
-            });
-          }
+          const mergedColors = {
+            ...(localBucketColors || {}),
+          } as Record<string, string>;
+          await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
         } else {
           // If no buckets found anywhere, set default buckets
           const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
@@ -2776,14 +2681,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
           }
 
-          // Save to Supabase
-          if (prefs) {
-            await saveUserPreferences({
-              ...prefs,
-              life_buckets: defaultBuckets,
-              bucket_colors: { ...(prefs.bucket_colors || {}), ...defaultColors },
-            });
-          }
+          // Save to Supabase — targeted update
+          await updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
         }
       }
     } catch (err) {
@@ -3291,10 +3190,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // 2) Debounce the Supabase save so we don't spam the database while the user drags tasks around
     const supabaseDebounce = setTimeout(async () => {
       try {
-        const prefs = await getUserPreferencesClient();
-        if (prefs) {
-          await saveUserPreferences({ ...prefs, hourly_plan: JSON.parse(localStorage.getItem(localStorageKey) || '{}') });
-        }
+        await updateUserPreferenceFields({ hourly_plan: JSON.parse(localStorage.getItem(localStorageKey) || '{}') });
       } catch (sbErr) {
         console.warn('Could not save hourly plan to Supabase (schema may need updating):', sbErr);
       }
@@ -4056,11 +3952,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       : Math.min(100, Math.round((todayVal / normalizedTarget) * 100));
                     const goalMet = isLinkedTask ? linkedTaskCompleted : pct >= 100;
 
-                    const widgetColor = w.color || getTemplateColor(w.id) || 'tan';
-                    const cardBgClass = goalMet ? (BG_TINT_CLASSES[widgetColor] ?? 'bg-[rgba(177,145,106,0.08)]') : 'bg-white';
+                    // All widgets inherit the active bucket's color
+                    const bucketHex = getBucketColor(activeBucket);
+                    const wStyles = getWidgetColorStyles(bucketHex);
 
                     return (
-                      <div key={w.instanceId} className={`rounded-xl border border-[#dbd6cf] ${goalMet ? cardBgClass : 'bg-white'} p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} onClick={() => {
+                      <div key={w.instanceId} className={`rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} style={goalMet ? { backgroundColor: wStyles.tint } : undefined} onClick={() => {
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -4142,14 +4039,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             }
                             if (!IconComponent) return <div className="h-5 w-5 bg-[#dbd6cf] rounded" />;
 
-                            // Get color - fallback to widget template default if not set
-                            const widgetColor = w.color || getTemplateColor(w.id) || 'tan';
-
                             return (
                               <div
-                                className={`w-9 h-9 rounded-lg flex items-center justify-center ${BG_ICON_TINT_CLASSES[widgetColor] ?? 'bg-[rgba(177,145,106,0.15)]'}`}
+                                className="w-9 h-9 rounded-lg flex items-center justify-center"
+                                style={{ backgroundColor: wStyles.iconTint }}
                               >
-                                <IconComponent className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-[#B1916A]'}`} />
+                                <IconComponent className="h-5 w-5" style={{ color: wStyles.text }} />
                               </div>
                             );
                           })()}
@@ -4689,7 +4584,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 )}
                               </div>
                               <div className="w-full bg-[rgba(183,148,106,0.08)] rounded-full h-1 mt-2">
-                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#B1916A]'}`} style={{ width: `${displayPct}%` }} />
+                                <div className="h-1 rounded-full transition-all duration-300" style={{ width: `${displayPct}%`, backgroundColor: wStyles.solid }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
@@ -4708,7 +4603,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               incrementProgress(w);
                             }}
-                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-[#B1916A]'} hover:scale-110 transition-transform`}
+                            className="absolute bottom-2 right-2 text-xl font-bold leading-none hover:scale-110 transition-transform"
+                            style={{ color: wStyles.text }}
                           >
                             +
                           </button>
@@ -4895,13 +4791,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             return (
                               <div key={widget.instanceId} className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-                                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${BG_ICON_TINT_CLASSES[widget.color || "tan"] ?? "bg-[rgba(177,145,106,0.15)]"}`}>
-                                    {IconComponent ? (
-                                      <IconComponent className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widget.color || "tan"] ?? "text-[#B1916A]"}`} />
-                                    ) : (
-                                      <LayoutDashboard className={`h-5 w-5 ${TEXT_COLOR_CLASSES[widget.color || "tan"] ?? "text-[#B1916A]"}`} />
-                                    )}
-                                  </div>
+                                  {(() => {
+                                    const settingsBucketHex = getBucketColor(activeBucket);
+                                    const sStyles = getWidgetColorStyles(settingsBucketHex);
+                                    return (
+                                      <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: sStyles.iconTint }}>
+                                        {IconComponent ? (
+                                          <IconComponent className="h-5 w-5" style={{ color: sStyles.text }} />
+                                        ) : (
+                                          <LayoutDashboard className="h-5 w-5" style={{ color: sStyles.text }} />
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   <div>
                                     <h3 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">{widget.name}</h3>
                                     <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">{widget.id}</p>
@@ -4925,24 +4827,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                       }}
                                       className="w-full px-3 py-2 border border-[#dbd6cf] rounded-lg bg-white font-['Inter',sans-serif] text-[13px] text-[#314158] focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
                                     />
-                                  </div>
-                                  <div>
-                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Color</label>
-                                    <select
-                                      value={widget.color || "gray"}
-                                      onChange={(event) => {
-                                        patchWidgetInActiveBucket(widget.instanceId, {
-                                          color: event.target.value,
-                                        });
-                                      }}
-                                      className="w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 font-['Inter',sans-serif] text-[13px] text-[#314158] capitalize focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
-                                    >
-                                      {WIDGET_COLOR_OPTIONS.map((colorName) => (
-                                        <option key={colorName} value={colorName}>
-                                          {WIDGET_COLOR_LABELS[colorName] || colorName}
-                                        </option>
-                                      ))}
-                                    </select>
                                   </div>
                                   <div>
                                     <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Data source</label>
@@ -5098,6 +4982,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             availableBuckets={buckets}
             defaultBucket={activeBucket}
             selectedDate={selectedDate}
+            bucketColor={getBucketColor(activeBucket)}
           />
         )}
 
@@ -5115,6 +5000,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             <div className="flex-1 overflow-y-auto px-4 pb-8 sm:px-0 sm:pb-0">
               <WidgetLibrary
                 bucket={activeBucket}
+                bucketColor={getBucketColor(activeBucket)}
                 onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
                   const isInstance = (widgetOrTemplate as any).instanceId !== undefined;
                   const newInstance: WidgetInstance = isInstance
@@ -5129,21 +5015,49 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       schedule: [true, true, true, true, true, true, true],
                     };
 
+                  let nextWidgets: Record<string, WidgetInstance[]> | undefined;
                   setWidgetsByBucket(prev => {
                     const updated = { ...prev };
                     updated[activeBucket] = [...(updated[activeBucket] ?? []), newInstance];
-                    // update ref immediately so debounced save reads latest
                     widgetsByBucketRef.current = updated;
+                    nextWidgets = updated;
                     return updated;
                   });
+
+                  // Persist to localStorage synchronously — must survive a refresh
+                  if (nextWidgets && typeof window !== 'undefined') {
+                    try {
+                      const payload = JSON.stringify({
+                        widgets: nextWidgets,
+                        savedAt: new Date().toISOString(),
+                      });
+                      localStorage.setItem('widgets_by_bucket', payload);
+
+                      // Verify the save was successful by reading back
+                      const readBack = localStorage.getItem('widgets_by_bucket');
+                      if (!readBack) {
+                        console.error('[onAdd] localStorage verification FAILED — readBack is null');
+                      }
+                    } catch (lsErr) {
+                      console.error('[onAdd] localStorage.setItem FAILED:', lsErr);
+                    }
+                  }
 
                   // Open editor for the newly added widget for quick tweaks
                   setEditingBucket(activeBucket);
                   setEditingWidget(newInstance);
                   setNewlyCreatedWidgetId(newInstance.instanceId);
 
-                  // Persist
-                  debouncedSaveToSupabase();
+                  // Persist to Supabase (async, but with error logging)
+                  if (nextWidgets) {
+                    updateUserPreferenceFields({ widgets_by_bucket: nextWidgets }).then(ok => {
+                      if (!ok) {
+                        console.error('[onAdd] Supabase save FAILED — updateUserPreferenceFields returned false');
+                      }
+                    }).catch(err => {
+                      console.error('[onAdd] Supabase save exception:', err);
+                    });
+                  }
                   setIsWidgetSheetOpen(false);
                 }}
               />

@@ -50,16 +50,18 @@ const idToIconMap: Record<string, any> = {
 };
 
 // Re-use a tiny version of the dashboard card so users can see changes instantly
-export function WidgetPreview({ 
-  widget, 
-  draggable = false, 
+export function WidgetPreview({
+  widget,
+  draggable = false,
   onDragStart,
-  onUpdate
-}: { 
-  widget: WidgetInstance; 
+  onUpdate,
+  bucketColor
+}: {
+  widget: WidgetInstance;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
   onUpdate?: (widget: WidgetInstance) => void;
+  bucketColor?: string;
 }) {
   let Icon: any = null;
   if (typeof widget.icon === 'string') {
@@ -90,9 +92,8 @@ export function WidgetPreview({
         <>
           <div className="flex items-center gap-2">
             <div
-              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
-                widget.color ?? "gray"
-              )}`}
+              className="w-6 h-6 rounded flex items-center justify-center"
+              style={{ backgroundColor: bucketColor || '#B1916A' }}
             >
               {SafeIcon ? (
                 <SafeIcon className="h-4 w-4 text-white" />
@@ -112,9 +113,8 @@ export function WidgetPreview({
         <>
           <div className="flex items-center gap-2">
             <div
-              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
-                widget.color ?? "gray"
-              )}`}
+              className="w-6 h-6 rounded flex items-center justify-center"
+              style={{ backgroundColor: bucketColor || '#B1916A' }}
             >
               {SafeIcon ? (
                 <SafeIcon className="h-4 w-4 text-white" />
@@ -134,9 +134,8 @@ export function WidgetPreview({
         <>
           <div className="flex items-center gap-2">
             <div
-              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
-                widget.color ?? "gray"
-              )}`}
+              className="w-6 h-6 rounded flex items-center justify-center"
+              style={{ backgroundColor: bucketColor || '#B1916A' }}
             >
               {SafeIcon ? (
                 <SafeIcon className="h-4 w-4 text-white" />
@@ -157,9 +156,8 @@ export function WidgetPreview({
         <>
           <div className="flex items-center gap-2">
             <div
-              className={`w-6 h-6 rounded flex items-center justify-center ${getColorClass(
-                widget.color ?? "gray"
-              )}`}
+              className="w-6 h-6 rounded flex items-center justify-center"
+              style={{ backgroundColor: bucketColor || '#B1916A' }}
             >
               {SafeIcon ? (
                 <SafeIcon className="h-4 w-4 text-white" />

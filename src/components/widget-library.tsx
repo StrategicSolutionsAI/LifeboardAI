@@ -604,18 +604,45 @@ const getColorClass = (color: string): string => {
   return colorMap[color] || "bg-[#B1916A]"
 }
 
+// Semi-opaque variant: pastel bg + colored icon
+const getSemiOpaqueClasses = (color: string): { bg: string; text: string } => {
+  const map: Record<string, { bg: string; text: string }> = {
+    tan:    { bg: "bg-[#f5ede4]",    text: "text-[#B1916A]" },
+    green:  { bg: "bg-emerald-100",  text: "text-[#48B882]" },
+    blue:   { bg: "bg-blue-100",     text: "text-[#4AADE0]" },
+    purple: { bg: "bg-purple-100",   text: "text-[#8B7FD4]" },
+    pink:   { bg: "bg-pink-100",     text: "text-[#D07AA4]" },
+    gold:   { bg: "bg-amber-100",    text: "text-[#C4A44E]" },
+    orange: { bg: "bg-orange-100",   text: "text-[#E28A5D]" },
+    teal:   { bg: "bg-teal-100",     text: "text-[#5E9B8C]" },
+    slate:  { bg: "bg-slate-100",    text: "text-[#8e99a8]" },
+    stone:  { bg: "bg-stone-100",    text: "text-[#b8b0a8]" },
+  }
+  return map[color] || map.tan
+}
+
 const COLORS = [
   "tan", "green", "blue", "purple", "pink", "gold", "orange", "teal", "slate", "stone"
 ];
+
+// Convert hex to rgba for inline styles
+const hexToRgba = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 interface WidgetLibraryProps {
   onAdd?: (widget: any) => void;
   bucket?: string;
+  bucketColor?: string;
 }
 
-export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLibraryProps) {
+export function WidgetLibrary({ onAdd = () => {}, bucket = "General", bucketColor }: WidgetLibraryProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   // For now, we'll use a simple approach: let the user choose which category to view
@@ -735,7 +762,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
             placeholder="Search widgets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-[#dbd6cf] rounded-md focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-[#dbd6cf]/80 rounded-xl focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] outline-none transition-all duration-200 ease-out"
           />
         </div>
         
@@ -744,8 +771,8 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           <span className="text-sm font-medium text-[#4a5568]">Category</span>
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:gap-1">
             <button
-              className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
-                ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium' 
+              className={`px-3 py-1.5 text-sm rounded-full transition-all duration-200 ease-out ${selectedCategory === 'all'
+                ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium'
                 : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'}`}
               onClick={() => setSelectedCategory('all')}
             >
@@ -754,8 +781,8 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
             {allCategories.map(category => (
               <button
                 key={category}
-                className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
-                  ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium' 
+                className={`px-3 py-1.5 text-sm rounded-full transition-all duration-200 ease-out relative ${selectedCategory === category
+                  ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium'
                   : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'} ${
                     getRecommendedCategory(bucket) === category && selectedCategory !== category 
                       ? 'ring-2 ring-[#B1916A]/40 ring-offset-1' 
@@ -790,11 +817,11 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           {filteredWidgets.map((widget) => {
             const Icon = widget.icon
             return (
-              <Card key={widget.id} className={`hover:shadow-warm transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-[#B1916A]' : ''}`} onClick={() => setSelectedTemplate(widget)}>
+              <Card key={widget.id} className={`hover:shadow-warm-lg hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-200 ease-out cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-[#B1916A]' : ''}`} onClick={() => setSelectedTemplate(widget)}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClass(widget.color)}`}>
-                      <Icon className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={bucketColor ? { backgroundColor: hexToRgba(bucketColor, 0.15) } : { backgroundColor: 'rgba(177,145,106,0.15)' }}>
+                      <Icon className="w-5 h-5" style={{ color: bucketColor || '#B1916A' }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-sm font-medium">{widget.name}</CardTitle>
@@ -839,7 +866,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           {draftWidget ? (
             <>
               <div className="mt-3">
-                <WidgetPreview widget={draftWidget} />
+                <WidgetPreview widget={draftWidget} bucketColor={bucketColor} />
               </div>
 
               {/* Target input */}
@@ -880,23 +907,6 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                   >
                     +
                   </button>
-                </div>
-              </div>
-
-              {/* Color picker */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-[#6b7688]">Colour</p>
-                <div className="flex flex-wrap gap-2">
-                  {COLORS.map((clr) => (
-                    <button
-                      key={clr}
-                      aria-label={clr}
-                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-[#B1916A] ring-offset-2 border-white scale-110' : 'border-white'}`}
-                      onClick={() =>
-                        setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
-                      }
-                    />
-                  ))}
                 </div>
               </div>
 

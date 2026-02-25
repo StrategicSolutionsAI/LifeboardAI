@@ -59,6 +59,7 @@ interface WidgetEditorProps {
   availableBuckets?: string[];
   defaultBucket?: string;
   selectedDate?: Date;
+  bucketColor?: string;
 }
 
 type WidgetTaskConfig = NonNullable<WidgetInstance["linkedTaskConfig"]>;
@@ -123,6 +124,7 @@ export default function WidgetEditorSheet({
   availableBuckets = [],
   defaultBucket,
   selectedDate,
+  bucketColor,
 }: WidgetEditorProps) {
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
@@ -374,7 +376,7 @@ export default function WidgetEditorSheet({
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
             <div className="rounded-2xl border border-[#dbd6cf]/80 bg-gradient-to-b from-[#faf8f5] to-white p-3 shadow-sm">
-              <WidgetPreview widget={draft} />
+              <WidgetPreview widget={draft} bucketColor={bucketColor} />
             </div>
 
             {/* Birthday, Events, and Holiday specific fields */}
@@ -1196,20 +1198,7 @@ export default function WidgetEditorSheet({
               </div>
             )}
 
-            {/* Colour */}
-            <div className={PANEL_SECTION_CLASS}>
-              <p className={FIELD_LABEL_CLASS}>Colour</p>
-              <div className="flex flex-wrap gap-2">
-                {COLORS.map(c => (
-                  <button
-                    key={c}
-                    aria-label={c}
-                    className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(c)} ${draft.color === c ? "ring-2 ring-[#B1916A] ring-offset-2 border-white scale-110" : "border-white"}`}
-                    onClick={() => setDraft(p => p ? { ...p, color: c } : p)}
-                  />
-                ))}
-              </div>
-            </div>
+
 
             {/* Task / Event Details */}
             <div className={PANEL_SECTION_CLASS}>
