@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import AmazonIntegrationPageClient from "./page.client";
 
 export default function AmazonIntegrationPage() {

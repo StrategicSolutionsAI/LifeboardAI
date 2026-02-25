@@ -9,9 +9,9 @@ import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
 import { format } from "date-fns";
 
-// Colour map reused
+// Calidora-aligned colour palette
 const COLORS = [
-  "blue", "green", "red", "orange", "purple", "indigo", "amber", "teal", "rose", "cyan", "yellow", "sky", "emerald", "violet", "lime", "fuchsia", "gray", "slate", "stone",
+  "tan", "green", "blue", "purple", "pink", "gold", "orange", "teal", "slate", "stone",
 ];
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -38,17 +38,17 @@ const getHolidaySuggestions = () => {
 
 const getColorClass = (color: string): string => {
   const colorMap: Record<string, string> = {
-    blue: "bg-blue-500", green: "bg-green-500", red: "bg-red-500", orange: "bg-orange-500", purple: "bg-purple-500", indigo: "bg-indigo-500", amber: "bg-amber-500", teal: "bg-teal-500", rose: "bg-rose-500", cyan: "bg-cyan-500", yellow: "bg-yellow-500", sky: "bg-sky-500", emerald: "bg-emerald-500", violet: "bg-violet-500", lime: "bg-lime-500", fuchsia: "bg-fuchsia-500", gray: "bg-gray-500", slate: "bg-slate-500", stone: "bg-stone-500"
+    tan: "bg-[#B1916A]", green: "bg-[#48B882]", blue: "bg-[#4AADE0]", purple: "bg-[#8B7FD4]", pink: "bg-[#D07AA4]", gold: "bg-[#C4A44E]", orange: "bg-[#E28A5D]", teal: "bg-[#5E9B8C]", slate: "bg-[#8e99a8]", stone: "bg-[#b8b0a8]"
   }
-  return colorMap[color] || "bg-[#faf8f5]0"
+  return colorMap[color] || "bg-[#B1916A]"
 }
 
 const PANEL_SECTION_CLASS = "space-y-4 rounded-2xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_4px_16px_rgba(163,133,96,0.06)]";
 const FIELD_LABEL_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-[#8e99a8]";
 const FORM_CONTROL_CLASS = "w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2.5 text-sm text-[#314158] shadow-[0px_4px_16px_rgba(163,133,96,0.06)] transition focus:border-[#bb9e7b] focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]";
 const TEXTAREA_CLASS = `${FORM_CONTROL_CLASS} min-h-[88px] resize-y`;
-const RADIO_CONTROL_CLASS = "h-4 w-4 border-[#dbd6cf] text-theme-primary-600 focus:ring-theme-primary-400";
-const CHECKBOX_CONTROL_CLASS = "h-4 w-4 rounded border-[#dbd6cf] text-theme-primary-600 focus:ring-theme-primary-400";
+const RADIO_CONTROL_CLASS = "h-4 w-4 border-[#dbd6cf] text-[#B1916A] focus:ring-[#B1916A]/40";
+const CHECKBOX_CONTROL_CLASS = "h-4 w-4 rounded border-[#dbd6cf] text-[#B1916A] focus:ring-[#B1916A]/40";
 
 interface WidgetEditorProps {
   widget: WidgetInstance | null;
@@ -554,7 +554,7 @@ export default function WidgetEditorSheet({
                           }
                         } : p)}
                         className={`flex flex-col items-center rounded-lg border p-2 transition-all ${draft.moodData?.currentMood === mood.value
-                            ? "border-theme-primary-500 bg-theme-primary-50"
+                            ? "border-[#B1916A] bg-[rgba(177,145,106,0.06)]"
                             : 'border-[#dbd6cf] hover:border-[#dbd6cf]'
                           }`}
                       >
@@ -1072,7 +1072,7 @@ export default function WidgetEditorSheet({
                           alert(`Weight logged: ${weight} ${draft.weightData?.unit || draft.unit || 'lbs'}`);
                         }
                       }}
-                      className="rounded-lg border border-warm-200 bg-warm-100 px-4 py-2 text-sm font-medium text-warm-700 transition hover:bg-warm-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg border border-[#dbd6cf] bg-[rgba(177,145,106,0.08)] px-4 py-2 text-sm font-medium text-[#314158] transition hover:bg-[rgba(177,145,106,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Log
                     </button>
@@ -1132,7 +1132,7 @@ export default function WidgetEditorSheet({
                     type="number"
                     value={draft.target}
                     onChange={e => setDraft(p => p ? { ...p, target: Number(e.target.value) } : p)}
-                    className="w-20 rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 text-center text-sm text-[#314158] shadow-sm focus:border-theme-primary-400 focus:outline-none focus:ring-2 focus:ring-theme-primary-100"
+                    className="w-20 rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 text-center text-sm text-[#314158] shadow-sm focus:border-[#B1916A] focus:outline-none focus:ring-2 focus:ring-[#B1916A]/20"
                   />
                   <span className="text-sm text-[#6b7688]">{draft.unit}</span>
                   <button
@@ -1204,7 +1204,7 @@ export default function WidgetEditorSheet({
                   <button
                     key={c}
                     aria-label={c}
-                    className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-105 ${getColorClass(c)} ${draft.color === c ? "ring-2 ring-theme-primary-500 ring-offset-2 border-white" : "border-white"}`}
+                    className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(c)} ${draft.color === c ? "ring-2 ring-[#B1916A] ring-offset-2 border-white scale-110" : "border-white"}`}
                     onClick={() => setDraft(p => p ? { ...p, color: c } : p)}
                   />
                 ))}
@@ -1331,7 +1331,7 @@ export default function WidgetEditorSheet({
                   {WEEKDAYS.map((d, idx) => (
                     <button
                       key={d}
-                      className={`h-9 w-9 rounded-full border text-[11px] font-semibold transition ${draft.schedule[idx] ? "border-theme-primary-600 bg-theme-primary-600 text-white shadow-sm" : "border-[#dbd6cf] bg-white text-[#6b7688] hover:border-[#c5beb6]"}`}
+                      className={`h-9 w-9 rounded-full border text-[11px] font-semibold transition ${draft.schedule[idx] ? "border-[#B1916A] bg-[#B1916A] text-white shadow-sm" : "border-[#dbd6cf] bg-white text-[#6b7688] hover:border-[#c5beb6]"}`}
                       onClick={() => setDraft(p => p ? { ...p, schedule: p.schedule.map((v, i) => i === idx ? !v : v) as boolean[] } : p)}
                     >
                       {d.charAt(0)}

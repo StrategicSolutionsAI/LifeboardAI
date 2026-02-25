@@ -117,7 +117,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track resting heart rate",
     icon: Heart,
     category: "health",
-    color: "red",
+    color: "pink",
     defaultTarget: 70,
     unit: "bpm",
     units: ["bpm"]
@@ -128,7 +128,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Monitor nightly sleep hours",
     icon: Moon,
     category: "health",
-    color: "indigo",
+    color: "purple",
     defaultTarget: 8,
     unit: "hours",
     units: ["hours"]
@@ -150,7 +150,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Monitor daily caffeine consumption",
     icon: Coffee,
     category: "health",
-    color: "amber",
+    color: "gold",
     defaultTarget: 2,
     unit: "cups",
     units: ["cups"]
@@ -161,7 +161,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track your daily meals and nutrition intake with breakfast, lunch, dinner, and snacks",
     icon: Utensils,
     category: "health",
-    color: "emerald",
+    color: "green",
     defaultTarget: 1,
     unit: "meals",
     units: ["meals"]
@@ -183,7 +183,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Capture your thoughts and reflections",
     icon: Notebook,
     category: "wellness",
-    color: "rose",
+    color: "pink",
     defaultTarget: 1,
     unit: "entry",
     units: ["entry"]
@@ -194,7 +194,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track daily meditation time",
     icon: Brain,
     category: "wellness",
-    color: "cyan",
+    color: "blue",
     defaultTarget: 10,
     unit: "min",
     units: ["min"]
@@ -205,7 +205,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Note what you're thankful for",
     icon: Sparkles,
     category: "wellness",
-    color: "yellow",
+    color: "gold",
     defaultTarget: 1,
     unit: "entry",
     units: ["entry"]
@@ -216,7 +216,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Guided 4-7-8 breathing sessions",
     icon: Wind,
     category: "wellness",
-    color: "sky",
+    color: "blue",
     defaultTarget: 5,
     unit: "min",
     units: ["min"]
@@ -227,7 +227,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Reminders to move and stretch",
     icon: Move,
     category: "wellness",
-    color: "emerald",
+    color: "green",
     defaultTarget: 3,
     unit: "breaks",
     units: ["breaks"]
@@ -238,7 +238,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Positive affirmation carousel",
     icon: Quote,
     category: "wellness",
-    color: "violet",
+    color: "purple",
     defaultTarget: 1,
     unit: "set",
     units: ["set"]
@@ -249,7 +249,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track non-work screen minutes",
     icon: Smartphone,
     category: "wellness",
-    color: "amber",
+    color: "gold",
     defaultTarget: 60,
     unit: "min",
     units: ["min"]
@@ -260,7 +260,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "1-10 scale quick log",
     icon: Gauge,
     category: "wellness",
-    color: "red",
+    color: "pink",
     defaultTarget: 1,
     unit: "entry",
     units: ["entry"]
@@ -271,7 +271,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Custom daily self-care items",
     icon: CheckSquare,
     category: "wellness",
-    color: "lime",
+    color: "green",
     defaultTarget: 1,
     unit: "list",
     units: ["list"]
@@ -282,7 +282,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Upcoming medical visits and reminders",
     icon: CalendarClock,
     category: "medical",
-    color: "indigo",
+    color: "purple",
     defaultTarget: 1,
     unit: "event",
     units: ["event"]
@@ -293,7 +293,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track doses and refill reminders",
     icon: Pill,
     category: "medical",
-    color: "fuchsia",
+    color: "pink",
     defaultTarget: 1,
     unit: "dose",
     units: ["dose"]
@@ -304,7 +304,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track progress and milestones for breaking bad habits",
     icon: ShieldOff,
     category: "medical",
-    color: "gray",
+    color: "slate",
     defaultTarget: 1,
     unit: "day",
     units: ["day"]
@@ -337,7 +337,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Daily and weekly household chores",
     icon: ListChecks,
     category: "household",
-    color: "amber",
+    color: "gold",
     defaultTarget: 1,
     unit: "list",
     units: ["list"]
@@ -381,7 +381,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Roster with contact info & birthdays",
     icon: Users,
     category: "family",
-    color: "indigo",
+    color: "purple",
     defaultTarget: 1,
     unit: "list",
     units: ["list"]
@@ -392,7 +392,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Shared events & birthdays",
     icon: CalendarDays,
     category: "family",
-    color: "sky",
+    color: "blue",
     defaultTarget: 1,
     unit: "event",
     units: ["event"]
@@ -414,7 +414,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Weekly dinner plan & groceries",
     icon: Utensils,
     category: "family",
-    color: "amber",
+    color: "gold",
     defaultTarget: 1,
     unit: "week",
     units: ["week"]
@@ -425,7 +425,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track allowances & shared expenses",
     icon: Wallet,
     category: "family",
-    color: "violet",
+    color: "purple",
     defaultTarget: 1,
     unit: "budget",
     units: ["budget"]
@@ -436,7 +436,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Recent family memories",
     icon: ImageIcon,
     category: "family",
-    color: "rose",
+    color: "pink",
     defaultTarget: 1,
     unit: "photo",
     units: ["photo"]
@@ -447,7 +447,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Allergies, contacts, insurance",
     icon: HeartPulse,
     category: "family",
-    color: "red",
+    color: "pink",
     defaultTarget: 1,
     unit: "entry",
     units: ["entry"]
@@ -458,7 +458,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Who's driving where & when",
     icon: Car,
     category: "family",
-    color: "cyan",
+    color: "blue",
     defaultTarget: 1,
     unit: "ride",
     units: ["ride"]
@@ -469,7 +469,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Upcoming birthdays",
     icon: Cake,
     category: "social",
-    color: "rose",
+    color: "pink",
     defaultTarget: 1,
     unit: "birthday",
     units: ["birthday"]
@@ -480,7 +480,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Concerts, meetups, parties",
     icon: PartyPopper,
     category: "social",
-    color: "indigo",
+    color: "purple",
     defaultTarget: 1,
     unit: "event",
     units: ["event"]
@@ -491,7 +491,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Public and personal holidays",
     icon: Gift,
     category: "social",
-    color: "emerald",
+    color: "green",
     defaultTarget: 1,
     unit: "holiday",
     units: ["holiday"]
@@ -535,7 +535,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track monthly budget vs spend",
     icon: Wallet,
     category: "finance",
-    color: "lime",
+    color: "green",
     defaultTarget: 1,
     unit: "budget",
     units: ["budget"]
@@ -546,7 +546,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Monitor savings progress",
     icon: PiggyBank,
     category: "finance",
-    color: "emerald",
+    color: "green",
     defaultTarget: 1,
     unit: "amount",
     units: ["amount"]
@@ -557,7 +557,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Assets minus liabilities snapshot",
     icon: TrendingUp,
     category: "finance",
-    color: "violet",
+    color: "purple",
     defaultTarget: 1,
     unit: "amount",
     units: ["amount"]
@@ -568,7 +568,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Track real-estate assets",
     icon: HomeIcon,
     category: "finance",
-    color: "amber",
+    color: "gold",
     defaultTarget: 1,
     unit: "property",
     units: ["property"]
@@ -579,7 +579,7 @@ const widgetTemplates: WidgetTemplate[] = [
     description: "Milestones toward big purchases",
     icon: Flag,
     category: "finance",
-    color: "fuchsia",
+    color: "pink",
     defaultTarget: 1,
     unit: "goal",
     units: ["goal"]
@@ -587,34 +587,25 @@ const widgetTemplates: WidgetTemplate[] = [
 ]
 
 
-// Helper function to convert color name to Tailwind class
+// Calidora-aligned color palette for widget swatches
 const getColorClass = (color: string): string => {
   const colorMap: Record<string, string> = {
-    blue: "bg-warm-500",
-    green: "bg-green-500",
-    red: "bg-red-500",
-    orange: "bg-orange-500",
-    purple: "bg-amber-500",
-    indigo: "bg-warm-500",
-    amber: "bg-amber-500",
-    teal: "bg-teal-500",
-    rose: "bg-rose-500",
-    cyan: "bg-cyan-500",
-    yellow: "bg-yellow-500",
-    sky: "bg-sky-500",
-    emerald: "bg-emerald-500",
-    violet: "bg-violet-500",
-    lime: "bg-lime-500",
-    fuchsia: "bg-fuchsia-500",
-    gray: "bg-gray-500",
-    slate: "bg-slate-500",
-    stone: "bg-stone-500"
+    tan: "bg-[#B1916A]",
+    green: "bg-[#48B882]",
+    blue: "bg-[#4AADE0]",
+    purple: "bg-[#8B7FD4]",
+    pink: "bg-[#D07AA4]",
+    gold: "bg-[#C4A44E]",
+    orange: "bg-[#E28A5D]",
+    teal: "bg-[#5E9B8C]",
+    slate: "bg-[#8e99a8]",
+    stone: "bg-[#b8b0a8]",
   }
-  return colorMap[color] || "bg-gray-500" // Default to gray if color not found
+  return colorMap[color] || "bg-[#B1916A]"
 }
 
 const COLORS = [
-  "blue","green","red","orange","purple","indigo","amber","teal","rose","cyan","yellow","sky","emerald","violet","lime","fuchsia","gray","slate","stone"
+  "tan", "green", "blue", "purple", "pink", "gold", "orange", "teal", "slate", "stone"
 ];
 
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -744,7 +735,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
             placeholder="Search widgets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-[#dbd6cf] rounded-md focus:ring-2 focus:ring-warm-500 focus:border-warm-500 outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-[#dbd6cf] rounded-md focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] outline-none"
           />
         </div>
         
@@ -754,7 +745,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:gap-1">
             <button
               className={`px-3 py-1.5 text-sm rounded-full transition-colors ${selectedCategory === 'all' 
-                ? 'bg-warm-100 text-warm-700 font-medium' 
+                ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium' 
                 : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'}`}
               onClick={() => setSelectedCategory('all')}
             >
@@ -764,17 +755,17 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               <button
                 key={category}
                 className={`px-3 py-1.5 text-sm rounded-full transition-colors relative ${selectedCategory === category 
-                  ? 'bg-warm-100 text-warm-700 font-medium' 
+                  ? 'bg-[rgba(177,145,106,0.12)] text-[#314158] font-medium' 
                   : 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] hover:bg-[#ebe5de]'} ${
                     getRecommendedCategory(bucket) === category && selectedCategory !== category 
-                      ? 'ring-2 ring-warm-300 ring-offset-1' 
+                      ? 'ring-2 ring-[#B1916A]/40 ring-offset-1' 
                       : ''
                   }`}
                 onClick={() => setSelectedCategory(category)}
               >
                 {category.charAt(0).toUpperCase() + category.slice(1)}
                 {getRecommendedCategory(bucket) === category && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-warm-500 rounded-full animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#B1916A] rounded-full animate-pulse" />
                 )}
               </button>
             ))}
@@ -784,10 +775,10 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
         {/* Show a hint if not viewing the recommended category */}
         {selectedCategory !== getRecommendedCategory(bucket) && selectedCategory !== 'all' && (
           <div className="text-sm text-[#8e99a8] flex items-center gap-2">
-            <span className="inline-block w-2 h-2 bg-warm-500 rounded-full animate-pulse" />
+            <span className="inline-block w-2 h-2 bg-[#B1916A] rounded-full animate-pulse" />
             <span>Tip: Try the <button 
               onClick={() => setSelectedCategory(getRecommendedCategory(bucket))} 
-              className="text-warm-600 hover:underline font-medium"
+              className="text-[#B1916A] hover:underline font-medium"
             >
               {getRecommendedCategory(bucket).charAt(0).toUpperCase() + getRecommendedCategory(bucket).slice(1)}
             </button> category for widgets that match your "{bucket}" bucket</span>
@@ -799,7 +790,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
           {filteredWidgets.map((widget) => {
             const Icon = widget.icon
             return (
-              <Card key={widget.id} className={`hover:shadow-warm transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-warm-400' : ''}`} onClick={() => setSelectedTemplate(widget)}>
+              <Card key={widget.id} className={`hover:shadow-warm transition-shadow cursor-pointer ${selectedTemplate?.id === widget.id ? 'ring-2 ring-[#B1916A]' : ''}`} onClick={() => setSelectedTemplate(widget)}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClass(widget.color)}`}>
@@ -900,7 +891,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     <button
                       key={clr}
                       aria-label={clr}
-                      className={`w-6 h-6 rounded-full border-2 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-warm-500' : 'border-white'}`}
+                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 ${getColorClass(clr)} ${draftWidget.color === clr ? 'ring-2 ring-[#B1916A] ring-offset-2 border-white scale-110' : 'border-white'}`}
                       onClick={() =>
                         setDraftWidget((prev) => (prev ? { ...prev, color: clr } : prev))
                       }
@@ -921,7 +912,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                         value="manual"
                         checked={draftWidget.dataSource === 'manual'}
                         onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'manual' } : prev)}
-                        className="text-warm-600"
+                        className="text-[#B1916A]"
                       />
                       <span className="text-sm">Manual tracking</span>
                     </label>
@@ -932,7 +923,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                         value="fitbit"
                         checked={draftWidget.dataSource === 'fitbit'}
                         onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'fitbit' } : prev)}
-                        className="text-warm-600"
+                        className="text-[#B1916A]"
                       />
                       <span className="text-sm">Fitbit (automatic)</span>
                     </label>
@@ -944,7 +935,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                           value="googlefit"
                           checked={draftWidget.dataSource === 'googlefit'}
                           onChange={() => setDraftWidget(prev => prev ? { ...prev, dataSource: 'googlefit' } : prev)}
-                          className="text-warm-600"
+                          className="text-[#B1916A]"
                         />
                         <span className="text-sm">Google Fit (automatic)</span>
                       </label>
@@ -966,7 +957,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
                     <button
                       key={d}
                       aria-label={d}
-                      className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-warm-500 text-white' : 'bg-white text-[#6b7688]'} hover:bg-warm-100`}
+                      className={`w-8 h-8 text-[11px] rounded-full border ${draftWidget.schedule[idx] ? 'bg-[#B1916A] text-white' : 'bg-white text-[#6b7688]'} hover:bg-[rgba(177,145,106,0.12)]`}
                       onClick={() =>
                         setDraftWidget((prev) =>
                           prev
@@ -1014,7 +1005,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General" }: WidgetLi
               </div>
 
               <button
-                className="w-full mt-4 py-2 rounded bg-warm-600 hover:bg-warm-700 text-white text-sm font-medium"
+                className="w-full mt-4 py-2 rounded bg-[#B1916A] hover:bg-[#a07f5a] text-white text-sm font-medium"
                 onClick={() => {
                   if (!draftWidget) return;
                   // Convert component to its name string for persistence

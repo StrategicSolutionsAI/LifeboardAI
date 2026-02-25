@@ -1,14 +1,14 @@
 import { getUserPreferencesClient } from "./user-preferences";
 
 const UNASSIGNED_BUCKET_ID = "__unassigned";
-const BUCKET_COLOR_PALETTE = ["#4F46E5","#22C55E","#F97316","#EC4899","#14B8A6","#8B5CF6","#F59E0B","#06B6D4"] as const;
+const BUCKET_COLOR_PALETTE = ["#6B8AF7","#48B882","#D07AA4","#4AADE0","#C4A44E","#8B7FD4","#E28A5D","#5E9B8C"] as const;
 
 let cachedBucketColors: Record<string, string> | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function defaultBucketColorFromId(id: string): string {
-  if (id === UNASSIGNED_BUCKET_ID) return "#94A3B8";
+  if (id === UNASSIGNED_BUCKET_ID) return "#8e99a8";
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash << 5) - hash + id.charCodeAt(i);

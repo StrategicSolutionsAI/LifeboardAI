@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react"
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -90,6 +90,29 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const pathname = usePathname() || "/dashboard"
   const router = useRouter()
   const hasPrefetchedCalendarRef = useRef(false)
+  const hasPrefetchedAllRef = useRef(false)
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
+
+  // Clear navigatingTo when pathname changes (navigation completed)
+  useEffect(() => {
+    setNavigatingTo(null)
+  }, [pathname])
+
+  // Aggressively prefetch ALL sidebar routes on mount for instant navigation
+  useEffect(() => {
+    if (hasPrefetchedAllRef.current) return
+    hasPrefetchedAllRef.current = true
+    const allHrefs = [...navItems.map((n) => n.href), "/dashboard/settings"]
+    allHrefs.forEach((href) => router.prefetch(href))
+  }, [router])
+
+  // Let Link handle navigation natively — just provide instant visual feedback
+  const handleNavClick = useCallback(
+    (_e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      setNavigatingTo(href)
+    },
+    []
+  )
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -101,6 +124,11 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       return pathname === "/dashboard" || pathname === "/dashboard/"
     }
     return pathname.startsWith(href)
+  }
+
+  const isActiveOrNavigating = (href: string) => {
+    if (navigatingTo === href) return true
+    return isActiveRoute(href)
   }
 
   const currentRoute = useMemo(() => {
@@ -119,14 +147,14 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   const getPrefetchHandlers = useCallback(
     (href: string) => {
-      if (href !== "/calendar") {
-        return {}
+      if (href === "/calendar") {
+        return {
+          onMouseEnter: warmCalendarNavigation,
+          onFocus: warmCalendarNavigation,
+          onTouchStart: warmCalendarNavigation,
+        }
       }
-      return {
-        onMouseEnter: warmCalendarNavigation,
-        onFocus: warmCalendarNavigation,
-        onTouchStart: warmCalendarNavigation,
-      }
+      return {}
     },
     [warmCalendarNavigation]
   )
@@ -166,7 +194,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   }, [pathname, warmCalendarNavigation])
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-x-hidden md:grid md:h-screen md:grid-cols-[92px_1fr] md:grid-rows-[64px_1fr] md:overflow-hidden" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="relative min-h-screen flex flex-col overflow-x-hidden md:flex md:h-screen md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
@@ -174,145 +202,148 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         Skip to content
       </a>
 
-      {/* Sidebar */}
-      <aside className="hidden md:flex flex-shrink-0 flex-col border-r border-[#dbd6cf] bg-white py-3 md:row-start-2 md:sticky md:top-16 md:h-[calc(100vh-64px)] md:max-h-[calc(100vh-64px)] md:overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
-        <nav className="w-full px-2 space-y-2">
+      {/* Sidebar - Floating Panel */}
+      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-[#dbd6cf] py-3 w-[92px] h-[calc(100vh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-1 px-2 pb-3 mb-1 border-b border-[rgba(219,214,207,0.5)]">
+          <div className="w-9 h-9 bg-theme-primary rounded-xl flex items-center justify-center shadow-sm">
+            <span className="text-white text-sm font-bold">L</span>
+          </div>
+          <span className="section-label text-[8px] tracking-[0.5px]">Lifeboard</span>
+        </div>
+
+        <nav className="w-full px-2 space-y-1 pt-1">
           {navItems.map(({ href, icon: Icon, label }) => {
-            const active = isActiveRoute(href)
+            const activeOrNav = isActiveOrNavigating(href)
+            const isNavigating = navigatingTo === href
             return (
               <Link
                 key={href}
                 href={href}
+                onClick={(e) => handleNavClick(e, href)}
                 {...getPrefetchHandlers(href)}
-                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${active
-                  ? "border border-theme-primary-200 bg-theme-primary-50 text-theme-primary-700 shadow-sm"
-                  : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
+                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${activeOrNav
+                  ? "bg-[rgba(183,148,106,0.12)] text-[#314158]"
+                  : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.06)] hover:text-[#314158]"
                   }`}
                 aria-label={label}
                 title={label}
               >
-                {active && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-theme-primary" aria-hidden="true" />}
-                <Icon className={`h-5 w-5 ${active ? "text-theme-primary" : "text-[#8e99a8] group-hover:text-[#314158]"}`} />
+                {activeOrNav && <span className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#B1916A] ${isNavigating ? "animate-pulse" : ""}`} aria-hidden="true" />}
+                <Icon className={`h-5 w-5 ${activeOrNav ? "text-[#B1916A]" : "text-[#8e99a8] group-hover:text-[#314158]"} ${isNavigating ? "animate-pulse" : ""}`} />
                 <span className="leading-none">{label}</span>
               </Link>
             )
           })}
         </nav>
 
-        <div className="mt-auto px-2 pt-3">
+        <div className="mt-auto px-2 pt-3 border-t border-[rgba(219,214,207,0.5)]">
           <Link
             href="/dashboard/settings"
-            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${isActiveRoute("/dashboard/settings")
-              ? "border border-theme-primary-200 bg-theme-primary-50 text-theme-primary-700 shadow-sm"
+            onClick={(e) => handleNavClick(e, "/dashboard/settings")}
+            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${isActiveOrNavigating("/dashboard/settings")
+              ? "bg-[rgba(183,148,106,0.08)] text-[#314158]"
               : "text-[#8e99a8] hover:bg-[rgba(177,145,106,0.08)] hover:text-[#314158]"
               }`}
             aria-label="Settings"
             title="Settings"
           >
-            {isActiveRoute("/dashboard/settings") && (
-              <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-theme-primary" aria-hidden="true" />
+            {isActiveOrNavigating("/dashboard/settings") && (
+              <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-theme-primary ${navigatingTo === "/dashboard/settings" ? "animate-pulse" : ""}`} aria-hidden="true" />
             )}
             <Settings
-              className={`h-5 w-5 ${isActiveRoute("/dashboard/settings") ? "text-theme-primary" : "text-[#8e99a8] group-hover:text-[#314158]"
-                }`}
+              className={`h-5 w-5 ${isActiveOrNavigating("/dashboard/settings") ? "text-theme-primary" : "text-[#8e99a8] group-hover:text-[#314158]"
+                } ${navigatingTo === "/dashboard/settings" ? "animate-pulse" : ""}`}
             />
             <span className="leading-none">Settings</span>
           </Link>
         </div>
       </aside>
 
-      {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#dbd6cf] px-4 md:col-span-2 md:px-8 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]" style={{ backgroundImage: "linear-gradient(173.681deg, rgba(255, 255, 255, 0.98) 41.319%, rgb(255, 255, 255) 81.558%)" }}>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-bold">L</span>
+      {/* Right side: Header + Content */}
+      <div className="flex flex-1 flex-col min-w-0 md:gap-5">
+        {/* Header - Floating Bar */}
+        <header
+          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#dbd6cf] px-4 md:static md:h-[66px] md:shrink-0 md:rounded-[20px] md:border md:border-[#dbd6cf] md:px-10 md:shadow-[0px_8px_30px_rgba(163,133,96,0.1)]"
+          style={{ backgroundImage: "linear-gradient(173.681deg, rgba(255, 255, 255, 0.98) 41.319%, rgb(255, 255, 255) 81.558%)" }}
+        >
+          <div className="flex min-w-0 items-center gap-4">
+            {/* Mobile logo */}
+            <div className="md:hidden w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
+              <span className="text-white text-sm font-bold">L</span>
+            </div>
+            <div className="hidden md:flex items-center gap-2">
+              <LayoutDashboard size={16} className="text-[#314158]" />
+              <span className="font-['Inter',sans-serif] text-[14px] text-[#314158] tracking-wide">
+                {currentRoute.title.toUpperCase()}
+              </span>
+            </div>
+            <div className="hidden sm:flex md:hidden items-baseline gap-1 text-[22px] font-semibold leading-none">
+              <span className="text-theme-primary">Lifeboard</span>
+              <span className="text-[#314158]">AI</span>
+            </div>
           </div>
-          <div className="hidden sm:flex items-baseline gap-1 text-[22px] font-semibold leading-none">
-            <span className="text-theme-primary">Lifeboard</span>
-            <span className="text-[#314158]">AI</span>
-          </div>
-          <div className="hidden lg:block h-8 w-px bg-[#dbd6cf]" />
-          <div className="hidden lg:block min-w-0">
-            <p className="truncate text-sm font-semibold text-[#314158]">{currentRoute.title}</p>
-            <p className="truncate text-xs text-[#8e99a8]">{currentRoute.description}</p>
-          </div>
-        </div>
 
-        <nav className="hidden xl:flex items-center gap-1 rounded-full border border-[#dbd6cf] bg-white p-1 shadow-[0px_4px_16px_rgba(163,133,96,0.06)]">
-          {mobileNavItems.slice(0, 4).map(({ href, label }) => {
-            const active = isActiveRoute(href)
-            return (
-              <Link
-                key={href}
-                href={href}
-                {...getPrefetchHandlers(href)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${active ? "bg-theme-primary text-white" : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)]"
-                  }`}
-              >
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="hidden md:flex items-center gap-2">
-          <Link href="/tasks">
-            <Button className="h-9 rounded-lg bg-theme-primary px-3 text-white hover:bg-theme-primary-600">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Quick Task
-            </Button>
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="h-9 w-9 rounded-full border border-[#dbd6cf] bg-white flex items-center justify-center hover:bg-[rgba(183,148,106,0.08)]"
-            aria-label="Sign out"
-          >
-            <User className="h-4 w-4 text-[#314158]" />
-          </button>
-        </div>
-
-        {/* Mobile actions */}
-        <div className="md:hidden">
-          <Sheet>
-            <SheetTrigger asChild>
-              <button className="p-2 rounded-lg hover:bg-[rgba(183,148,106,0.08)] active:bg-[rgba(183,148,106,0.14)]" aria-label="Open quick actions">
-                <Menu className="h-5 w-5 text-[#314158]" />
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <SheetHeader>
-                <SheetTitle>{currentRoute.title}</SheetTitle>
-              </SheetHeader>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    {...getPrefetchHandlers(href)}
-                    className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] px-3 py-3 text-sm font-medium text-[#314158] hover:bg-[rgba(183,148,106,0.08)]"
-                  >
-                    <Icon className="h-4 w-4 text-[#8e99a8]" />
-                    {label}
-                  </Link>
-                ))}
-              </div>
-
-              <Button onClick={handleSignOut} variant="outline" className="mt-4 w-full">
-                Sign out
+          <div className="hidden md:flex items-center gap-2">
+            <Link href="/tasks">
+              <Button className="h-9 rounded-lg bg-theme-primary px-3 text-white hover:bg-theme-primary-600">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Quick Task
               </Button>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className="h-9 w-9 rounded-full border border-[#dbd6cf] bg-white flex items-center justify-center hover:bg-[rgba(183,148,106,0.08)]"
+              aria-label="Sign out"
+            >
+              <User className="h-4 w-4 text-[#314158]" />
+            </button>
+          </div>
 
-      {/* Main content area */}
-      <main
-        id="main-content"
-        className="flex-1 w-full px-4 pb-24 pt-4 sm:pt-6 md:col-start-2 md:row-start-2 md:h-full md:overflow-y-auto md:px-8 md:pb-8"
-      >
-        {children}
-      </main>
+          {/* Mobile actions */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="p-2 rounded-lg hover:bg-[rgba(183,148,106,0.08)] active:bg-[rgba(183,148,106,0.14)]" aria-label="Open quick actions">
+                  <Menu className="h-5 w-5 text-[#314158]" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <SheetHeader>
+                  <SheetTitle>{currentRoute.title}</SheetTitle>
+                </SheetHeader>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={(e) => handleNavClick(e, href)}
+                      {...getPrefetchHandlers(href)}
+                      className={`flex items-center gap-2 rounded-lg border border-[#dbd6cf] px-3 py-3 text-sm font-medium text-[#314158] hover:bg-[rgba(183,148,106,0.08)] ${navigatingTo === href ? "bg-[rgba(183,148,106,0.08)]" : ""}`}
+                    >
+                      <Icon className="h-4 w-4 text-[#8e99a8]" />
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+
+                <Button onClick={handleSignOut} variant="outline" className="mt-4 w-full">
+                  Sign out
+                </Button>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </header>
+
+        {/* Main content area */}
+        <main
+          id="main-content"
+          className="flex-1 w-full px-4 pb-24 pt-4 sm:pt-6 md:h-full md:overflow-y-auto md:px-2 md:pb-4 md:pt-0"
+        >
+          {children}
+        </main>
+      </div>
 
       {/* Mobile bottom nav */}
       <nav
@@ -321,18 +352,20 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       >
         <ul className="grid grid-cols-5 items-center py-1">
           {mobileNavItems.map(({ href, icon: Icon, label }) => {
-            const active = isActiveRoute(href)
+            const activeOrNav = isActiveOrNavigating(href)
             return (
               <li key={href} className="flex justify-center">
                 <Link
                   href={href}
+                  onClick={(e) => handleNavClick(e, href)}
                   {...getPrefetchHandlers(href)}
                   aria-label={label}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex w-full max-w-[72px] flex-col items-center justify-center rounded-md px-2 py-2 text-[10px] font-medium transition-colors ${active ? "text-theme-primary" : "text-[#6b7688]"
+                  aria-current={isActiveRoute(href) ? "page" : undefined}
+                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium transition-colors ${activeOrNav ? "text-[#314158] bg-[rgba(183,148,106,0.1)]" : "text-[#6b7688]"
                     }`}
                 >
-                  <Icon className={`mb-0.5 h-5 w-5 ${active ? "text-theme-primary" : "text-[#8e99a8]"}`} />
+                  {activeOrNav && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[#B1916A]" aria-hidden="true" />}
+                  <Icon className={`mb-0.5 h-5 w-5 ${activeOrNav ? "text-[#B1916A]" : "text-[#8e99a8]"}`} />
                   {label}
                 </Link>
               </li>

@@ -24,17 +24,27 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
   const bucketId = normalizeBucketId(bucketName);
   const color = getBucketColorSync(bucketId, bucketColors);
 
-  // Map hex colors to Tailwind classes
+  // Map hex colors to Tailwind classes (Calidora palette)
   const colorMap: Record<string, string> = {
-    "#4F46E5": "bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]", // indigo
-    "#22C55E": "bg-green-100 text-green-700 border-green-200",   // green
-    "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange
-    "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink
-    "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal
-    "#8B5CF6": "bg-violet-100 text-violet-700 border-violet-200", // violet
-    "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber
-    "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan
-    "#94A3B8": "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]",     // gray (unassigned)
+    "#6B8AF7": "bg-[#f0f3fe] text-[#5570c7] border-[#c8d3f9]", // blue (Calidora)
+    "#48B882": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]", // green (Calidora)
+    "#D07AA4": "bg-[#fdf1f6] text-[#b05c86] border-[#ebc3d6]", // rose (Calidora)
+    "#4AADE0": "bg-[#eef7fc] text-[#3889b5] border-[#b0daf0]", // sky blue (Calidora)
+    "#C4A44E": "bg-[#faf6ec] text-[#9e843e] border-[#e0d4a8]", // golden (Calidora)
+    "#8B7FD4": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // plum (Calidora)
+    "#E28A5D": "bg-[#fdf3ee] text-[#b56e4a] border-[#f0c8b3]", // orange (Calidora)
+    "#5E9B8C": "bg-[#eff7f5] text-[#4b7c70] border-[#b8d8cf]", // teal (Calidora)
+    "#8e99a8": "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]", // gray (unassigned - Calidora)
+    // Legacy colors for backwards compatibility
+    "#4F46E5": "bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]", // indigo (legacy)
+    "#22C55E": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]", // green (legacy)
+    "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange (legacy)
+    "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink (legacy)
+    "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal (legacy)
+    "#8B5CF6": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // violet (legacy)
+    "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber (legacy)
+    "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan (legacy)
+    "#94A3B8": "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]", // gray (legacy)
     "#ff52bf": "bg-pink-100 text-pink-700 border-pink-200"      // custom pink
   };
 
@@ -55,6 +65,16 @@ const getCustomBucketStyles = (bucketName?: string | null, bucketColors?: Record
 
   // Check if this is a custom color (not in predefined map)
   const colorMap: Record<string, string> = {
+    "#6B8AF7": "predefined",
+    "#48B882": "predefined",
+    "#D07AA4": "predefined",
+    "#4AADE0": "predefined",
+    "#C4A44E": "predefined",
+    "#8B7FD4": "predefined",
+    "#E28A5D": "predefined",
+    "#5E9B8C": "predefined",
+    "#8e99a8": "predefined",
+    // Legacy colors
     "#4F46E5": "predefined",
     "#22C55E": "predefined",
     "#F97316": "predefined",
@@ -1153,8 +1173,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
       <div className="px-6 py-5 border-b border-[#dbd6cf]/60/80 bg-gradient-to-r from-[#faf8f5]/30 to-transparent">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-[#314158] tracking-tight">Tasks</h3>
-            <p className="text-sm text-[#8e99a8] mt-0.5">Organize your workflow</p>
+            <h3 className="section-label-sm">Tasks</h3>
+            <p className="font-['Inter',sans-serif] text-[13px] text-[#8e99a8] mt-1">Organize your workflow</p>
           </div>
           <button
             onClick={() => setIsCollapsed(true)}
@@ -1229,7 +1249,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <ChevronRight size={14} className="text-white" />
                       </div>
                       <div>
-                        <h4 className="text-base font-semibold text-[#314158] tracking-tight">Today's Tasks</h4>
+                        <h4 className="section-label">Today&apos;s Tasks</h4>
                         <p className="text-sm text-[#8e99a8]">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>
@@ -1617,7 +1637,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <ChevronRight size={14} className="text-white" />
                       </div>
                       <div>
-                        <h4 className="text-base font-semibold text-[#314158] tracking-tight">Today's Tasks</h4>
+                        <h4 className="section-label">Today&apos;s Tasks</h4>
                         <p className="text-sm text-[#8e99a8]">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>

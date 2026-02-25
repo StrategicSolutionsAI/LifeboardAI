@@ -87,6 +87,7 @@ import {
   Sun,
   LayoutDashboard,
   Settings as SettingsIcon,
+  Settings2,
   ListChecks,
   Pencil,
   Check,
@@ -301,41 +302,88 @@ const getIconComponent = (name: string): LucideIcon | null => {
   return iconMap[name] || null
 }
 
-// Default colors for widget templates
+// Default colors for widget templates (mapped to Calidora palette)
 const templateColors: Record<string, string> = {
   water: "blue",
   calories: "orange",
   steps: "green",
   weight: "purple",
-  heartrate: "red",
-  sleep: "indigo",
+  heartrate: "pink",
+  sleep: "purple",
   exercise: "teal",
-  caffeine: "amber",
-  chores: "amber",
-  nutrition: "emerald",
+  caffeine: "gold",
+  chores: "gold",
+  nutrition: "green",
 };
 
 const getTemplateColor = (id: string): string | null => {
   return templateColors[id] || null;
 };
 
-// Color to Tailwind background class map (500 tone)
+// Calidora-aligned color palette for widgets
+// Solid background classes (used for icon containers & badges)
 const BG_COLOR_CLASSES: Record<string, string> = {
-  blue: 'bg-warm-500', green: 'bg-green-500', red: 'bg-red-500', orange: 'bg-orange-500', purple: 'bg-amber-500', indigo: 'bg-warm-500', amber: 'bg-amber-500', teal: 'bg-teal-500', rose: 'bg-rose-500', cyan: 'bg-cyan-500', yellow: 'bg-yellow-500', sky: 'bg-sky-500', emerald: 'bg-emerald-500', violet: 'bg-violet-500', lime: 'bg-lime-500', fuchsia: 'bg-fuchsia-500', gray: 'bg-[#b8b0a8]', slate: 'bg-slate-500', stone: 'bg-stone-500'
+  tan: 'bg-[#B1916A]',
+  green: 'bg-[#48B882]',
+  blue: 'bg-[#4AADE0]',
+  purple: 'bg-[#8B7FD4]',
+  pink: 'bg-[#D07AA4]',
+  gold: 'bg-[#C4A44E]',
+  orange: 'bg-[#E28A5D]',
+  teal: 'bg-[#5E9B8C]',
+  slate: 'bg-[#8e99a8]',
+  stone: 'bg-[#b8b0a8]',
 };
 
-// Text color classes to match widget icon color (500 tone)
+// Text color classes to match widget icon color
 const TEXT_COLOR_CLASSES: Record<string, string> = {
-  blue: 'text-warm-500', green: 'text-green-500', red: 'text-red-500', orange: 'text-orange-500', purple: 'text-amber-500', indigo: 'text-warm-500', amber: 'text-amber-500', teal: 'text-teal-500', rose: 'text-rose-500', cyan: 'text-cyan-500', yellow: 'text-yellow-500', sky: 'text-sky-500', emerald: 'text-emerald-500', violet: 'text-violet-500', lime: 'text-lime-500', fuchsia: 'text-fuchsia-500', gray: 'text-[#8e99a8]', slate: 'text-slate-500', stone: 'text-stone-500'
+  tan: 'text-[#B1916A]',
+  green: 'text-[#48B882]',
+  blue: 'text-[#4AADE0]',
+  purple: 'text-[#8B7FD4]',
+  pink: 'text-[#D07AA4]',
+  gold: 'text-[#C4A44E]',
+  orange: 'text-[#E28A5D]',
+  teal: 'text-[#5E9B8C]',
+  slate: 'text-[#8e99a8]',
+  stone: 'text-[#b8b0a8]',
+};
+
+// Light tint classes (8% opacity, used for card backgrounds when goal met)
+const BG_TINT_CLASSES: Record<string, string> = {
+  tan: 'bg-[rgba(177,145,106,0.08)]',
+  green: 'bg-[rgba(72,184,130,0.08)]',
+  blue: 'bg-[rgba(74,173,224,0.08)]',
+  purple: 'bg-[rgba(139,127,212,0.08)]',
+  pink: 'bg-[rgba(208,122,164,0.08)]',
+  gold: 'bg-[rgba(196,164,78,0.08)]',
+  orange: 'bg-[rgba(226,138,93,0.08)]',
+  teal: 'bg-[rgba(94,155,140,0.08)]',
+  slate: 'bg-[rgba(142,153,168,0.08)]',
+  stone: 'bg-[rgba(184,176,168,0.08)]',
+};
+
+// Display labels for the color picker
+const WIDGET_COLOR_LABELS: Record<string, string> = {
+  tan: 'Tan',
+  green: 'Green',
+  blue: 'Blue',
+  purple: 'Purple',
+  pink: 'Pink',
+  gold: 'Gold',
+  orange: 'Orange',
+  teal: 'Teal',
+  slate: 'Slate',
+  stone: 'Stone',
 };
 
 const WIDGET_COLOR_OPTIONS = Object.keys(BG_COLOR_CLASSES);
 
 const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
-  progress: "bg-warm-500",
-  integration: "bg-emerald-500",
-  entry: "bg-violet-500",
-  task: "bg-amber-500",
+  progress: "bg-[#4AADE0]",
+  integration: "bg-[#48B882]",
+  entry: "bg-[#8B7FD4]",
+  task: "bg-[#C4A44E]",
   system: "bg-[#b8b0a8]",
 };
 
@@ -511,18 +559,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     'Home'
   ] as const
 
-  // Recommended color per common bucket name
+  // Recommended color per common bucket name (Calidora palette)
   const SUGGESTED_BUCKET_COLOR_MAP: Record<string, string> = {
-    health: '#22C55E',     // green-500
-    wellness: '#10B981',   // emerald-500
-    family: '#60A5FA',     // blue-400
-    social: '#F43F5E',     // rose-500
-    work: '#B1916A',       // indigo-500
-    personal: '#8B5CF6',   // violet-500
-    projects: '#0EA5E9',   // sky-500
-    home: '#64748B',       // slate-500
-    finance: '#EAB308',    // yellow-500
-    fitness: '#EF4444',    // red-500
+    health: '#48B882',     // green (Calidora)
+    wellness: '#5E9B8C',   // teal (Calidora)
+    family: '#4AADE0',     // sky blue (Calidora)
+    social: '#D07AA4',     // rose (Calidora)
+    work: '#B1916A',       // warm brown (Calidora)
+    personal: '#8B7FD4',   // plum (Calidora)
+    projects: '#6B8AF7',   // blue (Calidora)
+    home: '#5E9B8C',       // teal (Calidora)
+    finance: '#C4A44E',    // golden (Calidora)
+    fitness: '#E28A5D',    // orange (Calidora)
   }
 
   function getSuggestedColorForBucket(name: string): string {
@@ -535,20 +583,20 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     [buckets]
   )
 
-  // Preset color palette (hex) for bucket color selection
+  // Preset color palette (hex) for bucket color selection (Calidora palette)
   const BUCKET_COLOR_PALETTE = [
-    '#B1916A', // indigo-500
-    '#22C55E', // green-500
-    '#EF4444', // red-500
-    '#F59E0B', // amber-500
-    '#8B5CF6', // violet-500
-    '#06B6D4', // cyan-500
-    '#F43F5E', // rose-500
-    '#0EA5E9', // sky-500
-    '#10B981', // emerald-500
-    '#EAB308', // yellow-500
-    '#64748B', // slate-500
-    '#A3A3A3', // neutral-400
+    '#B1916A', // warm brown (Calidora)
+    '#6B8AF7', // blue (Calidora)
+    '#48B882', // green (Calidora)
+    '#D07AA4', // rose (Calidora)
+    '#4AADE0', // sky blue (Calidora)
+    '#C4A44E', // golden (Calidora)
+    '#8B7FD4', // plum (Calidora)
+    '#E28A5D', // orange (Calidora)
+    '#5E9B8C', // teal (Calidora)
+    '#bb9e7b', // sand (Calidora)
+    '#314158', // dark slate (Calidora)
+    '#8e99a8', // muted gray (Calidora)
   ] as const
 
   // Create lighter opaque colors by blending with white
@@ -3692,37 +3740,63 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, [checkAndResetWidgets]);
 
   return (
-    <div className="flex-1 relative min-h-screen overflow-hidden">
-      {/* Background Image Layer */}
-      <div className="absolute inset-0 w-full h-full -z-10 pointer-events-none">
-        <img
-          src="/images/background.png"
-          alt="dashboard background"
-          className="w-full h-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-white/50 via-white/25 to-white/10"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-br from-theme-primary-500/5 via-transparent to-transparent"></div>
-      </div>
+    <div className="flex-1 relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)' }}>
 
-      {/* Main wrapper: no styling, acts purely as a container */}
+      {/* Main wrapper */}
       <div className="relative z-10 flex flex-col">
 
-        {/* Greeting */}
-        <section className="w-full mb-6 mt-2">
-          <h1 className="text-[28px] tracking-[0.5px] font-semibold text-[#171A1F] mb-1">
-            Hello <span className="text-theme-primary-600 font-bold">{greetingName || 'there'}</span>
-          </h1>
-          <p className="text-[15px] text-[#6b7688]">You've got this! Let's make today productive.</p>
+        {/* Greeting + Completion Ring row */}
+        <section className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="font-['DM_Sans',sans-serif] text-[24px] text-[#314158] tracking-tight">
+              Welcome back, <span className="text-[#B1916A] font-bold">{greetingName || 'there'}</span>
+            </h1>
+            <p className="font-['Inter',sans-serif] text-[14px] text-[#8e99a8] mt-1">You've got this! Let's make today productive.</p>
+          </div>
+          {/* Completion ring card */}
+          <div className="hidden md:flex items-center gap-3 bg-white border border-[#dbd6cf] rounded-2xl px-5 py-3 shadow-warm-sm">
+            <div className="relative w-12 h-12">
+              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(219,214,207,0.4)" strokeWidth="3" />
+                <circle cx="24" cy="24" r="20" fill="none" stroke="#48B882" strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={`${Math.round((activeWidgets.filter(w => {
+                    const prog = progressByWidget[w.instanceId];
+                    const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
+                    const target = w.target && w.target > 0 ? w.target : 1;
+                    return todayVal >= target;
+                  }).length / Math.max(activeWidgets.length, 1)) * 125.6)} 125.6`}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center font-['DM_Sans',sans-serif] text-[11px] font-medium text-[#314158]">
+                {activeWidgets.length > 0 ? `${Math.round((activeWidgets.filter(w => {
+                  const prog = progressByWidget[w.instanceId];
+                  const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
+                  const target = w.target && w.target > 0 ? w.target : 1;
+                  return todayVal >= target;
+                }).length / activeWidgets.length) * 100)}%` : '0%'}
+              </span>
+            </div>
+            <div>
+              <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">Today's Progress</p>
+              <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">
+                {activeWidgets.filter(w => {
+                  const prog = progressByWidget[w.instanceId];
+                  const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
+                  const target = w.target && w.target > 0 ? w.target : 1;
+                  return todayVal >= target;
+                }).length} of {activeWidgets.length} goals met
+              </p>
+            </div>
+          </div>
         </section>
         {/* Bucket tabs row (scrollable) */}
         <div
-          className="relative z-10 mt-6 transition-all duration-300 ease-in-out"
+          className="relative z-10 transition-all duration-300 ease-in-out"
           style={{ width: '100%' }}
         >
           <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
             {bucketsInitialized && buckets.length === 0 && (
-              <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-[#dbd6cf] bg-white/70 px-4 text-sm text-[#8e99a8]">
+              <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-[#dbd6cf] bg-white px-5 text-[13px] text-[#8e99a8] font-['Inter',sans-serif]">
                 <span>No tabs yet. Click + to add your first bucket.</span>
               </div>
             )}
@@ -3774,11 +3848,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   marginRight: '-10px',
                   backgroundColor: b === activeBucket ? getBucketColor(b) : 'rgba(252, 250, 248, 0.9)',
                   borderColor: b === activeBucket ? getBucketColor(b) : 'rgba(219, 214, 207, 0.6)',
-                  color: b === activeBucket ? 'white' : '#314158'
+                  borderBottomColor: b === activeBucket ? getBucketColor(b) : 'transparent',
+                  color: b === activeBucket ? 'white' : '#314158',
+                  marginBottom: '-1px',
                 }}
-                className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-4 sm:px-6 text-[14px] font-semibold capitalize transition-all duration-300 border-2 ${b === activeBucket
-                  ? 'scale-[1.02] shadow-[0px_8px_24px_rgba(163,133,96,0.15)] text-white'
-                  : 'hover:scale-[1.01] shadow-none'
+                className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-5 sm:px-6 font-['Inter',sans-serif] text-[13px] font-medium capitalize transition-all duration-300 border ${b === activeBucket
+                  ? 'shadow-warm-sm text-white'
+                  : 'shadow-none'
                   }`}
                 onMouseEnter={(e) => {
                   if (b !== activeBucket) {
@@ -3801,11 +3877,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               style={{
                 // "+" tab participates in the same stacking order (lowest, furthest right)
                 zIndex: 0,
-                marginRight: '-10px'
+                marginRight: '-10px',
+                marginBottom: '-1px',
+                borderBottomColor: 'transparent',
               }}
-              className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-bold transition-all duration-300 hover:bg-white hover:border-theme-primary-500/30 border border-[#dbd6cf]/60 shadow-none"
+              className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-medium transition-colors hover:bg-[rgba(252,250,248,1)] border border-[#dbd6cf] shadow-none"
             >
-              <span className="text-theme-primary-600">
+              <span className="text-[#B1916A]">
                 +
               </span>
             </button>
@@ -3826,39 +3904,78 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           )}
         </div>
         {/* Main content container */}
-        <div className="w-full flex-1 pb-24">
+        <div className="w-full flex-1 pb-24 md:pb-4">
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
             {/* Content container: white widget box with subtle shadow */}
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-2xl border border-[#dbd6cf]/60 bg-white shadow-sm">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-[#dbd6cf] bg-white shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center gap-4 sm:gap-8 border-b border-white/20 px-4 sm:px-6 pt-3 sm:pt-4 text-sm font-semibold">
+              <nav className="flex items-center gap-5 border-b border-[rgba(219,214,207,0.7)] px-5 pt-4 text-sm font-semibold">
                 {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                   <button
                     key={item}
                     onClick={() => setActiveSubTab(item)}
-                    className={`pb-3 border-b-2 transition-all duration-300 ${item === activeSubTab
-                      ? 'border-theme-primary-500 text-theme-primary-600 font-bold'
-                      : 'border-transparent text-[#8e99a8] hover:text-[#4a5568] hover:border-theme-primary-300/50'
+                    className={`relative pb-3 font-['DM_Sans',sans-serif] text-[12px] tracking-[0.88px] uppercase transition-colors ${item === activeSubTab
+                      ? 'text-[#314158]'
+                      : 'text-[#596881] hover:text-[#314158]'
                       }`}
                   >
                     {item}
+                    {item === activeSubTab && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B1916A] rounded-full" />
+                    )}
                   </button>
                 ))}
               </nav>
 
               {/* Content area */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="flex-1 overflow-y-auto p-5">
                 {/* Overview Tab */}
-                <div className={activeSubTab === 'Overview' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr' : 'hidden'}>
+                <div className={activeSubTab === 'Overview' ? '' : 'hidden'}>
+                  {/* Stat summary row — Calidora pattern */}
+                  {activeWidgets.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-2">
+                          <LayoutDashboard className="h-[18px] w-[18px] text-[#B1916A]" />
+                        </div>
+                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.length}</p>
+                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Total Widgets</p>
+                      </div>
+                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.08)] mb-2">
+                          <Activity className="h-[18px] w-[18px] text-[#4AADE0]" />
+                        </div>
+                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val > 0 && val < (w.target || 1); }).length}</p>
+                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">In Progress</p>
+                      </div>
+                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.08)] mb-2">
+                          <Check className="h-[18px] w-[18px] text-[#48B882]" />
+                        </div>
+                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val >= (w.target || 1); }).length}</p>
+                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Completed</p>
+                      </div>
+                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.08)] mb-2">
+                          <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
+                        </div>
+                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val === 0; }).length}</p>
+                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Not Started</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Widget grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr">
                   {/* Refresh card */}
                   {activeWidgets.length > 0 && (
                     <div
                       onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                      className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02]"
+                      className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm hover:shadow-warm relative cursor-pointer transition-shadow"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-primary-500/90 shadow-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#B1916A] shadow-sm">
                           {isRefreshing ? (
                             <Loader2 className="h-5 w-5 animate-spin text-white" />
                           ) : (
@@ -3925,15 +4042,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       : Math.min(100, Math.round((todayVal / normalizedTarget) * 100));
                     const goalMet = isLinkedTask ? linkedTaskCompleted : pct >= 100;
 
-                    // Background tint (5% opacity of widget color) when goal met
-                    const bgTintClasses: Record<string, string> = {
-                      blue: 'bg-warm-500/5', green: 'bg-green-500/5', red: 'bg-red-500/5', orange: 'bg-orange-500/5', purple: 'bg-amber-500/5', indigo: 'bg-warm-500/5', amber: 'bg-amber-500/5', teal: 'bg-teal-500/5', rose: 'bg-rose-500/5', cyan: 'bg-cyan-500/5', yellow: 'bg-yellow-500/5', sky: 'bg-sky-500/5', emerald: 'bg-emerald-500/5', violet: 'bg-violet-500/5', lime: 'bg-lime-500/5', fuchsia: 'bg-fuchsia-500/5', gray: 'bg-[#b8b0a8]/5', slate: 'bg-slate-500/5', stone: 'bg-stone-500/5'
-                    };
-                    const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
-                    const cardBgClass = goalMet ? (bgTintClasses[widgetColor] ?? 'bg-[rgba(183,148,106,0.08)]/60') : 'bg-white/80';
+                    const widgetColor = w.color || getTemplateColor(w.id) || 'tan';
+                    const cardBgClass = goalMet ? (BG_TINT_CLASSES[widgetColor] ?? 'bg-[rgba(177,145,106,0.08)]') : 'bg-white';
 
                     return (
-                      <div key={w.instanceId} className={`rounded-2xl border border-white/40 ${cardBgClass} backdrop-blur-md p-5 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] relative group cursor-pointer hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0`} onClick={() => {
+                      <div key={w.instanceId} className={`rounded-xl border border-[#dbd6cf] ${goalMet ? cardBgClass : 'bg-white'} p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} onClick={() => {
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -3972,15 +4085,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               convertWidgetToTask(w, activeBucket);
                             }}
-                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary-500 transition ${w.linkedTaskId
-                              ? "bg-theme-primary-600 hover:bg-theme-primary-700"
-                              : "bg-theme-primary-100 hover:bg-theme-primary-200"
+                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#B1916A]/40 transition ${w.linkedTaskId
+                              ? "bg-[#B1916A] hover:bg-[#a07f5a]"
+                              : "bg-[rgba(177,145,106,0.12)] hover:bg-[rgba(177,145,106,0.2)]"
                               }`}
                             aria-label={w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"}
                             title={w.linkedTaskId ? "Remove from Tasks tab" : "Show in Tasks tab"}
                           >
                             <ListChecks
-                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-theme-primary-600"
+                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-[#B1916A]"
                                 }`}
                             />
                           </button>
@@ -4016,11 +4129,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             if (!IconComponent) return <div className="h-5 w-5 bg-[#dbd6cf] rounded" />;
 
                             // Get color - fallback to widget template default if not set
-                            const widgetColor = w.color || getTemplateColor(w.id) || 'gray';
+                            const widgetColor = w.color || getTemplateColor(w.id) || 'tan';
 
                             return (
                               <div
-                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#b8b0a8]'}`}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#B1916A]'}`}
                               >
                                 <IconComponent className="h-5 w-5 text-white" />
                               </div>
@@ -4042,7 +4155,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           <div className="mt-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 text-sm text-[#4a5568]">
-                                <ListChecks className="h-4 w-4 text-theme-primary-600" />
+                                <ListChecks className="h-4 w-4 text-[#B1916A]" />
                                 <span className="truncate">{linkedTaskContent}</span>
                               </div>
                               <button
@@ -4435,7 +4548,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {w.weightData.goalWeight !== undefined && (
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">🎯</span>
-                                      <p className="text-xs text-warm-600">
+                                      <p className="text-xs text-[#B1916A]">
                                         Goal: {w.weightData.goalWeight} {w.weightData.unit || w.unit || 'lbs'}
                                       </p>
                                     </div>
@@ -4528,7 +4641,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   <div className="border-t border-[#dbd6cf]/60 pt-2">
                                     <div className="text-xs text-[#6b7688] mb-1">Next Priority:</div>
                                     <div className="flex items-center gap-1">
-                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-warm-500' : 'bg-[#b8b0a8]'}`}></span>
+                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-[#C4A44E]' : 'bg-[#b8b0a8]'}`}></span>
                                       <span className="text-xs font-medium text-[#314158] truncate">{nextProject.title}</span>
                                     </div>
                                     {nextProject.room && (
@@ -4562,11 +4675,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 )}
                               </div>
                               <div className="w-full bg-[rgba(183,148,106,0.08)] rounded-full h-1 mt-2">
-                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-theme-primary-500'}`} style={{ width: `${displayPct}%` }} />
+                                <div className={`h-1 rounded-full transition-all duration-300 ${BG_COLOR_CLASSES[widgetColor] ?? 'bg-[#B1916A]'}`} style={{ width: `${displayPct}%` }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
-                                  {w.dataSource === 'fitbit' && <span className="text-xs text-warm-500">Fitbit</span>}
+                                  {w.dataSource === 'fitbit' && <span className="text-xs text-[#B1916A]">Fitbit</span>}
                                   {w.dataSource === 'googlefit' && <span className="text-xs text-green-600">Google Fit</span>}
                                 </div>
                               )}
@@ -4581,7 +4694,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               incrementProgress(w);
                             }}
-                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-theme-primary-600'} hover:scale-110 transition-transform`}
+                            className={`absolute bottom-2 right-2 text-xl font-bold leading-none ${TEXT_COLOR_CLASSES[widgetColor] ?? 'text-[#B1916A]'} hover:scale-110 transition-transform`}
                           >
                             +
                           </button>
@@ -4591,16 +4704,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   })}
 
                   {/* Add Widget card */}
-                  <div className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-md p-4 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.12)] flex flex-col items-center gap-3 cursor-pointer hover:bg-white/95 hover:border-theme-primary-500/30 transition-all duration-500 hover:scale-[1.02] min-w-0" onClick={() => setIsWidgetSheetOpen(true)}>
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-theme-primary-500/10">
-                      <Plus className="h-6 w-6 text-theme-primary-600" />
+                  <button className="rounded-xl border border-dashed border-[#dbd6cf] bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-[#dbd6cf] bg-[rgba(177,145,106,0.06)]">
+                      <Plus className="h-5 w-5 text-[#B1916A]" />
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-[#314158]">Add Widget</p>
-                      <p className="text-xs text-[#8e99a8]">Track your stats</p>
-                    </div>
-                  </div>
-                </div>
+                    <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">Add Widget</p>
+                    <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">Track your stats</p>
+                  </button>
+                  </div>{/* close widget grid */}
+                </div>{/* close overview tab */}
 
                 {activeSubTab === 'Trends' && (
                   <TrendsPanel
@@ -4613,8 +4725,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   <div>
                     {buckets.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-[#dbd6cf] rounded-2xl bg-white/80">
-                        <div className="w-16 h-16 bg-warm-50 rounded-full flex items-center justify-center mb-4">
-                          <ListChecks className="h-8 w-8 text-warm-600" />
+                        <div className="w-16 h-16 bg-[rgba(177,145,106,0.08)] rounded-full flex items-center justify-center mb-4">
+                          <ListChecks className="h-8 w-8 text-[#B1916A]" />
                         </div>
                         <h3 className="text-xl font-semibold text-[#314158] mb-2">
                           Set up your first bucket
@@ -4624,7 +4736,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         </p>
                         <button
                           onClick={() => setIsEditorOpen(true)}
-                          className="px-6 py-3 bg-warm-600 text-white rounded-lg hover:bg-warm-700 font-medium transition-colors"
+                          className="px-6 py-3 bg-[#B1916A] text-white rounded-lg hover:bg-[#a07f5a] font-medium transition-colors"
                         >
                           Create Bucket
                         </button>
@@ -4644,8 +4756,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   <div>
                     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <h2 className="text-xl font-semibold">Widget Logs</h2>
-                        <p className="text-sm text-[#8e99a8]">
+                        <h2 className="section-label-sm">Widget Logs</h2>
+                        <p className="font-['Inter',sans-serif] text-[13px] text-[#8e99a8] mt-1">
                           Recent syncs, entries, and progress updates for this bucket.
                         </p>
                       </div>
@@ -4676,27 +4788,40 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         </div>
                       ) : null}
                       {activeWidgets.length === 0 ? (
-                        <div className="text-center py-12 text-[#8e99a8]">
-                          <p>No widgets available to show logs for.</p>
-                          <p className="text-sm mt-2">Add some widgets to see their activity logs here.</p>
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
+                            <ClipboardList className="h-6 w-6 text-[#B1916A]" />
+                          </div>
+                          <p className="font-['DM_Sans',sans-serif] text-[14px] font-medium text-[#314158]">No activity yet</p>
+                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1 max-w-xs">Add widgets to this bucket to start tracking activity and see your logs here.</p>
+                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#dbd6cf] bg-white px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
+                            <Plus className="h-3.5 w-3.5 text-[#B1916A]" />
+                            Add Widget
+                          </button>
                         </div>
                       ) : filteredWidgetLogs.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-[#dbd6cf] bg-white px-6 py-12 text-center text-[#8e99a8]">
-                          <p>No activity yet for this selection.</p>
-                          <p className="mt-1 text-sm">Track progress or update a widget to start building logs.</p>
+                        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
+                            <ClipboardList className="h-5 w-5 text-[#B1916A]" />
+                          </div>
+                          <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">No activity yet</p>
+                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Track progress or update a widget to start building logs.</p>
                         </div>
                       ) : (
-                        <div className="bg-white rounded-lg border border-[#dbd6cf] p-6">
-                          <h3 className="mb-4 text-lg font-medium">
-                            {selectedLogsWidget === 'all' ? 'All Widget Activity' :
-                              `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
-                            <span className="ml-2 text-sm font-normal text-[#8e99a8]">
+                        <div className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
+                          <div className="flex items-center gap-2 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
+                            <ClipboardList className="h-4 w-4 text-[#B1916A]" />
+                            <h3 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">
+                              {selectedLogsWidget === 'all' ? 'All Widget Activity' :
+                                `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
+                            </h3>
+                            <span className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">
                               ({filteredWidgetLogs.length})
                             </span>
-                          </h3>
-                          <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
+                          </div>
+                          <div className="max-h-[480px] overflow-y-auto">
                             {filteredWidgetLogs.slice(0, 80).map((entry) => (
-                              <div key={entry.id} className="flex items-start gap-3 rounded bg-[#faf8f5] p-3">
+                              <div key={entry.id} className="flex items-start gap-4 px-5 py-3 border-b border-[rgba(219,214,207,0.5)] last:border-b-0 hover:bg-[rgba(252,250,248,0.5)] transition-colors">
                                 <div className={`mt-1.5 h-2 w-2 rounded-full ${LOG_KIND_DOT_CLASS[entry.kind]}`} />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-sm font-medium text-[#314158]">{entry.message}</p>
@@ -4720,7 +4845,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 {activeSubTab === 'Settings' && (
                   <div>
                     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h2 className="text-xl font-semibold">Widget Settings</h2>
+                      <h2 className="section-label-sm">Widget Settings</h2>
                       <WidgetSelector
                         widgets={activeWidgets}
                         selectedWidget={selectedSettingsWidget}
@@ -4732,9 +4857,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                     <div className="space-y-6">
                       {activeWidgets.length === 0 ? (
-                        <div className="text-center py-12 text-[#8e99a8]">
-                          <p>No widgets available to configure.</p>
-                          <p className="text-sm mt-2">Add some widgets to manage their settings here.</p>
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
+                            <Settings2 className="h-6 w-6 text-[#B1916A]" />
+                          </div>
+                          <p className="font-['DM_Sans',sans-serif] text-[14px] font-medium text-[#314158]">No widgets to configure</p>
+                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1 max-w-xs">Add widgets to this bucket to customize their targets, colors, and data sources.</p>
+                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#dbd6cf] bg-white px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
+                            <Plus className="h-3.5 w-3.5 text-[#B1916A]" />
+                            Add Widget
+                          </button>
                         </div>
                       ) : (
                         <div className="grid gap-6">
@@ -4747,9 +4879,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               : sourceOptions[0];
 
                             return (
-                              <div key={widget.instanceId} className="bg-white rounded-lg border border-[#dbd6cf] p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${BG_COLOR_CLASSES[widget.color || "gray"] ?? "bg-[#b8b0a8]"}`}>
+                              <div key={widget.instanceId} className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
+                                <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
+                                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${BG_COLOR_CLASSES[widget.color || "tan"] ?? "bg-[#B1916A]"}`}>
                                     {IconComponent ? (
                                       <IconComponent className="h-5 w-5 text-white" />
                                     ) : (
@@ -4757,14 +4889,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     )}
                                   </div>
                                   <div>
-                                    <h3 className="text-lg font-medium">{widget.name}</h3>
-                                    <p className="text-sm text-[#8e99a8]">Widget ID: {widget.id}</p>
+                                    <h3 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">{widget.name}</h3>
+                                    <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">{widget.id}</p>
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
                                   <div>
-                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Daily target</label>
+                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Daily target</label>
                                     <input
                                       type="number"
                                       min={1}
@@ -4777,11 +4909,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                           target: Math.max(1, parsed),
                                         });
                                       }}
-                                      className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                      className="w-full px-3 py-2 border border-[#dbd6cf] rounded-lg bg-white font-['Inter',sans-serif] text-[13px] text-[#314158] focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Color</label>
+                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Color</label>
                                     <select
                                       value={widget.color || "gray"}
                                       onChange={(event) => {
@@ -4789,17 +4921,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                           color: event.target.value,
                                         });
                                       }}
-                                      className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                      className="w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 font-['Inter',sans-serif] text-[13px] text-[#314158] capitalize focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
                                     >
                                       {WIDGET_COLOR_OPTIONS.map((colorName) => (
                                         <option key={colorName} value={colorName}>
-                                          {colorName}
+                                          {WIDGET_COLOR_LABELS[colorName] || colorName}
                                         </option>
                                       ))}
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Data source</label>
+                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Data source</label>
                                     <select
                                       value={selectedDataSource}
                                       onChange={(event) => {
@@ -4808,7 +4940,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                         });
                                         void fetchIntegrationsData();
                                       }}
-                                      className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-warm-500"
+                                      className="w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 font-['Inter',sans-serif] text-[13px] text-[#314158] capitalize focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
                                     >
                                       {sourceOptions.map((option) => (
                                         <option key={option} value={option}>
@@ -4818,7 +4950,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="block text-sm font-medium text-[#4a5568] mb-2">Created</label>
+                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Created</label>
                                     <span className="text-sm text-[#6b7688]">
                                       {widget.createdAt
                                         ? new Date(widget.createdAt).toLocaleDateString()
@@ -4827,14 +4959,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   </div>
                                 </div>
 
-                                <div className="mt-4 flex flex-wrap gap-2 border-t border-[#dbd6cf] pt-4">
+                                <div className="flex flex-wrap gap-2 border-t border-[rgba(219,214,207,0.7)] px-5 py-4">
                                   <button
                                     onClick={() => {
                                       setEditingBucket(activeBucket);
                                       setEditingWidget(widget);
                                       setNewlyCreatedWidgetId(null);
                                     }}
-                                    className="rounded-md bg-theme-primary-500 px-4 py-2 text-white hover:bg-theme-primary-500/90 focus:outline-none focus:ring-2 focus:ring-theme-primary-500"
+                                    className="rounded-lg bg-[#B1916A] px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-white shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[#a07f5a] transition-colors"
                                   >
                                     Open Editor
                                   </button>
@@ -4842,7 +4974,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     onClick={() => {
                                       void resetWidgetProgress(widget);
                                     }}
-                                    className="rounded-md border border-[#dbd6cf] px-4 py-2 text-[#4a5568] hover:bg-[#faf8f5] focus:outline-none focus:ring-2 focus:ring-[#bb9e7b]"
+                                    className="rounded-lg border border-[#dbd6cf] px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
                                   >
                                     Reset Today
                                   </button>
@@ -4850,9 +4982,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     onClick={() => {
                                       requestRemoveWidget(widget);
                                     }}
-                                    className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                    className="rounded-lg border border-red-200 px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
                                   >
-                                    Remove Widget
+                                    Remove
                                   </button>
                                 </div>
                               </div>
@@ -4930,7 +5062,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   setUndoState(null);
                   void Promise.resolve(pending.onUndo());
                 }}
-                className="rounded-md bg-theme-primary-600 px-2 py-1 text-xs text-white hover:bg-theme-primary-700"
+                className="rounded-lg bg-[#B1916A] px-2 py-1 text-xs text-white hover:bg-[#a07f5a] transition-colors"
               >
                 Undo
               </button>
@@ -5021,12 +5153,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     value={newBucket}
                     onChange={(e) => setNewBucket(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddBucket()}
-                    className="flex-1 rounded-md border border-[#dbd6cf] px-3 py-2 text-sm focus:border-warm-500 focus:ring-1 focus:ring-warm-500 focus:outline-none"
+                    className="flex-1 rounded-lg border border-[#dbd6cf] px-3 py-2 text-sm focus:border-[#B1916A] focus:ring-1 focus:ring-[#B1916A]/30 focus:outline-none transition-colors"
                   />
                   <button
                     onClick={handleAddBucket}
                     disabled={!newBucket.trim() || buckets.includes(newBucket.trim())}
-                    className="px-3 py-2 text-sm rounded-md bg-theme-primary-500 text-white hover:bg-theme-primary-600 disabled:opacity-50"
+                    className="px-3 py-2 text-sm rounded-lg bg-[#B1916A] text-white hover:bg-[#a07f5a] disabled:opacity-50 transition-colors"
                   >
                     Add
                   </button>
@@ -5084,11 +5216,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 if (e.key === 'Enter') handleSaveEditBucket();
                                 if (e.key === 'Escape') handleCancelEditBucket();
                               }}
-                              className="flex-1 text-sm border border-warm-500 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-warm-500"
+                              className="flex-1 text-sm border border-[#B1916A] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#B1916A]/30"
                               autoFocus
                             />
                           ) : (
-                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary-600' : 'text-[#4a5568]'}`}>{b}</span>
+                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-[#B1916A]' : 'text-[#4a5568]'}`}>{b}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -5113,7 +5245,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             <>
                               <button
                                 onClick={() => handleStartEditBucket(b)}
-                                className="text-xs p-1.5 rounded-md border border-warm-200 text-warm-600 hover:bg-warm-50"
+                                className="text-xs p-1.5 rounded-lg border border-[#dbd6cf] text-[#B1916A] hover:bg-[rgba(177,145,106,0.06)]"
                                 title="Edit name"
                               >
                                 <Pencil className="w-3.5 h-3.5" />

@@ -170,57 +170,70 @@ const getBucketEventStyles = (bucketName?: string | null, bucketColors?: Record<
   const bucketId = normalizeBucketId(bucketName);
   const color = getBucketColorSync(bucketId, bucketColors);
   
-  // Map hex colors to Tailwind classes for calendar events
+  // Map hex colors to Tailwind classes for calendar events (Calidora palette)
   const colorMap: Record<string, any> = {
-    "#4F46E5": { // indigo
+    "#6B8AF7": { // blue (Calidora)
+      container: 'bg-[#f0f3fe] border-l-4 border-[#6B8AF7] text-[#314158] hover:bg-[#e3e9fd]',
+      time: 'text-[#5570c7]',
+      dot: 'bg-[#6B8AF7]',
+      badge: 'text-[#5570c7]'
+    },
+    "#48B882": { // green (Calidora)
+      container: 'bg-[#eefaf3] border-l-4 border-[#48B882] text-[#314158] hover:bg-[#dcf5e7]',
+      time: 'text-[#3a9468]',
+      dot: 'bg-[#48B882]',
+      badge: 'text-[#3a9468]'
+    },
+    "#D07AA4": { // rose (Calidora)
+      container: 'bg-[#fdf1f6] border-l-4 border-[#D07AA4] text-[#314158] hover:bg-[#fbe3ed]',
+      time: 'text-[#b05c86]',
+      dot: 'bg-[#D07AA4]',
+      badge: 'text-[#b05c86]'
+    },
+    "#4AADE0": { // sky blue (Calidora)
+      container: 'bg-[#eef7fc] border-l-4 border-[#4AADE0] text-[#314158] hover:bg-[#dcf0fa]',
+      time: 'text-[#3889b5]',
+      dot: 'bg-[#4AADE0]',
+      badge: 'text-[#3889b5]'
+    },
+    "#C4A44E": { // golden (Calidora)
+      container: 'bg-[#faf6ec] border-l-4 border-[#C4A44E] text-[#314158] hover:bg-[#f5edd8]',
+      time: 'text-[#9e843e]',
+      dot: 'bg-[#C4A44E]',
+      badge: 'text-[#9e843e]'
+    },
+    "#8B7FD4": { // plum (Calidora)
+      container: 'bg-[#f3f1fb] border-l-4 border-[#8B7FD4] text-[#314158] hover:bg-[#e7e3f7]',
+      time: 'text-[#6f65aa]',
+      dot: 'bg-[#8B7FD4]',
+      badge: 'text-[#6f65aa]'
+    },
+    "#E28A5D": { // orange (Calidora)
+      container: 'bg-[#fdf3ee] border-l-4 border-[#E28A5D] text-[#314158] hover:bg-[#fbe7dc]',
+      time: 'text-[#b56e4a]',
+      dot: 'bg-[#E28A5D]',
+      badge: 'text-[#b56e4a]'
+    },
+    "#5E9B8C": { // teal (Calidora)
+      container: 'bg-[#eff7f5] border-l-4 border-[#5E9B8C] text-[#314158] hover:bg-[#dff0ec]',
+      time: 'text-[#4b7c70]',
+      dot: 'bg-[#5E9B8C]',
+      badge: 'text-[#4b7c70]'
+    },
+    "#8e99a8": { // gray (unassigned - Calidora)
+      container: 'bg-[#faf8f5] border-l-4 border-[#b8b0a8] text-[#314158] hover:bg-[rgba(183,148,106,0.08)]',
+      time: 'text-[#6b7688]',
+      dot: 'bg-[#b8b0a8]',
+      badge: 'text-[#6b7688]'
+    },
+    // Legacy colors for backwards compatibility
+    "#4F46E5": { // indigo (legacy)
       container: 'bg-[#fdf8f6] border-l-4 border-[#bb9e7b] text-[#314158] hover:bg-[#f5ede4]',
       time: 'text-[#9a7b5a]',
       dot: 'bg-[#bb9e7b]',
       badge: 'text-[#9a7b5a]'
     },
-    "#22C55E": { // green
-      container: 'bg-green-50 border-l-4 border-green-400 text-green-900 hover:bg-green-100',
-      time: 'text-green-600',
-      dot: 'bg-green-400',
-      badge: 'text-green-600'
-    },
-    "#F97316": { // orange
-      container: 'bg-orange-50 border-l-4 border-orange-400 text-orange-900 hover:bg-orange-100',
-      time: 'text-orange-600',
-      dot: 'bg-orange-400',
-      badge: 'text-orange-600'
-    },
-    "#EC4899": { // pink
-      container: 'bg-pink-50 border-l-4 border-pink-400 text-pink-900 hover:bg-pink-100',
-      time: 'text-pink-600',
-      dot: 'bg-pink-400',
-      badge: 'text-pink-600'
-    },
-    "#14B8A6": { // teal
-      container: 'bg-teal-50 border-l-4 border-teal-400 text-teal-900 hover:bg-teal-100',
-      time: 'text-teal-600',
-      dot: 'bg-teal-400',
-      badge: 'text-teal-600'
-    },
-    "#8B5CF6": { // violet
-      container: 'bg-violet-50 border-l-4 border-violet-400 text-violet-900 hover:bg-violet-100',
-      time: 'text-violet-600',
-      dot: 'bg-violet-400',
-      badge: 'text-violet-600'
-    },
-    "#F59E0B": { // amber
-      container: 'bg-amber-50 border-l-4 border-amber-400 text-amber-900 hover:bg-amber-100',
-      time: 'text-amber-600',
-      dot: 'bg-amber-400',
-      badge: 'text-amber-600'
-    },
-    "#06B6D4": { // cyan
-      container: 'bg-cyan-50 border-l-4 border-cyan-400 text-cyan-900 hover:bg-cyan-100',
-      time: 'text-cyan-600',
-      dot: 'bg-cyan-400',
-      badge: 'text-cyan-600'
-    },
-    "#94A3B8": { // gray (unassigned)
+    "#94A3B8": { // gray (legacy unassigned)
       container: 'bg-[#faf8f5] border-l-4 border-[#b8b0a8] text-[#314158] hover:bg-[rgba(183,148,106,0.08)]',
       time: 'text-[#6b7688]',
       dot: 'bg-[#b8b0a8]',
@@ -1974,7 +1987,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     <div className="w-full max-w-none mx-2 sm:mx-4 bg-white border border-[#dbd6cf] rounded-xl shadow-sm overflow-hidden">
       {/* Calidora-style Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-        <h3 className="text-[18px] tracking-[0.4px] text-[#314158] font-semibold">
+        <h3 className="section-label-sm">
           {headerTitle}
         </h3>
         <div className="flex items-center gap-3">
@@ -1986,7 +1999,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 key={viewOption}
                 onClick={() => handleViewChange(viewOption)}
                 aria-pressed={view === viewOption}
-                className={`px-3 py-1.5 text-[12px] capitalize transition-colors ${
+                className={`px-3 py-1.5 font-['DM_Sans',sans-serif] text-[11px] tracking-[0.6px] uppercase transition-colors ${
                   view === viewOption
                     ? 'bg-[#B1916A] text-white'
                     : 'text-[#596881] hover:bg-[rgba(252,250,248,0.5)]'
@@ -2102,7 +2115,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <div className="bg-white overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(219,214,207,0.7)]">
               <div className="flex items-center gap-3">
-                <h2 className="text-[16px] text-[#314158] font-medium">
+                <h2 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">
                   {format(currentDate, "EEEE, MMMM d, yyyy")}
                 </h2>
                 <StickerRow dayStr={currentDateKey} className="flex" />

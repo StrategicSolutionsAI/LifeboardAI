@@ -4,46 +4,46 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* Pure White (Calidora) */
-    --foreground: 240 24% 5%; /* Near Black */
+    --background: 0 0% 100%; /* #ffffff (Calidora) */
+    --foreground: 0 0% 4%; /* oklch(0.145 0 0) (Calidora) */
     --card: 0 0% 100%;
-    --card-foreground: 240 24% 5%;
+    --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 24% 5%;
-    --primary: 244 90% 5%; /* #030213 dark navy (Calidora) */
+    --popover-foreground: 0 0% 4%;
+    --primary: 244 81% 4%; /* #030213 (Calidora) */
     --primary-foreground: 0 0% 100%;
-    --secondary: 249 14% 95%; /* Light lavender (Calidora) */
-    --secondary-foreground: 244 90% 5%;
+    --secondary: 220 19% 94%; /* oklch(0.95 0.0058 264.53) (Calidora) */
+    --secondary-foreground: 244 81% 4%;
     --muted: 240 7% 93%; /* #ececf0 (Calidora) */
     --muted-foreground: 240 5% 47%; /* #717182 (Calidora) */
     --accent: 225 8% 93%; /* #e9ebef (Calidora) */
-    --accent-foreground: 244 90% 5%;
+    --accent-foreground: 244 81% 4%;
     --destructive: 348 83% 47%; /* #d4183d (Calidora) */
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 0% / 0.1; /* rgba(0,0,0,0.1) (Calidora) */
     --input: 0 0% 0% / 0; /* transparent (Calidora) */
     --input-background: #f3f3f5; /* Calidora input bg */
     --switch-background: #cbced4; /* Calidora switch bg */
-    --ring: 0 0% 44%;
-    --chart-1: 29 66% 42%;
-    --chart-2: 180 30% 38%;
-    --chart-3: 217 37% 32%;
-    --chart-4: 80 55% 52%;
-    --chart-5: 38 70% 50%;
+    --ring: 0 0% 63%; /* oklch(0.708 0 0) (Calidora) */
+    --chart-1: 18 100% 48%; /* oklch(0.646 0.222 41.116) (Calidora) */
+    --chart-2: 175 100% 29%; /* oklch(0.6 0.118 184.704) (Calidora) */
+    --chart-3: 196 72% 23%; /* oklch(0.398 0.07 227.392) (Calidora) */
+    --chart-4: 44 100% 50%; /* oklch(0.828 0.189 84.429) (Calidora) */
+    --chart-5: 36 100% 50%; /* oklch(0.769 0.188 70.08) (Calidora) */
     --radius: 0.625rem; /* Calidora base radius */
     --font-size: 16px;
     --font-weight-medium: 500;
     --font-weight-normal: 400;
 
-    /* Sidebar tokens */
-    --sidebar: 0 0% 97%;
-    --sidebar-foreground: 240 24% 5%;
-    --sidebar-primary: 244 90% 5%;
-    --sidebar-primary-foreground: 0 0% 97%;
+    /* Sidebar tokens (Calidora) */
+    --sidebar: 0 0% 98%;
+    --sidebar-foreground: 0 0% 4%;
+    --sidebar-primary: 244 81% 4%;
+    --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 240 10% 12%;
-    --sidebar-border: 0 0% 89%;
-    --sidebar-ring: 0 0% 44%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 0 0% 63%;
 
     /* Brand Colors (warm earth tones) */
     --brand-primary: #B1916A;
@@ -141,50 +141,50 @@
   }
  
   .dark {
-    --background: 24 8% 8%;
-    --foreground: 30 10% 95%;
-    --card: 24 8% 8%;
-    --card-foreground: 30 10% 95%;
-    --popover: 24 8% 8%;
-    --popover-foreground: 30 10% 95%;
-    --primary: 30 10% 95%;
-    --primary-foreground: 24 8% 10%;
-    --secondary: 24 6% 16%;
-    --secondary-foreground: 30 10% 95%;
-    --muted: 24 6% 16%;
-    --muted-foreground: 30 5% 65%;
-    --accent: 24 6% 16%;
-    --accent-foreground: 30 10% 95%;
-    --destructive: 348 62% 30%;
-    --destructive-foreground: 0 85% 60%;
-    --border: 24 6% 16%;
-    --input: 24 6% 16%;
-    --ring: 30 20% 50%;
+    --background: 0 0% 4%; /* oklch(0.145 0 0) (Calidora) */
+    --foreground: 0 0% 98%; /* oklch(0.985 0 0) (Calidora) */
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%; /* oklch(0.205 0 0) (Calidora) */
+    --secondary: 0 0% 15%; /* oklch(0.269 0 0) (Calidora) */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 63%; /* oklch(0.708 0 0) (Calidora) */
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 359 69% 30%; /* oklch(0.396 0.141 25.723) (Calidora) */
+    --destructive-foreground: 357 96% 58%; /* oklch(0.637 0.237 25.331) (Calidora) */
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 32%; /* oklch(0.439 0 0) (Calidora) */
 
-    --sidebar: 24 8% 12%;
-    --sidebar-foreground: 30 10% 95%;
-    --sidebar-primary: 240 50% 60%;
-    --sidebar-primary-foreground: 30 10% 95%;
-    --sidebar-accent: 24 6% 16%;
-    --sidebar-accent-foreground: 30 10% 95%;
-    --sidebar-border: 24 6% 16%;
-    --sidebar-ring: 30 20% 50%;
+    --sidebar: 0 0% 9%; /* oklch(0.205 0 0) (Calidora) */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 225 84% 49%; /* oklch(0.488 0.243 264.376) (Calidora) */
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 0 0% 32%;
 
-    --theme-surface-base: #12100e;
-    --theme-surface-raised: #1c1917;
-    --theme-surface-overlay: #292524;
-    --theme-surface-sunken: #0c0a09;
-    --theme-widget-border: #292524;
-    --theme-widget-bg: #1c1917;
-    --theme-widget-header: #292524;
-    --theme-tab-inactive: #292524;
+    --theme-surface-base: #0a0a0a;
+    --theme-surface-raised: #171717;
+    --theme-surface-overlay: #262626;
+    --theme-surface-sunken: #050505;
+    --theme-widget-border: #262626;
+    --theme-widget-bg: #171717;
+    --theme-widget-header: #262626;
+    --theme-tab-inactive: #262626;
     --theme-tab-active: var(--theme-primary-400);
-    --theme-tab-hover: #3f3127;
-    --theme-text-primary: #f5f0eb;
-    --theme-text-secondary: #d6cfc7;
-    --theme-text-tertiary: #a39e97;
-    --theme-text-quaternary: #6b6560;
-    --theme-text-inverse: #12100e;
+    --theme-tab-hover: #333333;
+    --theme-text-primary: #fafafa;
+    --theme-text-secondary: #d4d4d4;
+    --theme-text-tertiary: #a3a3a3;
+    --theme-text-quaternary: #666666;
+    --theme-text-inverse: #0a0a0a;
   }
 }
 
@@ -343,6 +343,23 @@
 
 .animate-pulse-ring {
   animation: pulse-ring 3s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+/* Calidora section label patterns */
+.section-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.88px;
+  text-transform: uppercase;
+  color: #bb9e7b;
+}
+
+.section-label-sm {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #bb9e7b;
 }
 
 /* Hide scrollbar but allow scroll */
