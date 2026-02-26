@@ -9,76 +9,111 @@ function getReplicate() {
   });
 }
 
-export interface GPT5Message {
+export interface GeminiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-export interface GPT5Options {
-  messages: GPT5Message[];
+export interface GeminiOptions {
+  messages: GeminiMessage[];
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  thinking_level?: 'low' | 'medium' | 'high';
 }
 
 /**
- * Run GPT-5 Pro via Replicate
- * @param options - Configuration for the GPT-5 Pro model
+ * Convert a messages array into Gemini's prompt + system_instruction format.
+ * System messages become system_instruction, user/assistant turns become
+ * a structured prompt string.
+ */
+function convertMessagesToGeminiInput(messages: GeminiMessage[]): {
+  system_instruction: string;
+  prompt: string;
+} {
+  const systemParts: string[] = [];
+  const conversationParts: string[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      systemParts.push(msg.content);
+    } else if (msg.role === 'user') {
+      conversationParts.push(`User: ${msg.content}`);
+    } else if (msg.role === 'assistant') {
+      conversationParts.push(`Assistant: ${msg.content}`);
+    }
+  }
+
+  return {
+    system_instruction: systemParts.join('\n\n'),
+    prompt: conversationParts.join('\n\n'),
+  };
+}
+
+/**
+ * Run Gemini 3.1 Pro via Replicate
+ * @param options - Configuration for the Gemini 3.1 Pro model
  * @returns The model's response text
  */
-export async function runGPT5Pro(options: GPT5Options): Promise<string> {
+export async function runGemini(options: GeminiOptions): Promise<string> {
   const {
     messages,
     temperature = 0.7,
-    max_tokens = 1024,
-    top_p = 0.9,
+    max_tokens = 2048,
+    top_p = 0.95,
+    thinking_level = 'medium',
   } = options;
 
   try {
     const replicate = getReplicate();
+    const { system_instruction, prompt } = convertMessagesToGeminiInput(messages);
 
     const input: Record<string, unknown> = {
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      prompt,
       temperature,
       top_p,
+      thinking_level,
     };
 
+    if (system_instruction) {
+      input.system_instruction = system_instruction;
+    }
+
     if (typeof max_tokens === 'number') {
-      // Replicate expects `max_completion_tokens` for GPT-5
-      input.max_completion_tokens = max_tokens;
+      input.max_output_tokens = max_tokens;
     }
 
     const prediction = await replicate.predictions.create({
-      model: 'openai/gpt-5',
+      model: 'google/gemini-3.1-pro',
       input,
     });
 
     let finalPrediction = prediction;
     const pollStart = Date.now();
-    const pollTimeoutMs = 90_000;
+    const pollTimeoutMs = 120_000;
     const pollDelayMs = 1_000;
 
     while (finalPrediction.status === 'starting' || finalPrediction.status === 'processing') {
       if (Date.now() - pollStart > pollTimeoutMs) {
-        throw new Error('GPT-5 Pro prediction timed out after 90s');
+        throw new Error('Gemini 3.1 Pro prediction timed out after 120s');
       }
       await new Promise(resolve => setTimeout(resolve, pollDelayMs));
       finalPrediction = await replicate.predictions.get(finalPrediction.id);
     }
 
     if (finalPrediction.status !== 'succeeded') {
-      throw new Error(`GPT-5 Pro prediction failed with status ${finalPrediction.status}`);
+      throw new Error(`Gemini 3.1 Pro prediction failed with status ${finalPrediction.status}`);
     }
 
     const fullResponse = extractText(finalPrediction.output);
 
     if (!fullResponse || fullResponse.trim().length === 0) {
-      throw new Error('GPT-5 Pro returned an empty response');
+      throw new Error('Gemini 3.1 Pro returned an empty response');
     }
 
     return fullResponse.trim();
   } catch (error) {
-    console.error('❌ Error in runGPT5Pro:', error);
+    console.error('❌ Error in runGemini:', error);
     console.error('Error name:', error instanceof Error ? error.name : 'unknown');
     console.error('Error message:', error instanceof Error ? error.message : String(error));
     throw error;
@@ -86,33 +121,40 @@ export async function runGPT5Pro(options: GPT5Options): Promise<string> {
 }
 
 /**
- * Stream GPT-5 Pro responses via Replicate
- * @param options - Configuration for the GPT-5 Pro model
+ * Stream Gemini 3.1 Pro responses via Replicate
+ * @param options - Configuration for the Gemini 3.1 Pro model
  * @returns AsyncIterable for streaming responses
  */
-export async function* streamGPT5Pro(options: GPT5Options) {
+export async function* streamGemini(options: GeminiOptions) {
   const {
     messages,
     temperature = 0.7,
-    max_tokens = 1024,
-    top_p = 0.9,
+    max_tokens = 2048,
+    top_p = 0.95,
+    thinking_level = 'medium',
   } = options;
 
   try {
     const replicate = getReplicate();
+    const { system_instruction, prompt } = convertMessagesToGeminiInput(messages);
 
     const input: Record<string, unknown> = {
-      messages,
+      prompt,
       temperature,
       top_p,
+      thinking_level,
     };
 
+    if (system_instruction) {
+      input.system_instruction = system_instruction;
+    }
+
     if (typeof max_tokens === 'number') {
-      input.max_completion_tokens = max_tokens;
+      input.max_output_tokens = max_tokens;
     }
 
     const stream = await replicate.stream(
-      "openai/gpt-5" as any,
+      "google/gemini-3.1-pro" as any,
       { input }
     );
 
@@ -120,7 +162,7 @@ export async function* streamGPT5Pro(options: GPT5Options) {
       yield event;
     }
   } catch (error) {
-    console.error('Error streaming GPT-5 Pro:', error);
+    console.error('Error streaming Gemini 3.1 Pro:', error);
     throw error;
   }
 }

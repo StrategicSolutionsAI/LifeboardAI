@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { ReactNode, useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -17,7 +17,7 @@ import {
 import { supabase } from "@/utils/supabase/client"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { prefetchCalendarExperience, shouldPrefetchCalendar } from "@/lib/prefetch-calendar"
+import { prefetchCalendarExperience } from "@/lib/prefetch-calendar"
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -87,8 +87,6 @@ const routeContext = [
 export function SidebarLayout({ children }: SidebarLayoutProps) {
   const pathname = usePathname() || "/dashboard"
   const router = useRouter()
-  const hasPrefetchedCalendarRef = useRef(false)
-  const hasPrefetchedAllRef = useRef(false)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -97,37 +95,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     setNavigatingTo(null)
   }, [pathname])
 
-  // Stagger route prefetches during idle time instead of all-at-once on mount.
-  // Next.js <Link> already prefetches when links enter the viewport, so this
-  // only covers routes that may not be visible (e.g. below the fold on mobile).
-  useEffect(() => {
-    if (hasPrefetchedAllRef.current) return
-    hasPrefetchedAllRef.current = true
-
-    const allHrefs = [...navItems.map((n) => n.href), "/dashboard/settings"]
-    // Remove the current route — it's already loaded
-    const toPrefetch = allHrefs.filter((h) => !pathname.startsWith(h))
-
-    let i = 0
-    const prefetchNext = () => {
-      if (i >= toPrefetch.length) return
-      router.prefetch(toPrefetch[i])
-      i++
-      // Stagger each prefetch by 200ms to avoid saturating the network
-      setTimeout(prefetchNext, 200)
-    }
-
-    const windowWithIdle = window as Window & {
-      requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number
-    }
-    if (typeof windowWithIdle.requestIdleCallback === "function") {
-      windowWithIdle.requestIdleCallback(() => prefetchNext(), { timeout: 3000 })
-    } else {
-      setTimeout(prefetchNext, 1500)
-    }
-  }, [router, pathname])
-
   // Let Link handle navigation natively — just provide instant visual feedback
+  // Next.js <Link> already prefetches routes when they enter the viewport.
   const handleNavClick = useCallback(
     (_e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
       startTransition(() => {
@@ -181,40 +150,6 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     },
     [warmCalendarNavigation]
   )
-
-  useEffect(() => {
-    const isDashboardRoute = pathname === "/dashboard" || pathname === "/dashboard/"
-    if (!isDashboardRoute || hasPrefetchedCalendarRef.current || !shouldPrefetchCalendar()) {
-      return
-    }
-
-    hasPrefetchedCalendarRef.current = true
-
-    let cancelled = false
-    const warmIfActive = () => {
-      if (cancelled) return
-      warmCalendarNavigation()
-    }
-
-    const windowWithIdle = window as Window & {
-      requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number
-      cancelIdleCallback?: (id: number) => void
-    }
-
-    if (typeof windowWithIdle.requestIdleCallback === "function") {
-      const handle = windowWithIdle.requestIdleCallback(warmIfActive, { timeout: 1200 })
-      return () => {
-        cancelled = true
-        windowWithIdle.cancelIdleCallback?.(handle)
-      }
-    }
-
-    const timeout = setTimeout(warmIfActive, 600)
-    return () => {
-      cancelled = true
-      clearTimeout(timeout)
-    }
-  }, [pathname, warmCalendarNavigation])
 
   return (
     <div className="relative min-h-screen flex flex-col overflow-x-hidden md:flex md:h-screen md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>

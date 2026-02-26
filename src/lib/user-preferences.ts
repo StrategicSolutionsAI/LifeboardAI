@@ -1,4 +1,5 @@
 import { supabase } from "@/utils/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 export interface UserPreferences {
   id?: string;
@@ -13,13 +14,54 @@ export interface UserPreferences {
 }
 
 // ---------------------------------------------------------------------------
+// Deduplicated auth helper — avoids redundant getUser() network round-trips.
+// Multiple call sites share a single in-flight promise within a short window.
+// ---------------------------------------------------------------------------
+let _authFlight: Promise<User | null> | null = null
+let _authCache: { user: User | null; ts: number } | null = null
+const AUTH_CACHE_TTL = 30_000 // 30 seconds
+
+/** Get the current Supabase user with deduplication + caching. */
+export async function getCachedUser(): Promise<User | null> {
+  if (_authCache && Date.now() - _authCache.ts < AUTH_CACHE_TTL) {
+    return _authCache.user
+  }
+  if (_authFlight) return _authFlight
+
+  _authFlight = (async () => {
+    // getSession() reads from local storage (fast), getUser() hits the server
+    const { data: sessionData } = await supabase.auth.getSession()
+    const user = sessionData?.session?.user ?? null
+    if (user) {
+      _authCache = { user, ts: Date.now() }
+      _authFlight = null
+      return user
+    }
+    // Fallback to getUser() if session is stale
+    const { data: directUser } = await supabase.auth.getUser()
+    const resolved = directUser?.user ?? null
+    _authCache = { user: resolved, ts: Date.now() }
+    _authFlight = null
+    return resolved
+  })()
+
+  return _authFlight
+}
+
+/** Invalidate the cached auth user (call on sign-out). */
+export function invalidateAuthCache() {
+  _authCache = null
+  _authFlight = null
+}
+
+// ---------------------------------------------------------------------------
 // In-flight deduplication + short-lived cache for getUserPreferencesClient().
 // Multiple components calling this within the same tick (or TTL window) share
 // a single Supabase round-trip instead of each firing their own query.
 // ---------------------------------------------------------------------------
 let _prefsCache: { data: UserPreferences | null; ts: number } | null = null
 let _prefsFlight: Promise<UserPreferences | null> | null = null
-const PREFS_CACHE_TTL = 5_000 // 5 seconds
+const PREFS_CACHE_TTL = 60_000 // 60 seconds
 
 /** Invalidate the in-memory preferences cache (call after saves). */
 export function invalidatePreferencesCache() {
@@ -48,72 +90,48 @@ export async function getUserPreferencesClient() {
 }
 
 async function _fetchPreferencesClient() {
-  const { data: sessionData } = await supabase.auth.getSession();
-  let user = sessionData?.session?.user ?? null;
-
-  if (!user) {
-    const { data: directUser } = await supabase.auth.getUser();
-    user = directUser?.user ?? null;
-  }
+  const user = await getCachedUser();
 
   if (!user) {
     console.warn('getUserPreferencesClient: no authenticated user');
     return null;
   }
 
-  // Check if user_preferences table exists
+  const defaults: UserPreferences = {
+    user_id: user.id,
+    life_buckets: [],
+    bucket_colors: {},
+    widgets_by_bucket: {},
+    progress_by_widget: {},
+    hourly_plan: {}
+  };
+
   try {
     const { data, error } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user.id)
       .single();
-    
+
     if (error && error.code === 'PGRST116') {
-      // No rows found, create initial preferences
-      const initialPrefs = {
-        user_id: user.id,
-        life_buckets: [],
-        bucket_colors: {},
-        widgets_by_bucket: {},
-        progress_by_widget: {},
-        hourly_plan: {}
-      };
-      
-      const { data: newData, error: insertError } = await supabase
+      // No rows found — return defaults immediately and create row in background
+      void supabase
         .from('user_preferences')
-        .insert(initialPrefs)
+        .insert(defaults)
         .select()
-        .single();
-        
-      if (insertError) {
-        console.error('Error creating initial preferences:', insertError);
-        return {
-          user_id: user.id,
-          life_buckets: [],
-          bucket_colors: {},
-          widgets_by_bucket: {},
-          progress_by_widget: {},
-          hourly_plan: {}
-        };
-      }
-      
-      return newData;
+        .single()
+        .then(({ error: insertError }) => {
+          if (insertError) console.error('Error creating initial preferences:', insertError);
+        });
+
+      return defaults;
     }
-    
+
     if (error) {
-      // Table might not exist or other error
       console.error('Error fetching user preferences:', error);
-      return {
-        user_id: user.id,
-        life_buckets: [],
-        bucket_colors: {},
-        widgets_by_bucket: {},
-        progress_by_widget: {}
-      };
+      return defaults;
     }
-    
-    // Ensure required fields are present
+
     return {
       ...data,
       bucket_colors: data.bucket_colors || {},
@@ -123,14 +141,7 @@ async function _fetchPreferencesClient() {
     };
   } catch (err) {
     console.error('Exception fetching user preferences:', err);
-    return {
-      user_id: user.id,
-      life_buckets: [],
-      bucket_colors: {},
-      widgets_by_bucket: {},
-      progress_by_widget: {},
-      hourly_plan: {}
-    };
+    return defaults;
   }
 }
 
@@ -144,12 +155,7 @@ export async function updateUserPreferenceFields(
 ): Promise<boolean> {
   invalidatePreferencesCache()
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    let user = sessionData?.session?.user ?? null;
-    if (!user) {
-      const { data: directUser } = await supabase.auth.getUser();
-      user = directUser?.user ?? null;
-    }
+    const user = await getCachedUser();
     if (!user) {
       console.warn('updateUserPreferenceFields: no authenticated user');
       return false;

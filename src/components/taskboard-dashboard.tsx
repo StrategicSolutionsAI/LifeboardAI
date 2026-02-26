@@ -6,7 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
-import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from "@/lib/user-preferences";
+import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
 import {
   type ProfileNameRow,
@@ -55,12 +55,15 @@ import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task, RepeatOption } from "@/hooks/use-tasks";
 import dynamic from 'next/dynamic';
 
-// Import the widget editor statically to avoid dynamic chunk loading issues
-// seen during login (ChunkLoadError for widget-editor.tsx). This slightly
-// increases the initial bundle size but removes the fragile runtime fetch
-// for this component.
-import WidgetEditorSheet from "@/components/widget-editor";
-import { WidgetLibrary } from "@/components/widget-library";
+// Lazy-load these heavy components — only rendered when user opens a drawer/sheet
+const WidgetEditorSheet = dynamic(
+  () => import("@/components/widget-editor"),
+  { ssr: false, loading: () => null }
+);
+const WidgetLibrary = dynamic(
+  () => import("@/components/widget-library").then(m => m.WidgetLibrary),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
+);
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -135,7 +138,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [greetingName, setGreetingName] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
   // Track when we've completed the initial auth check to avoid clearing
   // localStorage/state before Supabase auth resolves on first load
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -757,10 +759,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     setIsRefreshing(true);
 
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('todoist_all_tasks');
-      }
-
       const refreshPromises: Promise<void>[] = [];
 
       refreshPromises.push((async () => {
@@ -773,10 +771,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
             const iso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
             setTodoistTasks(allTasks.filter((t: any) => t.due?.date === iso));
-
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('todoist_all_tasks', JSON.stringify({ tasks: allTasks, savedAt: Date.now() }));
-            }
           } else {
             console.error('Failed to refresh Todoist tasks');
           }
@@ -802,12 +796,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               calories: data.calories || 0,
             };
             setFitbitData(obj);
-            if (typeof window !== "undefined") {
-              localStorage.setItem(
-                "fitbit_metrics",
-                JSON.stringify({ ...obj, savedAt: Date.now() })
-              );
-            }
 
             try {
               const todayStr = todayStrGlobal;
@@ -842,17 +830,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
               setProgressByWidget(updatedProgress);
 
-              if (typeof window !== "undefined") {
-                try {
-                  localStorage.setItem(
-                    "widget_progress",
-                    JSON.stringify(updatedProgress)
-                  );
-                } catch (e) {
-                  console.error("Failed to persist widget progress", e);
-                }
-              }
-
               const {
                 data: { user: currentUser },
               } = await supabase.auth.getUser();
@@ -871,29 +848,35 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       onConflict: "user_id,widget_instance_id,date",
                     });
 
+                  // Fire-and-forget: backfill yesterday's data in background
+                  // to avoid blocking the main integration refresh
                   if (!fetchedYesterdayRef.current) {
                     fetchedYesterdayRef.current = true;
-                    try {
-                      const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
-                      if (resY.ok) {
-                        const dataY = await resY.json();
-                        const rowsY = fitbitWidgets.map((w) => ({
-                          user_id: currentUser.id,
-                          widget_instance_id: w.instanceId,
-                          date: yesterdayStrGlobal,
-                          value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
-                        }));
-                        if (rowsY.length) {
-                          await supabase
-                            .from("widget_progress_history")
-                            .upsert(rowsY, {
-                              onConflict: "user_id,widget_instance_id,date",
-                            });
+                    const uid = currentUser.id;
+                    const fwCopy = [...fitbitWidgets];
+                    void (async () => {
+                      try {
+                        const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
+                        if (resY.ok) {
+                          const dataY = await resY.json();
+                          const rowsY = fwCopy.map((w) => ({
+                            user_id: uid,
+                            widget_instance_id: w.instanceId,
+                            date: yesterdayStrGlobal,
+                            value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
+                          }));
+                          if (rowsY.length) {
+                            await supabase
+                              .from("widget_progress_history")
+                              .upsert(rowsY, {
+                                onConflict: "user_id,widget_instance_id,date",
+                              });
+                          }
                         }
+                      } catch (errYesterday) {
+                        console.error("Failed to backfill yesterday Fitbit history", errYesterday);
                       }
-                    } catch (errYesterday) {
-                      console.error("Failed to backfill yesterday Fitbit history", errYesterday);
-                    }
+                    })();
                   }
                 }
               }
@@ -929,9 +912,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             if (kg === undefined || kg === null) return;
 
             setWithingsData({ weightKg: kg });
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('withings_metrics', JSON.stringify({ weightKg: kg, savedAt: Date.now() }));
-            }
 
             setWidgetsByBucket((prev) => {
               const updated = { ...prev };
@@ -981,9 +961,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             };
 
             setGoogleFitData(obj);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('googlefit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
-            }
 
             // Update progress for each Google Fit widget
             try {
@@ -1015,14 +992,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               });
 
               setProgressByWidget(updatedProgress);
-
-              if (typeof window !== "undefined") {
-                try {
-                  localStorage.setItem("widget_progress", JSON.stringify(updatedProgress));
-                } catch (e) {
-                  console.error("Failed to persist widget progress", e);
-                }
-              }
 
               const { data: { user: currentUser } } = await supabase.auth.getUser();
               if (currentUser) {
@@ -1519,13 +1488,22 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // fetchAllTodoistTasks();
   };
 
-  // modify useEffect to use fetchIntegrationsData
-  // Run once immediately, then every 30 minutes to avoid Fitbit rate limits
+  // Defer the first integration sync until widgets are loaded and visible,
+  // so it doesn't compete with the critical rendering path.
+  // After the first run, repeat every 30 minutes to stay current.
+  const hasFetchedIntegrationsRef = useRef(false);
   useEffect(() => {
-    fetchIntegrationsData();
+    if (!isWidgetLoadComplete || hasFetchedIntegrationsRef.current) return;
+    hasFetchedIntegrationsRef.current = true;
+
+    // Small delay so the browser can paint the widget grid first
+    const timeout = setTimeout(fetchIntegrationsData, 200);
     const int = setInterval(fetchIntegrationsData, 30 * 60 * 1000); // 30 min
-    return () => clearInterval(int);
-  }, [fetchIntegrationsData]);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(int);
+    };
+  }, [isWidgetLoadComplete, fetchIntegrationsData]);
 
   // Fetch tasks whenever date changes (single consolidated request).
   // Skip the initial mount call — fetchIntegrationsData already handles it.
@@ -2136,6 +2114,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         setWidgetsByBucket(migratedMerged);
         widgetsByBucketRef.current = migratedMerged;
 
+        // Mark widgets as ready immediately — Supabase write-back runs in background
+        setIsWidgetLoadComplete(true);
+        loadWidgetsInProgress.current = false;
+
         // Persist merged result
         if (typeof window !== 'undefined') {
           localStorage.setItem('widgets_by_bucket', JSON.stringify({
@@ -2143,10 +2125,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             savedAt: new Date().toISOString(),
           }));
         }
-        // Push cleaned data to Supabase if local-only widgets were added
-        // or if stale bucket keys were removed
+        // Push cleaned data to Supabase in background if local-only widgets
+        // were added or stale bucket keys were removed
         if (mergedDiffersFromSupabase || removedStaleBuckets) {
-          await updateUserPreferenceFields({ widgets_by_bucket: migratedMerged });
+          void updateUserPreferenceFields({ widgets_by_bucket: migratedMerged });
         }
       }
     } catch (err) {
@@ -2157,17 +2139,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
   }
 
-  // Auth state change listener
+  // Auth state change listener — uses deduplicating cached helper so
+  // preferences can share the same auth round-trip instead of re-fetching.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      setUser(user);
-      // Mark auth as initialized after the initial getUser resolves
+    getCachedUser().then((resolvedUser) => {
+      setUser(resolvedUser);
       setAuthInitialized(true);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') invalidateAuthCache();
       setUser(session?.user ?? null);
-      // Ensure we mark initialized when we receive any auth event
       setAuthInitialized(true);
     });
 
@@ -2220,13 +2202,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, [user]);
 
   // Effect for user state changes (login/logout)
+  // loadBuckets + loadWidgets both call getUserPreferencesClient() which deduplicates
+  // via the in-flight cache, so running them concurrently is safe and faster.
   useEffect(() => {
-    // Do not act until the initial auth status has been determined
     if (!authInitialized) return;
 
     if (user) {
-      loadBuckets({ fetchFromSupabase: true });
-      loadWidgets();
+      // Run in parallel — prefs fetch is deduplicated internally
+      void Promise.all([
+        loadBuckets({ fetchFromSupabase: true }),
+        loadWidgets(),
+      ]);
       ensureUserOnboarded();
     } else {
       loadBuckets({ fetchFromSupabase: false });
@@ -2242,17 +2228,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     // Save to localStorage immediately
     if (typeof window !== 'undefined') {
-      const dataToSave = {
+      localStorage.setItem('widgets_by_bucket', JSON.stringify({
         widgets: widgetsByBucket,
         savedAt: new Date().toISOString()
-      };
-      localStorage.setItem('widgets_by_bucket', JSON.stringify(dataToSave));
-      Object.entries(widgetsByBucket).forEach(([bucket, widgets]) => {
-      });
-
-      // Verify save by reading back
-      const savedData = localStorage.getItem('widgets_by_bucket');
-      const verified = JSON.parse(savedData!);
+      }));
     }
 
     // Debounce the Supabase save
@@ -2339,14 +2318,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
       if (hasLocal && unsynced) {
         // Local has unsynced changes (e.g. user refreshed before Supabase
-        // save completed). Prefer local and push to server.
+        // save completed). Prefer local and push to server in background.
         setBuckets(localBuckets);
         const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || localBuckets[0];
         setActiveBucket(localBuckets.includes(active || '') ? (active as string) : localBuckets[0]);
         if (localBucketColors) setBucketColors(localBucketColors);
         const mergedColors = { ...(prefs?.bucket_colors || {}), ...(localBucketColors || {}) } as Record<string, string>;
-        const ok = await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
-        if (ok) markBucketsSynced();
+        void updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors }).then((ok) => {
+          if (ok) markBucketsSynced();
+        });
       } else if (hasServer) {
         // Local is fully synced (or empty) — server may have newer data
         // from another device. Use server as source of truth.
@@ -2369,11 +2349,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         markBucketsSaved();
         markBucketsSynced();
       } else if (hasLocal) {
-        // No server data but local exists — push local to server
+        // No server data but local exists — push local to server in background
         if (localBucketColors) setBucketColors(localBucketColors);
         const mergedColors = { ...(localBucketColors || {}) } as Record<string, string>;
-        const ok = await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
-        if (ok) markBucketsSynced();
+        void updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors }).then((ok) => {
+          if (ok) markBucketsSynced();
+        });
       } else {
         // If no buckets found anywhere, set default buckets
         const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
@@ -2391,7 +2372,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
         }
 
-        await updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
+        void updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
       }
     } catch (err) {
       console.error('Failed to load preferences', err);
@@ -2406,29 +2387,26 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }
 
   // Safety net: if a user has preferences but somehow their onboarded flag
-  // wasn't set, update it to prevent getting stuck in onboarding loop
-  async function ensureUserOnboarded() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  // wasn't set, update it to prevent getting stuck in onboarding loop.
+  // Runs as fire-and-forget so it never blocks widget rendering.
+  function ensureUserOnboarded() {
+    void (async () => {
+      try {
+        const cachedUser = await getCachedUser();
+        if (!cachedUser) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarded')
-        .eq('id', user.id)
-        .single();
+        const [{ data: profile }, prefs] = await Promise.all([
+          supabase.from('profiles').select('onboarded').eq('id', cachedUser.id).single(),
+          getUserPreferencesClient(),
+        ]);
 
-      // If user has buckets but onboarded flag is false, fix it
-      const prefs = await getUserPreferencesClient();
-      if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
-        await supabase
-          .from('profiles')
-          .update({ onboarded: true })
-          .eq('id', user.id);
+        if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
+          await supabase.from('profiles').update({ onboarded: true }).eq('id', cachedUser.id);
+        }
+      } catch (err) {
+        console.error('Error in ensureUserOnboarded:', err);
       }
-    } catch (err) {
-      console.error('Error in ensureUserOnboarded:', err);
-    }
+    })();
   }
 
   const daysInMonth = () => {

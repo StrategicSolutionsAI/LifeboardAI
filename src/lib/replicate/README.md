@@ -1,6 +1,6 @@
-# Replicate GPT-5 Pro Integration
+# Replicate Gemini 3.1 Pro Integration
 
-This directory contains the Replicate API client for running GPT-5 Pro in LifeboardAI's chatbot.
+This directory contains the Replicate API client for running Google's Gemini 3.1 Pro in LifeboardAI's chatbot.
 
 ## Setup
 
@@ -14,52 +14,54 @@ This directory contains the Replicate API client for running GPT-5 Pro in Lifebo
    REPLICATE_API_TOKEN=your_token_here
    ```
 
-3. **The chatbot will automatically use GPT-5 Pro** via Replicate with OpenAI as a fallback.
+3. **The chatbot will automatically use Gemini 3.1 Pro** via Replicate with OpenAI GPT-4o-mini as a fallback.
 
 ## Usage
 
-The chatbot API route (`/src/app/api/chat/route.ts`) now uses GPT-5 Pro by default:
+The chatbot API route (`/src/app/api/chat/route.ts`) uses Gemini 3.1 Pro by default:
 
 ```typescript
-import { runGPT5Pro } from '@/lib/replicate/client';
+import { runGemini } from '@/lib/replicate/client';
 
-const reply = await runGPT5Pro({
+const reply = await runGemini({
   messages: [
     { role: 'system', content: 'You are a helpful assistant' },
     { role: 'user', content: 'Hello!' }
   ],
   temperature: 0.7,
-  max_tokens: 1024,
+  max_tokens: 2048,
 });
 ```
 
 ## Features
 
-- **Primary Model**: GPT-5 Pro via Replicate
+- **Primary Model**: Gemini 3.1 Pro via Replicate
 - **Fallback**: OpenAI GPT-4o-mini if Replicate fails
 - **Task Creation**: Supports Lifeboard task commands
 - **Context Aware**: Includes user's buckets, widgets, and dynamic data
 - **TTS Support**: OpenAI TTS for voice responses
+- **Thinking Levels**: Configurable reasoning depth (low/medium/high)
 
 ## API Reference
 
-### `runGPT5Pro(options)`
+### `runGemini(options)`
 
-Runs GPT-5 Pro and returns the complete response.
+Runs Gemini 3.1 Pro and returns the complete response.
 
 **Parameters:**
 - `messages`: Array of message objects with `role` and `content`
-- `temperature`: (optional) 0.0-1.0, default 0.7
-- `max_tokens`: (optional) Maximum tokens to generate, default 1024
-- `top_p`: (optional) Nucleus sampling parameter, default 0.9
+- `temperature`: (optional) 0.0-2.0, default 0.7
+- `max_tokens`: (optional) Maximum output tokens, default 2048 (up to 65,535)
+- `top_p`: (optional) Nucleus sampling parameter, default 0.95
+- `thinking_level`: (optional) Reasoning depth: 'low', 'medium', or 'high', default 'medium'
 
 **Returns:** Promise<string> - The model's response text
 
-### `streamGPT5Pro(options)`
+### `streamGemini(options)`
 
-Streams GPT-5 Pro responses for real-time output.
+Streams Gemini 3.1 Pro responses for real-time output.
 
-**Parameters:** Same as `runGPT5Pro`
+**Parameters:** Same as `runGemini`
 
 **Returns:** AsyncIterable<string> - Streaming response chunks
 
@@ -69,13 +71,15 @@ If Replicate fails (network issues, rate limits, etc.), the chatbot automaticall
 
 ## Cost Considerations
 
-- GPT-5 Pro runs on Replicate's infrastructure
-- Pricing: https://replicate.com/openai/gpt-5-pro
+- Gemini 3.1 Pro runs on Replicate's infrastructure
+- Pricing: $2/$12 per million tokens (input/output) for <=200k context, $4/$18 for >200k
 - Monitor usage in your Replicate dashboard
 - OpenAI fallback uses your OpenAI API key
 
 ## Model Information
 
-- **Model**: openai/gpt-5-pro
+- **Model**: google/gemini-3.1-pro
 - **Provider**: Replicate
-- **Documentation**: https://replicate.com/openai/gpt-5-pro
+- **Context Window**: 1M tokens
+- **Max Output**: 65,535 tokens
+- **Documentation**: https://replicate.com/google/gemini-3.1-pro
