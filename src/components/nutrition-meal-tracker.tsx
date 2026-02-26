@@ -129,17 +129,23 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
     loadFavoriteFoods()
   }, [currentDate])
   
-  // Check for date changes every minute
+  // Check for date changes when tab becomes visible or regains focus (no polling)
   useEffect(() => {
-    const interval = setInterval(() => {
+    const checkDate = () => {
       const today = getCurrentLocalDate()
       if (today !== currentDate) {
         setCurrentDate(today)
-        // This will trigger the above useEffect to reload meals
       }
-    }, 60000) // Check every minute
-    
-    return () => clearInterval(interval)
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') checkDate()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', checkDate)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', checkDate)
+    }
   }, [currentDate])
   
   const loadMeals = async () => {

@@ -19,7 +19,7 @@ const config = {
     },
     extend: {
       fontFamily: {
-        sans: ['"DM Sans"', 'Inter', 'Manrope', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        sans: ['var(--font-dm-sans)', 'var(--font-inter)', '"DM Sans"', 'Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
       boxShadow: {
         'warm-sm': '0px 4px 16px rgba(163, 133, 96, 0.06)',

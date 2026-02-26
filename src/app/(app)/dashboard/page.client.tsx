@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react'
 import dynamic from 'next/dynamic'
-import { SidebarLayout } from "@/components/sidebar-layout"
 import { Loader2 } from 'lucide-react'
 import SectionLoadTimer from '@/components/section-load-timer'
 
@@ -22,11 +21,7 @@ const TaskBoardDashboard = dynamic(
 )
 
 function DashboardContent() {
-  return (
-    <SidebarLayout>
-      <TaskBoardDashboard />
-    </SidebarLayout>
-  )
+  return <TaskBoardDashboard />
 }
 
 function LoadingDashboard() {

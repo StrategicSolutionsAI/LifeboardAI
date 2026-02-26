@@ -5,7 +5,6 @@ import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square, Che
 import { ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
-import { SidebarLayout } from '@/components/sidebar-layout'
 import { getUserPreferencesClient, saveUserPreferences, UserPreferences } from '@/lib/user-preferences'
 import { invalidateBucketColorCache } from '@/lib/bucket-colors'
 
@@ -246,8 +245,7 @@ export default function SettingsPageClient() {
   if (!mounted) return null
 
   return (
-    <SidebarLayout>
-      <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
         {/* ── Page header ─────────────────────────────────── */}
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
           <Settings className="w-6 h-6 text-[#8e99a8]" />
@@ -486,7 +484,6 @@ export default function SettingsPageClient() {
             </div>
           </div>
         </div>
-      </div>
-    </SidebarLayout>
+    </div>
   )
 }

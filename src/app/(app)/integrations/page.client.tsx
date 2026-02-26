@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { SidebarLayout } from '@/components/sidebar-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -345,7 +344,7 @@ export default function IntegrationsPageClient() {
 
   if (initialLoading) {
     return (
-      <SidebarLayout>
+      <>
         <SectionLoadTimer name="/integrations" />
         <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
           <div className="mb-8">
@@ -358,12 +357,12 @@ export default function IntegrationsPageClient() {
             ))}
           </div>
         </div>
-      </SidebarLayout>
+      </>
     )
   }
 
   return (
-    <SidebarLayout>
+    <>
       <SectionLoadTimer name="/integrations" />
       <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
         <div className="mb-8">
@@ -588,6 +587,6 @@ export default function IntegrationsPageClient() {
           <p className="text-sm text-[#314158]">If you're having trouble connecting an integration, try refreshing the page or disconnecting and reconnecting the service. Make sure you have the necessary permissions enabled in your connected apps.</p>
         </div>
       </div>
-    </SidebarLayout>
+    </>
   )
 }

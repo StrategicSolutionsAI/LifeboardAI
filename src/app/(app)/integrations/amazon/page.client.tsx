@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SidebarLayout } from "@/components/sidebar-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,8 +158,7 @@ function AmazonIntegrationPageInner() {
   );
 
   return (
-    <SidebarLayout>
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" className="px-0 text-sm text-theme-primary hover:text-theme-primary">
             <Link href="/integrations" className="inline-flex items-center gap-2">
@@ -314,8 +312,7 @@ function AmazonIntegrationPageInner() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </SidebarLayout>
+    </div>
   );
 }
 

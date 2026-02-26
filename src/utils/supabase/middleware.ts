@@ -66,7 +66,12 @@ function generateNonce(): string {
   return Math.random().toString(36).slice(2, 18)
 }
 
-function buildContentSecurityPolicy(nonce: string): string {
+// Cache the static CSP template — only the nonce changes per request
+let cachedCspTemplate: string | null = null
+
+function getCspTemplate(): string {
+  if (cachedCspTemplate) return cachedCspTemplate
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseHost = (() => {
     try {
@@ -80,7 +85,7 @@ function buildContentSecurityPolicy(nonce: string): string {
     "'self'",
     "'wasm-unsafe-eval'",
     "'inline-speculation-rules'",
-    `'nonce-${nonce}'`,
+    'NONCE_PLACEHOLDER',
     'https://va.vercel-scripts.com',
   ]
 
@@ -131,5 +136,10 @@ function buildContentSecurityPolicy(nonce: string): string {
     `upgrade-insecure-requests`,
   ]
 
-  return directives.join('; ')
+  cachedCspTemplate = directives.join('; ')
+  return cachedCspTemplate
+}
+
+function buildContentSecurityPolicy(nonce: string): string {
+  return getCspTemplate().replace('NONCE_PLACEHOLDER', `'nonce-${nonce}'`)
 }

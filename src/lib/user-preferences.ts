@@ -12,7 +12,42 @@ export interface UserPreferences {
   updated_at?: string;
 }
 
+// ---------------------------------------------------------------------------
+// In-flight deduplication + short-lived cache for getUserPreferencesClient().
+// Multiple components calling this within the same tick (or TTL window) share
+// a single Supabase round-trip instead of each firing their own query.
+// ---------------------------------------------------------------------------
+let _prefsCache: { data: UserPreferences | null; ts: number } | null = null
+let _prefsFlight: Promise<UserPreferences | null> | null = null
+const PREFS_CACHE_TTL = 5_000 // 5 seconds
+
+/** Invalidate the in-memory preferences cache (call after saves). */
+export function invalidatePreferencesCache() {
+  _prefsCache = null
+  _prefsFlight = null
+}
+
 export async function getUserPreferencesClient() {
+  // Return cached result if still fresh
+  if (_prefsCache && Date.now() - _prefsCache.ts < PREFS_CACHE_TTL) {
+    return _prefsCache.data
+  }
+  // Deduplicate concurrent in-flight requests
+  if (_prefsFlight) return _prefsFlight
+
+  _prefsFlight = _fetchPreferencesClient().then((result) => {
+    _prefsCache = { data: result, ts: Date.now() }
+    _prefsFlight = null
+    return result
+  }).catch((err) => {
+    _prefsFlight = null
+    throw err
+  })
+
+  return _prefsFlight
+}
+
+async function _fetchPreferencesClient() {
   const { data: sessionData } = await supabase.auth.getSession();
   let user = sessionData?.session?.user ?? null;
 
@@ -100,12 +135,70 @@ export async function getUserPreferencesClient() {
 }
 
 /**
+ * Update only specific fields on the user_preferences row without touching
+ * other columns. This avoids race conditions where concurrent full-row
+ * upserts overwrite each other's changes.
+ */
+export async function updateUserPreferenceFields(
+  fields: Partial<Pick<UserPreferences, 'life_buckets' | 'bucket_colors' | 'widgets_by_bucket' | 'progress_by_widget' | 'hourly_plan'>>
+): Promise<boolean> {
+  invalidatePreferencesCache()
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    let user = sessionData?.session?.user ?? null;
+    if (!user) {
+      const { data: directUser } = await supabase.auth.getUser();
+      user = directUser?.user ?? null;
+    }
+    if (!user) {
+      console.warn('updateUserPreferenceFields: no authenticated user');
+      return false;
+    }
+
+    // Use .select() so we can verify at least one row was updated
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .update(fields)
+      .eq('user_id', user.id)
+      .select('user_id');
+
+    if (error) {
+      console.error('Error in updateUserPreferenceFields:', error);
+      return false;
+    }
+
+    // If .update() matched 0 rows the row doesn't exist yet — fall back to
+    // a full upsert so the data is not silently lost.
+    if (!data || data.length === 0) {
+      console.warn('updateUserPreferenceFields: 0 rows matched, falling back to upsert');
+      const { error: upsertError } = await supabase
+        .from('user_preferences')
+        .upsert(
+          { user_id: user.id, ...fields },
+          { onConflict: 'user_id' }
+        )
+        .select();
+      if (upsertError) {
+        console.error('Fallback upsert failed:', upsertError);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Exception in updateUserPreferenceFields:', err);
+    return false;
+  }
+}
+
+/**
  * Save user preferences to Supabase with enhanced error handling and logging
- * 
+ *
  * @param preferences UserPreferences object to save
  * @returns Promise<boolean> indicating success or failure
  */
 export async function saveUserPreferences(preferences: UserPreferences) {
+  invalidatePreferencesCache()
   try {
     // Only include fields that exist in the database schema
     // Exclude id, created_at, updated_at as they are auto-managed

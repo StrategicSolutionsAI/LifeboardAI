@@ -36,12 +36,11 @@ const CalendarView = dynamic(
   }
 );
 
-import { SidebarLayout } from "@/components/sidebar-layout";
 import SectionLoadTimer from "@/components/section-load-timer";
 
 export default function CalendarPage() {
   return (
-    <SidebarLayout>
+    <>
       <SectionLoadTimer name="/calendar" />
       <Suspense fallback={
         <div className="h-full">
@@ -58,6 +57,6 @@ export default function CalendarPage() {
       }>
         <CalendarView />
       </Suspense>
-    </SidebarLayout>
+    </>
   );
 }

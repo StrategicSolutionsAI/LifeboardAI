@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { isPast, isThisWeek, isToday, parseISO } from "date-fns";
 
@@ -148,7 +148,7 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
     });
   }, [groups]);
 
-  const toggleGroup = (key: string) => {
+  const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -158,22 +158,12 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
       }
       return next;
     });
-  };
-
-  const getGroupStyles = (tone: TaskGroup["tone"]) => {
-    const styles = {
-      critical: "border-red-200/70 bg-red-50/60 text-red-700",
-      accent: "border-[#dbd6cf]/70 bg-[#fdf8f6]/60 text-[#9a7b5a]",
-      success: "border-emerald-200/70 bg-emerald-50/60 text-emerald-700",
-      neutral: "border-border/70 bg-muted/40 text-muted-foreground",
-    };
-    return styles[tone];
-  };
+  }, []);
 
   if (groups.length === 0) {
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        <p className="mb-2 text-lg">All caught up</p>
+      <div className="py-12 text-center text-[#8e99a8]">
+        <p className="mb-2 text-lg text-[#314158]">All caught up</p>
         <p className="text-sm">No open tasks in this section.</p>
       </div>
     );
@@ -181,34 +171,62 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
 
   return (
     <div className="space-y-4">
-      {groups.map((group) => {
-        const isCollapsed = collapsedGroups.has(group.key);
-        
-        return (
-          <div key={group.key} className="overflow-hidden rounded-xl border border-border/70">
-            <button
-              onClick={() => toggleGroup(group.key)}
-              className={`flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors ${getGroupStyles(group.tone)}`}
-            >
-              <div className="flex items-center gap-2">
-                {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                <span>{group.title}</span>
-              </div>
-              <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-background/70 px-2 text-xs font-semibold text-foreground">
-                {group.tasks.length}
-              </div>
-            </button>
-
-            {!isCollapsed && (
-              <div className="divide-y divide-border/60 bg-background">
-                {group.tasks.map((task, index) => (
-                  <div key={task.id}>{renderTask(task, index)}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {groups.map((group) => (
+        <GroupSection
+          key={group.key}
+          group={group}
+          isCollapsed={collapsedGroups.has(group.key)}
+          onToggle={toggleGroup}
+          renderTask={renderTask}
+        />
+      ))}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Memoized group section — collapsing one group won't re-render the others.
+// ---------------------------------------------------------------------------
+const TONE_STYLES: Record<TaskGroup["tone"], string> = {
+  critical: "border-red-200/70 bg-red-50/60 text-red-700",
+  accent: "border-[#dbd6cf]/70 bg-[#fdf8f6]/60 text-[#9a7b5a]",
+  success: "border-emerald-200/70 bg-emerald-50/60 text-emerald-700",
+  neutral: "border-[#dbd6cf]/70 bg-[rgba(250,248,245,0.4)] text-[#8e99a8]",
+};
+
+const GroupSection = memo(function GroupSection({
+  group,
+  isCollapsed,
+  onToggle,
+  renderTask,
+}: {
+  group: TaskGroup;
+  isCollapsed: boolean;
+  onToggle: (key: string) => void;
+  renderTask: (task: Task, index: number) => React.ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#dbd6cf]/70">
+      <button
+        onClick={() => onToggle(group.key)}
+        className={`flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors ${TONE_STYLES[group.tone]}`}
+      >
+        <div className="flex items-center gap-2">
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          <span>{group.title}</span>
+        </div>
+        <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/70 px-2 text-xs font-semibold text-[#314158]">
+          {group.tasks.length}
+        </div>
+      </button>
+
+      {!isCollapsed && (
+        <div className="divide-y divide-[#dbd6cf]/60 bg-white">
+          {group.tasks.map((task, index) => (
+            <div key={task.id}>{renderTask(task, index)}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});

@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
 import SectionLoadTimer from '@/components/section-load-timer';
-import { SidebarLayout } from "@/components/sidebar-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +69,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
 
   if (loading) {
     return (
-      <SidebarLayout>
+      <>
         <SectionLoadTimer name="/trends/[instanceId]" />
         <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
           <div className="space-y-2"><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-96" /></div>
@@ -78,33 +77,31 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{[...Array(4)].map((_, i) => (<Card key={i}><CardHeader className="pb-3"><Skeleton className="h-4 w-24" /></CardHeader><CardContent><Skeleton className="h-8 w-16 mb-2" /><Skeleton className="h-3 w-20" /></CardContent></Card>))}</div>
           <Card><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>
         </div>
-      </SidebarLayout>
+      </>
     );
   }
 
   if (error) {
     return (
-      <SidebarLayout>
+      <>
         <SectionLoadTimer name="/trends/[instanceId]" />
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           <Card className="border-red-200 bg-red-50"><CardHeader><CardTitle className="text-red-800 flex items-center gap-2"><BarChart3 className="h-5 w-5" />Unable to Load Trends</CardTitle><CardDescription className="text-red-600">{error.replace(/<[^>]+>/g, '').slice(0, 120)}{error.length > 120 ? '…' : ''}</CardDescription></CardHeader><CardContent><Button onClick={handleRefresh} variant="outline" className="border-red-300 text-red-700 hover:bg-red-100" disabled={refreshing}><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Try Again</Button></CardContent></Card>
         </div>
-      </SidebarLayout>
+      </>
     );
   }
 
   if (!data || data.length === 0) {
     return (
-      <SidebarLayout>
-        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-          <Card className="text-center py-12"><CardContent><BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><CardTitle className="mb-2">No Data Available</CardTitle><CardDescription className="mb-4">There's no trend data for the selected time period. Try refreshing or selecting a different time range.</CardDescription><Button onClick={handleRefresh} disabled={refreshing}><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh Data</Button></CardContent></Card>
-        </div>
-      </SidebarLayout>
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+        <Card className="text-center py-12"><CardContent><BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><CardTitle className="mb-2">No Data Available</CardTitle><CardDescription className="mb-4">There's no trend data for the selected time period. Try refreshing or selecting a different time range.</CardDescription><Button onClick={handleRefresh} disabled={refreshing}><RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh Data</Button></CardContent></Card>
+      </div>
     );
   }
 
   return (
-    <SidebarLayout>
+    <>
       <SectionLoadTimer name="/trends/[instanceId]" />
       <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -154,6 +151,6 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
           </CardContent>
         </Card>
       </div>
-    </SidebarLayout>
+    </>
   );
 }

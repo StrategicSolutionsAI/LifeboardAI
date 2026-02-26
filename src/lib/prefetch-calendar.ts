@@ -38,7 +38,7 @@ export async function prefetchCalendarExperience() {
   calendarAssetsPrefetched = true;
 
   await Promise.allSettled([
-    import("@/app/calendar/OptimizedCalendarView"),
+    import("@/app/(app)/calendar/OptimizedCalendarView"),
     import("@/components/full-calendar"),
     import("@/components/calendar-task-list"),
   ]);

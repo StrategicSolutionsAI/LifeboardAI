@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -10,11 +10,9 @@ import {
   ListChecks,
   History,
   Settings,
-  User,
   Zap,
   Menu,
   ShoppingCart,
-  Plus,
 } from "lucide-react"
 import { supabase } from "@/utils/supabase/client"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -92,6 +90,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const hasPrefetchedCalendarRef = useRef(false)
   const hasPrefetchedAllRef = useRef(false)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   // Clear navigatingTo when pathname changes (navigation completed)
   useEffect(() => {
@@ -109,7 +108,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   // Let Link handle navigation natively — just provide instant visual feedback
   const handleNavClick = useCallback(
     (_e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-      setNavigatingTo(href)
+      startTransition(() => {
+        setNavigatingTo(href)
+      })
     },
     []
   )
@@ -222,9 +223,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 href={href}
                 onClick={(e) => handleNavClick(e, href)}
                 {...getPrefetchHandlers(href)}
-                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${activeOrNav
+                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${activeOrNav
                   ? "bg-[rgba(183,148,106,0.12)] text-[#314158]"
-                  : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.06)] hover:text-[#314158]"
+                  : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
                   }`}
                 aria-label={label}
                 title={label}
@@ -241,9 +242,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           <Link
             href="/dashboard/settings"
             onClick={(e) => handleNavClick(e, "/dashboard/settings")}
-            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-colors ${isActiveOrNavigating("/dashboard/settings")
-              ? "bg-[rgba(183,148,106,0.08)] text-[#314158]"
-              : "text-[#8e99a8] hover:bg-[rgba(177,145,106,0.08)] hover:text-[#314158]"
+            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${isActiveOrNavigating("/dashboard/settings")
+              ? "bg-[rgba(183,148,106,0.12)] text-[#314158]"
+              : "text-[#8e99a8] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
               }`}
             aria-label="Settings"
             title="Settings"
@@ -262,78 +263,52 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Right side: Header + Content */}
       <div className="flex flex-1 flex-col min-w-0 md:gap-5">
-        {/* Header - Floating Bar */}
+        {/* Mobile Header */}
         <header
-          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#dbd6cf] px-4 md:static md:h-[66px] md:shrink-0 md:rounded-[20px] md:border md:border-[#dbd6cf] md:px-10 md:shadow-[0px_8px_30px_rgba(163,133,96,0.1)]"
+          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#dbd6cf] px-4 md:hidden"
           style={{ backgroundImage: "linear-gradient(173.681deg, rgba(255, 255, 255, 0.98) 41.319%, rgb(255, 255, 255) 81.558%)" }}
         >
           <div className="flex min-w-0 items-center gap-4">
-            {/* Mobile logo */}
-            <div className="md:hidden w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
               <span className="text-white text-sm font-bold">L</span>
             </div>
-            <div className="hidden md:flex items-center gap-2">
-              <LayoutDashboard size={16} className="text-[#314158]" />
-              <span className="font-['Inter',sans-serif] text-[14px] text-[#314158] tracking-wide">
-                {currentRoute.title.toUpperCase()}
-              </span>
-            </div>
-            <div className="hidden sm:flex md:hidden items-baseline gap-1 text-[22px] font-semibold leading-none">
+            <div className="hidden sm:flex items-baseline gap-1 text-[22px] font-semibold leading-none">
               <span className="text-theme-primary">Lifeboard</span>
               <span className="text-[#314158]">AI</span>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <Link href="/tasks">
-              <Button className="h-9 rounded-lg bg-theme-primary px-3 text-white hover:bg-theme-primary-600">
-                <Plus className="mr-1.5 h-4 w-4" />
-                Quick Task
+          <Sheet>
+            <SheetTrigger asChild>
+              <button className="p-2 rounded-lg hover:bg-[rgba(183,148,106,0.08)] active:bg-[rgba(183,148,106,0.14)] transition-[background-color] duration-150 ease-out" aria-label="Open quick actions">
+                <Menu className="h-5 w-5 text-[#314158]" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SheetHeader>
+                <SheetTitle>{currentRoute.title}</SheetTitle>
+              </SheetHeader>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={(e) => handleNavClick(e, href)}
+                    {...getPrefetchHandlers(href)}
+                    className={`flex items-center gap-2 rounded-xl border border-[#dbd6cf]/80 px-3 py-3 text-sm font-medium text-[#314158] hover:bg-[rgba(183,148,106,0.08)] transition-[background-color] duration-150 ease-out ${navigatingTo === href ? "bg-[rgba(183,148,106,0.08)]" : ""}`}
+                  >
+                    <Icon className="h-4 w-4 text-[#8e99a8]" />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+
+              <Button onClick={handleSignOut} variant="outline" className="mt-4 w-full">
+                Sign out
               </Button>
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className="h-9 w-9 rounded-full border border-[#dbd6cf] bg-white flex items-center justify-center hover:bg-[rgba(183,148,106,0.08)]"
-              aria-label="Sign out"
-            >
-              <User className="h-4 w-4 text-[#314158]" />
-            </button>
-          </div>
-
-          {/* Mobile actions */}
-          <div className="md:hidden">
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="p-2 rounded-lg hover:bg-[rgba(183,148,106,0.08)] active:bg-[rgba(183,148,106,0.14)]" aria-label="Open quick actions">
-                  <Menu className="h-5 w-5 text-[#314158]" />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <SheetHeader>
-                  <SheetTitle>{currentRoute.title}</SheetTitle>
-                </SheetHeader>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={(e) => handleNavClick(e, href)}
-                      {...getPrefetchHandlers(href)}
-                      className={`flex items-center gap-2 rounded-lg border border-[#dbd6cf] px-3 py-3 text-sm font-medium text-[#314158] hover:bg-[rgba(183,148,106,0.08)] ${navigatingTo === href ? "bg-[rgba(183,148,106,0.08)]" : ""}`}
-                    >
-                      <Icon className="h-4 w-4 text-[#8e99a8]" />
-                      {label}
-                    </Link>
-                  ))}
-                </div>
-
-                <Button onClick={handleSignOut} variant="outline" className="mt-4 w-full">
-                  Sign out
-                </Button>
-              </SheetContent>
-            </Sheet>
-          </div>
+            </SheetContent>
+          </Sheet>
         </header>
 
         {/* Main content area */}
@@ -361,7 +336,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                   {...getPrefetchHandlers(href)}
                   aria-label={label}
                   aria-current={isActiveRoute(href) ? "page" : undefined}
-                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium transition-colors ${activeOrNav ? "text-[#314158] bg-[rgba(183,148,106,0.1)]" : "text-[#6b7688]"
+                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${activeOrNav ? "text-[#314158] bg-[rgba(183,148,106,0.1)]" : "text-[#6b7688]"
                     }`}
                 >
                   {activeOrNav && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[#B1916A]" aria-hidden="true" />}

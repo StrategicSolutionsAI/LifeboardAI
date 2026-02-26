@@ -46,7 +46,11 @@ async function handler(request: Request) {
     integrationId: integration?.id || null
   };
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+    },
+  });
 }
 
 export const GET = withErrorHandling(handler, 'integrations/status')

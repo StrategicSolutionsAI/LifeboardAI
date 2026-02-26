@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { DM_Sans, Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
@@ -6,6 +7,19 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import PerfObserver from '@/components/perf-observer'
 
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+})
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Lifeboard.ai - Organize Your Life, Effortlessly With AI',
@@ -24,11 +38,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600&family=Geist:wght@400;500&family=Manrope:wght@400;500&display=swap" rel="stylesheet" />
+        {/* Preconnect to external APIs used during page lifecycle */}
+        <link rel="dns-prefetch" href="https://api.openai.com" />
+        <link rel="dns-prefetch" href="https://api.open-meteo.com" />
       </head>
       <body className="font-sans antialiased">
         <ThemeProvider>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SidebarLayout } from "@/components/sidebar-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { WidgetInstance } from "@/types/widgets";
 import { useWidgets } from "@/hooks/use-widgets";
+import { hexToRgba } from "@/lib/dashboard-utils";
 
 const UNSORTED_LABEL = "Unsorted";
 
@@ -80,12 +80,6 @@ const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> 
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function hexToRgba(hex: string, alpha: number) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 function ShoppingListLayout() {
   const { toast } = useToast();
@@ -758,7 +752,7 @@ function ShoppingListLayout() {
   };
 
   return (
-    <SidebarLayout>
+    <>
       <div className="mx-auto flex max-w-4xl flex-col gap-6 pb-12">
         <header className="flex flex-col gap-2">
           <p className="text-sm font-medium uppercase text-theme-primary">
@@ -1407,7 +1401,7 @@ function ShoppingListLayout() {
           )}
         </SheetContent>
       </Sheet>
-    </SidebarLayout>
+    </>
   );
 }
 
