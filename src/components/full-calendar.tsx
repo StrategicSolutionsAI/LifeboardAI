@@ -1633,21 +1633,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, [refetch]);
 
-  // Listen for task updates from other components
-  useEffect(() => {
-    const handleTasksUpdated = () => {
-      try {
-        refetch();
-      } catch (error) {
-        console.error('Failed to refetch tasks after update:', error);
-      }
-    };
-
-    window.addEventListener('lifeboard:tasks-updated', handleTasksUpdated);
-    return () => {
-      window.removeEventListener('lifeboard:tasks-updated', handleTasksUpdated);
-    };
-  }, [refetch]);
+  // Task updates are handled by TasksContext — allTasks updates automatically
+  // via optimistic updates and the useTasks hook's own event listener with
+  // proper version tracking. A manual refetch here would wipe optimistic state.
 
   // Legacy bucket label retained for older imports
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';

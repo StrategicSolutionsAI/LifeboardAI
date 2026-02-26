@@ -35,15 +35,9 @@ async function postHandler(request: Request) {
     );
   }
 
-    const existingBuckets = existingPrefs?.life_buckets || [];
     const existingWidgets = existingPrefs?.widgets_by_bucket || {};
-    
-    const newBuckets = body.life_buckets || [];
     const newWidgets = body.widgets_by_bucket || {};
 
-    // Merge and deduplicate buckets
-    const combinedBuckets = Array.from(new Set([...existingBuckets, ...newBuckets]));
-    
     // Merge widgets - new widgets take precedence
     const combinedWidgets = { ...existingWidgets, ...newWidgets };
 
@@ -53,9 +47,11 @@ async function postHandler(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    // Only update fields that are provided in the request
+    // Only update fields that are provided in the request.
+    // life_buckets is treated as a full replacement (not a merge) so that
+    // deletions are correctly persisted.
     if (body.life_buckets !== undefined) {
-      updateData.life_buckets = combinedBuckets;
+      updateData.life_buckets = body.life_buckets;
     }
     if (body.widgets_by_bucket !== undefined) {
       updateData.widgets_by_bucket = combinedWidgets;
@@ -63,7 +59,7 @@ async function postHandler(request: Request) {
 
     // If neither field is provided, just use existing data
     if (body.life_buckets === undefined && body.widgets_by_bucket === undefined) {
-      updateData.life_buckets = existingBuckets;
+      updateData.life_buckets = existingPrefs?.life_buckets || [];
       updateData.widgets_by_bucket = existingWidgets;
     }
 

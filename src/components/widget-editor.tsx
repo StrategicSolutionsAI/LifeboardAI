@@ -134,30 +134,30 @@ export default function WidgetEditorSheet({
   const [saveError, setSaveError] = useState<string | null>(null);
   const { createTask, batchUpdateTasks, deleteTask } = useTasksContext();
 
-  // Check if Fitbit or Google Fit is connected
+  // Only check integration connections when the editor is actually open
   useEffect(() => {
+    if (!open) return;
     const checkConnections = async () => {
       try {
-        // Fitbit
-        const fitbitRes = await fetch('/api/integrations/status?provider=fitbit');
-        const fitbitData = await fitbitRes.json();
+        const [fitbitRes, gfRes, wRes] = await Promise.all([
+          fetch('/api/integrations/status?provider=fitbit'),
+          fetch('/api/integrations/status?provider=google-fit'),
+          fetch('/api/integrations/status?provider=withings'),
+        ]);
+        const [fitbitData, gfData, wData] = await Promise.all([
+          fitbitRes.json(),
+          gfRes.json(),
+          wRes.json(),
+        ]);
         setIsFitbitConnected(fitbitData.connected);
-
-        // Google Fit
-        const gfRes = await fetch('/api/integrations/status?provider=google-fit');
-        const gfData = await gfRes.json();
         setIsGoogleFitConnected(gfData.connected);
-
-        // Withings
-        const wRes = await fetch('/api/integrations/status?provider=withings');
-        const wData = await wRes.json();
         setIsWithingsConnected(wData.connected);
       } catch (error) {
         console.error('Error checking integration connections:', error);
       }
     };
     checkConnections();
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (widget && draft?.instanceId !== widget.instanceId) {

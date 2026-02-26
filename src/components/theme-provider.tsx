@@ -13,9 +13,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeColor>(() => getUserTheme())
-  const [isThemeLoaded, setIsThemeLoaded] = useState(false)
   const pathname = usePathname()
-  
+
   // Landing pages should not be affected by theme changes
   const isLandingPage = pathname === '/' || pathname === '/login' || pathname === '/signup'
 
@@ -24,25 +23,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (!isLandingPage) {
       applyTheme(newTheme)
     }
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('user_theme', newTheme.id)
       localStorage.setItem('theme_colors', JSON.stringify(newTheme))
     }
   }
 
+  // Theme CSS vars are already applied by the inline <script> in layout.tsx
+  // before React hydrates, so no blocking render needed. This effect keeps
+  // the CSS vars in sync when the theme or page changes after mount.
   useEffect(() => {
-    // Apply theme on mount only for app pages, not landing pages
     if (!isLandingPage) {
       applyTheme(theme)
     }
-    setIsThemeLoaded(true)
   }, [theme, isLandingPage])
-
-  // Don't render children until theme is loaded to prevent flash
-  if (!isThemeLoaded && !isLandingPage) {
-    return null
-  }
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

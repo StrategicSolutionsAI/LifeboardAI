@@ -97,13 +97,35 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     setNavigatingTo(null)
   }, [pathname])
 
-  // Aggressively prefetch ALL sidebar routes on mount for instant navigation
+  // Stagger route prefetches during idle time instead of all-at-once on mount.
+  // Next.js <Link> already prefetches when links enter the viewport, so this
+  // only covers routes that may not be visible (e.g. below the fold on mobile).
   useEffect(() => {
     if (hasPrefetchedAllRef.current) return
     hasPrefetchedAllRef.current = true
+
     const allHrefs = [...navItems.map((n) => n.href), "/dashboard/settings"]
-    allHrefs.forEach((href) => router.prefetch(href))
-  }, [router])
+    // Remove the current route — it's already loaded
+    const toPrefetch = allHrefs.filter((h) => !pathname.startsWith(h))
+
+    let i = 0
+    const prefetchNext = () => {
+      if (i >= toPrefetch.length) return
+      router.prefetch(toPrefetch[i])
+      i++
+      // Stagger each prefetch by 200ms to avoid saturating the network
+      setTimeout(prefetchNext, 200)
+    }
+
+    const windowWithIdle = window as Window & {
+      requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number
+    }
+    if (typeof windowWithIdle.requestIdleCallback === "function") {
+      windowWithIdle.requestIdleCallback(() => prefetchNext(), { timeout: 3000 })
+    } else {
+      setTimeout(prefetchNext, 1500)
+    }
+  }, [router, pathname])
 
   // Let Link handle navigation natively — just provide instant visual feedback
   const handleNavClick = useCallback(

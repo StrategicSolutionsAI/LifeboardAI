@@ -325,11 +325,12 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         {/* Backdrop */}
         <div className="absolute inset-0 bg-black/25 animate-in fade-in duration-200" />
 
-        {/* Slide-over panel */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-full sm:max-w-[480px] bg-white shadow-[-8px_0px_30px_rgba(0,0,0,0.08)] animate-in slide-in-from-right duration-300 ease-out flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
+        {/* Centered modal */}
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-[520px] max-h-[90vh] bg-white rounded-2xl shadow-[0px_16px_48px_rgba(0,0,0,0.12)] animate-in fade-in zoom-in-95 duration-200 ease-out flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(219,214,207,0.5)] shrink-0">
             <div className="min-w-0">
@@ -561,6 +562,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
     );

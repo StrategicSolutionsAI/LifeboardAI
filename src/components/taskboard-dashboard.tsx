@@ -655,11 +655,34 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return formatDistanceToNow(parsed, { addSuffix: true });
   };
 
+  // ---------------------------------------------------------------------------
+  // Bucket sync helpers: track whether local changes have been synced to
+  // Supabase so that loadBuckets() can decide whether to prefer local
+  // (unsynced edit) or server (may have newer data from another device).
+  // ---------------------------------------------------------------------------
+  const markBucketsSaved = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets_saved_at', String(Date.now()));
+    }
+  };
+  const markBucketsSynced = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('life_buckets_synced_at', String(Date.now()));
+    }
+  };
+  const hasUnsyncedBucketChanges = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const savedAt = Number(localStorage.getItem('life_buckets_saved_at') || '0');
+    const syncedAt = Number(localStorage.getItem('life_buckets_synced_at') || '0');
+    return savedAt > syncedAt;
+  };
+
   // Debounced persistence of bucket order to Supabase
   const debouncedSaveBucketsToSupabase = useRef(
     debounce(async (ordered: string[]) => {
       try {
-        await updateUserPreferenceFields({ life_buckets: ordered });
+        const ok = await updateUserPreferenceFields({ life_buckets: ordered });
+        if (ok) markBucketsSynced();
       } catch (err) {
         console.error('Failed to save bucket order to Supabase', err);
       }
@@ -1504,8 +1527,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return () => clearInterval(int);
   }, [fetchIntegrationsData]);
 
-  // Fetch tasks whenever date changes (single consolidated request)
+  // Fetch tasks whenever date changes (single consolidated request).
+  // Skip the initial mount call — fetchIntegrationsData already handles it.
+  const hasLoadedTodoistRef = useRef(false);
   useEffect(() => {
+    if (!hasLoadedTodoistRef.current) {
+      hasLoadedTodoistRef.current = true;
+      return; // fetchIntegrationsData handles the first load
+    }
     fetchAllTodoistTasks(selectedDate);
   }, [selectedDate, fetchAllTodoistTasks]);
 
@@ -1704,6 +1733,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(updated));
+      markBucketsSaved();
       // Notify other views (e.g., Calendar) that buckets changed
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
@@ -1711,7 +1741,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // Save to Supabase for persistence — targeted update to avoid race conditions
     try {
       const mergedColors = { ...bucketColors, [name]: colorToUse } as Record<string, string>;
-      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: mergedColors });
+      const ok = await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: mergedColors });
+      if (ok) markBucketsSynced();
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
@@ -1728,6 +1759,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(updated));
+      markBucketsSaved();
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
     try {
@@ -1743,7 +1775,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
       }
-      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: nextColors });
+      const ok = await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: nextColors });
+      if (ok) markBucketsSynced();
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
     }
@@ -1757,16 +1790,52 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     } else if (!updated.length) {
       setActiveBucket('');
     }
+
+    // Clean up widget data and bucket colors for the removed bucket.
+    // Use refs/spread directly so values are available for the Supabase call
+    // without depending on React setState callback timing.
+    const cleanedWidgets = { ...widgetsByBucketRef.current };
+    delete cleanedWidgets[bucket];
+    widgetsByBucketRef.current = cleanedWidgets;
+    setWidgetsByBucket(cleanedWidgets);
+
+    const cleanedColors = { ...bucketColors };
+    delete cleanedColors[bucket];
+    setBucketColors(cleanedColors);
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(updated));
+      localStorage.setItem('bucket_colors', JSON.stringify(cleanedColors));
+      localStorage.setItem('widgets_by_bucket', JSON.stringify({
+        widgets: cleanedWidgets,
+        savedAt: new Date().toISOString(),
+      }));
+      markBucketsSaved();
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
 
-    // Save to Supabase for persistence — targeted update
+    // Save life_buckets, widgets_by_bucket, and bucket_colors to Supabase
+    // so the deleted bucket is fully removed on all devices.
     try {
-      await updateUserPreferenceFields({ life_buckets: updated });
+      const ok = await updateUserPreferenceFields({
+        life_buckets: updated,
+        widgets_by_bucket: cleanedWidgets,
+        bucket_colors: cleanedColors,
+      });
+      if (ok) markBucketsSynced();
     } catch (err) {
       console.error('Failed to save buckets to Supabase:', err);
+    }
+
+    // Cascade-delete tasks, calendar events, and shopping list items for this bucket
+    try {
+      await fetch('/api/user/bucket-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket }),
+      });
+    } catch (err) {
+      console.error('Failed to cascade-delete bucket data:', err);
     }
   };
 
@@ -1774,9 +1843,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const previousBuckets = [...buckets];
     const previousActiveBucket = activeBucket;
 
+    // Close the Manage Tabs Sheet first so its portal overlay
+    // doesn't block interaction with the confirm dialog.
+    setIsEditorOpen(false);
+
     setConfirmState({
       title: `Remove "${bucket}" tab?`,
-      description: "This removes the tab from your dashboard. You can undo immediately after confirming.",
+      description: "This permanently removes the tab and all its tasks, calendar events, and shopping list items.",
       confirmLabel: "Remove tab",
       onConfirm: async () => {
         await handleRemoveBucketImmediate(bucket);
@@ -1793,11 +1866,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
           if (typeof window !== "undefined") {
             localStorage.setItem("life_buckets", JSON.stringify(previousBuckets));
+            markBucketsSaved();
             window.dispatchEvent(new CustomEvent("lifeBucketsChanged"));
           }
 
           try {
-            await updateUserPreferenceFields({ life_buckets: previousBuckets });
+            const ok = await updateUserPreferenceFields({ life_buckets: previousBuckets });
+            if (ok) markBucketsSynced();
           } catch (err) {
             console.error("Failed to restore bucket after undo:", err);
           }
@@ -1875,6 +1950,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(updated));
       localStorage.setItem('bucket_colors', JSON.stringify(updatedColors));
+      markBucketsSaved();
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
       window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
     }
@@ -1890,7 +1966,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     // Save to Supabase — targeted update
     try {
-      await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: updatedColors });
+      const ok = await updateUserPreferenceFields({ life_buckets: updated, bucket_colors: updatedColors });
+      if (ok) markBucketsSynced();
     } catch (err) {
       console.error('Failed to save bucket rename to Supabase:', err);
     }
@@ -1943,11 +2020,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
+      markBucketsSaved();
       window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
     }
     // Save to Supabase — targeted update
     try {
-      await updateUserPreferenceFields({ life_buckets: latestBuckets });
+      const ok = await updateUserPreferenceFields({ life_buckets: latestBuckets });
+      if (ok) markBucketsSynced();
     } catch (err) {
       console.error('Failed to save bucket order to Supabase:', err);
     }
@@ -2040,21 +2119,22 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         const mergedCount = Object.values(merged).reduce((sum, arr) => sum + arr.length, 0);
 
         const migratedMerged = migrateWidgetsToTemplates(merged);
+
+        // Filter widget data to only include buckets that actually exist in
+        // the current bucket list. This prevents deleted buckets from being
+        // resurrected just because they still have leftover widget entries.
+        // Use bucketsRef for a synchronous read of the latest bucket list.
+        const currentBuckets = new Set(bucketsRef.current);
+        let removedStaleBuckets = false;
+        for (const key of Object.keys(migratedMerged)) {
+          if (!currentBuckets.has(key)) {
+            delete migratedMerged[key];
+            removedStaleBuckets = true;
+          }
+        }
+
         setWidgetsByBucket(migratedMerged);
         widgetsByBucketRef.current = migratedMerged;
-
-        // Ensure bucket list includes any bucket keys from widgets
-        const widgetBuckets = Object.keys(migratedMerged);
-        setBuckets(prev => {
-          const mergedBuckets = Array.from(new Set([...prev, ...widgetBuckets]));
-          if (mergedBuckets.length !== prev.length) {
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('life_buckets', JSON.stringify(mergedBuckets));
-            }
-            updateUserPreferenceFields({ life_buckets: mergedBuckets });
-          }
-          return mergedBuckets;
-        });
 
         // Persist merged result
         if (typeof window !== 'undefined') {
@@ -2063,8 +2143,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             savedAt: new Date().toISOString(),
           }));
         }
-        // If the merge added local-only widgets, push them to Supabase
-        if (mergedDiffersFromSupabase) {
+        // Push cleaned data to Supabase if local-only widgets were added
+        // or if stale bucket keys were removed
+        if (mergedDiffersFromSupabase || removedStaleBuckets) {
           await updateUserPreferenceFields({ widgets_by_bucket: migratedMerged });
         }
       }
@@ -2251,75 +2332,66 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
 
       const prefs = await getUserPreferencesClient();
-      if (prefs && prefs.life_buckets && prefs.life_buckets.length) {
-        // If we already loaded buckets from localStorage, prefer them to avoid flicker
-        if (!loadedFromLocal) {
-          setBuckets(prefs.life_buckets);
-          const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-          const initialActive = localSaved && prefs.life_buckets.includes(localSaved) ? localSaved : prefs.life_buckets[0];
-          setActiveBucket(initialActive);
+      const serverBuckets = prefs?.life_buckets ?? [];
+      const hasServer = serverBuckets.length > 0;
+      const hasLocal = loadedFromLocal && localBuckets.length > 0;
+      const unsynced = hasUnsyncedBucketChanges();
+
+      if (hasLocal && unsynced) {
+        // Local has unsynced changes (e.g. user refreshed before Supabase
+        // save completed). Prefer local and push to server.
+        setBuckets(localBuckets);
+        const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || localBuckets[0];
+        setActiveBucket(localBuckets.includes(active || '') ? (active as string) : localBuckets[0]);
+        if (localBucketColors) setBucketColors(localBucketColors);
+        const mergedColors = { ...(prefs?.bucket_colors || {}), ...(localBucketColors || {}) } as Record<string, string>;
+        const ok = await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
+        if (ok) markBucketsSynced();
+      } else if (hasServer) {
+        // Local is fully synced (or empty) — server may have newer data
+        // from another device. Use server as source of truth.
+        setBuckets(serverBuckets);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('life_buckets', JSON.stringify(serverBuckets));
         }
-        // Apply colors from Supabase only if non-empty to avoid wiping out locally cached colors
-        const serverColors = prefs.bucket_colors || {};
-        if (serverColors && Object.keys(serverColors).length > 0) {
+        const localSaved = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+        const initialActive = localSaved && serverBuckets.includes(localSaved) ? localSaved : serverBuckets[0];
+        setActiveBucket(initialActive);
+        // Apply colors from Supabase
+        const serverColors = prefs?.bucket_colors || {};
+        if (Object.keys(serverColors).length > 0) {
           setBucketColors(serverColors);
           if (typeof window !== 'undefined') {
             localStorage.setItem('bucket_colors', JSON.stringify(serverColors));
           }
         }
-        // If we have locally cached buckets that aren't yet on the server, merge and persist them.
-        // Preserve the local ordering as the primary source of truth and append any server-only buckets.
-        if (loadedFromLocal && localBuckets.length) {
-          const merged = [...localBuckets];
-          (prefs.life_buckets ?? []).forEach((bucket: string) => {
-            if (!merged.includes(bucket)) {
-              merged.push(bucket);
-            }
-          });
-          if (merged.length !== prefs.life_buckets.length || merged.some((name, idx) => name !== prefs.life_buckets[idx])) {
-            setBuckets(merged);
-            const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || merged[0];
-            setActiveBucket(merged.includes(active || '') ? (active as string) : merged[0]);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('life_buckets', JSON.stringify(merged));
-              window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
-            }
-            const mergedColors = {
-              ...(prefs.bucket_colors || {}),
-              ...(localBucketColors || {}),
-            } as Record<string, string>;
-            await updateUserPreferenceFields({ life_buckets: merged, bucket_colors: mergedColors });
-          }
-        }
+        // Mark as synced so next reload also uses server
+        markBucketsSaved();
+        markBucketsSynced();
+      } else if (hasLocal) {
+        // No server data but local exists — push local to server
+        if (localBucketColors) setBucketColors(localBucketColors);
+        const mergedColors = { ...(localBucketColors || {}) } as Record<string, string>;
+        const ok = await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
+        if (ok) markBucketsSynced();
       } else {
-        if (loadedFromLocal && localBuckets.length) {
-          const mergedColors = {
-            ...(localBucketColors || {}),
-          } as Record<string, string>;
-          await updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors });
-        } else {
-          // If no buckets found anywhere, set default buckets
-          const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
-          setBuckets(defaultBuckets);
-          // Assign default colors for defaults if none exist
-          const defaultColors: Record<string, string> = Object.fromEntries(
-            defaultBuckets.map((n) => [n, getSuggestedColorForBucket(n)])
-          );
-          setBucketColors(defaultColors);
-          const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-          setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
+        // If no buckets found anywhere, set default buckets
+        const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
+        setBuckets(defaultBuckets);
+        const defaultColors: Record<string, string> = Object.fromEntries(
+          defaultBuckets.map((n) => [n, getSuggestedColorForBucket(n)])
+        );
+        setBucketColors(defaultColors);
+        const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
+        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
 
-          // Save the default buckets
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
-            localStorage.setItem('bucket_colors', JSON.stringify(defaultColors));
-            // Broadcast so any open views refresh colors
-            window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
-          }
-
-          // Save to Supabase — targeted update
-          await updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
+          localStorage.setItem('bucket_colors', JSON.stringify(defaultColors));
+          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
         }
+
+        await updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
       }
     } catch (err) {
       console.error('Failed to load preferences', err);
@@ -3383,6 +3455,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   const latestBuckets = bucketsRef.current.length ? bucketsRef.current : buckets;
                   if (typeof window !== 'undefined') {
                     localStorage.setItem('life_buckets', JSON.stringify(latestBuckets));
+                    markBucketsSaved();
                     window.dispatchEvent(new CustomEvent('lifeBucketsChanged'));
                   }
                   debouncedSaveBucketsToSupabase(latestBuckets);
@@ -4542,74 +4615,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         </div>
 
 
-        {confirmState && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={confirmState.title}
-              className="w-full max-w-md rounded-xl border border-[#dbd6cf] bg-white p-5 shadow-xl"
-            >
-              <h3 className="text-base font-semibold text-[#314158]">{confirmState.title}</h3>
-              <p className="mt-2 text-sm text-[#6b7688]">{confirmState.description}</p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfirmState(null)}
-                  className="rounded-md border border-[#dbd6cf] px-3 py-2 text-sm text-[#4a5568] hover:bg-[#faf8f5]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const pending = confirmState;
-                    setConfirmState(null);
-                    void Promise.resolve(pending.onConfirm());
-                  }}
-                  className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
-                >
-                  {confirmState.confirmLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {undoState && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-[#dbd6cf] bg-white p-3 shadow-warm-lg"
-          >
-            <p className="text-sm text-[#314158]">{undoState.message}</p>
-            <div className="mt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  clearUndoTimer();
-                  setUndoState(null);
-                }}
-                className="rounded-md border border-[#dbd6cf] px-2 py-1 text-xs text-[#6b7688] hover:bg-[#faf8f5]"
-              >
-                Dismiss
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pending = undoState;
-                  clearUndoTimer();
-                  setUndoState(null);
-                  void Promise.resolve(pending.onUndo());
-                }}
-                className="rounded-lg bg-[#B1916A] px-2 py-1 text-xs text-white hover:bg-[#a07f5a] transition-colors"
-              >
-                Undo
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Widget editor sheet */}
         {typeof window !== 'undefined' && (
           <WidgetEditorSheet
@@ -4628,7 +4633,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           />
         )}
 
-        {/* Widget library sheet */}
+        {/* Widget library sheet — only mount WidgetLibrary when open to avoid unnecessary API calls */}
+        {isWidgetSheetOpen && (
         <Sheet open={isWidgetSheetOpen} onOpenChange={setIsWidgetSheetOpen}>
           <SheetContent
             side={isMobileView ? 'bottom' : 'right'}
@@ -4706,6 +4712,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </div>
           </SheetContent>
         </Sheet>
+        )}
 
         {/* Bucket editor: add/remove tabs */}
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
@@ -4953,6 +4960,77 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           </SheetContent>
         </Sheet>
       </div>
+
+      {/* Confirm dialog & undo toast rendered outside the z-10 stacking context
+          so they always appear above the sidebar / mobile bottom nav. */}
+      {confirmState && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={confirmState.title}
+            className="w-full max-w-md rounded-xl border border-[#dbd6cf] bg-white p-5 shadow-xl"
+          >
+            <h3 className="text-base font-semibold text-[#314158]">{confirmState.title}</h3>
+            <p className="mt-2 text-sm text-[#6b7688]">{confirmState.description}</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmState(null)}
+                className="rounded-md border border-[#dbd6cf] px-3 py-2 text-sm text-[#4a5568] hover:bg-[#faf8f5]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pending = confirmState;
+                  setConfirmState(null);
+                  void Promise.resolve(pending.onConfirm());
+                }}
+                className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
+              >
+                {confirmState.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {undoState && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-[#dbd6cf] bg-white p-3 shadow-warm-lg"
+        >
+          <p className="text-sm text-[#314158]">{undoState.message}</p>
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                clearUndoTimer();
+                setUndoState(null);
+              }}
+              className="rounded-md border border-[#dbd6cf] px-2 py-1 text-xs text-[#6b7688] hover:bg-[#faf8f5]"
+            >
+              Dismiss
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const pending = undoState;
+                clearUndoTimer();
+                setUndoState(null);
+                void Promise.resolve(pending.onUndo());
+              }}
+              className="rounded-lg bg-[#B1916A] px-2 py-1 text-xs text-white hover:bg-[#a07f5a] transition-colors"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
+
       {chatBarReady && <ChatBarLazy />}
     </div>
   );

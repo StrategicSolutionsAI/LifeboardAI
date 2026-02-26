@@ -9,8 +9,6 @@ import type { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import type { ListTask } from "@/components/task-list-view";
 import type { KanbanTask } from "@/components/task-kanban-board";
 import type { KanbanStatus } from "@/hooks/use-tasks";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,8 +17,19 @@ import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { useToast, ToastProvider } from "@/components/ui/use-toast";
 import { TaskBoardTabs, type TaskTabId } from "@/components/task-board-tabs";
 import { type TaskFilterState, type TaskSortOption, defaultTaskFilters } from "@/components/task-filter-panel";
+import { prefetchAllTasks } from "@/lib/prefetch-tasks";
 
-const TasksBoard = dynamic(() => import("@/components/TasksBoard"), {
+// Start fetching task data immediately at module evaluation time so it's
+// cached by the time the component tree mounts and calls useTasks.
+prefetchAllTasks();
+
+// Eagerly start downloading chunks at module evaluation time.
+// TaskListView is the default tab, so preload it first.
+const taskListChunk = import("@/components/task-list-view");
+const tasksBoardChunk = import("@/components/TasksBoard");
+const kanbanChunk = import("@/components/task-kanban-board");
+
+const TasksBoard = dynamic(() => tasksBoardChunk, {
   ssr: false,
   loading: () => (
     <div className="h-full rounded-xl border border-[#dbd6cf] bg-white p-4">
@@ -30,7 +39,7 @@ const TasksBoard = dynamic(() => import("@/components/TasksBoard"), {
 });
 
 const TaskListView = dynamic(
-  () => import("@/components/task-list-view").then((m) => ({ default: m.TaskListView })),
+  () => taskListChunk.then((m) => ({ default: m.TaskListView })),
   {
     ssr: false,
     loading: () => (
@@ -42,7 +51,7 @@ const TaskListView = dynamic(
 );
 
 const TaskKanbanBoard = dynamic(
-  () => import("@/components/task-kanban-board").then((m) => ({ default: m.TaskKanbanBoard })),
+  () => kanbanChunk.then((m) => ({ default: m.TaskKanbanBoard })),
   {
     ssr: false,
     loading: () => (
@@ -123,14 +132,11 @@ function TasksBoardShell() {
   const { buckets } = useBuckets();
   const { toast } = useToast();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
-  const [quickTask, setQuickTask] = useState("");
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
   const [activeTab, setActiveTab] = useState<TaskTabId>("lists");
   const [filters, setFilters] = useState<TaskFilterState>(defaultTaskFilters);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const quickAddInputRef = useRef<HTMLInputElement>(null);
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -235,6 +241,13 @@ function TasksBoardShell() {
     });
   }, [openTasks]);
 
+  const todoTasks = useMemo(() => {
+    return openTasks.filter((t) => {
+      const status = t.kanbanStatus ?? (t.completed ? "done" : "todo");
+      return status === "todo";
+    });
+  }, [openTasks]);
+
   const inProgressTasks = useMemo(() => {
     return openTasks.filter((t) => {
       const status = t.kanbanStatus ?? (t.completed ? "done" : "todo");
@@ -318,29 +331,9 @@ function TasksBoardShell() {
     }));
   }, [filteredTasks]);
 
-  const handleQuickAdd = async () => {
-    const trimmed = quickTask.trim();
-    if (!trimmed) return;
-
-    setIsCreatingTask(true);
-    try {
-      await createTask(trimmed, null, undefined, quickBucket || undefined);
-      toast({
-        title: "Task created",
-        description: `"${trimmed}" added to ${quickBucket || "Unsorted"}`,
-      });
-      setQuickTask("");
-      quickAddInputRef.current?.focus();
-    } catch {
-      toast({
-        title: "Failed to create task",
-        description: "Please try again.",
-        type: "error",
-      });
-    } finally {
-      setIsCreatingTask(false);
-    }
-  };
+  const openNewTaskModal = useCallback(() => {
+    taskEditorRef.current?.openNew(format(new Date(), "yyyy-MM-dd"));
+  }, []);
 
   const handleToggleTask = useCallback(
     async (taskId: string) => {
@@ -532,10 +525,13 @@ function TasksBoardShell() {
   const dashOffset = circumference - (completionPct / 100) * circumference;
 
   // Stat-based quick filter
-  const handleStatClick = (stat: "total" | "in-progress" | "completed" | "overdue") => {
+  const handleStatClick = (stat: "total" | "todo" | "in-progress" | "completed" | "overdue") => {
     switch (stat) {
       case "total":
         setFilters({ ...defaultTaskFilters });
+        break;
+      case "todo":
+        setFilters({ ...defaultTaskFilters, status: "open" });
         break;
       case "in-progress":
         setFilters({ ...defaultTaskFilters, status: "open" });
@@ -568,12 +564,12 @@ function TasksBoardShell() {
       }
       if (e.key === "n" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        quickAddInputRef.current?.focus();
+        openNewTaskModal();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSelectMode, clearSelection]);
+  }, [isSelectMode, clearSelection, openNewTaskModal]);
 
   const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.dueDateRange !== null;
 
@@ -607,6 +603,15 @@ function TasksBoardShell() {
           </div>
 
 
+          {/* Add Task */}
+          <button
+            onClick={openNewTaskModal}
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[#B1916A] text-white text-[13px] font-medium hover:bg-[#96784f] transition-colors shadow-[0px_1px_3px_rgba(177,145,106,0.3)]"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add Task</span>
+          </button>
+
           {/* Select mode toggle */}
           <button
             onClick={() => {
@@ -620,7 +625,7 @@ function TasksBoardShell() {
               isSelectMode
                 ? "bg-[rgba(177,145,106,0.12)] text-[#314158] ring-1 ring-[rgba(177,145,106,0.25)]"
                 : "text-[#8e99a8] hover:bg-[rgba(177,145,106,0.06)] hover:text-[#596881]"
-            } ml-auto`}
+            }`}
             aria-label={isSelectMode ? "Exit select mode" : "Select tasks"}
           >
             <ListChecks size={18} />
@@ -669,7 +674,28 @@ function TasksBoardShell() {
         )}
 
         {/* ── Stat Tiles ── */}
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <button
+            onClick={() => handleStatClick("todo")}
+            className={cn(
+              "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
+              filters.status === "open" && !filters.dueDateRange
+                ? "border-[rgba(124,110,189,0.4)] ring-1 ring-[rgba(124,110,189,0.15)] shadow-sm"
+                : "border-[#dbd6cf]/80 hover:border-[rgba(124,110,189,0.3)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.06)]"
+            )}
+          >
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ backgroundColor: "rgba(124,110,189,0.15)" }}
+            >
+              <CheckSquare size={18} style={{ color: "#7C6EBD" }} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[18px] font-bold text-[#314158] leading-tight">{todoTasks.length}</span>
+              <span className="text-[11px] text-[#8e99a8]">To Do</span>
+            </div>
+          </button>
+
           <button
             onClick={() => handleStatClick("in-progress")}
             className={cn(
@@ -734,47 +760,6 @@ function TasksBoardShell() {
           </button>
         </div>
 
-        {/* ── Quick Add Bar ── */}
-        <div className="flex items-center gap-2 rounded-xl border border-[#dbd6cf] bg-white p-2 shadow-[0px_1px_3px_rgba(163,133,96,0.04)] focus-within:ring-2 focus-within:ring-[rgba(177,145,106,0.2)] focus-within:border-[rgba(177,145,106,0.4)] transition-all">
-          <div className="flex items-center justify-center w-8 h-8 shrink-0">
-            <Plus size={16} className="text-[#bb9e7b]" />
-          </div>
-          <Input
-            ref={quickAddInputRef}
-            value={quickTask}
-            onChange={(e) => setQuickTask(e.target.value)}
-            placeholder="Add a new task...   press n"
-            className="flex-1 border-0 focus-visible:ring-0 h-8 text-[14px] text-[#314158] placeholder:text-[#b5b0a8]"
-            disabled={isCreatingTask}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && quickTask.trim()) {
-                event.preventDefault();
-                handleQuickAdd();
-              }
-            }}
-          />
-          <select
-            value={quickBucket}
-            onChange={(event) => setQuickBucket(event.target.value)}
-            disabled={isCreatingTask}
-            className="h-8 rounded-lg border border-[#dbd6cf] bg-[rgba(252,250,248,0.5)] px-3 text-[12px] text-[#596881] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(177,145,106,0.3)]"
-          >
-            <option value="">Unsorted</option>
-            {buckets.map((bucket) => (
-              <option key={bucket} value={bucket}>
-                {bucket}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleQuickAdd}
-            disabled={!quickTask.trim() || isCreatingTask}
-            className="h-8 px-4 rounded-lg bg-[#B1916A] text-white text-[13px] font-medium hover:bg-[#96784f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-          >
-            {isCreatingTask ? "..." : "Add"}
-          </button>
-        </div>
-
         {/* ── Tabs + Filter ── */}
         <TaskBoardTabs
           activeTab={activeTab}
@@ -823,10 +808,10 @@ function TasksBoardShell() {
               Start organizing your tasks
             </h3>
             <p className="text-[14px] text-[#8e99a8] text-center max-w-[320px] mb-6 leading-relaxed">
-              Add your first task using the quick-add bar above, or press <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-[#dbd6cf] bg-[rgba(252,250,248,0.8)] text-[11px] font-mono text-[#596881]">n</kbd> to get started.
+              Add your first task using the button above, or press <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-[#dbd6cf] bg-[rgba(252,250,248,0.8)] text-[11px] font-mono text-[#596881]">n</kbd> to get started.
             </p>
             <button
-              onClick={() => quickAddInputRef.current?.focus()}
+              onClick={openNewTaskModal}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#B1916A] text-white text-[14px] font-medium hover:bg-[#96784f] transition-colors shadow-[0px_2px_8px_rgba(177,145,106,0.25)]"
             >
               <Plus size={16} />

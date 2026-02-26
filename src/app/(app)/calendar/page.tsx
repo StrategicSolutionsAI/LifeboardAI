@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   title: "Calendar | LifeboardAI",
 };
 
-// Use optimized calendar by default, with fallback to original via query param
+// Eagerly start downloading the calendar chunk at module evaluation time.
+const calendarChunk = import("./OptimizedCalendarView");
+
 const CalendarView = dynamic(
   () => {
     if (typeof window !== 'undefined') {
@@ -16,9 +18,9 @@ const CalendarView = dynamic(
         return import("./CalendarView");
       }
     }
-    return import("./OptimizedCalendarView");
+    return calendarChunk;
   },
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="h-full">

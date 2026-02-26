@@ -577,6 +577,7 @@ export function useTasks(selectedDate?: Date) {
             if (typeof window !== 'undefined') {
               sharedFetchRef.current = null
               const timestamp = Date.now()
+              localUpdateTimestamps.current.add(timestamp)
               window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
               window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
             }
@@ -591,6 +592,7 @@ export function useTasks(selectedDate?: Date) {
             if (typeof window !== 'undefined') {
               sharedFetchRef.current = null
               const timestamp = Date.now()
+              localUpdateTimestamps.current.add(timestamp)
               window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
               window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
             }

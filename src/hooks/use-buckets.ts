@@ -71,9 +71,23 @@ async function fetchBucketsSnapshot(force = false): Promise<BucketSnapshot> {
       const prefs = await getUserPreferencesClient();
       const remoteBuckets = normalizeBuckets(prefs?.life_buckets ?? []);
 
-      const mergedBuckets = remoteBuckets.length > 0
-        ? Array.from(new Set([...localSnapshot.buckets, ...remoteBuckets]))
-        : localSnapshot.buckets;
+      // Decide whether to use local or remote buckets:
+      // - If local has unsynced changes (saved_at > synced_at), prefer local
+      //   (handles refresh before Supabase save completes).
+      // - Otherwise prefer remote (may have newer data from another device).
+      // - Fall back to local if remote is empty (offline / first load).
+      const savedAt = Number(localStorage.getItem('life_buckets_saved_at') || '0');
+      const syncedAt = Number(localStorage.getItem('life_buckets_synced_at') || '0');
+      const hasUnsyncedLocal = savedAt > syncedAt;
+
+      let mergedBuckets: string[];
+      if (hasUnsyncedLocal && localSnapshot.buckets.length > 0) {
+        mergedBuckets = localSnapshot.buckets;
+      } else if (remoteBuckets.length > 0) {
+        mergedBuckets = remoteBuckets;
+      } else {
+        mergedBuckets = localSnapshot.buckets;
+      }
 
       const activeBucket = mergedBuckets.includes(localSnapshot.activeBucket)
         ? localSnapshot.activeBucket

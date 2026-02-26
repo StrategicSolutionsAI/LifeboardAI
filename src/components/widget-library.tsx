@@ -683,22 +683,22 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General", bucketColo
   const [draftWidget, setDraftWidget] = useState<WidgetInstance | null>(null);
   const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([]);
   
-  // Check for connected integrations
+  // Check for connected integrations (parallel fetch)
   useEffect(() => {
     const checkIntegrations = async () => {
       try {
-        // Fitbit
-        const fitbitResponse = await fetch('/api/integrations/status?provider=fitbit');
-        const fitbitData = await fitbitResponse.json();
-        if (fitbitData.connected) {
-          setConnectedIntegrations(prev => [...prev, 'fitbit']);
-        }
-        // Google Fit
-        const gfResponse = await fetch('/api/integrations/status?provider=google-fit');
-        const gfData = await gfResponse.json();
-        if (gfData.connected) {
-          setConnectedIntegrations(prev => [...prev, 'google-fit']);
-        }
+        const [fitbitRes, gfRes] = await Promise.all([
+          fetch('/api/integrations/status?provider=fitbit'),
+          fetch('/api/integrations/status?provider=google-fit'),
+        ]);
+        const [fitbitData, gfData] = await Promise.all([
+          fitbitRes.json(),
+          gfRes.json(),
+        ]);
+        const connected: string[] = [];
+        if (fitbitData.connected) connected.push('fitbit');
+        if (gfData.connected) connected.push('google-fit');
+        if (connected.length > 0) setConnectedIntegrations(connected);
       } catch (error) {
         console.error('Error checking integrations:', error);
       }
