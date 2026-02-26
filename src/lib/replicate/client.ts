@@ -184,6 +184,9 @@ export interface WhisperOptions {
  * Transcribe audio using OpenAI Whisper running on Replicate.
  * @returns The transcription text
  */
+// Whisper requires the version-pinned identifier (doesn't support the /models/ predictions endpoint)
+const WHISPER_VERSION = '8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e'
+
 export async function runWhisper(options: WhisperOptions): Promise<string> {
   const { audio, language, translate = false } = options
   const replicate = getReplicate()
@@ -198,7 +201,7 @@ export async function runWhisper(options: WhisperOptions): Promise<string> {
   if (language) input.language = language
   if (translate) input.translate = true
 
-  const output = await replicate.run('openai/whisper', { input }) as any
+  const output = await replicate.run(`openai/whisper:${WHISPER_VERSION}`, { input }) as any
 
   // Output: { detected_language, transcription, segments, ... }
   if (output && typeof output.transcription === 'string') {
