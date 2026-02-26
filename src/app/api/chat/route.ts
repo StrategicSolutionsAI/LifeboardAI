@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { runGemini } from '@/lib/replicate/client'
+import { runGemini, runTTS } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { handleApiError } from '@/lib/api-error-handler'
@@ -19,7 +19,6 @@ function getOpenAI() {
 
 export async function POST(req: NextRequest) {
   try {
-    const openai = getOpenAI()
     const body = await req.json() as {
       messages: { role: 'user' | 'assistant'; content: string }[]
       tts?: { voice?: string; speed?: number }
@@ -182,6 +181,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error('Gemini 3.1 Pro error:', error instanceof Error ? error.message : String(error))
       try {
+        const openai = getOpenAI()
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: geminiMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -213,17 +213,17 @@ export async function POST(req: NextRequest) {
       commandsExecuted = cmdResult.commandsExecuted
     }
 
-    // Optional server-side TTS for consistent assistant voice
+    // Optional server-side TTS via MiniMax on Replicate
     let audioUrl: string | undefined
     try {
-      const speech = await openai.audio.speech.create({
-        model: 'gpt-4o-mini-tts',
-        voice: (body.tts?.voice as any) || (process.env.TTS_VOICE as any) || 'alloy',
-        input: reply,
-        response_format: 'mp3',
-        ...(typeof body.tts?.speed === 'number' ? { speed: body.tts!.speed } : {}),
+      const ttsFileUrl = await runTTS({
+        text: reply,
+        voice: body.tts?.voice || process.env.TTS_VOICE || 'alloy',
+        speed: typeof body.tts?.speed === 'number' && !Number.isNaN(body.tts.speed) ? body.tts.speed : undefined,
       })
-      const buf = Buffer.from(await speech.arrayBuffer())
+      // Fetch the audio file and convert to base64 data URI (Replicate URLs are temporary)
+      const audioRes = await fetch(ttsFileUrl)
+      const buf = Buffer.from(await audioRes.arrayBuffer())
       const b64 = buf.toString('base64')
       audioUrl = `data:audio/mpeg;base64,${b64}`
     } catch (e) {

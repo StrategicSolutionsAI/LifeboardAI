@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { toFile } from 'openai/uploads'
-import { runGemini } from '@/lib/replicate/client'
+import { runGemini, runWhisper, runTTS } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
@@ -19,8 +18,6 @@ function getOpenAI() {
 
 export async function POST(req: NextRequest) {
   try {
-    const openai = getOpenAI()
-
     // Expect multipart/form-data with a field named 'audio'
     const formData = await req.formData()
     const audioFile = formData.get('audio') as File | null
@@ -32,19 +29,9 @@ export async function POST(req: NextRequest) {
     const requestedSpeedRaw = (formData.get('speed') as string | null)
     const requestedSpeed = requestedSpeedRaw ? Number(requestedSpeedRaw) : undefined
 
-    // Convert to a File that OpenAI SDK accepts
+    // Transcribe audio to text via Whisper on Replicate
     const buf = Buffer.from(await audioFile.arrayBuffer())
-    const uploadFile = await toFile(buf, audioFile.name || 'voice-message.webm', {
-      type: audioFile.type || 'audio/webm',
-    })
-
-    // Transcribe audio to text
-    const transcription = await openai.audio.transcriptions.create({
-      model: 'whisper-1',
-      file: uploadFile,
-    })
-
-    const transcript = (transcription.text || '').trim()
+    const transcript = await runWhisper({ audio: buf })
     if (!transcript) {
       return NextResponse.json({ error: 'Empty transcription' }, { status: 422 })
     }
@@ -208,6 +195,7 @@ export async function POST(req: NextRequest) {
     } catch (geminiErr) {
       console.error('Gemini 3.1 Pro error (voice):', geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
       // Fall back to OpenAI
+      const openai = getOpenAI()
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -236,18 +224,18 @@ export async function POST(req: NextRequest) {
       commandsExecuted = cmdResult.commandsExecuted
     }
 
-    // Try to synthesize speech on the server for consistent voice
+    // Synthesize speech via MiniMax TTS on Replicate
     let audioUrl: string | undefined
     try {
-      const speech = await openai.audio.speech.create({
-        model: 'gpt-4o-mini-tts',
-        voice: (requestedVoice as any) || (process.env.TTS_VOICE as any) || 'alloy',
-        input: reply,
-        response_format: 'mp3',
-        ...(typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? { speed: requestedSpeed } : {}),
+      const ttsFileUrl = await runTTS({
+        text: reply,
+        voice: requestedVoice || process.env.TTS_VOICE || 'alloy',
+        speed: typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? requestedSpeed : undefined,
       })
-      const buf = Buffer.from(await speech.arrayBuffer())
-      const b64 = buf.toString('base64')
+      // Fetch the audio file and convert to base64 data URI (Replicate URLs are temporary)
+      const audioRes = await fetch(ttsFileUrl)
+      const audioBuf = Buffer.from(await audioRes.arrayBuffer())
+      const b64 = audioBuf.toString('base64')
       audioUrl = `data:audio/mpeg;base64,${b64}`
     } catch (e) {
       console.warn('Server TTS failed, falling back to client TTS', e)

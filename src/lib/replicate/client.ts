@@ -167,6 +167,130 @@ export async function* streamGemini(options: GeminiOptions) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Speech-to-Text (Whisper on Replicate)
+// ---------------------------------------------------------------------------
+
+export interface WhisperOptions {
+  /** Raw audio buffer (webm, ogg, mp4, wav, etc.) */
+  audio: Buffer
+  /** Language code (e.g. 'en', 'es'). Omit for auto-detection. */
+  language?: string
+  /** Translate to English */
+  translate?: boolean
+}
+
+/**
+ * Transcribe audio using OpenAI Whisper running on Replicate.
+ * @returns The transcription text
+ */
+export async function runWhisper(options: WhisperOptions): Promise<string> {
+  const { audio, language, translate = false } = options
+  const replicate = getReplicate()
+
+  // Convert Buffer to a data URI so the Replicate SDK can handle it
+  const b64 = audio.toString('base64')
+  const dataUri = `data:audio/webm;base64,${b64}`
+
+  const input: Record<string, unknown> = {
+    audio: dataUri,
+  }
+  if (language) input.language = language
+  if (translate) input.translate = true
+
+  const output = await replicate.run('openai/whisper', { input }) as any
+
+  // Output: { detected_language, transcription, segments, ... }
+  if (output && typeof output.transcription === 'string') {
+    return output.transcription.trim()
+  }
+  // Fallback: try extractText for unexpected output shapes
+  const text = extractText(output)
+  if (!text || text.trim().length === 0) {
+    throw new Error('Whisper returned an empty transcription')
+  }
+  return text.trim()
+}
+
+// ---------------------------------------------------------------------------
+// Text-to-Speech (MiniMax Speech-02-Turbo on Replicate)
+// ---------------------------------------------------------------------------
+
+export interface TTSOptions {
+  /** Text to synthesize (max 10,000 chars) */
+  text: string
+  /** Voice name — accepts OpenAI names (mapped) or MiniMax voice_id directly */
+  voice?: string
+  /** Speed multiplier 0.5–2.0 (default 1.0) */
+  speed?: number
+  /** Emotion: happy, sad, angry, fearful, disgusted, surprised, or neutral */
+  emotion?: string
+}
+
+/** Map OpenAI voice names → MiniMax voice IDs */
+const VOICE_MAP: Record<string, string> = {
+  alloy: 'English_CalmWoman',
+  ash: 'English_Trustworth_Man',
+  ballad: 'English_Gentle_Woman',
+  coral: 'English_Friendly_Woman',
+  echo: 'Deep_Voice_Man',
+  sage: 'English_Wise_Woman',
+  shimmer: 'English_Cheerful_Girl',
+  verse: 'English_Storyteller_Man',
+  marin: 'English_Sweet_Girl',
+  cedar: 'English_Confident_Man',
+}
+
+/**
+ * Generate speech audio using MiniMax Speech-02-Turbo on Replicate.
+ * @returns URL to the generated audio file
+ */
+export async function runTTS(options: TTSOptions): Promise<string> {
+  const { text, voice = 'alloy', speed = 1.0, emotion } = options
+  const replicate = getReplicate()
+
+  // Resolve voice: check our map first, otherwise pass through as-is
+  const voiceId = VOICE_MAP[voice] || voice
+
+  const input: Record<string, unknown> = {
+    text,
+    voice_id: voiceId,
+    speed: Math.max(0.5, Math.min(2.0, speed)),
+    audio_format: 'mp3',
+    sample_rate: '32000',
+    bitrate: '128000',
+    channel: '1',
+  }
+  if (emotion) input.emotion = emotion
+
+  const output = await replicate.run('minimax/speech-02-turbo', { input }) as any
+
+  // Output is typically a FileOutput (URL string) or { audio: url }
+  let audioUrl: string | undefined
+  if (typeof output === 'string') {
+    audioUrl = output
+  } else if (output && typeof output === 'object') {
+    // Could be a FileOutput (has toString/href) or an object with audio field
+    if (typeof output.audio === 'string') {
+      audioUrl = output.audio
+    } else if (output.url) {
+      audioUrl = String(output.url)
+    } else {
+      audioUrl = String(output)
+    }
+  }
+
+  if (!audioUrl || audioUrl === '[object Object]') {
+    throw new Error('MiniMax TTS returned unexpected output format')
+  }
+
+  return audioUrl
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function extractText(node: unknown): string {
   if (node == null) return '';
 
