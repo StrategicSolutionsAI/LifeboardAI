@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,27 @@ type TasksBoardProps = {
   loadingTasks?: Set<string>;
   onTaskOpen?: (taskId: string) => void;
 };
+
+/* ─── Calidora color helpers ─── */
+
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function getBucketStyles(hex: string) {
+  const { r, g, b } = hexToRgb(hex);
+  return {
+    iconTint: `rgba(${r}, ${g}, ${b}, 0.12)`,
+    text: hex,
+    ringActive: `rgba(${r}, ${g}, ${b}, 0.35)`,
+    dropBg: `rgba(${r}, ${g}, ${b}, 0.06)`,
+  };
+}
 
 function isDateSoon(dueDate?: string | null) {
   if (!dueDate) return false;
@@ -191,51 +212,79 @@ function TaskCard({
           ref={provided.innerRef}
           {...provided.draggableProps}
           className={cn(
-            "group bg-white rounded-xl border border-[#dbd6cf] p-4 hover:shadow-[0px_4px_12px_rgba(163,133,96,0.08)] transition-all cursor-default",
-            snapshot.isDragging && "opacity-40 shadow-warm-lg"
+            "group bg-white rounded-xl border border-[#dbd6cf]/80 p-3.5 transition-all cursor-default",
+            "hover:border-[rgba(177,145,106,0.35)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.08)]",
+            snapshot.isDragging && "opacity-40 shadow-warm-lg border-[#B1916A]/40"
           )}
         >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              {/* Drag Handle */}
-              <div
-                {...provided.dragHandleProps}
-                className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-40 transition-opacity shrink-0"
-              >
-                <GripVertical size={14} className="text-[#596881]" />
-              </div>
+          <div className="flex items-start gap-2.5">
+            {/* Drag Handle */}
+            <div
+              {...provided.dragHandleProps}
+              className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-30 transition-opacity shrink-0 mt-0.5"
+            >
+              <GripVertical size={14} className="text-[#596881]" />
+            </div>
 
-              {/* Checkbox */}
-              <button
-                type="button"
-                onClick={() => onToggle?.(task.id, task.status !== "done")}
-                disabled={isLoading}
-                aria-label={task.status === "done" ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
-                className={cn(
-                  "w-4 h-4 rounded shrink-0 transition-all flex items-center justify-center",
-                  task.status === "done"
-                    ? "bg-[#bb9e7b] border-[#bb9e7b]"
-                    : "bg-white border border-[rgba(219,214,207,0.7)] shadow-[0px_1px_2px_rgba(6,27,22,0.06)]",
-                  isLoading && "animate-pulse opacity-50"
-                )}
-              >
-                {task.status === "done" && (
-                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
+            {/* Checkbox */}
+            <button
+              type="button"
+              onClick={() => onToggle?.(task.id, task.status !== "done")}
+              disabled={isLoading}
+              aria-label={task.status === "done" ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
+              className={cn(
+                "w-[18px] h-[18px] rounded-[5px] shrink-0 mt-0.5 transition-all flex items-center justify-center",
+                task.status === "done"
+                  ? "bg-[#48B882]"
+                  : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]",
+                isLoading && "animate-pulse opacity-50"
+              )}
+            >
+              {task.status === "done" && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
 
-              {/* Title */}
+            {/* Content */}
+            <div className="flex-1 min-w-0">
               <button
                 onClick={() => onOpen?.(task.id)}
                 className={cn(
-                  "text-[14px] text-[#314158] text-left hover:text-[#bb9e7b] transition-colors cursor-pointer",
-                  task.status === "done" && "line-through opacity-50"
+                  "text-[13px] text-[#314158] text-left hover:text-[#B1916A] transition-colors cursor-pointer leading-snug w-full",
+                  task.status === "done" && "line-through text-[#8e99a8]"
                 )}
               >
                 {task.title}
               </button>
+
+              {/* Date Badge + Tags */}
+              {(dateBadge || !!task.tags?.length) && (
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  {dateBadge && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium",
+                        dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
+                        dateBadge.tone === "accent" && "bg-[rgba(177,145,106,0.08)] text-[#96784f]",
+                        dateBadge.tone === "default" && "bg-[#f4f6f8] text-[#596881]"
+                      )}
+                    >
+                      <CalendarDays size={9} />
+                      {dateBadge.label}
+                    </span>
+                  )}
+                  {task.tags?.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-md bg-[#f4f6f8] px-1.5 py-0.5 text-[10px] text-[#8e99a8]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Actions Dropdown */}
@@ -244,9 +293,9 @@ function TaskCard({
                 <button
                   type="button"
                   aria-label="Task actions"
-                  className="p-0.5 rounded hover:bg-[#f5f0eb] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  className="p-0.5 rounded hover:bg-[rgba(177,145,106,0.06)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                 >
-                  <MoreHorizontal size={16} className="text-[#596881]" />
+                  <MoreHorizontal size={15} className="text-[#8e99a8]" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
@@ -288,37 +337,6 @@ function TaskCard({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-
-          {/* Date Badge */}
-          <div className="flex items-center justify-between mt-3">
-            {dateBadge ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] border",
-                  dateBadge.tone === "destructive" && "border-red-200 bg-red-50 text-red-600",
-                  dateBadge.tone === "accent" && "border-[rgba(177,145,106,0.3)] bg-[rgba(177,145,106,0.06)] text-[#96784f]",
-                  dateBadge.tone === "default" && "border-[#e2e8f0] bg-[#f8fafc] text-[#596881]"
-                )}
-              >
-                <CalendarDays size={10} />
-                {dateBadge.label}
-              </span>
-            ) : (
-              <span />
-            )}
-            {!!task.tags?.length && (
-              <div className="flex items-center gap-1">
-                {task.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#8e99a8]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
     </Draggable>
@@ -351,6 +369,8 @@ function BucketColumn({
 
   const { tasks, dueSoonCount } = summary;
   const isCompletedView = viewMode === "completed";
+  const color = bucket.color ?? "#bb9e7b";
+  const styles = getBucketStyles(color);
 
   const handleSubmit = () => {
     const trimmed = draft.trim();
@@ -361,35 +381,43 @@ function BucketColumn({
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-[#dbd6cf] bg-white overflow-hidden">
-      {/* Column Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(219,214,207,0.5)]">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span
-            className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-            style={{ background: bucket.color ?? "#bb9e7b" }}
-            aria-hidden
-          />
-          <span className="text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b] font-medium truncate">
-            {bucket.name}
-          </span>
-          <span className="text-[22px] tracking-[0.88px] text-[#bb9e7b] leading-none">
-            {tasks.length}
-          </span>
-          {!isCompletedView && dueSoonCount > 0 && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-[rgba(177,145,106,0.12)] px-1.5 py-0.5 text-[10px] font-medium text-[#96784f]">
-              <Clock3 className="h-2.5 w-2.5" />
-              {dueSoonCount}
+    <div className="flex flex-col h-full rounded-xl border border-[#dbd6cf]/80 bg-[rgba(252,250,248,0.5)] overflow-hidden">
+      {/* Color accent bar */}
+      <div className="h-[3px] shrink-0" style={{ backgroundColor: color }} />
+
+      {/* Column Header — Calidora icon tint style */}
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-[rgba(219,214,207,0.4)] bg-white">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+            style={{ backgroundColor: styles.iconTint }}
+          >
+            <ClipboardList size={18} style={{ color: styles.text }} />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[13px] text-[#314158] font-semibold truncate">
+              {bucket.name}
             </span>
-          )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-[#8e99a8]">
+                {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+              </span>
+              {!isCompletedView && dueSoonCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-[rgba(177,145,106,0.1)] px-1.5 py-0.5 text-[10px] font-medium text-[#96784f]">
+                  <Clock3 className="h-2.5 w-2.5" />
+                  {dueSoonCount} due soon
+                </span>
+              )}
+            </div>
+          </div>
         </div>
         <button
           type="button"
           onClick={() => setIsAdding(true)}
           aria-label={`Add task in ${bucket.name}`}
-          className="p-0.5 hover:bg-[#faf8f5] rounded transition-colors"
+          className="p-1.5 hover:bg-[rgba(177,145,106,0.06)] rounded-lg transition-colors"
         >
-          <Plus size={18} className="text-[#BFA483]" />
+          <Plus size={16} className="text-[#bb9e7b]" />
         </button>
       </div>
 
@@ -402,22 +430,32 @@ function BucketColumn({
               {...provided.droppableProps}
               className={cn(
                 "flex-1 flex flex-col gap-2.5 rounded-lg transition-all relative min-h-[100px]",
-                snapshot.isDraggingOver && "bg-[rgba(177,145,106,0.06)] ring-2 ring-[rgba(177,145,106,0.3)]"
               )}
+              style={snapshot.isDraggingOver ? {
+                backgroundColor: styles.dropBg,
+                boxShadow: `inset 0 0 0 2px ${styles.ringActive}`,
+                borderRadius: "0.5rem",
+              } : undefined}
             >
               {snapshot.isDraggingOver && tasks.length === 0 && (
-                <div className="flex items-center justify-center py-10 rounded-xl border border-dashed border-[#B1916A] bg-[rgba(177,145,106,0.04)]">
-                  <span className="text-[13px] text-[#bb9e7b]">Drop here</span>
+                <div
+                  className="flex items-center justify-center py-10 rounded-xl border border-dashed"
+                  style={{ borderColor: color, backgroundColor: styles.iconTint }}
+                >
+                  <span className="text-[13px]" style={{ color: styles.text }}>Drop here</span>
                 </div>
               )}
 
               {tasks.length === 0 && !snapshot.isDraggingOver && (
                 <div className="flex flex-col items-center justify-center py-12 rounded-xl bg-[rgba(177,145,106,0.03)]">
-                  <div className="w-10 h-10 rounded-lg bg-[rgba(177,145,106,0.08)] flex items-center justify-center mb-3">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-lg mb-3"
+                    style={{ backgroundColor: styles.iconTint }}
+                  >
                     {isCompletedView ? (
-                      <CheckCircle2 size={18} className="text-[#bb9e7b]" />
+                      <CheckCircle2 size={18} style={{ color: styles.text, opacity: 0.6 }} />
                     ) : (
-                      <ClipboardList size={18} className="text-[#bb9e7b]" />
+                      <ClipboardList size={18} style={{ color: styles.text, opacity: 0.6 }} />
                     )}
                   </div>
                   <span className="text-[13px] text-[#8e99a8] mb-1">
@@ -426,7 +464,7 @@ function BucketColumn({
                   <span className="text-[11px] text-[#b5b0a8]">
                     {isCompletedView
                       ? `Completed tasks in ${bucket.name} appear here`
-                      : "Add a task to get started"}
+                      : "Drag tasks here or add a new one"}
                   </span>
                 </div>
               )}
@@ -453,13 +491,13 @@ function BucketColumn({
       {/* Add Task */}
       <div className="p-3 pt-0">
         {isAdding ? (
-          <div className="flex items-center gap-2 p-2 rounded-xl border border-[#dbd6cf] bg-[rgba(252,250,248,0.5)]">
+          <div className="flex items-center gap-2 p-2 rounded-lg border border-[#dbd6cf]/80 bg-white">
             <Input
               autoFocus
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={`Add task in ${bucket.name}`}
-              className="flex-1 border-0 focus-visible:ring-0 h-8 text-[13px]"
+              placeholder="Task name..."
+              className="flex-1 border-0 focus-visible:ring-0 h-7 text-[13px] text-[#314158] placeholder:text-[#b5b0a8]"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -484,10 +522,10 @@ function BucketColumn({
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center justify-center gap-2 py-3 w-full rounded-xl border border-dashed border-[#dbd6cf] text-[#bb9e7b] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+            className="flex items-center justify-center gap-1.5 py-2.5 w-full rounded-lg border border-dashed border-[rgba(219,214,207,0.6)] text-[#bb9e7b] hover:bg-[rgba(177,145,106,0.04)] hover:border-[rgba(177,145,106,0.3)] transition-all"
           >
-            <Plus size={16} />
-            <span className="text-[13px]">Add Task</span>
+            <Plus size={14} />
+            <span className="text-[12px]">Add task</span>
           </button>
         )}
       </div>
@@ -506,40 +544,11 @@ function TasksBoard({
   viewMode = "open",
   loadingTasks = new Set(),
 }: TasksBoardProps) {
-  const mockBuckets: Bucket[] = [
-    { id: "b1", name: "Health", color: "#48B882" },
-    { id: "b2", name: "Work", color: "#4AADE0" },
-    { id: "b3", name: "Household", color: "#B1916A" },
-    { id: "b4", name: "Kids", color: "#d97706" },
-    { id: "b5", name: "Finance", color: "#8B7FD4" },
-    { id: "b6", name: "Errands", color: "#7d6349" },
-  ];
-  const mockTasks: Task[] = [
-    { id: "t1", title: "Supplements", bucketId: "b1", status: "open", tags: ["daily"] },
-    { id: "t2", title: "Clean out fridge", bucketId: "b3", status: "open" },
-    { id: "t3", title: "Business cards reorder", bucketId: "b2", status: "open", tags: ["print"] },
-    { id: "t4", title: "Calendar to-dos for Dalit Designs", bucketId: "b2", status: "open" },
-    { id: "t5", title: "Website audit", bucketId: "b2", status: "open", tags: ["SEO"] },
-    { id: "t6", title: "Bon Bon", bucketId: "b4", status: "open" },
-    { id: "t7", title: "Budget review", bucketId: "b5", status: "open" },
-    { id: "t8", title: "Returns run", bucketId: "b6", status: "open" },
-  ];
-
-  const buckets = bucketsProp ?? mockBuckets;
-  const tasks = tasksProp ?? mockTasks;
+  const buckets = bucketsProp ?? [];
+  const tasks = tasksProp ?? [];
   const summaries = useMemo(() => groupByBucket(tasks), [tasks]);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [activeBucket, setActiveBucket] = useState<string | null>(null);
-
-  const handleJump = React.useCallback((bucketId: string) => {
-    setActiveBucket(bucketId);
-    const element = columnRefs.current[bucketId];
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-    }
-  }, []);
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -558,77 +567,16 @@ function TasksBoard({
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex h-full w-full flex-col gap-3">
-        {/* Bucket navigation pills */}
-        <div className="flex items-center justify-between gap-3">
-          <div
-            tabIndex={-1}
-            className="flex items-center gap-1.5 overflow-x-auto pb-1 focus-visible:outline-none"
-            aria-label="Buckets"
-          >
-            {buckets.map((bucket) => (
-              <button
-                key={bucket.id}
-                onClick={() => handleJump(bucket.id)}
-                type="button"
-                className={cn(
-                  "flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-medium shrink-0 transition-colors",
-                  activeBucket === bucket.id
-                    ? "bg-[rgba(177,145,106,0.12)] border border-[rgba(177,145,106,0.35)] text-[#314158]"
-                    : "text-[#596881] hover:bg-[rgba(177,145,106,0.06)] border border-transparent"
-                )}
-              >
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: bucket.color ?? "#bb9e7b" }}
-                />
-                {bucket.name}
-                <span className="opacity-60 text-[10px]">
-                  {summaries[bucket.id]?.tasks.length ?? 0}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="hidden items-center gap-0.5 md:flex shrink-0">
-            <button
-              type="button"
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-[rgba(177,145,106,0.06)] transition-colors text-[#596881]"
-              onClick={() => {
-                if (wrapperRef.current) {
-                  wrapperRef.current.scrollBy({ left: -360, behavior: "smooth" });
-                }
-              }}
-              aria-label="Scroll left"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-            </button>
-            <button
-              type="button"
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-[rgba(177,145,106,0.06)] transition-colors text-[#596881]"
-              onClick={() => {
-                if (wrapperRef.current) {
-                  wrapperRef.current.scrollBy({ left: 360, behavior: "smooth" });
-                }
-              }}
-              aria-label="Scroll right"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-            </button>
-          </div>
-        </div>
-
         {/* Columns */}
         <div
           ref={wrapperRef}
           className="relative grow snap-x snap-mandatory overflow-x-auto pb-4"
         >
-          <div className="grid auto-cols-[300px] grid-flow-col gap-5 pr-6" style={{ minHeight: "520px" }}>
+          <div className="grid auto-cols-[320px] grid-flow-col gap-4 pr-6" style={{ minHeight: "520px" }}>
             {buckets.map((bucket) => (
               <div
                 key={bucket.id}
-                ref={(element) => {
-                  columnRefs.current[bucket.id] = element;
-                }}
+                className="snap-start"
               >
                 <BucketColumn
                   bucket={bucket}

@@ -1,7 +1,6 @@
 "use client"
 
 import { WithingsWeightWidget } from '@/components/withings-weight-widget'
-// import { WeightTrackingDashboard } from '@/components/weight-tracking-dashboard'
 import { ToastProvider } from '@/components/ui/use-toast'
 
 export default function TestWithingsPage() {

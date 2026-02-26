@@ -1,13 +1,33 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseServer } from '@/utils/supabase/server';
 
 /**
  * API endpoint to check user_preferences table schema
  * This helps diagnose the 400 error when saving user preferences
- * 
+ *
  * Usage: GET /api/admin/check-schema
+ * Requires: authenticated admin user + ADMIN_SECRET header
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Block in production unless explicitly enabled
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_ROUTES !== 'true') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Require authentication
+  const supabaseAuth = supabaseServer();
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // Require admin secret header
+  const adminSecret = request.headers.get('x-admin-secret');
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -79,12 +99,12 @@ export async function GET() {
       timestamp: new Date().toISOString()
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Exception checking schema:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to check schema',
-        details: error.message
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     );

@@ -8,77 +8,36 @@ import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
+import {
+  type ProfileNameRow,
+  type WidgetLogEntry,
+  type DestructiveConfirmState,
+  type UndoState,
+  iconMap,
+  LOG_KIND_DOT_CLASS,
+  extractFirstWord,
+  deriveGreetingName,
+  getIconComponent,
+  hexToRgb,
+  getWidgetColorStyles,
+  dateStr,
+  todayStrGlobal,
+  yesterdayStrGlobal,
+  withRetry,
+  debounce,
+  migrateWidgetsToTemplates,
+} from "@/lib/dashboard-utils";
 import { format, addDays, isSameDay, parseISO, formatDistanceToNow } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
-  MessageSquare,
-  LogOut,
   X,
-  Droplets,
-  Flame,
   Target,
-  Scale,
-  Heart,
-  Moon,
   Activity,
-  Coffee,
-  Brain,
-  Calendar,
-  CheckSquare,
-  Clock,
-  Users,
-  Pill,
-  Apple,
-  Utensils,
-  TreePine,
-  Dumbbell,
-  Home,
-  DollarSign,
-  Briefcase,
-  Zap,
-  Book,
-  Gamepad2,
-  Music,
-  Palette,
-  Camera,
-  Plane,
-  ShoppingBag,
-  Wrench,
-  FileText,
-  BarChart,
-  TrendingUp,
-  Award,
-  Gift,
-  Sparkles,
-  Smile,
-  Notebook,
-  Wind,
-  Move,
-  Quote,
-  Smartphone,
-  Gauge,
-  CalendarClock,
-  ClipboardList,
-  Wallet,
-  ImageIcon,
-  HeartPulse,
-  Car,
-  Cake,
-  PartyPopper,
-  ShieldOff,
-  Timer,
-  PiggyBank,
-  Flag,
-  HomeIcon,
-  Hammer,
-  Brush,
-  CalendarDays,
-  RotateCw,
+  Check,
   Loader2,
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
+  RotateCw,
+  ClipboardList,
   Cloud,
   CloudSun,
   CloudRain,
@@ -90,24 +49,12 @@ import {
   Settings2,
   ListChecks,
   Pencil,
-  Check,
   GripVertical,
 } from "lucide-react";
-import { widgetTemplates } from "./widget-library";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task, RepeatOption } from "@/hooks/use-tasks";
 import dynamic from 'next/dynamic';
 
-function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
-  return async () => {
-    let lastErr: any
-    for (let i = 0; i <= retries; i++) {
-      try { return await loader() } catch (e) { lastErr = e }
-      await new Promise(r => setTimeout(r, delayMs))
-    }
-    throw lastErr
-  }
-}
 // Import the widget editor statically to avoid dynamic chunk loading issues
 // seen during login (ChunkLoadError for widget-editor.tsx). This slightly
 // increases the initial bundle size but removes the fragile runtime fetch
@@ -159,295 +106,6 @@ const ChatBarLazy = dynamic(
   { ssr: false, loading: () => null }
 );
 
-// Icon mapping for serialization
-const iconMap: Record<string, LucideIcon> = {
-  Droplets,
-  Flame,
-  Target,
-  Scale,
-  Heart,
-  Moon,
-  Activity,
-  Coffee,
-  Brain,
-  Calendar,
-  CheckSquare,
-  Clock,
-  Users,
-  Pill,
-  Apple,
-  Utensils,
-  TreePine,
-  Dumbbell,
-  Home,
-  DollarSign,
-  Briefcase,
-  Zap,
-  Book,
-  Gamepad2,
-  Music,
-  Palette,
-  Camera,
-  Plane,
-  ShoppingBag,
-  Wrench,
-  FileText,
-  BarChart,
-  TrendingUp,
-  Award,
-  Gift,
-  Sparkles,
-  water: Droplets,
-  calories: Flame,
-  steps: Target,
-  weight: Scale,
-  heartrate: Heart,
-  sleep: Moon,
-  exercise: Activity,
-  caffeine: Coffee,
-  chores: CheckSquare,
-  nutrition: Utensils,
-  mood: Smile,
-  journal: Notebook,
-  meditation: Brain,
-  gratitude: Sparkles,
-  breathwork: Wind,
-  stretch: Move,
-  affirmations: Quote,
-  screen_time: Smartphone,
-  stress: Gauge,
-  self_care: CheckSquare,
-  doctor_appt: CalendarClock,
-  medication: Pill,
-  quit_habit: ShieldOff,
-  symptom_log: ClipboardList,
-  medical_bills: DollarSign,
-  home_projects: Hammer,
-  maintenance: Wrench,
-  cleaning: Brush,
-  family_members: Users,
-  family_calendar: CalendarDays,
-  family_chores: ClipboardList,
-  meal_plan: Utensils,
-  family_budget: Wallet,
-  photo_carousel: ImageIcon,
-  emergency_info: HeartPulse,
-  carpool: Car,
-  birthdays: Cake,
-  social_events: PartyPopper,
-  holidays: Gift,
-  work_projects: Briefcase,
-  work_deadlines: CalendarClock,
-  pomodoro: Timer,
-  finance_budget: Wallet,
-  savings_tracker: PiggyBank,
-  net_worth: TrendingUp,
-  properties: HomeIcon,
-  financial_goals: Flag,
-};
-
-type ProfileNameRow = {
-  first_name?: string | null;
-};
-
-const extractFirstWord = (value: unknown): string | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const [first] = trimmed.split(/\s+/);
-  return first || null;
-};
-
-const deriveGreetingName = (profile: ProfileNameRow | null, supabaseUser: User | null): string => {
-  if (!supabaseUser) {
-    return "there";
-  }
-
-  const metadata = (supabaseUser.user_metadata ?? {}) as Record<string, unknown>;
-  const candidates: unknown[] = [
-    profile?.first_name,
-    metadata.preferred_name,
-    metadata.first_name,
-    metadata.given_name,
-    metadata.nickname,
-    metadata.name,
-    metadata.full_name,
-    metadata.user_name,
-    metadata.username,
-  ];
-
-  for (const candidate of candidates) {
-    const extracted = extractFirstWord(candidate);
-    if (extracted) {
-      return extracted;
-    }
-  }
-
-  if (typeof supabaseUser.email === "string" && supabaseUser.email.includes("@")) {
-    const [localPart] = supabaseUser.email.split("@");
-    if (localPart) {
-      return localPart;
-    }
-  }
-
-  return "there";
-};
-
-// Helper to get icon component from string name
-const getIconComponent = (name: string): LucideIcon | null => {
-  return iconMap[name] || null
-}
-
-// Helper to parse hex color to RGB components
-const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
-  const clean = hex.replace('#', '');
-  return {
-    r: parseInt(clean.slice(0, 2), 16),
-    g: parseInt(clean.slice(2, 4), 16),
-    b: parseInt(clean.slice(4, 6), 16),
-  };
-};
-
-// Generate widget color styles from a bucket's hex color
-const getWidgetColorStyles = (hex: string) => {
-  const { r, g, b } = hexToRgb(hex);
-  return {
-    solid: hex,
-    text: hex,
-    tint: `rgba(${r}, ${g}, ${b}, 0.08)`,
-    iconTint: `rgba(${r}, ${g}, ${b}, 0.15)`,
-  };
-};
-
-const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
-  progress: "bg-[#4AADE0]",
-  integration: "bg-[#48B882]",
-  entry: "bg-[#8B7FD4]",
-  task: "bg-[#C4A44E]",
-  system: "bg-[#b8b0a8]",
-};
-
-interface WidgetLogEntry {
-  id: string;
-  widgetInstanceId: string;
-  widgetName: string;
-  message: string;
-  details?: string;
-  occurredAt: string;
-  kind: "progress" | "integration" | "entry" | "task" | "system";
-}
-
-interface DestructiveConfirmState {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  onConfirm: () => Promise<void> | void;
-}
-
-interface UndoState {
-  id: number;
-  message: string;
-  onUndo: () => Promise<void> | void;
-}
-
-/**
- * TaskBoardDashboard
- * -----------------------------------------------------------------------------
- * Clean, responsive rebuild of the TaskBoard dashboard based on Figma design.
- * - Sticky header
- * - Fixed left sidebar
- * - Main scrollable content
- * - Greeting ➜ bucket tabs ➜ card layout
- *
- * This component avoids absolute-positioned pixels. Instead it uses normal flow,
- * flex / grid utilities, and Tailwind spacing so elements never overlap and the
- * dashboard remains responsive.
- */
-const debounce = (func: (...args: any[]) => void, delay: number) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  let lastArgs: any[] | null = null;
-  const debounced = (...args: any[]) => {
-    lastArgs = args;
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => {
-      lastArgs = null;
-      func.apply(null, args);
-    }, delay);
-  };
-  debounced.flush = () => {
-    if (lastArgs !== null) {
-      clearTimeout(timeoutId);
-      const args = lastArgs;
-      lastArgs = null;
-      func.apply(null, args);
-    }
-  };
-  return debounced;
-};
-
-// -----------------------------------------------------------------------------
-// Date helpers
-// -----------------------------------------------------------------------------
-const dateStr = (d: Date) => d.toISOString().slice(0, 10);
-const todayStrGlobal = dateStr(new Date());
-const yesterdayStrGlobal = dateStr(new Date(Date.now() - 86400000));
-
-const SUGGESTED_BUCKETS = [
-  "Health",
-  "Wellness",
-  "Medical",
-  "Household",
-  "Family",
-  "Social",
-  "Work",
-  "Finance",
-  "Education",
-  "Hobbies",
-  "Travel",
-  "Meals",
-];
-
-// Migration function to update existing widgets to match current templates
-function migrateWidgetsToTemplates(widgetsByBucket: Record<string, WidgetInstance[]>): Record<string, WidgetInstance[]> {
-  const migratedWidgets = { ...widgetsByBucket };
-  let hasChanges = false;
-
-  // Create a lookup map for templates
-  const templateMap = new Map<string, WidgetTemplate>();
-  widgetTemplates.forEach(template => {
-    templateMap.set(template.id, template);
-  });
-
-  // Migrate widgets in each bucket
-  Object.keys(migratedWidgets).forEach(bucketName => {
-    const widgets = migratedWidgets[bucketName];
-
-    widgets.forEach((widget, index) => {
-      const template = templateMap.get(widget.id);
-      if (template) {
-        // Check if widget needs migration
-        const needsNameUpdate = widget.name !== template.name;
-        const needsIconUpdate = widget.icon !== template.icon;
-
-        if (needsNameUpdate || needsIconUpdate) {
-          // Update widget with template data
-          migratedWidgets[bucketName][index] = {
-            ...widget,
-            name: template.name,
-            icon: template.icon
-          };
-          hasChanges = true;
-        }
-      }
-    });
-  });
-
-  return migratedWidgets;
-}
 
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
@@ -455,9 +113,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask, allTasks, toggleTaskCompletion: toggleTaskCompletionContext } = useTasksContext();
 
   // State for task management
-  const [taskView, setTaskView] = useState('Today');
-  const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
-  const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [newOpenTask, setNewOpenTask] = useState('');
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
   const [buckets, setBuckets] = useState<string[]>([]);
@@ -492,13 +147,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Bucket color utility functions
   const getBucketColor = (bucket: string) => {
     return bucketColors[bucket] || '#B1916A'
-  }
-
-  const hexToRgba = (hex: string, alpha: number) => {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`
   }
 
   // Suggested bucket presets for quick adding in the Manage Tabs sheet
@@ -2335,14 +1983,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           }
 
           const localCount = Object.values(localWidgets).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
-          console.log('[loadWidgets] localStorage:', localCount, 'widgets across', Object.keys(localWidgets).length, 'buckets');
 
           if (localCount > 0) {
             setWidgetsByBucket(localWidgets);
             loadedFromLocal = true;
           }
-        } else {
-          console.log('[loadWidgets] No widgets in localStorage');
         }
       } catch (e) {
         console.error('Failed to parse stored widgets', e);
@@ -2358,8 +2003,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const hasSupabase = sbCount > 0;
       const localCount = Object.values(localWidgets).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
       const hasLocal = loadedFromLocal && localCount > 0;
-
-      console.log('[loadWidgets] Supabase:', sbCount, 'widgets | Local:', localCount, 'widgets');
 
       if (hasSupabase || hasLocal) {
         // Merge strategy: combine widgets from both sources by instanceId
@@ -2395,13 +2038,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }
 
         const mergedCount = Object.values(merged).reduce((sum, arr) => sum + arr.length, 0);
-        console.log('[loadWidgets] Merged:', mergedCount, 'widgets | differsFromSupabase:', mergedDiffersFromSupabase);
-
-        // Safety: merged should never have fewer widgets than either source
-        if (mergedCount < localCount || mergedCount < sbCount) {
-          console.error('[loadWidgets] MERGE ERROR: merged has FEWER widgets than source!',
-            { mergedCount, localCount, sbCount });
-        }
 
         const migratedMerged = migrateWidgetsToTemplates(merged);
         setWidgetsByBucket(migratedMerged);
@@ -3104,14 +2740,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // Auto-scroll the planner so the current hour sits at the top
   useEffect(() => {
-    if (taskView !== 'Today' || isPlannerCollapsed) return;
+    if (isPlannerCollapsed) return;
     const container = plannerRef.current;
     if (!container) return;
     const target = container.querySelector<HTMLElement>(`[data-hour='${currentHourDisplay}']`);
     if (target) {
       container.scrollTop = target.offsetTop - container.offsetTop;
     }
-  }, [currentHourDisplay, taskView, isPlannerCollapsed]);
+  }, [currentHourDisplay, isPlannerCollapsed]);
 
   // ------------------------------ Resize state ------------------------------
   const [resizingTask, setResizingTask] = useState<{ taskId: string; hour: string } | null>(null);
@@ -4076,9 +3712,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 }}
                                 disabled={!linkedTask}
                                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${linkedTaskCompleted
-                                  ? "border-green-500 text-green-600 bg-green-50 hover:bg-green-100"
+                                  ? ""
                                   : "border-[#dbd6cf] text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)]"
                                   } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
+                                style={linkedTaskCompleted ? { borderColor: wStyles.solid, color: wStyles.text, backgroundColor: wStyles.tint } : undefined}
                               >
                                 {linkedTaskCompleted ? "Undo" : "Mark done"}
                               </button>
@@ -4344,8 +3981,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <span>Since {quitDate.toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-baseline gap-1">
-                                    <span className="text-2xl font-bold text-green-600">{daysSince}</span>
-                                    <span className="text-sm text-green-600 font-medium">days clean</span>
+                                    <span className="text-2xl font-bold" style={{ color: wStyles.text }}>{daysSince}</span>
+                                    <span className="text-sm font-medium" style={{ color: wStyles.text }}>days clean</span>
                                   </div>
                                   {w.quitHabitData.costPerDay && w.quitHabitData.costPerDay > 0 && (
                                     <div className="flex items-center gap-2 text-xs text-[#6b7688]">
@@ -4358,7 +3995,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {latestMilestone && (
                                     <div className="flex items-center gap-2 text-xs">
                                       <span className="text-sm">{latestMilestone.emoji}</span>
-                                      <span className="text-amber-600 font-medium">{latestMilestone.label}</span>
+                                      <span className="font-medium" style={{ color: wStyles.text }}>{latestMilestone.label}</span>
                                     </div>
                                   )}
                                 </div>
@@ -4437,7 +4074,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <span className="text-xs">⚖️</span>
                                     <p className="text-xs font-medium text-[#4a5568]">Current Weight</p>
                                   </div>
-                                  <p className="text-lg font-bold text-amber-600">
+                                  <p className="text-lg font-bold" style={{ color: wStyles.text }}>
                                     {w.weightData.currentWeight} {w.weightData.unit || w.unit || 'lbs'}
                                   </p>
 
@@ -4446,7 +4083,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">📈</span>
                                       <p
-                                        className={`text-xs ${w.weightData.currentWeight < w.weightData.startingWeight ? 'text-green-600' : w.weightData.currentWeight > w.weightData.startingWeight ? 'text-orange-600' : 'text-[#6b7688]'}`}
+                                        className="text-xs"
+                                        style={{ color: wStyles.text }}
                                       >
                                         {w.weightData.currentWeight < w.weightData.startingWeight ? 'Lost' : w.weightData.currentWeight > w.weightData.startingWeight ? 'Gained' : 'No change'}: {Math.abs(w.weightData.currentWeight - w.weightData.startingWeight).toFixed(1)} {w.weightData.unit || w.unit || 'lbs'}
                                       </p>
@@ -4479,6 +4117,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <NutritionSummaryWidget
                                   variant="embedded"
                                   className="p-0"
+                                  bucketColor={wStyles.solid}
                                 />
                               </div>
                             );
@@ -4536,11 +4175,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <div className="text-xs text-[#8e99a8]">Active</div>
                                   </div>
                                   <div>
-                                    <div className="text-sm font-semibold text-red-600">{urgentProjects.length}</div>
+                                    <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{urgentProjects.length}</div>
                                     <div className="text-xs text-[#8e99a8]">Urgent</div>
                                   </div>
                                   <div>
-                                    <div className="text-sm font-semibold text-green-600">{completionRate}%</div>
+                                    <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{completionRate}%</div>
                                     <div className="text-xs text-[#8e99a8]">Done</div>
                                   </div>
                                 </div>
@@ -4550,7 +4189,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   <div className="border-t border-[#dbd6cf]/60 pt-2">
                                     <div className="text-xs text-[#6b7688] mb-1">Next Priority:</div>
                                     <div className="flex items-center gap-1">
-                                      <span className={`w-2 h-2 rounded-full ${nextProject.priority === 'critical' ? 'bg-red-500' : nextProject.priority === 'high' ? 'bg-orange-500' : nextProject.priority === 'medium' ? 'bg-[#C4A44E]' : 'bg-[#b8b0a8]'}`}></span>
+                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: wStyles.solid }}></span>
                                       <span className="text-xs font-medium text-[#314158] truncate">{nextProject.title}</span>
                                     </div>
                                     {nextProject.room && (
@@ -4578,7 +4217,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   </span>
                                 </div>
                                 {prog?.streak >= 2 && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                  <span
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                    style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
+                                  >
                                     🔥 {prog.streak}
                                   </span>
                                 )}
@@ -4588,8 +4230,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
                                 <div className="text-right mt-1 mb-1">
-                                  {w.dataSource === 'fitbit' && <span className="text-xs text-[#B1916A]">Fitbit</span>}
-                                  {w.dataSource === 'googlefit' && <span className="text-xs text-green-600">Google Fit</span>}
+                                  {w.dataSource === 'fitbit' && <span className="text-xs" style={{ color: wStyles.text }}>Fitbit</span>}
+                                  {w.dataSource === 'googlefit' && <span className="text-xs" style={{ color: wStyles.text }}>Google Fit</span>}
                                 </div>
                               )}
                             </div>

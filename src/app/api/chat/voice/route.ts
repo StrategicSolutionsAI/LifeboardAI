@@ -34,7 +34,7 @@ async function createTodoistTaskDirect(req: NextRequest, payload: { content: str
     if (payload.bucket) meta.bucket = payload.bucket
     if (Object.keys(meta).length > 0) body.description = `[LIFEBOARD_META]${JSON.stringify(meta)}[/LIFEBOARD_META]`
 
-    const resp = await fetch('https://api.todoist.com/rest/v2/tasks', {
+    const resp = await fetch('https://api.todoist.com/api/v1/tasks', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${integration.access_token}`,
@@ -179,50 +179,53 @@ export async function POST(req: NextRequest) {
           steps?: number
         } = {}
 
-        // Fetch tasks
-        try {
-          const tasksRes = await fetch(`${origin}/api/tasks?all=true&includeCompleted=false`, {
-            headers: { cookie: req.headers.get('cookie') || '' },
-            cache: 'no-store'
-          })
-          if (tasksRes.ok) {
-            const tasksJson = await tasksRes.json()
-            contextData.tasks = tasksJson.tasks || []
-          }
-        } catch (err) {
-          console.error('Failed fetching tasks for voice chat context', err)
-        }
+        // Direct DB queries in parallel instead of self-calling HTTP
+        const supabase = supabaseServer()
+        const { data: { user } } = await supabase.auth.getUser()
 
-        // Fetch calendar events
-        try {
-          const supabase = supabaseServer()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (user) {
-            const { data: events } = await supabase
+        if (user) {
+          const [tasksResult, calendarResult, shoppingResult] = await Promise.all([
+            // Tasks: all incomplete tasks
+            supabase
+              .from('lifeboard_tasks')
+              .select('id, content, completed, due_date, start_date, hour_slot, bucket, created_at')
+              .eq('user_id', user.id)
+              .eq('completed', false)
+              .order('created_at', { ascending: false })
+              .limit(50),
+            // Calendar events: upcoming
+            supabase
               .from('calendar_events')
               .select('id, title, description, start_date, end_date, hour_slot, all_day, bucket')
               .eq('user_id', user.id)
               .gte('start_date', today)
               .order('start_date', { ascending: true })
-              .limit(20)
-            if (events) contextData.calendar = events
-          }
-        } catch (err) {
-          console.error('Failed fetching calendar for voice chat context', err)
-        }
+              .limit(20),
+            // Shopping list: unpurchased items
+            supabase
+              .from('shopping_list_items')
+              .select('id, name, quantity, bucket, is_purchased')
+              .eq('user_id', user.id)
+              .eq('is_purchased', false)
+              .order('created_at', { ascending: true })
+              .limit(30),
+          ])
 
-        // Fetch shopping list
-        try {
-          const shoppingRes = await fetch(`${origin}/api/shopping-list`, {
-            headers: { cookie: req.headers.get('cookie') || '' },
-            cache: 'no-store'
-          })
-          if (shoppingRes.ok) {
-            const shoppingJson = await shoppingRes.json()
-            contextData.shopping = shoppingJson.items || []
+          if (tasksResult.data) {
+            contextData.tasks = tasksResult.data.map(row => ({
+              content: row.content,
+              due: row.due_date ? { date: row.due_date } : row.start_date ? { date: row.start_date } : undefined,
+              bucket: row.bucket || undefined,
+            }))
           }
-        } catch (err) {
-          console.error('Failed fetching shopping list for voice chat context', err)
+          if (calendarResult.data) contextData.calendar = calendarResult.data
+          if (shoppingResult.data) {
+            contextData.shopping = shoppingResult.data.map(row => ({
+              name: row.name,
+              quantity: row.quantity,
+              bucket: row.bucket,
+            }))
+          }
         }
 
         // Detect steps widget and fetch metrics
@@ -480,11 +483,11 @@ CAPABILITIES:
     }
 
     return NextResponse.json({ reply, audioUrl, createdTask })
-  } catch (err: any) {
+  } catch (err) {
     console.error('Voice chat route error', err)
 
     // Map common OpenAI quota/auth errors to a structured reply the client can detect
-    const message: string = String(err?.message || 'Internal error')
+    const message: string = String(err instanceof Error ? err.message : 'Internal error')
     const status = /quota/i.test(message) ? 402 : 500
     const body = /quota/i.test(message)
       ? { reply: 'OpenAI quota exceeded. Please add credits or switch to browser speech.' }

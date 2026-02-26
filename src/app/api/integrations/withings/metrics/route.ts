@@ -39,18 +39,21 @@ async function handler(request: Request) {
 
   requestLogger.debug('User authenticated', { userId: effectiveUser.id })
 
-  // Fetch integration row
-  const { data: integration, error: integrationError } = await supabase
+  // Fetch integration row — use order + limit to handle potential duplicates
+  const { data: integrations, error: integrationError } = await supabase
     .from('user_integrations')
     .select('id, access_token, refresh_token, token_data, updated_at')
     .eq('user_id', effectiveUser.id)
     .eq('provider', 'withings')
-    .maybeSingle()
+    .order('updated_at', { ascending: false })
+    .limit(1)
 
   if (integrationError) {
     requestLogger.error('Failed to fetch integration', { userId: effectiveUser.id }, integrationError)
     return NextResponse.json({ error: 'Failed to fetch integration' }, { status: 500 })
   }
+
+  const integration = integrations?.[0] ?? null
 
   if (!integration?.access_token) {
     requestLogger.warn('Withings integration not found or missing token', { userId: effectiveUser.id })
@@ -76,7 +79,7 @@ async function handler(request: Request) {
 
   // Check token expiry and refresh if needed
   try {
-    const tokenData: any = integration.token_data || {}
+    const tokenData = (integration.token_data || {}) as { expires_in?: number }
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
       const expiresAt = updated + tokenData.expires_in * 1000
@@ -131,9 +134,9 @@ async function handler(request: Request) {
     
     return NextResponse.json({ weightKg })
     
-  } catch (error: any) {
+  } catch (error) {
     // Handle token errors with automatic refresh
-    if (error.message === 'INVALID_TOKEN') {
+    if (error instanceof Error && error.message === 'INVALID_TOKEN') {
       requestLogger.warn('Invalid token detected, attempting refresh', {
         integrationId: integration.id
       })

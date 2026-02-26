@@ -12,29 +12,29 @@ function getClientFromRequest(req: NextRequest) {
 }
 
 // lifeboard_tasks → unified item
-function mapTaskRow(row: any) {
-  const startDate: string | undefined = row.start_date ?? row.due_date ?? undefined
-  const endDate: string | undefined = row.end_date ?? startDate ?? undefined
+function mapTaskRow(row: Record<string, unknown>) {
+  const startDate = (row.start_date ?? row.due_date ?? undefined) as string | undefined
+  const endDate = (row.end_date ?? startDate ?? undefined) as string | undefined
   return {
     id: `task:${row.id}`,
     kind: 'task' as const,
-    content: row.content,
+    content: row.content as string,
     completed: !!row.completed,
     startDate,
     endDate,
     hourSlot: row.hour_slot ?? undefined,
     allDay: row.all_day ?? (!row.hour_slot && !row.end_hour_slot),
-    created_at: row.created_at,
-    position: row.position ?? undefined,
+    created_at: row.created_at as string,
+    position: (row.position ?? undefined) as number | undefined,
   }
 }
 
 // calendar_events → unified item
-function mapEventRow(row: any) {
+function mapEventRow(row: Record<string, unknown>) {
   const title =
-    row.title ?? row.summary ?? row.name ?? row.content ?? 'Event'
-  const startDate: string | undefined = row.start_date ?? row.date ?? row.due_date ?? undefined
-  const endDate: string | undefined = row.end_date ?? startDate ?? undefined
+    (row.title ?? row.summary ?? row.name ?? row.content ?? 'Event') as string
+  const startDate = (row.start_date ?? row.date ?? row.due_date ?? undefined) as string | undefined
+  const endDate = (row.end_date ?? startDate ?? undefined) as string | undefined
   return {
     id: `event:${row.id}`,
     kind: 'event' as const,
@@ -44,8 +44,8 @@ function mapEventRow(row: any) {
     endDate,
     hourSlot: row.hour_slot ?? undefined,
     allDay: row.all_day ?? (!row.hour_slot),
-    created_at: row.created_at,
-    position: row.position ?? undefined,
+    created_at: row.created_at as string,
+    position: (row.position ?? undefined) as number | undefined,
   }
 }
 
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     const eventItems = (eventsRes.data ?? []).map(mapEventRow)
 
     // Merge + sort: time first, then position, then created_at
-    const items = [...taskItems, ...eventItems].sort((a: any, b: any) => {
+    const items = [...taskItems, ...eventItems].sort((a, b) => {
       const ah = typeof a.hourSlot === 'number' ? a.hourSlot : 99
       const bh = typeof b.hourSlot === 'number' ? b.hourSlot : 99
       if (ah !== bh) return ah - bh

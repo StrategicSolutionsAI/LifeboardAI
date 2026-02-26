@@ -6,7 +6,7 @@ import { handleApiError } from '@/lib/api-error-handler';
 import { createTaskSchema, updateTaskSchema, parseBody } from '@/lib/validations';
 
 const SELECT_COLUMNS =
-  'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, created_at, updated_at';
+  'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, kanban_status, created_at, updated_at';
 
 // DB → client
 function mapRowToTask(row: any) {
@@ -236,11 +236,10 @@ export async function PATCH(request: NextRequest) {
       updatePayload.repeat_rule = repeatRule ? String(repeatRule).trim() : null;
     }
 
-    // kanban_status update will be enabled after migration is run
-    // const kanbanStatus = (body as any).kanban_status ?? (body as any).kanbanStatus;
-    // if (typeof kanbanStatus === 'string' && ['todo', 'in_progress', 'done'].includes(kanbanStatus)) {
-    //   updatePayload.kanban_status = kanbanStatus;
-    // }
+    const kanbanStatus = (body as any).kanban_status ?? (body as any).kanbanStatus;
+    if (typeof kanbanStatus === 'string' && ['todo', 'in_progress', 'done'].includes(kanbanStatus)) {
+      updatePayload.kanban_status = kanbanStatus;
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: 'no update fields provided' }, { status: 400 });

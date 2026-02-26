@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/utils/supabase/server";
 import { supabaseFromBearer } from "@/utils/supabase/bearer";
+import { handleApiError } from "@/lib/api-error-handler";
+import { createShoppingItemSchema, updateShoppingItemSchema, deleteShoppingItemSchema, parseBody } from "@/lib/validations";
 
 const TABLE = "shopping_list_items";
 const SELECT_COLUMNS =
@@ -92,19 +94,17 @@ export async function GET(request: NextRequest) {
     const items = (data ?? []).map(mapRowToItem);
     return NextResponse.json({ items });
   } catch (error) {
-    console.error("GET /api/shopping-list error", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return handleApiError(error, "GET /api/shopping-list");
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as Record<string, any>;
-    const name = (body.name ?? "").toString().trim();
-
-    if (!name) {
-      return NextResponse.json({ error: "name required" }, { status: 400 });
-    }
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = parseBody(createShoppingItemSchema, rawBody);
+    if (parsed.response) return parsed.response;
+    const { name: rawName, ...restBody } = parsed.data;
+    const name = rawName.trim();
 
     const supabase = getClientFromRequest(request);
     const {
@@ -117,23 +117,23 @@ export async function POST(request: NextRequest) {
     }
 
     const bucket =
-      typeof body.bucket === "string" && body.bucket.trim().length > 0
-        ? body.bucket.trim()
+      typeof restBody.bucket === "string" && restBody.bucket.trim().length > 0
+        ? restBody.bucket.trim()
         : null;
 
     const quantity =
-      typeof body.quantity === "string" && body.quantity.trim().length > 0
-        ? body.quantity.trim()
+      typeof restBody.quantity === "string" && restBody.quantity.trim().length > 0
+        ? restBody.quantity.trim()
         : null;
 
     const notes =
-      typeof body.notes === "string" && body.notes.trim().length > 0
-        ? body.notes.trim()
+      typeof restBody.notes === "string" && restBody.notes.trim().length > 0
+        ? restBody.notes.trim()
         : null;
 
     const neededBy =
-      typeof body.neededBy === "string" && body.neededBy.trim().length > 0
-        ? body.neededBy.trim()
+      typeof restBody.neededBy === "string" && restBody.neededBy.trim().length > 0
+        ? restBody.neededBy.trim()
         : null;
 
     const insert = {
@@ -162,19 +162,17 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("POST /api/shopping-list error", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return handleApiError(error, "POST /api/shopping-list");
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as Record<string, any>;
-    const id = (body.id ?? "").toString().trim();
-
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = parseBody(updateShoppingItemSchema, rawBody);
+    if (parsed.response) return parsed.response;
+    const body = parsed.data;
+    const id = body.id;
 
     const supabase = getClientFromRequest(request);
     const {
@@ -290,19 +288,16 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ item: mapRowToItem(data) });
   } catch (error) {
-    console.error("PATCH /api/shopping-list error", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return handleApiError(error, "PATCH /api/shopping-list");
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => ({}))) as Record<string, any>;
-    const id = (body.id ?? "").toString().trim();
-
-    if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
-    }
+    const rawBody = await request.json().catch(() => ({}));
+    const parsed = parseBody(deleteShoppingItemSchema, rawBody);
+    if (parsed.response) return parsed.response;
+    const id = parsed.data.id;
 
     const supabase = getClientFromRequest(request);
     const {
@@ -326,7 +321,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/shopping-list error", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return handleApiError(error, "DELETE /api/shopping-list");
   }
 }

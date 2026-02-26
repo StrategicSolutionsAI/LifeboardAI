@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
 
-const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
+const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/api/v1/tasks';
 
 type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
 
@@ -79,7 +79,7 @@ interface TaskUpdate {
     bucket?: string | null;
     due?: { date: string };
     position?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Merge updates with existing metadata
-        const newMeta: any = {
+        const newMeta: Record<string, unknown> = {
           ...existingMeta,
           ...(update.updates.duration !== undefined && { duration: update.updates.duration }),
           ...(update.updates.hourSlot !== undefined && { hourSlot: update.updates.hourSlot }),
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
 
 
         // Prepare update payload for Todoist
-        const todoistUpdate: any = {};
+        const todoistUpdate: Record<string, unknown> = {};
         
         if (update.updates.content) {
           todoistUpdate.content = update.updates.content;
@@ -236,12 +236,6 @@ export async function POST(request: NextRequest) {
 
         // Always update description to include metadata
         todoistUpdate.description = newDescription.trim();
-
-        console.log('📤 Sending Todoist update:', {
-          taskId: update.taskId,
-          newMeta,
-          todoistUpdate
-        });
 
         // Update task in Todoist
         const updateRes = await fetch(`${TODOIST_TASKS_ENDPOINT}/${update.taskId}`, {

@@ -9,8 +9,8 @@ import {
   Pencil,
   Trash2,
   GripVertical,
-  CheckCircle,
-  Circle,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { differenceInCalendarDays, parseISO, isValid, format } from "date-fns";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
+type TaskStatus = "todo" | "in_progress" | "done";
+
 export interface ListTask {
   id: string;
   title: string;
@@ -32,6 +34,7 @@ export interface ListTask {
   dueDate?: string | null;
   isRecurring?: boolean;
   position?: number | null;
+  kanbanStatus?: TaskStatus;
 }
 
 interface TaskListViewProps {
@@ -40,9 +43,34 @@ interface TaskListViewProps {
   onDeleteTask: (id: string) => void;
   onEditTask: (id: string) => void;
   onAddTask: (title: string, bucket?: string) => void;
-  onMoveTask?: (taskId: string, newBucket: string) => void;
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
   loadingTasks?: Set<string>;
   bucketColors?: Record<string, string>;
+  searchQuery?: string;
+  isSelectMode?: boolean;
+  selectedTasks?: Set<string>;
+  onToggleSelection?: (taskId: string) => void;
+  onReorder?: (reorderedIds: string[]) => void;
+}
+
+const STATUS_CONFIG = {
+  todo: { label: "To Do", color: "#B1916A" },
+  in_progress: { label: "In Progress", color: "#4AADE0" },
+  done: { label: "Done", color: "#48B882" },
+} as const;
+
+function HighlightText({ text, query }: { text: string; query?: string }) {
+  if (!query || !query.trim()) return <>{text}</>;
+  const q = query.trim();
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-[rgba(177,145,106,0.2)] text-[#314158] rounded-sm px-0.5">{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </>
+  );
 }
 
 function formatDue(dueDate?: string | null, isRecurring?: boolean) {
@@ -61,87 +89,169 @@ function formatDue(dueDate?: string | null, isRecurring?: boolean) {
   return { label: format(parsed, "MMM d"), tone: diff <= 3 ? ("accent" as const) : ("default" as const) };
 }
 
+function getTaskStatus(task: ListTask): TaskStatus {
+  return task.kanbanStatus ?? (task.completed ? "done" : "todo");
+}
+
+/* ─── StatusBadge ─── */
+
+function StatusBadge({
+  taskId,
+  status,
+  onStatusChange,
+}: {
+  taskId: string;
+  status: TaskStatus;
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
+}) {
+  const config = STATUS_CONFIG[status];
+  const otherStatuses = (["todo", "in_progress", "done"] as TaskStatus[]).filter((s) => s !== status);
+
+  if (!onStatusChange) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium"
+        style={{ backgroundColor: `${config.color}15`, color: config.color }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+        {config.label}
+      </span>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium transition-opacity hover:opacity-80 cursor-pointer"
+          style={{ backgroundColor: `${config.color}15`, color: config.color }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+          {config.label}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-36">
+        {otherStatuses.map((s) => {
+          const c = STATUS_CONFIG[s];
+          return (
+            <DropdownMenuItem key={s} onClick={() => onStatusChange(taskId, s)}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+              {c.label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/* ─── Main TaskListView ─── */
+
 export function TaskListView({
   tasks,
   onToggleTask,
   onDeleteTask,
   onEditTask,
   onAddTask,
+  onStatusChange,
   loadingTasks = new Set(),
   bucketColors = {},
+  searchQuery,
+  isSelectMode = false,
+  selectedTasks = new Set(),
+  onToggleSelection,
+  onReorder,
 }: TaskListViewProps) {
-  const openTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
-  const completedTasks = useMemo(() => tasks.filter((t) => t.completed), [tasks]);
+  const todoTasks = useMemo(() => tasks.filter((t) => getTaskStatus(t) === "todo"), [tasks]);
+  const inProgressTasks = useMemo(() => tasks.filter((t) => getTaskStatus(t) === "in_progress"), [tasks]);
+  const doneTasks = useMemo(() => tasks.filter((t) => getTaskStatus(t) === "done"), [tasks]);
 
   const handleDragEnd = (result: DropResult) => {
-    // For now, just handle visual reordering - no persistence
     if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+
+    // Cross-section drag = status change
+    if (source.droppableId !== destination.droppableId) {
+      const newStatus = destination.droppableId as TaskStatus;
+      onStatusChange?.(draggableId, newStatus);
+      return;
+    }
+
+    // Same-section reorder
+    if (source.index === destination.index) return;
+    const sectionId = source.droppableId as TaskStatus;
+    const sectionTasks =
+      sectionId === "todo" ? todoTasks : sectionId === "in_progress" ? inProgressTasks : doneTasks;
+    const reordered = [...sectionTasks];
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+    onReorder?.(reordered.map((t) => t.id));
+  };
+
+  const sharedProps = {
+    onToggleTask,
+    onDeleteTask,
+    onEditTask,
+    onAddTask,
+    onStatusChange,
+    loadingTasks,
+    bucketColors,
+    searchQuery,
+    isSelectMode,
+    selectedTasks,
+    onToggleSelection,
   };
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex flex-col gap-5">
-        {/* Open Tasks Section */}
-        <TaskSection
-          status="open"
-          label="Open"
-          dotColor="bg-[#bb9e7b]"
-          tasks={openTasks}
-          onToggleTask={onToggleTask}
-          onDeleteTask={onDeleteTask}
-          onEditTask={onEditTask}
-          onAddTask={onAddTask}
-          loadingTasks={loadingTasks}
-          bucketColors={bucketColors}
-        />
-
-        {/* Completed Tasks Section */}
-        <TaskSection
-          status="completed"
-          label="Completed"
-          dotColor="bg-[#7f43ea]"
-          tasks={completedTasks}
-          onToggleTask={onToggleTask}
-          onDeleteTask={onDeleteTask}
-          onEditTask={onEditTask}
-          onAddTask={onAddTask}
-          loadingTasks={loadingTasks}
-          bucketColors={bucketColors}
-        />
+        <TaskSection sectionStatus="todo" tasks={todoTasks} {...sharedProps} />
+        <TaskSection sectionStatus="in_progress" tasks={inProgressTasks} {...sharedProps} />
+        <TaskSection sectionStatus="done" tasks={doneTasks} {...sharedProps} />
       </div>
     </DragDropContext>
   );
 }
 
+/* ─── TaskSection ─── */
+
 interface TaskSectionProps {
-  status: "open" | "completed";
-  label: string;
-  dotColor: string;
+  sectionStatus: TaskStatus;
   tasks: ListTask[];
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
   onEditTask: (id: string) => void;
   onAddTask: (title: string, bucket?: string) => void;
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
   loadingTasks: Set<string>;
   bucketColors: Record<string, string>;
+  searchQuery?: string;
+  isSelectMode?: boolean;
+  selectedTasks?: Set<string>;
+  onToggleSelection?: (taskId: string) => void;
 }
 
 function TaskSection({
-  status,
-  label,
-  dotColor,
+  sectionStatus,
   tasks,
   onToggleTask,
   onDeleteTask,
   onEditTask,
   onAddTask,
+  onStatusChange,
   loadingTasks,
   bucketColors,
+  searchQuery,
+  isSelectMode = false,
+  selectedTasks = new Set(),
+  onToggleSelection,
 }: TaskSectionProps) {
+  const config = STATUS_CONFIG[sectionStatus];
   const count = tasks.length;
-  const isOpen = status === "open";
+  const isDone = sectionStatus === "done";
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isExpanded, setIsExpanded] = useState(!isDone);
 
   const handleSubmitNew = () => {
     const trimmed = newTaskTitle.trim();
@@ -152,76 +262,141 @@ function TaskSection({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#dbd6cf] overflow-hidden w-full transition-all">
+    <div
+      className={cn(
+        "rounded-xl border overflow-hidden w-full transition-all",
+        !isDone
+          ? "bg-white border-[#dbd6cf] shadow-[0px_1px_3px_rgba(163,133,96,0.04)]"
+          : "bg-[rgba(252,250,248,0.6)] border-[#dbd6cf]/60"
+      )}
+    >
       {/* Section Header */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          "flex items-center justify-between px-4 py-3 w-full text-left cursor-pointer transition-colors",
+          isDone ? "hover:bg-[rgba(252,250,248,0.8)]" : "hover:bg-[rgba(252,250,248,0.6)]"
+        )}
+      >
         <div className="flex items-center gap-2.5">
-          <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
-          <span className="text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b] font-medium">
-            {label}
+          {isExpanded ? (
+            <ChevronDown size={14} className="text-[#8e99a8]" />
+          ) : (
+            <ChevronRight size={14} className="text-[#8e99a8]" />
+          )}
+          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
+          <span
+            className={cn(
+              "text-[13px] tracking-[0.5px] uppercase font-medium",
+              !isDone ? "text-[#314158]" : "text-[#8e99a8]"
+            )}
+          >
+            {config.label}
           </span>
-          <span className="text-[22px] tracking-[0.88px] text-[#bb9e7b] leading-none">
+          <span
+            className="text-[13px] font-semibold rounded-md px-1.5 py-0.5 leading-none"
+            style={{ color: config.color, backgroundColor: `${config.color}15` }}
+          >
             {count}
           </span>
         </div>
-        {isOpen && (
+        {!isDone && (
           <button
             type="button"
-            onClick={() => setAddingTask(true)}
-            aria-label={`Add ${label.toLowerCase()} task`}
-            className="p-0.5 hover:bg-[#faf8f5] rounded transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setAddingTask(true);
+            }}
+            aria-label={`Add ${config.label.toLowerCase()} task`}
+            className="p-1 hover:bg-[rgba(177,145,106,0.08)] rounded-lg transition-colors"
           >
-            <Plus size={20} className="text-[#BFA483]" />
+            <Plus size={18} style={{ color: config.color }} />
           </button>
         )}
-      </div>
+      </button>
 
-      {/* Empty State */}
-      {count === 0 && !addingTask && (
-        <div className="flex flex-col items-center justify-center gap-3 px-5 py-12 border-t border-[rgba(219,214,207,0.5)] bg-[rgba(252,250,248,0.5)]">
-          <div className="w-12 h-12 rounded-xl bg-white border border-[#dbd6cf] shadow-[0px_4px_16px_rgba(163,133,96,0.06)] flex items-center justify-center shrink-0">
-            <ClipboardList size={20} className="text-[#bb9e7b]" />
+      {/* Empty State (To Do / In Progress only) */}
+      {!isDone && isExpanded && count === 0 && !addingTask && (
+        <div className="flex items-center gap-4 px-5 py-8 border-t border-[rgba(219,214,207,0.4)]">
+          <div
+            className="w-10 h-10 rounded-xl border border-[#dbd6cf]/60 flex items-center justify-center shrink-0"
+            style={{ backgroundColor: `${config.color}10` }}
+          >
+            <ClipboardList size={18} style={{ color: config.color }} />
           </div>
-          <div className="text-center">
-            <span className="text-[14px] font-medium text-[#314158] block mb-1">
-              No {label.toLowerCase()} tasks
+          <div>
+            <span className="text-[14px] font-medium text-[#314158] block">
+              No {config.label.toLowerCase()} tasks
             </span>
-            <span className="text-[13px] text-[#8e99a8]">
-              {isOpen ? "Click + to add your first task" : "Tasks you complete will appear here"}
+            <span className="text-[12px] text-[#8e99a8]">
+              {sectionStatus === "todo"
+                ? "Press + or type in the quick-add bar above"
+                : "Drag tasks here or use the status menu"}
             </span>
           </div>
         </div>
       )}
 
-      {/* Full Table for Open Tasks */}
-      {isOpen && count > 0 && (
+      {/* Table for expanded sections */}
+      {isExpanded && count > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-t border-b border-[rgba(219,214,207,0.7)]">
-                <th className="w-8" />
-                <th className="text-left py-3 pl-2 pr-4 min-w-[280px]">
-                  <div className="flex items-center gap-2">
-                    <Circle size={14} className="text-[#bb9e7b]" />
-                    <span className="text-[12px] font-medium tracking-[0.5px] uppercase text-[#8e99a8]">Task</span>
-                  </div>
+              <tr className="border-t border-[rgba(219,214,207,0.5)]">
+                <th className="w-8">
+                  {isSelectMode && (
+                    <div className="flex items-center justify-center pl-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allSelected = tasks.every((t) => selectedTasks.has(t.id));
+                          if (allSelected) {
+                            tasks.forEach((t) => onToggleSelection?.(t.id));
+                          } else {
+                            tasks
+                              .filter((t) => !selectedTasks.has(t.id))
+                              .forEach((t) => onToggleSelection?.(t.id));
+                          }
+                        }}
+                        className={cn(
+                          "w-[16px] h-[16px] rounded-[4px] transition-all flex items-center justify-center",
+                          tasks.every((t) => selectedTasks.has(t.id)) && tasks.length > 0
+                            ? "bg-[#B1916A]"
+                            : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]"
+                        )}
+                      >
+                        {tasks.every((t) => selectedTasks.has(t.id)) && tasks.length > 0 && (
+                          <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
+                            <path
+                              d="M1 4L3.5 6.5L9 1"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </th>
-                <th className="text-left py-3 px-4 border-l border-[rgba(219,214,207,0.7)] min-w-[140px]">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-[rgba(177,145,106,0.3)]" />
-                    <span className="text-[12px] font-medium tracking-[0.5px] uppercase text-[#8e99a8]">Bucket</span>
-                  </div>
+                <th className="text-left py-2.5 pl-2 pr-4 min-w-[200px]">
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Task</span>
                 </th>
-                <th className="text-left py-3 px-4 border-l border-[rgba(219,214,207,0.7)] min-w-[120px]">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays size={14} className="text-[#bb9e7b]" />
-                    <span className="text-[12px] font-medium tracking-[0.5px] uppercase text-[#8e99a8]">Due Date</span>
-                  </div>
+                <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[110px]">
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Status</span>
                 </th>
-                <th className="w-14 border-l border-[rgba(219,214,207,0.7)]" />
+                <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[120px]">
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Bucket</span>
+                </th>
+                <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[100px]">
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Due</span>
+                </th>
+                <th className="w-12 border-l border-[rgba(219,214,207,0.4)]" />
               </tr>
             </thead>
-            <Droppable droppableId="open-tasks" type="TASK">
+            <Droppable droppableId={sectionStatus} type="TASK">
               {(provided) => (
                 <tbody ref={provided.innerRef} {...provided.droppableProps}>
                   {tasks.map((task, index) => (
@@ -230,11 +405,17 @@ function TaskSection({
                       task={task}
                       index={index}
                       isLast={index === tasks.length - 1}
+                      isDoneSection={isDone}
                       onToggleTask={onToggleTask}
                       onDeleteTask={onDeleteTask}
                       onEditTask={onEditTask}
+                      onStatusChange={onStatusChange}
                       isLoading={loadingTasks.has(task.id)}
                       bucketColors={bucketColors}
+                      searchQuery={searchQuery}
+                      isSelectMode={isSelectMode}
+                      isSelected={selectedTasks.has(task.id)}
+                      onToggleSelection={onToggleSelection}
                     />
                   ))}
                   {provided.placeholder}
@@ -245,37 +426,15 @@ function TaskSection({
         </div>
       )}
 
-      {/* Simple list for Completed */}
-      {!isOpen && count > 0 && (
-        <div>
-          <div className="flex items-center gap-2 pl-10 pr-4 py-2 border-t border-b border-[rgba(219,214,207,0.7)]">
-            <CheckCircle size={14} className="text-[#596881]" />
-            <span className="text-[12px] text-[#596881]">Task</span>
-          </div>
-
-          {tasks.map((task) => (
-            <TaskSimpleRow
-              key={task.id}
-              task={task}
-              onToggleTask={onToggleTask}
-              onDeleteTask={onDeleteTask}
-              onEditTask={onEditTask}
-              isLoading={loadingTasks.has(task.id)}
-              bucketColors={bucketColors}
-            />
-          ))}
-        </div>
-      )}
-
       {/* Add Task Input */}
-      {isOpen && addingTask && (
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-[rgba(219,214,207,0.7)]">
+      {!isDone && isExpanded && addingTask && (
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-[rgba(219,214,207,0.4)]">
           <Input
             autoFocus
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
-            placeholder="Add a new task..."
-            className="flex-1 border-0 focus-visible:ring-0 h-8 text-sm"
+            placeholder="Task name..."
+            className="flex-1 border-0 focus-visible:ring-0 h-8 text-sm text-[#314158] placeholder:text-[#b5b0a8]"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -287,55 +446,74 @@ function TaskSection({
               }
             }}
           />
-          <Button size="sm" onClick={handleSubmitNew} className="h-8 px-3 text-xs">
+          <Button size="sm" onClick={handleSubmitNew} className="h-7 px-3 text-xs bg-[#B1916A] hover:bg-[#96784f]">
             Add
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setAddingTask(false); setNewTaskTitle(""); }}
-            className="h-8 px-2 text-xs text-muted-foreground"
+            onClick={() => {
+              setAddingTask(false);
+              setNewTaskTitle("");
+            }}
+            className="h-7 px-2 text-xs text-[#8e99a8] hover:text-[#596881]"
           >
             Cancel
           </Button>
         </div>
       )}
 
-      {/* Add Task Button (bottom of section) */}
-      {isOpen && !addingTask && count > 0 && (
+      {/* Inline add task row */}
+      {!isDone && isExpanded && !addingTask && count > 0 && (
         <button
           onClick={() => setAddingTask(true)}
-          className="flex items-center gap-3 pl-10 pr-4 h-12 w-full hover:bg-[rgba(252,250,248,0.5)] transition-colors border-t border-[#dbd6cf]"
+          className="flex items-center gap-3 pl-[52px] pr-4 h-11 w-full hover:bg-[rgba(177,145,106,0.04)] transition-colors border-t border-[rgba(219,214,207,0.4)]"
         >
-          <div className="w-4 h-4 rounded border border-[rgba(219,214,207,0.7)] bg-white shadow-[0px_1px_2px_rgba(6,27,22,0.06)]" />
-          <span className="text-[14px] text-[#314158]">+ Add Task</span>
+          <Plus size={14} style={{ color: config.color }} />
+          <span className="text-[13px] text-[#8e99a8]">Add task</span>
         </button>
       )}
     </div>
   );
 }
 
+/* ─── TaskTableRow ─── */
+
 function TaskTableRow({
   task,
   index,
   isLast,
+  isDoneSection,
   onToggleTask,
   onDeleteTask,
   onEditTask,
+  onStatusChange,
   isLoading,
   bucketColors,
+  searchQuery,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelection,
 }: {
   task: ListTask;
   index: number;
   isLast: boolean;
+  isDoneSection: boolean;
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
   onEditTask: (id: string) => void;
+  onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
   isLoading: boolean;
   bucketColors: Record<string, string>;
+  searchQuery?: string;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (taskId: string) => void;
 }) {
   const dateBadge = useMemo(() => formatDue(task.dueDate, task.isRecurring), [task.dueDate, task.isRecurring]);
   const bucketColor = task.bucket ? (bucketColors[task.bucket] ?? "#bb9e7b") : "#bb9e7b";
+  const isOverdue = dateBadge?.tone === "destructive";
+  const currentStatus = getTaskStatus(task);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -344,20 +522,55 @@ function TaskTableRow({
           ref={provided.innerRef}
           {...provided.draggableProps}
           className={cn(
-            "group hover:bg-[rgba(252,250,248,0.5)] transition-colors",
-            !isLast && "border-b border-[rgba(219,214,207,0.7)]",
+            "group transition-all duration-150",
+            "hover:bg-[rgba(177,145,106,0.04)]",
+            isOverdue && !isDoneSection && "bg-red-50/40",
+            isSelected && "bg-[rgba(177,145,106,0.08)]",
+            !isLast && "border-b border-[rgba(219,214,207,0.35)]",
             snapshot.isDragging && "opacity-40 bg-white shadow-warm-lg"
           )}
         >
-          <td className="py-3.5 pl-3 pr-0 w-8">
-            <div
-              {...provided.dragHandleProps}
-              className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-40 transition-opacity"
-            >
-              <GripVertical size={14} className="text-[#596881]" />
-            </div>
+          {/* Drag / Select */}
+          <td className="py-3 pl-3 pr-0 w-8">
+            {isSelectMode ? (
+              <button
+                type="button"
+                onClick={() => onToggleSelection?.(task.id)}
+                className="flex items-center justify-center w-5 h-5"
+              >
+                <div
+                  className={cn(
+                    "w-[18px] h-[18px] rounded-[5px] transition-all flex items-center justify-center",
+                    isSelected
+                      ? "bg-[#B1916A]"
+                      : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]"
+                  )}
+                >
+                  {isSelected && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path
+                        d="M1 4L3.5 6.5L9 1"
+                        stroke="white"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            ) : (
+              <div
+                {...provided.dragHandleProps}
+                className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-30 transition-opacity"
+              >
+                <GripVertical size={14} className="text-[#596881]" />
+              </div>
+            )}
           </td>
-          <td className="py-3.5 pl-2 pr-4">
+
+          {/* Task */}
+          <td className="py-3 pl-2 pr-4">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -365,69 +578,76 @@ function TaskTableRow({
                 disabled={isLoading}
                 aria-label={task.completed ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
                 className={cn(
-                  "w-4 h-4 rounded shrink-0 transition-all flex items-center justify-center",
+                  "w-[18px] h-[18px] rounded-[5px] shrink-0 transition-all flex items-center justify-center",
                   task.completed
-                    ? "bg-[#bb9e7b] border-[#bb9e7b]"
-                    : "bg-white border border-[rgba(219,214,207,0.7)] shadow-[0px_1px_2px_rgba(6,27,22,0.06)]",
+                    ? "bg-[#48B882] border-[#48B882]"
+                    : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]",
                   isLoading && "animate-pulse opacity-50"
                 )}
               >
                 {task.completed && (
                   <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M1 4L3.5 6.5L9 1"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 )}
               </button>
               <button
-                onClick={() => onEditTask(task.id)}
+                onClick={() => (isSelectMode ? onToggleSelection?.(task.id) : onEditTask(task.id))}
                 className={cn(
-                  "text-[14px] text-[#314158] text-left hover:text-[#bb9e7b] transition-colors cursor-pointer",
-                  task.completed && "line-through opacity-50"
+                  "text-[14px] text-[#314158] text-left hover:text-[#B1916A] transition-colors cursor-pointer leading-snug",
+                  isDoneSection && "line-through opacity-50"
                 )}
               >
-                {task.title}
+                <HighlightText text={task.title} query={searchQuery} />
               </button>
             </div>
           </td>
-          <td className="py-3.5 px-4 border-l border-[rgba(219,214,207,0.7)]">
-            {task.bucket && (
+
+          {/* Status */}
+          <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
+            <StatusBadge taskId={task.id} status={currentStatus} onStatusChange={onStatusChange} />
+          </td>
+
+          {/* Bucket */}
+          <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
+            {task.bucket ? (
               <div className="flex items-center gap-2">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: bucketColor }}
-                />
-                <span className="text-[13px] text-[rgba(49,65,88,0.8)] truncate">
-                  {task.bucket}
-                </span>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bucketColor }} />
+                <span className="text-[12px] text-[#596881] truncate">{task.bucket}</span>
               </div>
-            )}
-            {!task.bucket && (
-              <span className="text-[12px] text-[#b5b0a8] italic">Unsorted</span>
+            ) : (
+              <span className="text-[11px] text-[#b5b0a8]">--</span>
             )}
           </td>
-          <td className="py-3.5 px-4 border-l border-[rgba(219,214,207,0.7)]">
+
+          {/* Due */}
+          <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
             {dateBadge ? (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] border",
-                  dateBadge.tone === "destructive" && "border-red-200 bg-red-50 text-red-600",
-                  dateBadge.tone === "accent" && "border-[rgba(177,145,106,0.3)] bg-[rgba(177,145,106,0.06)] text-[#96784f]",
-                  dateBadge.tone === "default" && "border-[#e2e8f0] bg-[#f8fafc] text-[#596881]"
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium",
+                  dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
+                  dateBadge.tone === "accent" && "bg-[rgba(177,145,106,0.08)] text-[#96784f]",
+                  dateBadge.tone === "default" && "bg-[#f4f6f8] text-[#596881]"
                 )}
               >
                 <CalendarDays size={10} />
                 {dateBadge.label}
               </span>
             ) : (
-              <span className="text-[12px] text-[#b5b0a8]">No date</span>
+              <span className="text-[11px] text-[#c5c0b8]">--</span>
             )}
           </td>
-          <td className="py-3.5 px-3 border-l border-[rgba(219,214,207,0.7)]">
-            <TaskRowDropdown
-              taskId={task.id}
-              onDelete={onDeleteTask}
-              onEdit={onEditTask}
-            />
+
+          {/* Actions */}
+          <td className="py-3 px-2 border-l border-[rgba(219,214,207,0.3)]">
+            <TaskRowDropdown taskId={task.id} onDelete={onDeleteTask} onEdit={onEditTask} />
           </td>
         </tr>
       )}
@@ -435,63 +655,7 @@ function TaskTableRow({
   );
 }
 
-function TaskSimpleRow({
-  task,
-  onToggleTask,
-  onDeleteTask,
-  onEditTask,
-  isLoading,
-  bucketColors,
-}: {
-  task: ListTask;
-  onToggleTask: (id: string) => void;
-  onDeleteTask: (id: string) => void;
-  onEditTask: (id: string) => void;
-  isLoading: boolean;
-  bucketColors: Record<string, string>;
-}) {
-  const bucketColor = task.bucket ? (bucketColors[task.bucket] ?? "#bb9e7b") : undefined;
-
-  return (
-    <div className="group flex items-center gap-3 pl-3 pr-4 h-14 border-b border-[#dbd6cf] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-      <div className="w-5 shrink-0" />
-      <button
-        type="button"
-        onClick={() => onToggleTask(task.id)}
-        disabled={isLoading}
-        aria-label={`Mark "${task.title}" not completed`}
-        className={cn(
-          "w-4 h-4 rounded shrink-0 transition-all flex items-center justify-center bg-[#bb9e7b] border-[#bb9e7b]",
-          isLoading && "animate-pulse opacity-50"
-        )}
-      >
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <button
-        onClick={() => onEditTask(task.id)}
-        className="text-[14px] text-[#314158] flex-1 text-left hover:text-[#bb9e7b] transition-colors cursor-pointer line-through opacity-50"
-      >
-        {task.title}
-      </button>
-      {task.bucket && bucketColor && (
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: bucketColor }}
-          />
-          <span className="text-[11px] text-[#8e99a8]">{task.bucket}</span>
-        </div>
-      )}
-      <TaskRowDropdown
-        taskId={task.id}
-        onDelete={onDeleteTask}
-        onEdit={onEditTask}
-      />
-    </div>
-  );
-}
+/* ─── TaskRowDropdown ─── */
 
 function TaskRowDropdown({
   taskId,

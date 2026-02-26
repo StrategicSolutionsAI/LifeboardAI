@@ -80,7 +80,7 @@ export async function GET(_req: Request, { params }: { params: { instanceId: str
     const d = new Date();
     d.setDate(d.getDate() - ((days - 1) - i));
     const ds = d.toISOString().slice(0, 10);
-    const row = (data ?? []).find((r: any) => (r.date as string).slice(0, 10) === ds);
+    const row = (data ?? []).find((r: Record<string, unknown>) => (r.date as string).slice(0, 10) === ds);
     result.push({ date: ds, value: row?.value ?? 0 });
   }
   return NextResponse.json({ data: result });

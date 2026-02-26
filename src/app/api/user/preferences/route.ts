@@ -48,7 +48,7 @@ async function postHandler(request: Request) {
     const combinedWidgets = { ...existingWidgets, ...newWidgets };
 
     // Prepare the update data
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       user_id: user.id,
       updated_at: new Date().toISOString(),
     };

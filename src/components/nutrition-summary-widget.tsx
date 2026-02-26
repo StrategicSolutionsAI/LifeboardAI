@@ -36,14 +36,16 @@ interface NutritionSummaryWidgetProps {
   variant?: 'card' | 'embedded'
   showControls?: boolean
   compact?: boolean
+  bucketColor?: string
 }
 
-export function NutritionSummaryWidget({ 
-  className, 
-  onClick, 
-  variant = 'card', 
-  showControls = true, 
-  compact = false 
+export function NutritionSummaryWidget({
+  className,
+  onClick,
+  variant = 'card',
+  showControls = true,
+  compact = false,
+  bucketColor
 }: NutritionSummaryWidgetProps) {
   const { 
     dailyMeals, 
@@ -102,19 +104,18 @@ export function NutritionSummaryWidget({
               <span className="text-sm text-[#8e99a8]">/ {nutritionGoals.calories} cal</span>
             </div>
             {calorieProgress < 25 && (
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warm-500 text-white">
+              <span
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: bucketColor || '#B1916A' }}
+              >
                 Low
               </span>
             )}
           </div>
           <div className="w-full bg-[#f5f0eb] rounded-full h-1">
-            <div 
-              className={`h-1 rounded-full transition-all duration-300 ${
-                calorieProgress >= 100 ? "bg-warm-500" : 
-                calorieProgress >= 75 ? "bg-green-500" : 
-                calorieProgress >= 25 ? "bg-yellow-500" : "bg-[#ebe5de]"
-              }`}
-              style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+            <div
+              className="h-1 rounded-full transition-all duration-300"
+              style={{ width: `${Math.min(calorieProgress, 100)}%`, backgroundColor: bucketColor || '#B1916A' }}
             />
           </div>
           {mealsWithFood.length > 0 && (
@@ -131,7 +132,10 @@ export function NutritionSummaryWidget({
     return (
       <div className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative animate-pulse">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-9 h-9 rounded-lg bg-green-500/90 shadow-sm">
+          <div
+            className="w-9 h-9 rounded-lg shadow-sm"
+            style={{ backgroundColor: bucketColor ? `${bucketColor}e6` : 'rgba(72,184,130,0.9)' }}
+          >
             <Utensils className="h-5 w-5 text-white m-2" />
           </div>
           <span className="text-sm font-medium truncate">Daily Nutrition</span>
@@ -148,7 +152,10 @@ export function NutritionSummaryWidget({
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-green-500/90 shadow-sm">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm"
+          style={{ backgroundColor: bucketColor ? `${bucketColor}e6` : 'rgba(72,184,130,0.9)' }}
+        >
           <Utensils className="h-5 w-5 text-white" />
         </div>
         <span className="text-sm font-medium truncate">Daily Nutrition</span>
@@ -162,20 +169,19 @@ export function NutritionSummaryWidget({
           {" "}/ {nutritionGoals.calories}
         </span>
         {calorieProgress < 25 && (
-          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warm-500 text-white">
+          <span
+            className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white"
+            style={{ backgroundColor: bucketColor || '#B1916A' }}
+          >
             Low
           </span>
         )}
       </div>
-      
+
       <div className="w-full bg-[#f5f0eb] rounded-full h-1 mt-2">
-        <div 
-          className={`h-1 rounded-full transition-all duration-300 ${
-            calorieProgress >= 100 ? "bg-warm-500" : 
-            calorieProgress >= 75 ? "bg-green-500" : 
-            calorieProgress >= 25 ? "bg-yellow-500" : "bg-[#ebe5de]"
-          }`}
-          style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+        <div
+          className="h-1 rounded-full transition-all duration-300"
+          style={{ width: `${Math.min(calorieProgress, 100)}%`, backgroundColor: bucketColor || '#B1916A' }}
         />
       </div>
     </div>

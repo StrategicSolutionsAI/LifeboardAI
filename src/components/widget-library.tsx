@@ -53,6 +53,7 @@ import {
   } from "lucide-react"
 import { WidgetPreview } from "./widget-preview"
 import type { WidgetInstance } from "@/types/widgets"
+import { hexToRgba } from "@/lib/dashboard-utils"
 
 export interface WidgetTemplate {
   id: string
@@ -624,15 +625,6 @@ const getSemiOpaqueClasses = (color: string): { bg: string; text: string } => {
 const COLORS = [
   "tan", "green", "blue", "purple", "pink", "gold", "orange", "teal", "slate", "stone"
 ];
-
-// Convert hex to rgba for inline styles
-const hexToRgba = (hex: string, alpha: number): string => {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 

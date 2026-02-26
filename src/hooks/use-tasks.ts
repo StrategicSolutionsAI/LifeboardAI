@@ -5,6 +5,7 @@ import { useDataCache } from './use-data-cache'
 
 export type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly'
 export type RepeatOption = RepeatRule | 'none'
+export type KanbanStatus = 'todo' | 'in_progress' | 'done'
 
 export interface TaskDue {
   date?: string
@@ -30,6 +31,7 @@ export interface Task {
   repeatRule?: RepeatRule
   allDay?: boolean
   source?: 'todoist' | 'supabase' | 'local'
+  kanbanStatus?: KanbanStatus
 }
 
 export interface TaskOccurrenceException {
@@ -769,12 +771,14 @@ export function useTasks(selectedDate?: Date) {
     const source = (task.source ?? inferSourceFromId(task.id)) as 'todoist' | 'supabase' | 'local'
     const newCompleted = !task.completed
 
+    const newKanbanStatus: KanbanStatus = newCompleted ? 'done' : 'todo'
     const updater = (tasks: Task[] | null) =>
-      tasks?.map(t => t.id === taskId ? { ...t, completed: newCompleted } : t) || []
+      tasks?.map(t => t.id === taskId ? { ...t, completed: newCompleted, kanbanStatus: newKanbanStatus } : t) || []
 
     const revertOptimistic = () => {
+      const oldKanbanStatus: KanbanStatus = !newCompleted ? 'done' : 'todo'
       const revertUpdater = (tasks: Task[] | null) =>
-        tasks?.map(t => t.id === taskId ? { ...t, completed: !newCompleted } : t) || []
+        tasks?.map(t => t.id === taskId ? { ...t, completed: !newCompleted, kanbanStatus: oldKanbanStatus } : t) || []
       updateDailyOptimistically(revertUpdater)
       updateAllOptimistically(revertUpdater)
     }

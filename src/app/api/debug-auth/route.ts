@@ -3,26 +3,28 @@ import { supabaseServer } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+// Dev-only endpoint - exposes auth debugging info
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
-    // Check environment variables
     const envVars = {
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
       googleClientId: process.env.GOOGLE_CLIENT_ID,
       googleFitClientId: process.env.GOOGLE_FIT_CLIENT_ID,
       siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
     }
-    
-    // Test Supabase connection
+
     const supabase = supabaseServer()
     const { data: authSettings } = await supabase.auth.getSession()
-    
-    // Return debugging information
+
     return NextResponse.json({
       env: {
-        supabaseUrl: envVars.supabaseUrl ? '✅ Set' : '❌ Missing',
-        googleClientId: envVars.googleClientId ? '✅ Set' : '❌ Missing',
-        googleFitClientId: envVars.googleFitClientId ? '✅ Set' : '❌ Missing',
+        supabaseUrl: envVars.supabaseUrl ? 'Set' : 'Missing',
+        googleClientId: envVars.googleClientId ? 'Set' : 'Missing',
+        googleFitClientId: envVars.googleFitClientId ? 'Set' : 'Missing',
         siteUrl: envVars.siteUrl,
       },
       auth: {

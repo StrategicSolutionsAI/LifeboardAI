@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
 
-const TODOIST_TASK_URL = 'https://api.todoist.com/rest/v2/tasks';
+const TODOIST_TASK_URL = 'https://api.todoist.com/api/v1/tasks';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    const body: any = {};
+    const body: Record<string, string> = {};
     if (dueDate === null) {
       body.due_string = 'no date';
     } else if (typeof dueDate === 'string') {

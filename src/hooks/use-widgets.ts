@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useGlobalCache } from './use-data-cache'
-import { getUserPreferencesClient, saveUserPreferences } from '@/lib/user-preferences'
+import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from '@/lib/user-preferences'
 import type { WidgetInstance } from '@/types/widgets'
 
 interface ProgressEntry {
@@ -125,21 +125,18 @@ export function useWidgets() {
       }
     }
     
-    // Save to Supabase
+    // Save to Supabase — targeted update to avoid race conditions
     try {
-      const currentPrefs = await getUserPreferencesClient()
-      if (currentPrefs) {
-        const success = await saveUserPreferences({
-          ...currentPrefs,
-          widgets_by_bucket: widgets,
-          progress_by_widget: progress || currentPrefs.progress_by_widget || {}
-        })
-        
-        setSavingStatus(success ? 'saved' : 'error')
-        
-        // Reset status after a delay
-        setTimeout(() => setSavingStatus('idle'), 2000)
+      const fields: Record<string, any> = { widgets_by_bucket: widgets }
+      if (progress) {
+        fields.progress_by_widget = progress
       }
+      const success = await updateUserPreferenceFields(fields)
+
+      setSavingStatus(success ? 'saved' : 'error')
+
+      // Reset status after a delay
+      setTimeout(() => setSavingStatus('idle'), 2000)
     } catch (error) {
       console.error('Failed to save widgets:', error)
       setSavingStatus('error')

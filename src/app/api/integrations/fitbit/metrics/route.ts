@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   // Optional: naive expiry check if token_data.expires_in + updated_at < now
   try {
-    const tokenData: any = integration.token_data || {}
+    const tokenData = (integration.token_data || {}) as { expires_in?: number }
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
       const expiresAt = updated + tokenData.expires_in * 1000
@@ -84,14 +84,15 @@ export async function GET(request: NextRequest) {
       const waterJson = await fetchFitbitWater(accessToken, dateStr)
       const waterMl = waterJson.summary?.water ?? 0
       waterCups = +(waterMl / 236.588).toFixed(1)
-    } catch (err: any) {
-      console.warn('Fitbit water fetch failed (non-fatal)', err?.message ?? err)
+    } catch (err) {
+      console.warn('Fitbit water fetch failed (non-fatal)', err instanceof Error ? err.message : err)
     }
 
     return NextResponse.json({ steps, calories, water: waterCups })
-  } catch (e: any) {
+  } catch (e) {
     console.error('Failed to fetch Fitbit summary', e)
-    const isRateLimited = /429/.test(e.message ?? "")
-    return NextResponse.json({ error: e.message }, { status: isRateLimited ? 429 : 500 })
+    const errMessage = e instanceof Error ? e.message : String(e)
+    const isRateLimited = /429/.test(errMessage)
+    return NextResponse.json({ error: errMessage }, { status: isRateLimited ? 429 : 500 })
   }
 } 

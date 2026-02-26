@@ -12,7 +12,7 @@ import type { KanbanStatus } from "@/hooks/use-tasks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import { Plus, Search, Clock, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
+import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
@@ -57,9 +57,7 @@ const TaskKanbanBoard = dynamic(
   }
 );
 
-const TaskEditorModal = dynamic(() => import("@/components/task-editor-modal"), {
-  ssr: false,
-});
+import TaskEditorModal from "@/components/task-editor-modal";
 
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
 
@@ -238,12 +236,9 @@ function TasksBoardShell() {
   }, [openTasks]);
 
   const inProgressTasks = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     return openTasks.filter((t) => {
-      if (!t.due?.date) return false;
-      const parsed = parseISO(t.due.date);
-      return isValid(parsed) && parsed >= today;
+      const status = t.kanbanStatus ?? (t.completed ? "done" : "todo");
+      return status === "in_progress";
     });
   }, [openTasks]);
 
@@ -306,6 +301,7 @@ function TasksBoardShell() {
       dueDate: t.due?.date ?? null,
       isRecurring: t.due?.is_recurring ?? false,
       position: typeof t.position === "number" ? t.position : null,
+      kanbanStatus: (t.kanbanStatus ?? (t.completed ? "done" : "todo")) as "todo" | "in_progress" | "done",
     }));
   }, [filteredTasks]);
 
@@ -687,11 +683,11 @@ function TasksBoardShell() {
               className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
               style={{ backgroundColor: "rgba(74,173,224,0.15)" }}
             >
-              <Clock size={18} style={{ color: "#4AADE0" }} />
+              <Activity size={18} style={{ color: "#4AADE0" }} />
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[18px] font-bold text-[#314158] leading-tight">{inProgressTasks.length}</span>
-              <span className="text-[11px] text-[#8e99a8]">Active</span>
+              <span className="text-[11px] text-[#8e99a8]">In Progress</span>
             </div>
           </button>
 
@@ -847,6 +843,7 @@ function TasksBoardShell() {
                 onDeleteTask={handleDeleteTask}
                 onEditTask={handleEditTask}
                 onAddTask={handleAddTaskFromList}
+                onStatusChange={handleKanbanStatusChange}
                 loadingTasks={loadingTasks}
                 bucketColors={bucketColors}
                 searchQuery={searchQuery}

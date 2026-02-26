@@ -54,12 +54,14 @@ interface TaskFilterPanelProps {
   filters: TaskFilterState;
   onChange: (next: TaskFilterState) => void;
   bucketOptions: string[];
+  bucketColors?: Record<string, string>;
 }
 
 export function TaskFilterPanel({
   filters,
   onChange,
   bucketOptions,
+  bucketColors = {},
 }: TaskFilterPanelProps) {
   const toggleBucket = (bucket: string) => {
     const has = filters.buckets.includes(bucket);
@@ -152,16 +154,21 @@ export function TaskFilterPanel({
           <div className="flex flex-wrap gap-2">
             {bucketOptions.map((bucket) => {
               const active = filters.buckets.includes(bucket);
+              const color = bucketColors[bucket] ?? "#bb9e7b";
               return (
                 <button
                   key={bucket}
                   onClick={() => toggleBucket(bucket)}
-                  className={`px-2.5 py-1 rounded-md border text-[12px] transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[12px] transition-colors ${
                     active
                       ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158]"
                       : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
                   }`}
                 >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
                   {bucket}
                 </button>
               );

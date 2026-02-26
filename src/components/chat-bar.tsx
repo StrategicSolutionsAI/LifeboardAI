@@ -584,19 +584,12 @@ export function ChatBar() {
       if (!remoteAudio) {
         console.warn('Realtime: remote audio element not available')
       } else {
-        console.log('🔧 Realtime: Configuring audio element', {
-          speakReplies,
-          muted: !speakReplies,
-          volume: speakReplies ? 1 : 0,
-          speakerDeviceId
-        })
         remoteAudio.autoplay = true
         remoteAudio.muted = !speakReplies
         remoteAudio.volume = speakReplies ? 1 : 0
         try {
           if (speakerDeviceId && typeof (remoteAudio as any).setSinkId === 'function') {
             await (remoteAudio as any).setSinkId(speakerDeviceId)
-            console.log('✅ Realtime: Audio output device set to:', speakerDeviceId)
           }
         } catch (e) {
           console.warn('Failed to set output device (setSinkId)', e)
@@ -617,24 +610,19 @@ export function ChatBar() {
         if (stream && rtRemoteAudioRef.current) {
           gotTrack = true
           clearTimeout(trackTimeout)
-          console.log('🔊 Realtime: Received audio track, setting up playback')
           rtRemoteAudioRef.current.srcObject = stream
           rtRemoteAudioRef.current
             .play()
             .then(() => {
-              console.log('✅ Realtime: Audio playback started successfully')
               setIsSpeaking(true)
             })
             .catch((err) => {
-              console.error('❌ Realtime: Audio playback failed:', err)
-              console.log('💡 Try clicking anywhere on the page to enable audio autoplay')
+              console.error('Realtime: Audio playback failed:', err)
             })
           rtRemoteAudioRef.current.onplay = () => {
-            console.log('▶️ Realtime: Audio playing')
             setIsSpeaking(true)
           }
           rtRemoteAudioRef.current.onpause = rtRemoteAudioRef.current.onended = () => {
-            console.log('⏸️ Realtime: Audio stopped')
             setIsSpeaking(false)
           }
         }

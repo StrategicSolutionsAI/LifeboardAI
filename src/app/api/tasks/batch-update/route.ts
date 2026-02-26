@@ -15,14 +15,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const results: any[] = []
+    const results: Record<string, unknown>[] = []
     for (const u of updates) {
       const taskId = u.taskId?.toString?.()
       const patch = u.updates || {}
       if (!taskId) continue
 
       // Translate fields to DB columns
-      const updateData: any = { updated_at: new Date().toISOString() }
+      const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
       if (typeof patch.content === 'string') updateData.content = patch.content
       if (typeof patch.completed === 'boolean') updateData.completed = patch.completed
       const normalizeHourSlot = (value: unknown): string | null => {
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       if (patch.repeatRule !== undefined) updateData.repeat_rule = patch.repeatRule ?? null
       if (typeof patch.position === 'number') updateData.position = patch.position
       if (typeof patch.duration === 'number') updateData.duration = patch.duration
+      if (typeof patch.kanbanStatus === 'string') updateData.kanban_status = patch.kanbanStatus
       if (updateData.due_date === undefined && updateData.start_date !== undefined) {
         updateData.due_date = updateData.start_date
       }
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id)
-        .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day')
+        .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status')
         .single()
       if (error) {
         console.warn('Supabase batch update error for', taskId, error)

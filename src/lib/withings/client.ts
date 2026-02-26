@@ -93,22 +93,20 @@ export async function refreshWithingsToken(refreshToken: string) {
 
 // Fetch latest (most recent) weight measurement in kilograms
 export async function fetchWithingsLatestWeight(accessToken: string) {
-  const nowSec = Math.floor(Date.now() / 1000)
-  // Add 24 hours to end date to ensure we capture today's measurements regardless of timezone
-  const endDateSec = nowSec + (24 * 60 * 60)
-  // Fetch last 7 days to ensure at least one measurement
+  // Use lastupdate=1 to fetch all available weight measurements
   const params = new URLSearchParams({
     action: 'getmeas',
     meastype: '1', // weight
-    category: '1',
-    startdate: (nowSec - 7 * 24 * 60 * 60).toString(),
-    enddate: endDateSec.toString(),
+    lastupdate: '1', // fetch all measurements since epoch (returns most recent)
   })
 
-  const response = await fetch(`https://wbsapi.withings.net/measure?${params}`, {
+  const response = await fetch('https://wbsapi.withings.net/measure', {
+    method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
+    body: params.toString(),
   })
 
   if (!response.ok) {
@@ -116,7 +114,7 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
   }
 
   const data = await response.json()
-  
+
   // Handle Withings API error responses
   if (data.status !== 0) {
     if (data.status === 401) {
@@ -128,7 +126,7 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
     }
   }
   
-  if (!data.body?.measuregrps) {
+  if (!data.body?.measuregrps || data.body.measuregrps.length === 0) {
     throw new Error('No weight measurements found')
   }
 
@@ -136,10 +134,9 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
 
   // Sort groups by date to ensure we get the most recent (groups may not be pre-sorted)
   const sortedGroups = groups.sort((a: any, b: any) => a.date - b.date)
-  
+
   // Take the last group (most recent)
   const latestGroup = sortedGroups[sortedGroups.length - 1]
-  const latestDate = new Date(latestGroup.date * 1000)
   
   // Find the weight measurement (type 1) in the latest group
   const weightMeasure = latestGroup.measures.find((m: any) => m.type === 1)

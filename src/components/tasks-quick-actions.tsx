@@ -47,7 +47,7 @@ export function TasksQuickActions({
   };
 
   return (
-    <div className="sticky top-0 z-10 mb-6 rounded-xl border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <div className="sticky top-0 z-10 mb-6 rounded-xl border border-[#dbd6cf]/80 bg-white/95 p-3 shadow-[0px_1px_3px_rgba(163,133,96,0.06)] backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="mb-3 flex items-center gap-2">
         <Input
           value={quickAddInput}
@@ -59,43 +59,41 @@ export function TasksQuickActions({
             }
           }}
           placeholder={quickAddPlaceholder}
-          className="h-8 flex-1 border-border/70 text-sm"
+          className="h-8 flex-1 border-[#dbd6cf] text-sm text-[#314158] placeholder:text-[#b5b0a8] focus-visible:ring-[rgba(177,145,106,0.3)]"
           disabled={isAdding}
         />
-        <Button
-          size="sm"
+        <button
           onClick={() => void handleQuickAdd()}
           disabled={!quickAddInput.trim() || isAdding}
-          className="h-8 gap-1.5 px-3"
+          className="h-8 px-3 rounded-lg bg-[#B1916A] text-white text-[13px] font-medium hover:bg-[#96784f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
         >
           <Plus className="h-4 w-4" />
           {isAdding ? "Adding..." : "Add"}
-        </Button>
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         {filters.map((filter) => {
           const isActive = activeFilter === filter.key;
-          const variant =
-            isActive && filter.emphasis === "destructive"
-              ? "destructive"
-              : isActive
-                ? "default"
-                : "ghost";
+          const isDestructive = filter.emphasis === "destructive";
 
           return (
-            <Button
+            <button
               key={filter.key}
               type="button"
-              size="sm"
-              variant={variant}
               disabled={filter.disabled}
               onClick={() => onFilterChange(filter.key)}
-              className="h-7 gap-1 rounded-md px-2.5 text-xs"
+              className={`h-7 rounded-lg px-2.5 text-xs font-medium transition-all duration-200 ease-out flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                isActive && isDestructive
+                  ? "bg-red-500 text-white shadow-sm"
+                  : isActive
+                    ? "bg-[#B1916A] text-white shadow-sm"
+                    : "text-[#596881] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
+              }`}
             >
               {filter.label}
               <span className="opacity-80">{filter.count}</span>
-            </Button>
+            </button>
           );
         })}
       </div>

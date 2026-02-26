@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Dev-only in-memory task endpoint - disabled in production
+const isDev = process.env.NODE_ENV === 'development'
+
 type Task = {
   id: string;
   content: string;
@@ -15,20 +18,22 @@ let tasks: Task[] = [
 ];
 
 export async function GET() {
+  if (!isDev) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json({ tasks });
 }
 
 export async function POST(req: Request) {
+  if (!isDev) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
-    const body = await req.json().catch(() => ({} as any));
-    const content = (body.content ?? "").toString().trim();
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+    const content = (typeof body.content === 'string' ? body.content : "").trim();
     if (!content) return NextResponse.json({ error: "content required" }, { status: 400 });
 
     const newTask: Task = {
       id: globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2),
       content,
       completed: Boolean(body.completed ?? false),
-      startDate: body.startDate ?? null,
+      startDate: typeof body.startDate === 'string' ? body.startDate : null,
     };
 
     tasks.unshift(newTask);
@@ -39,9 +44,10 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  if (!isDev) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
-    const body = await req.json().catch(() => ({} as any));
-    const id = (body.id ?? "").toString();
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+    const id = (typeof body.id === 'string' ? body.id : "");
     const completed = Boolean(body.completed);
 
     const idx = tasks.findIndex(t => t.id === id);

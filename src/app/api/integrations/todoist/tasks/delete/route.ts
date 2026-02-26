@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
 
-const TODOIST_TASK_URL = 'https://api.todoist.com/rest/v2/tasks';
+const TODOIST_TASK_URL = 'https://api.todoist.com/api/v1/tasks';
 
 export async function DELETE(request: NextRequest) {
   try {

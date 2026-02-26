@@ -4,8 +4,20 @@ import { supabaseServer } from '@/utils/supabase/server';
 /**
  * Test endpoint to diagnose upsert issues
  * Usage: GET /api/admin/test-upsert
+ * Requires: authenticated admin user + ADMIN_SECRET header
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Block in production unless explicitly enabled
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_ROUTES !== 'true') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Require admin secret header
+  const adminSecret = request.headers.get('x-admin-secret');
+  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
     const supabase = supabaseServer();
     
@@ -28,8 +40,6 @@ export async function GET() {
       progress_by_widget: {},
       hourly_plan: {},
     };
-
-    console.log('Testing upsert with data:', testData);
 
     // Try upsert
     const { data, error } = await supabase
@@ -57,13 +67,13 @@ export async function GET() {
       testData,
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Exception in test-upsert:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Exception occurred',
-        details: error.message,
-        stack: error.stack,
+        details: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

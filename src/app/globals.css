@@ -241,67 +241,41 @@
   }
 }
 
-/* Custom Cursor */
-.custom-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 9999;
-  transform: translate(-50%, -50%);
-  transition: width 0.3s, height 0.3s, background-color 0.3s, transform 0.1s ease-out;
-  mix-blend-mode: exclusion;
+/* Landing page animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
 }
 
-.custom-cursor.hovering {
-  width: 60px;
-  height: 60px;
-  background: rgba(255, 255, 255, 1);
-  mix-blend-mode: difference;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-/* Restrict custom cursor behavior to landing page only */
-@media (min-width: 768px) {
-  .landing-cursor-enabled,
-  .landing-cursor-enabled * {
-    cursor: none !important;
-  }
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Grain Texture */
-.noise-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9998;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s ease-out forwards;
+  opacity: 0;
 }
 
-/* Smooth Marquee */
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+
+/* Scroll-reveal (triggered by IntersectionObserver) */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
 }
 
-.animate-marquee {
-  animation: marquee 30s linear infinite;
-}
-
-/* 3D Transforms */
-.perspective-1000 {
-  perspective: 1000px;
-}
-
-.preserve-3d {
-  transform-style: preserve-3d;
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Calidora section label patterns */

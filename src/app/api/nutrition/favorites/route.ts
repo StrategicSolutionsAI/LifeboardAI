@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 })
     }
 
-    const formattedFavorites = favorites?.map((fav: any) => ({
+    const formattedFavorites = favorites?.map((fav: Record<string, unknown>) => ({
       id: fav.food_id,
       food_name: fav.food_name,
       serving: fav.serving_data,

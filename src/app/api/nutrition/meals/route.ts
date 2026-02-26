@@ -27,10 +27,10 @@ export async function GET(request: NextRequest) {
 
     // Group meals by meal type
     const groupedMeals: {
-      breakfast: any[]
-      lunch: any[]
-      dinner: any[]
-      snacks: any[]
+      breakfast: Record<string, unknown>[]
+      lunch: Record<string, unknown>[]
+      dinner: Record<string, unknown>[]
+      snacks: Record<string, unknown>[]
     } = {
       breakfast: [],
       lunch: [],
@@ -38,13 +38,13 @@ export async function GET(request: NextRequest) {
       snacks: []
     }
 
-    meals?.forEach((meal: any) => {
+    meals?.forEach((meal: Record<string, unknown>) => {
       if (groupedMeals[meal.meal_type as keyof typeof groupedMeals]) {
         groupedMeals[meal.meal_type as keyof typeof groupedMeals].push({
           id: meal.id,
           food_name: meal.food_name,
           serving: meal.serving_data,
-          quantity: parseFloat(meal.quantity),
+          quantity: parseFloat(String(meal.quantity)),
           meal_type: meal.meal_type,
           added_at: meal.created_at
         })
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       id: meal.id,
       food_name: meal.food_name,
       serving: meal.serving_data,
-      quantity: parseFloat(meal.quantity),
+      quantity: parseFloat(String(meal.quantity)),
       meal_type: meal.meal_type,
       added_at: meal.created_at
     })

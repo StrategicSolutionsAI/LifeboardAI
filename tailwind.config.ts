@@ -24,9 +24,7 @@ const config = {
       boxShadow: {
         'warm-sm': '0px 4px 16px rgba(163, 133, 96, 0.06)',
         'warm': '0px 6px 20px rgba(163, 133, 96, 0.1)',
-        'warm-md': '0px 6px 24px rgba(163, 133, 96, 0.12)',
         'warm-lg': '0px 8px 30px rgba(163, 133, 96, 0.1)',
-        'warm-xl': '0px 12px 40px rgba(163, 133, 96, 0.15)',
       },
       colors: {
         // Warm color scale (Calidora earth tones)

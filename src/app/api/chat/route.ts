@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { runGPT5Pro } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { handleApiError } from '@/lib/api-error-handler'
 
 async function createTodoistTaskDirect(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
   try {
@@ -34,7 +35,7 @@ async function createTodoistTaskDirect(req: NextRequest, payload: { content: str
     if (payload.bucket) meta.bucket = payload.bucket
     if (Object.keys(meta).length > 0) body.description = `[LIFEBOARD_META]${JSON.stringify(meta)}[/LIFEBOARD_META]`
 
-    const resp = await fetch('https://api.todoist.com/rest/v2/tasks', {
+    const resp = await fetch('https://api.todoist.com/api/v1/tasks', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${integration.access_token}`,
@@ -146,17 +147,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No messages' }, { status: 400 })
     }
 
-    // Fetch comprehensive user context
+    // Fetch comprehensive user context via direct DB queries (not self-calling HTTP)
     const prefs = await getUserPreferencesServer()
     const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
     const today = new Date().toISOString().split('T')[0]
 
     let systemContext = ''
     if (prefs) {
-      // Gather widget metadata
       const bucketSummary = Object.entries(prefs.widgets_by_bucket).map(([b, w]: [string, any[]]) => `${b}: ${w.map(x => x.name || x.type || 'widget').join(', ')}`).join('; ')
 
-      // Map to hold comprehensive app data
       const contextData: {
         tasks?: any[]
         calendar?: any[]
@@ -164,53 +163,56 @@ export async function POST(req: NextRequest) {
         steps?: number
       } = {}
 
-      // Fetch tasks for today and upcoming
-      try {
-        const tasksRes = await fetch(`${origin}/api/tasks?all=true&includeCompleted=false`, {
-          headers: { cookie: req.headers.get('cookie') || '' },
-          cache: 'no-store'
-        })
-        if (tasksRes.ok) {
-          const tasksJson = await tasksRes.json()
-          contextData.tasks = tasksJson.tasks || []
-        }
-      } catch (err) {
-        console.error('Failed fetching tasks for chat context', err)
-      }
+      // Direct DB queries in parallel instead of self-calling HTTP
+      const supabase = supabaseServer()
+      const { data: { user } } = await supabase.auth.getUser()
 
-      // Fetch calendar events
-      try {
-        const supabase = supabaseServer()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: events } = await supabase
+      if (user) {
+        const [tasksResult, calendarResult, shoppingResult] = await Promise.all([
+          // Tasks: all incomplete tasks
+          supabase
+            .from('lifeboard_tasks')
+            .select('id, content, completed, due_date, start_date, hour_slot, bucket, created_at')
+            .eq('user_id', user.id)
+            .eq('completed', false)
+            .order('created_at', { ascending: false })
+            .limit(50),
+          // Calendar events: upcoming
+          supabase
             .from('calendar_events')
             .select('id, title, description, start_date, end_date, hour_slot, all_day, bucket')
             .eq('user_id', user.id)
             .gte('start_date', today)
             .order('start_date', { ascending: true })
-            .limit(20)
-          if (events) contextData.calendar = events
+            .limit(20),
+          // Shopping list: unpurchased items
+          supabase
+            .from('shopping_list_items')
+            .select('id, name, quantity, bucket, is_purchased')
+            .eq('user_id', user.id)
+            .eq('is_purchased', false)
+            .order('created_at', { ascending: true })
+            .limit(30),
+        ])
+
+        if (tasksResult.data) {
+          contextData.tasks = tasksResult.data.map(row => ({
+            content: row.content,
+            due: row.due_date ? { date: row.due_date } : row.start_date ? { date: row.start_date } : undefined,
+            bucket: row.bucket || undefined,
+          }))
         }
-      } catch (err) {
-        console.error('Failed fetching calendar for chat context', err)
+        if (calendarResult.data) contextData.calendar = calendarResult.data
+        if (shoppingResult.data) {
+          contextData.shopping = shoppingResult.data.map(row => ({
+            name: row.name,
+            quantity: row.quantity,
+            bucket: row.bucket,
+          }))
+        }
       }
 
-      // Fetch shopping list
-      try {
-        const shoppingRes = await fetch(`${origin}/api/shopping-list`, {
-          headers: { cookie: req.headers.get('cookie') || '' },
-          cache: 'no-store'
-        })
-        if (shoppingRes.ok) {
-          const shoppingJson = await shoppingRes.json()
-          contextData.shopping = shoppingJson.items || []
-        }
-      } catch (err) {
-        console.error('Failed fetching shopping list for chat context', err)
-      }
-
-      // Detect a steps widget and its data source
+      // Steps metrics still needs the integration-specific API (has token refresh logic)
       let stepsDataSource: 'fitbit' | 'googlefit' | null = null
       for (const widgets of Object.values(prefs.widgets_by_bucket)) {
         for (const w of widgets as any[]) {
@@ -316,25 +318,14 @@ CAPABILITIES:
 
     let reply: string | undefined
     try {
-      console.log('🤖 Attempting GPT-5 Pro via Replicate...')
-      console.log('Message count:', gpt5Messages.length)
-      console.log('Replicate token present:', !!process.env.REPLICATE_API_TOKEN)
-      
-      const startTime = Date.now()
       reply = await runGPT5Pro({
         messages: gpt5Messages,
         max_tokens: 1024,
         temperature: 0.7,
       })
-      const elapsed = Date.now() - startTime
-      console.log(`✅ GPT-5 Pro response received in ${elapsed}ms:`, reply.substring(0, 100))
     } catch (error) {
-      console.error('❌ GPT-5 Pro error:', error)
-      console.error('Error details:', error instanceof Error ? error.message : String(error))
-      console.error('Error type:', typeof error)
-      console.error('Error keys:', error ? Object.keys(error) : 'null')
+      console.error('GPT-5 Pro error:', error instanceof Error ? error.message : String(error))
       try {
-        const fallbackStart = Date.now()
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: gpt5Messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -342,9 +333,8 @@ CAPABILITIES:
           temperature: 0.7,
         })
         reply = completion.choices[0]?.message?.content ?? undefined
-        console.log(`✅ OpenAI fallback responded in ${Date.now() - fallbackStart}ms`)
       } catch (fallbackErr) {
-        console.error('❌ OpenAI fallback error:', fallbackErr)
+        console.error('OpenAI fallback error:', fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr))
         reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
       }
     }
@@ -428,7 +418,9 @@ CAPABILITIES:
                 dueDate = `${nowYr}${dueDate.slice(4)}`
               }
             }
-          } catch {}
+          } catch (dateFallbackError) {
+            console.error('Date inference fallback error:', dateFallbackError)
+          }
           // Try direct Todoist create first (fast path), then internal API, then Supabase fallback
           let created: any | undefined
           const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
@@ -452,7 +444,8 @@ CAPABILITIES:
             reply = reply.replace(cmdMatch[0], `\n\n⚠️ I couldn't create the task right now.`)
           }
         }
-      } catch {
+      } catch (parseError) {
+        console.error('Failed to parse LIFEBOARD_CMD JSON:', parseError)
         reply = reply.replace(cmdMatch[0], '')
       }
     }
@@ -481,7 +474,9 @@ CAPABILITIES:
               }
             }
           }
-        } catch {}
+        } catch (nlpTaskError) {
+          console.error('NLP task creation fallback failed:', nlpTaskError)
+        }
       }
     }
 
@@ -503,8 +498,7 @@ CAPABILITIES:
     }
 
     return NextResponse.json({ reply, audioUrl, createdTask })
-  } catch (err: any) {
-    console.error('Chat route error', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  } catch (err) {
+    return handleApiError(err, 'POST /api/chat')
   }
 }

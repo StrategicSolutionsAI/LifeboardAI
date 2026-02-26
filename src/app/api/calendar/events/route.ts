@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addMinutes } from "date-fns";
 import { supabaseServer } from "@/utils/supabase/server";
 import { supabaseFromBearer } from "@/utils/supabase/bearer";
+import { handleApiError } from "@/lib/api-error-handler";
 
 function getClientFromRequest(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -29,7 +30,7 @@ function formatHourSlot(time?: string | null): string | null {
   return `hour-${normalizedHour}${minutePart}${period}`;
 }
 
-function mapRow(row: any) {
+function mapRow(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     title: row.title as string,
@@ -201,7 +202,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ event: mapRow(result) }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/calendar/events error", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return handleApiError(error, "POST /api/calendar/events");
   }
 }

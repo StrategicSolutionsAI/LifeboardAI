@@ -73,9 +73,9 @@ const getDueBadge = (task: Task): DueBadge | null => {
 };
 
 const dueBadgeClasses: Record<DueBadgeTone, string> = {
-  default: "border-border/80 bg-muted/50 text-muted-foreground",
-  accent: "border-primary/30 bg-primary/10 text-primary",
-  destructive: "border-destructive/30 bg-destructive/10 text-destructive",
+  default: "border-[#dbd6cf] bg-[rgba(250,248,245,0.5)] text-[#8e99a8]",
+  accent: "border-[rgba(177,145,106,0.3)] bg-[rgba(177,145,106,0.1)] text-[#B1916A]",
+  destructive: "border-red-200 bg-red-50 text-red-600",
 };
 
 export function EnhancedTasksView({
@@ -251,14 +251,14 @@ export function EnhancedTasksView({
     };
 
     return (
-      <div className="p-4 transition-colors hover:bg-muted/30">
+      <div className="p-4 transition-colors hover:bg-[rgba(250,248,245,0.5)]">
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
             checked={Boolean(task.completed)}
             onChange={() => void handleToggleCompletion(task)}
             disabled={isUpdating}
-            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-0.5 h-4 w-4 rounded border-[#dbd6cf] text-[#B1916A] focus:ring-[rgba(177,145,106,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <div className="min-w-0 flex-1">
@@ -266,8 +266,8 @@ export function EnhancedTasksView({
               <h4
                 className={`text-sm font-medium ${
                   task.completed
-                    ? "text-muted-foreground line-through"
-                    : "text-foreground"
+                    ? "text-[#8e99a8] line-through"
+                    : "text-[#314158]"
                 }`}
               >
                 {task.content}
@@ -279,8 +279,8 @@ export function EnhancedTasksView({
                   disabled={isTogglingWidget}
                   className={`rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
                     linkedInfo
-                      ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-                      : "border-border text-muted-foreground hover:bg-muted"
+                      ? "border-[rgba(177,145,106,0.4)] bg-[rgba(177,145,106,0.1)] text-[#B1916A] hover:bg-[rgba(177,145,106,0.2)]"
+                      : "border-[#dbd6cf] text-[#8e99a8] hover:bg-[#faf8f5]"
                   } ${isTogglingWidget ? "cursor-progress opacity-60" : ""}`}
                   title={linkedInfo ? "Remove from overview" : "Show on overview"}
                 >
@@ -302,13 +302,13 @@ export function EnhancedTasksView({
               ) : null}
 
               {linkedInfo ? (
-                <span className="text-xs text-primary/90">
+                <span className="text-xs text-[#B1916A]/90">
                   Showing on overview ({linkedInfo.bucket})
                 </span>
               ) : null}
 
               {isUpdating ? (
-                <span className="text-xs text-muted-foreground">Updating...</span>
+                <span className="text-xs text-[#8e99a8]">Updating...</span>
               ) : null}
             </div>
           </div>
@@ -364,15 +364,15 @@ export function EnhancedTasksView({
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Tasks for {bucketLabel}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-xl font-semibold text-[#314158]">Tasks for {bucketLabel}</h2>
+          <p className="mt-1 text-sm text-[#8e99a8]">
             {taskCounts.open} open · {taskCounts.dueSoon} due soon · {taskCounts.completed} completed
             {buckets.length > 1 ? ` · ${buckets.length} buckets` : ""}
           </p>
         </div>
         <Link
           href="/tasks"
-          className="inline-flex h-9 items-center gap-1 rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#dbd6cf]/80 bg-white px-3 text-sm font-medium text-[#596881] shadow-sm transition-all duration-200 ease-out hover:bg-[#faf8f5] hover:text-[#314158] hover:shadow-warm"
         >
           Open full board
           <ExternalLink className="h-4 w-4" />
@@ -397,13 +397,13 @@ export function EnhancedTasksView({
 
       {showMarketingEmpty ? (
         <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <ListChecks className="h-8 w-8 text-primary" />
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(177,145,106,0.08)]">
+            <ListChecks className="h-8 w-8 text-[#B1916A]" />
           </div>
-          <h3 className="mb-2 text-xl font-semibold text-foreground">
+          <h3 className="mb-2 text-xl font-semibold text-[#314158]">
             Add tasks to {bucketLabel}
           </h3>
-          <p className="mb-6 max-w-md text-sm text-muted-foreground">
+          <p className="mb-6 max-w-md text-sm text-[#8e99a8]">
             Connect Todoist for automatic sync, or add tasks manually with quick add.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -414,14 +414,14 @@ export function EnhancedTasksView({
                   window.location.href = "/integrations";
                 }
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#B1916A] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#96784f]"
             >
               <Zap className="h-4 w-4" />
               Connect Todoist
             </button>
             <Link
               href="/tasks"
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-border/70 bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dbd6cf]/80 bg-white px-5 py-2.5 text-sm font-medium text-[#314158] transition-colors hover:bg-[#faf8f5]"
             >
               <ExternalLink className="h-4 w-4" />
               Open task board
@@ -429,10 +429,10 @@ export function EnhancedTasksView({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border/70 bg-background">
+        <div className="overflow-hidden rounded-xl border border-[#dbd6cf]/80 bg-white">
           {filteredTasks.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <p className="mb-2 text-lg font-medium text-foreground">
+            <div className="py-12 text-center text-[#8e99a8]">
+              <p className="mb-2 text-lg font-medium text-[#314158]">
                 {emptyStateCopy.title}
               </p>
               <p className="text-sm">{emptyStateCopy.description}</p>
@@ -442,7 +442,7 @@ export function EnhancedTasksView({
               <TasksGroupedList tasks={filteredTasks} renderTask={renderTask} />
             </div>
           ) : (
-            <div className="divide-y divide-border/60">
+            <div className="divide-y divide-[#dbd6cf]/60">
               {filteredTasks.map((task) => (
                 <div key={task.id}>{renderTask(task)}</div>
               ))}

@@ -9,7 +9,7 @@ import {
   invalidateTodoistTaskCache
 } from '@/lib/todoist-task-cache';
 
-const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/rest/v2/tasks';
+const TODOIST_TASKS_ENDPOINT = 'https://api.todoist.com/api/v1/tasks';
 
 type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
 
@@ -73,6 +73,22 @@ const buildDueString = (rule: RepeatRule, startDate?: string | null) => {
   return base;
 };
 
+interface TodoistDue {
+  date?: string;
+  datetime?: string;
+  is_recurring?: boolean;
+  string?: string;
+}
+
+interface TodoistApiTask {
+  id: string;
+  content: string;
+  description?: string;
+  due?: TodoistDue;
+  position?: number;
+  [key: string]: unknown;
+}
+
 class TodoistFetchError extends Error {
   status: number;
   body?: string;
@@ -84,8 +100,8 @@ class TodoistFetchError extends Error {
   }
 }
 
-const filterTasksByDate = (tasks: any[], date: string) =>
-  tasks.filter((task: any) => {
+const filterTasksByDate = (tasks: TodoistApiTask[], date: string) =>
+  tasks.filter((task: TodoistApiTask) => {
     const due = task?.due;
     if (!due) return false;
     if (typeof due.date === 'string') {
@@ -97,9 +113,9 @@ const filterTasksByDate = (tasks: any[], date: string) =>
     return false;
   });
 
-const sortTasksByPosition = (tasks: any[]) => {
+const sortTasksByPosition = (tasks: TodoistApiTask[]) => {
   const sorted = [...tasks];
-  sorted.sort((a: any, b: any) => {
+  sorted.sort((a: TodoistApiTask, b: TodoistApiTask) => {
     const posA = a?.position ?? Number.MAX_SAFE_INTEGER;
     const posB = b?.position ?? Number.MAX_SAFE_INTEGER;
     return posA - posB;
@@ -107,7 +123,7 @@ const sortTasksByPosition = (tasks: any[]) => {
   return sorted;
 };
 
-const enhanceTodoistTask = (task: any) => {
+const enhanceTodoistTask = (task: TodoistApiTask) => {
   let metadata: {
     duration?: number;
     hourSlot?: string;
@@ -205,7 +221,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
-    const respondWithTasks = (tasks: any[]) => {
+    const respondWithTasks = (tasks: TodoistApiTask[]) => {
       if (date && !allParam) {
         return NextResponse.json({ tasks: filterTasksByDate(tasks, date) });
       }
@@ -250,7 +266,7 @@ export async function GET(request: NextRequest) {
 
     setTodoistPendingFetch(user.id, fetchPromise);
 
-    let enhancedTasks: any[];
+    let enhancedTasks: TodoistApiTask[];
     try {
       enhancedTasks = await fetchPromise;
     } catch (err) {

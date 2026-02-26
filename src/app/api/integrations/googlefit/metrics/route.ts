@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   const refreshToken = integration.refresh_token ?? ''
 
   try {
-    const tokenData: any = integration.token_data || {}
+    const tokenData = (integration.token_data || {}) as { expires_in?: number }
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
       const expiresAt = updated + tokenData.expires_in * 1000
@@ -67,11 +67,12 @@ export async function GET(request: NextRequest) {
     // Use the improved retry mechanism for better data accuracy
     const steps = await fetchGoogleFitStepsWithRetry(accessToken, dateStr)
     return NextResponse.json({ steps })
-  } catch (e: any) {
+  } catch (e) {
     console.error('Google Fit steps fetch failed', e)
-    const isRateLimited = /429/.test(e.message ?? '')
+    const errMessage = e instanceof Error ? e.message : String(e)
+    const isRateLimited = /429/.test(errMessage)
     return NextResponse.json(
-      { error: e.message },
+      { error: errMessage },
       { status: isRateLimited ? 429 : 500 },
     )
   }

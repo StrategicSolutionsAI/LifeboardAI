@@ -115,35 +115,3 @@ export function withErrorHandling(
     }
   }
 }
-
-// Utility for async operations with error handling
-export async function safeApiCall<T>(
-  operation: () => Promise<T>,
-  context?: string
-): Promise<{ data?: T; error?: CustomApiError }> {
-  try {
-    const data = await operation()
-    return { data }
-  } catch (error) {
-    console.error(`SafeApiCall error ${context ? `in ${context}` : ''}:`, error)
-    
-    Sentry.withScope((scope) => {
-      if (context) {
-        scope.setTag('safeApiCall', context)
-      }
-      Sentry.captureException(error)
-    })
-
-    if (error instanceof CustomApiError) {
-      return { error }
-    }
-
-    return { 
-      error: new CustomApiError(
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        500,
-        'SAFE_API_CALL_ERROR'
-      )
-    }
-  }
-}

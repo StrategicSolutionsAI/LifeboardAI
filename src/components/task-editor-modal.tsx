@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { format, parseISO } from "date-fns";
+import { X, Trash2 } from "lucide-react";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/hooks/use-tasks";
 import {
@@ -17,6 +18,7 @@ import {
   sanitizeBucketName,
   UNASSIGNED_BUCKET_LABEL,
 } from "@/lib/task-form-utils";
+import { cn } from "@/lib/utils";
 
 const START_TIMES = ["7AM","8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM"];
 const END_TIMES = ["8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM","10PM"];
@@ -49,6 +51,7 @@ interface TaskEditorModalProps {
   selectedBucket?: string | null;
   getDefaultDate?: () => string;
   onSubmitSuccess?: (result: { action: "create" | "update"; taskId?: string | null; date: string }) => void;
+  bucketColors?: Record<string, string>;
 }
 
 const toHourSlot = (label: string): string | null => {
@@ -59,8 +62,8 @@ const toHourSlot = (label: string): string | null => {
 const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
-  ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess }, ref) => {
-    const { allTasks, createTask, batchUpdateTasks, refetch } = useTasksContext();
+  ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {} }, ref) => {
+    const { allTasks, createTask, batchUpdateTasks, deleteTask, refetch } = useTasksContext();
 
     const [isOpen, setIsOpen] = useState(false);
     const [formContent, setFormContent] = useState("");
@@ -73,6 +76,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const [startDate, setStartDate] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editTaskId, setEditTaskId] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const resolveDefaultDate = useCallback(() => {
       return getDefaultDate?.() ?? resolveTodayKey();
@@ -94,6 +98,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setFormEndDate(null);
       setIsSubmitting(false);
       setFormBucket(evaluateBucketDefault());
+      setShowDeleteConfirm(false);
     }, [evaluateBucketDefault]);
 
     const ensureTaskLookup = useCallback((taskId?: string | null): Task | undefined => {
@@ -103,14 +108,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     }, [allTasks]);
 
     const openWithTask = useCallback((task: Task | undefined, dateStr: string, options: TaskEditorOpenOptions = {}) => {
-      console.log('📝 Opening task editor:', { 
-        taskId: task?.id, 
-        taskStartDate: task?.startDate, 
-        taskEndDate: task?.endDate,
-        dateStr,
-        taskAllDay: task?.allDay,
-        taskHourSlot: task?.hourSlot
-      });
       const effectiveDate = dateStr || task?.startDate || task?.due?.date || resolveDefaultDate();
       const fallbackEndDate = options.fallbackEndDate ?? task?.endDate ?? effectiveDate;
       const bucketDefault = evaluateBucketDefault();
@@ -135,6 +132,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setFormEndDate(fallbackEndDate);
       setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
       setIsSubmitting(false);
+      setShowDeleteConfirm(false);
       setIsOpen(true);
     }, [evaluateBucketDefault, resolveDefaultDate]);
 
@@ -241,25 +239,11 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           updates.hourSlot = isAllDayEvent ? null : toHourSlot(formTime);
           updates.endHourSlot = isAllDayEvent ? null : toHourSlot(formEndTime);
 
-          console.log('💾 Updating task:', {
-            taskId: editTaskId,
-            formTime,
-            formEndTime,
-            isAllDayEvent,
-            hourSlot: updates.hourSlot,
-            endHourSlot: updates.endHourSlot,
-            startDate: resolvedStartDate,
-            endDate: resolvedEndDate,
-            updates
-          });
-
           await batchUpdateTasks([{
             taskId: editTaskId,
             updates,
             occurrenceDate: resolvedStartDate,
           }]);
-          
-          console.log('✅ Task update completed');
 
           resetState();
           try {
@@ -296,6 +280,35 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       batchUpdateTasks,
     ]);
 
+    const handleDelete = useCallback(async () => {
+      if (!editTaskId) return;
+      try {
+        await deleteTask(editTaskId);
+        resetState();
+        try {
+          await refetch();
+        } catch {}
+      } catch (error) {
+        console.error("Failed to delete task", error);
+      }
+    }, [editTaskId, deleteTask, resetState, refetch]);
+
+    // Keyboard shortcuts: Cmd+Enter to save, Escape to close
+    useEffect(() => {
+      if (!isOpen) return;
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          resetState();
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+          e.preventDefault();
+          handleSubmit();
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isOpen, resetState, handleSubmit]);
+
     const modalDateLabel = useMemo(() => {
       if (!startDate) return "No date selected";
       try {
@@ -308,151 +321,244 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     if (!isOpen) return null;
 
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        onClick={resetState}
-      >
+      <div className="fixed inset-0 z-50" onClick={resetState}>
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/25 animate-in fade-in duration-200" />
+
+        {/* Slide-over panel */}
         <div
-          className="bg-white rounded-lg w-[520px] max-w-[92%] p-6 shadow-xl"
-          onClick={(event) => event.stopPropagation()}
+          className="absolute right-0 top-0 bottom-0 w-full sm:max-w-[480px] bg-white shadow-[-8px_0px_30px_rgba(0,0,0,0.08)] animate-in slide-in-from-right duration-300 ease-out flex flex-col"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-[#314158]">{editTaskId ? "Edit Task" : "Add Task"}</h3>
-              <p className="text-xs text-[#8e99a8] mt-1">{modalDateLabel}</p>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(219,214,207,0.5)] shrink-0">
+            <div className="min-w-0">
+              <h3 className="text-[16px] font-semibold text-[#314158]">
+                {editTaskId ? "Edit Task" : "New Task"}
+              </h3>
+              <p className="text-[12px] text-[#8e99a8] mt-0.5 truncate">{modalDateLabel}</p>
             </div>
-            <button className="text-[#8e99a8] hover:text-[#6b7688]" onClick={resetState}>&times;</button>
+            <button
+              onClick={resetState}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8e99a8] hover:bg-[rgba(177,145,106,0.08)] hover:text-[#596881] transition-colors shrink-0 ml-4"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <div className="space-y-4">
+          {/* Form Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {/* Task Name */}
             <div>
-              <label className="block text-xs text-[#6b7688] mb-1">Task</label>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+                Task
+              </label>
               <input
-                className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
-                placeholder="What do you want to do?"
+                autoFocus
+                className="w-full border border-[#dbd6cf] rounded-lg px-3 py-2.5 text-[14px] text-[#314158] placeholder:text-[#b5b0a8] focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
+                placeholder="What needs to be done?"
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-[#6b7688] mb-1">Starts</label>
-                <input
-                  type="date"
-                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
-                  value={startDate ?? ""}
-                  onChange={(e) => setStartDate(e.target.value || null)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-[#6b7688] mb-1">Start time</label>
-                <select
-                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white disabled:bg-[#f5f0eb] disabled:text-[#8e99a8]"
-                  value={formTime}
-                  onChange={(e) => setFormTime(e.target.value)}
-                  disabled={formAllDay}
-                >
-                  <option value="">No time</option>
-                  {START_TIMES.map((time) => (
-                    <option key={time} value={time}>{time}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-[#6b7688] mb-1">Ends</label>
-                <input
-                  type="date"
-                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-warm-500"
-                  value={formEndDate ?? startDate ?? ""}
-                  min={startDate ?? undefined}
-                  onChange={(e) => setFormEndDate(e.target.value || null)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-[#6b7688] mb-1">End time</label>
-                <select
-                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white disabled:bg-[#f5f0eb] disabled:text-[#8e99a8]"
-                  value={formEndTime}
-                  onChange={(e) => setFormEndTime(e.target.value)}
-                  disabled={formAllDay}
-                >
-                  <option value="">No time</option>
-                  {END_TIMES.map((time) => (
-                    <option key={time} value={time}>{time}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center text-xs text-[#6b7688] select-none">
-                <input
-                  type="checkbox"
-                  className="mr-2 h-4 w-4 rounded border-[#dbd6cf] text-warm-600 focus:ring-warm-500"
-                  checked={formAllDay}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setFormAllDay(checked);
-                    if (checked) {
-                      setFormTime("");
-                      setFormEndTime("");
-                    }
-                  }}
-                />
-                All day
+            {/* Schedule Section */}
+            <div>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+                Schedule
               </label>
-            </div>
-
-            <div className={`grid gap-3 ${availableBuckets.length > 0 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
-              {availableBuckets.length > 0 && (
-                <div>
-                  <label className="block text-xs text-[#6b7688] mb-1">Category</label>
-                  <select
-                    className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white"
-                    value={formBucket}
-                    onChange={(e) => setFormBucket(e.target.value)}
-                  >
-                    <option value="">{UNASSIGNED_BUCKET_LABEL}</option>
-                    {availableBuckets.map((bucket) => (
-                      <option key={bucket} value={bucket}>{bucket}</option>
-                    ))}
-                  </select>
+              <div className="rounded-xl border border-[#dbd6cf] overflow-hidden">
+                {/* Start row */}
+                <div className="grid grid-cols-2">
+                  <div className="p-3">
+                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Starts</span>
+                    <input
+                      type="date"
+                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none"
+                      value={startDate ?? ""}
+                      onChange={(e) => setStartDate(e.target.value || null)}
+                    />
+                  </div>
+                  <div className="p-3 border-l border-[rgba(219,214,207,0.5)]">
+                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Time</span>
+                    <select
+                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none disabled:text-[#b5b0a8]"
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      disabled={formAllDay}
+                    >
+                      <option value="">--</option>
+                      {START_TIMES.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              )}
-              <div>
-                <label className="block text-xs text-[#6b7688] mb-1">Repeat</label>
-                <select
-                  className="w-full border border-[#dbd6cf] rounded px-2 py-1.5 text-sm bg-white"
-                  value={formRepeat}
-                  onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
-                >
-                  <option value="none">Do not repeat</option>
-                  <option value="daily">Every day</option>
-                  <option value="weekdays">Weekdays</option>
-                  <option value="weekly">Every week</option>
-                  <option value="monthly">Every month</option>
-                </select>
+                {/* End row */}
+                <div className="grid grid-cols-2 border-t border-[rgba(219,214,207,0.5)]">
+                  <div className="p-3">
+                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Ends</span>
+                    <input
+                      type="date"
+                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none"
+                      value={formEndDate ?? startDate ?? ""}
+                      min={startDate ?? undefined}
+                      onChange={(e) => setFormEndDate(e.target.value || null)}
+                    />
+                  </div>
+                  <div className="p-3 border-l border-[rgba(219,214,207,0.5)]">
+                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Time</span>
+                    <select
+                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none disabled:text-[#b5b0a8]"
+                      value={formEndTime}
+                      onChange={(e) => setFormEndTime(e.target.value)}
+                      disabled={formAllDay}
+                    >
+                      <option value="">--</option>
+                      {END_TIMES.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {/* All day toggle */}
+                <div className="px-3 py-2.5 border-t border-[rgba(219,214,207,0.5)] bg-[rgba(252,250,248,0.5)]">
+                  <label className="inline-flex items-center text-[12px] text-[#596881] select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2 h-3.5 w-3.5 rounded border-[#dbd6cf] accent-[#B1916A]"
+                      checked={formAllDay}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormAllDay(checked);
+                        if (checked) {
+                          setFormTime("");
+                          setFormEndTime("");
+                        }
+                      }}
+                    />
+                    All day
+                  </label>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                className="px-3 py-1.5 text-sm rounded border border-[#dbd6cf] text-[#4a5568] hover:bg-[#faf8f5]"
-                onClick={resetState}
+            {/* Category — Visual bucket picker */}
+            {availableBuckets.length > 0 && (
+              <div>
+                <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+                  Category
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormBucket("")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
+                      !formBucket
+                        ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158] font-medium"
+                        : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                    )}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#b5b0a8]" />
+                    {UNASSIGNED_BUCKET_LABEL}
+                  </button>
+                  {availableBuckets.map((bucket) => {
+                    const color = bucketColors[bucket] ?? "#bb9e7b";
+                    const active = formBucket === bucket;
+                    return (
+                      <button
+                        type="button"
+                        key={bucket}
+                        onClick={() => setFormBucket(bucket)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
+                          active
+                            ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158] font-medium"
+                            : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                        )}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                        {bucket}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Repeat */}
+            <div>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+                Repeat
+              </label>
+              <select
+                className="w-full border border-[#dbd6cf] rounded-lg px-3 py-2.5 text-[13px] text-[#314158] bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
+                value={formRepeat}
+                onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
               >
-                Close
-              </button>
-              <button
-                className="px-3 py-1.5 text-sm rounded bg-warm-600 text-white hover:bg-warm-700 disabled:opacity-50"
-                disabled={!formContent.trim() || isSubmitting}
-                onClick={handleSubmit}
-              >
-                {editTaskId ? (isSubmitting ? "Saving…" : "Save changes") : (isSubmitting ? "Creating…" : "Create task")}
-              </button>
+                <option value="none">Do not repeat</option>
+                <option value="daily">Every day</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="weekly">Every week</option>
+                <option value="monthly">Every month</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-[rgba(219,214,207,0.5)] bg-[rgba(252,250,248,0.5)] shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                {editTaskId && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-[12px] text-red-600">Delete this task?</span>
+                      <button
+                        onClick={handleDelete}
+                        className="text-[12px] text-red-600 font-semibold hover:text-red-700 transition-colors"
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="text-[12px] text-[#8e99a8] hover:text-[#596881] transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 text-[13px] text-[#8e99a8] hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="h-9 px-4 text-[13px] rounded-lg border border-[#dbd6cf] text-[#596881] hover:bg-[rgba(177,145,106,0.06)] transition-colors"
+                  onClick={resetState}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="h-9 px-4 text-[13px] rounded-lg bg-[#B1916A] text-white font-medium hover:bg-[#96784f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  disabled={!formContent.trim() || isSubmitting}
+                  onClick={handleSubmit}
+                >
+                  {editTaskId
+                    ? (isSubmitting ? "Saving..." : "Save")
+                    : (isSubmitting ? "Creating..." : "Create")}
+                  <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-normal">
+                    {"⌘↵"}
+                  </kbd>
+                </button>
+              </div>
             </div>
           </div>
         </div>

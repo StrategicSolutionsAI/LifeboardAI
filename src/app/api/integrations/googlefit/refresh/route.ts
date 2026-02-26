@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Refresh token if needed
-    const tokenData: any = integration.token_data || {}
+    const tokenData = (integration.token_data || {}) as { expires_in?: number }
     if (tokenData.expires_in && integration.updated_at) {
       const updated = new Date(integration.updated_at).getTime()
       const expiresAt = updated + tokenData.expires_in * 1000
@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
         ? 'Data refresh attempted successfully' 
         : 'Refresh attempted but sync trigger failed'
     })
-  } catch (e: any) {
+  } catch (e) {
     console.error('Google Fit refresh failed', e)
     return NextResponse.json(
-      { error: e.message },
+      { error: e instanceof Error ? e.message : String(e) },
       { status: 500 },
     )
   }
