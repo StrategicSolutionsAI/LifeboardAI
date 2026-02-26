@@ -117,6 +117,8 @@ export function useTasks(selectedDate?: Date) {
   const promptOccurrenceDecision = useOccurrencePrompt()
   const [occurrenceExceptions, setOccurrenceExceptions] = useState<TaskOccurrenceException[]>([])
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track timestamps of updates we made locally so we don't refetch and clobber our own optimistic state
+  const localUpdateTimestamps = useRef<Set<number>>(new Set())
 
   const refreshOccurrenceExceptions = useCallback(async () => {
     if (typeof window === 'undefined') return
@@ -662,10 +664,11 @@ export function useTasks(selectedDate?: Date) {
       if (typeof window !== 'undefined') {
         sharedFetchRef.current = null
         const timestamp = Date.now()
+        localUpdateTimestamps.current.add(timestamp)
         window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
         window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
       }
-      
+
       return todoistTask
     } catch (error) {
       console.error('💥 createTask error:', error);
@@ -686,6 +689,7 @@ export function useTasks(selectedDate?: Date) {
           if (typeof window !== 'undefined') {
             sharedFetchRef.current = null
             const timestamp = Date.now()
+            localUpdateTimestamps.current.add(timestamp)
             window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
             window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
           }
@@ -700,6 +704,7 @@ export function useTasks(selectedDate?: Date) {
         if (typeof window !== 'undefined') {
           sharedFetchRef.current = null
           const timestamp = Date.now()
+          localUpdateTimestamps.current.add(timestamp)
           window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
           window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
         }
@@ -716,7 +721,7 @@ export function useTasks(selectedDate?: Date) {
       const stored = window.localStorage.getItem('lifeboard:last-tasks-update')
       if (stored) {
         const ts = Number(stored)
-        if (!Number.isNaN(ts)) {
+        if (!Number.isNaN(ts) && !localUpdateTimestamps.current.has(ts)) {
           scheduleRefetch(ts, 0)
         }
       }
@@ -737,6 +742,11 @@ export function useTasks(selectedDate?: Date) {
     function onTasksUpdated(event: Event) {
       const custom = event as CustomEvent<{ timestamp?: number }>
       const ts = typeof custom.detail?.timestamp === 'number' ? custom.detail?.timestamp : Date.now()
+      // Skip refetch if this update originated from our own createTask/toggle — the optimistic state is already correct
+      if (localUpdateTimestamps.current.has(ts)) {
+        localUpdateTimestamps.current.delete(ts)
+        return
+      }
       scheduleRefetch(ts)
     }
 
