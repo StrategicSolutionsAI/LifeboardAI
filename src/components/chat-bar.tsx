@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { MessageSquare, X, Send, Mic, Volume2, VolumeX, Settings } from "lucide-react"
+import { invalidateTaskCaches } from "@/hooks/use-data-cache"
 
 interface Message {
   role: "user" | "assistant"
@@ -73,13 +74,30 @@ export function ChatBar() {
   const rtAudioTranscriptRef = useRef<string>('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  const notifyTasksUpdated = useCallback(() => {
+  const notifyTasksUpdated = useCallback((retryDelays?: number[]) => {
     if (typeof window === 'undefined') return
+    // Aggressively clear all client-side task caches first
+    invalidateTaskCaches()
     const timestamp = Date.now()
     try {
       window.localStorage.setItem('lifeboard:last-tasks-update', String(timestamp))
     } catch {}
-    window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+    // nocache: true tells use-tasks to bypass server-side cache (handles serverless process isolation)
+    window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp, nocache: true } }))
+    // Schedule delayed retries to handle eventual consistency (e.g. Todoist API propagation,
+    // server-side cache in a different serverless process)
+    if (retryDelays) {
+      for (const delay of retryDelays) {
+        setTimeout(() => {
+          invalidateTaskCaches()
+          const ts = Date.now()
+          try {
+            window.localStorage.setItem('lifeboard:last-tasks-update', String(ts))
+          } catch {}
+          window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp: ts, nocache: true } }))
+        }, delay)
+      }
+    }
   }, [])
 
   // Helper to aggressively clean filler phrases from assistant text so we don't
@@ -1063,16 +1081,20 @@ export function ChatBar() {
 
       const data = await res.json()
 
-      const assistantMessage: Message = { 
-        role: "assistant" as const, 
+      const assistantMessage: Message = {
+        role: "assistant" as const,
         content: data.reply,
         audio: data.audioUrl,
         createdTask: data.createdTask || null,
       }
       setMessages([...newMessages, assistantMessage])
-      // Broadcast a global refresh if a task was created
-      if (assistantMessage.createdTask) {
-        notifyTasksUpdated()
+      // If a task was created, inject it optimistically into the task list
+      if (assistantMessage.createdTask?.id) {
+        window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+      }
+      // Broadcast a global refresh if any commands were executed (tasks, calendar, shopping)
+      if (assistantMessage.createdTask || data.commandsExecuted) {
+        notifyTasksUpdated([1000, 3000])
       }
 
       // Auto-play OpenAI TTS audio if available and handle continuous conversation
@@ -1226,8 +1248,13 @@ export function ChatBar() {
       const assistantMessage: Message = { role: "assistant", content: data.reply, audio: data.audioUrl, createdTask: data.createdTask || null }
       setMessages([...newMessages, assistantMessage])
       setIsProcessing(false) // Hide thinking indicator
-      if (assistantMessage.createdTask) {
-        notifyTasksUpdated()
+      // If a task was created, inject it optimistically into the task list
+      if (assistantMessage.createdTask?.id) {
+        window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+      }
+      // Broadcast a global refresh if any commands were executed (tasks, calendar, shopping)
+      if (assistantMessage.createdTask || data.commandsExecuted) {
+        notifyTasksUpdated([1000, 3000])
       }
 
       // Prefer server TTS audio if present; otherwise use browser TTS

@@ -119,6 +119,8 @@ export function useTasks(selectedDate?: Date) {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track timestamps of updates we made locally so we don't refetch and clobber our own optimistic state
   const localUpdateTimestamps = useRef<Set<number>>(new Set())
+  // When true, the next fetch will bypass server-side Todoist cache (set by chat-created tasks)
+  const nocacheRef = useRef(false)
 
   const refreshOccurrenceExceptions = useCallback(async () => {
     if (typeof window === 'undefined') return
@@ -285,7 +287,11 @@ export function useTasks(selectedDate?: Date) {
           return fallbackToSupabaseOrLocal()
         }
 
-        const res = await fetchWithTimeout('/api/integrations/todoist/tasks?all=true', {
+        const todoistUrl = nocacheRef.current
+          ? '/api/integrations/todoist/tasks?all=true&nocache=1'
+          : '/api/integrations/todoist/tasks?all=true'
+        nocacheRef.current = false
+        const res = await fetchWithTimeout(todoistUrl, {
           credentials: 'same-origin'
         })
         if (!res.ok) {
@@ -742,12 +748,16 @@ export function useTasks(selectedDate?: Date) {
   // React to global refresh events (e.g., chat-created tasks) and storage sync
   useEffect(() => {
     function onTasksUpdated(event: Event) {
-      const custom = event as CustomEvent<{ timestamp?: number }>
+      const custom = event as CustomEvent<{ timestamp?: number; nocache?: boolean }>
       const ts = typeof custom.detail?.timestamp === 'number' ? custom.detail?.timestamp : Date.now()
       // Skip refetch if this update originated from our own createTask/toggle — the optimistic state is already correct
       if (localUpdateTimestamps.current.has(ts)) {
         localUpdateTimestamps.current.delete(ts)
         return
+      }
+      // Chat-created tasks set nocache to bypass server-side Todoist cache (handles serverless isolation)
+      if (custom.detail?.nocache) {
+        nocacheRef.current = true
       }
       scheduleRefetch(ts)
     }
@@ -761,17 +771,39 @@ export function useTasks(selectedDate?: Date) {
       }
     }
 
+    // Optimistically inject a task created from chat (bypasses refetch entirely)
+    function onTaskInjected(event: Event) {
+      const custom = event as CustomEvent<{ task?: Task }>
+      const task = custom.detail?.task
+      if (!task || !task.id) return
+      updateAllOptimistically((current) => {
+        const list = current || []
+        // Avoid duplicates
+        if (list.some(t => t.id === task.id)) return list
+        return [task, ...list]
+      })
+      updateDailyOptimistically((current) => {
+        const list = current || []
+        if (!task.due?.date) return list
+        if (task.due.date.slice(0, 10) !== dateStr) return list
+        if (list.some(t => t.id === task.id)) return list
+        return [task, ...list]
+      })
+    }
+
     if (typeof window !== 'undefined') {
       window.addEventListener('lifeboard:tasks-updated', onTasksUpdated)
       window.addEventListener('storage', onStorage)
+      window.addEventListener('lifeboard:task-injected', onTaskInjected)
     }
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('lifeboard:tasks-updated', onTasksUpdated)
         window.removeEventListener('storage', onStorage)
+        window.removeEventListener('lifeboard:task-injected', onTaskInjected)
       }
     }
-  }, [scheduleRefetch])
+  }, [scheduleRefetch, updateAllOptimistically, updateDailyOptimistically, dateStr])
   
   // Optimistic task toggle
   const toggleTaskCompletion = useCallback(async (taskId: string) => {

@@ -1,126 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { runGPT5Pro } from '@/lib/replicate/client'
+import { runGemini } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { handleApiError } from '@/lib/api-error-handler'
-
-async function createTodoistTaskDirect(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
-  try {
-    const supabase = supabaseServer()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { ok: false, reason: 'not_authenticated' as const }
-    const { data: integration } = await supabase
-      .from('user_integrations')
-      .select('access_token')
-      .eq('user_id', user.id)
-      .eq('provider', 'todoist')
-      .maybeSingle()
-    if (!integration?.access_token) return { ok: false, reason: 'not_connected' as const }
-
-    const body: Record<string, any> = { content: payload.content }
-    if (payload.due_date) body.due_date = payload.due_date
-    const meta: Record<string, any> = {}
-    if (typeof payload.hour_slot === 'number') {
-      // Normalize to app's convention: 'hour-<7AM..9PM>'
-      const h = Math.max(0, Math.min(23, payload.hour_slot))
-      const display = (() => {
-        if (h === 0) return '12AM'
-        if (h < 12) return `${h}AM`
-        if (h === 12) return '12PM'
-        return `${h - 12}PM`
-      })()
-      meta.hourSlot = `hour-${display}`
-    }
-    if (payload.bucket) meta.bucket = payload.bucket
-    if (Object.keys(meta).length > 0) body.description = `[LIFEBOARD_META]${JSON.stringify(meta)}[/LIFEBOARD_META]`
-
-    const resp = await fetch('https://api.todoist.com/api/v1/tasks', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${integration.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body)
-    })
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => '')
-      console.error('Todoist direct create failed', { status: resp.status, bodyPreview: (txt || '').slice(0, 200) })
-      return { ok: false, reason: 'upstream_error' as const, status: resp.status }
-    }
-    const task = await resp.json()
-    return { ok: true as const, task }
-  } catch (e) {
-    console.error('Todoist direct create exception', e)
-    return { ok: false as const, reason: 'exception' as const }
-  }
-}
-
-// Prefer internal API route so all creation logic stays consistent
-async function createTodoistTaskViaApi(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
-  try {
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
-    const res = await fetch(`${origin}/api/integrations/todoist/tasks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // forward cookies so the route can authenticate the user
-        cookie: req.headers.get('cookie') || ''
-      },
-      body: JSON.stringify({
-        content: payload.content,
-        due_date: payload.due_date ?? null,
-        hour_slot: typeof payload.hour_slot === 'number' ? payload.hour_slot : undefined,
-        bucket: payload.bucket
-      })
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '')
-      console.error('Todoist create via API failed', res.status, txt)
-      return { ok: false as const, status: res.status }
-    }
-    const json = await res.json().catch(() => ({} as any))
-    return { ok: true as const, task: json.task }
-  } catch (e) {
-    console.error('Todoist create via API exception', e)
-    return { ok: false as const }
-  }
-}
-
-// Supabase-backed task creation (for users without Todoist)
-async function createSupabaseTask(req: NextRequest, payload: { content: string; due_date?: string | null; hour_slot?: number; bucket?: string }) {
-  try {
-    const supabase = supabaseServer()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { ok: false as const, reason: 'not_authenticated' as const }
-
-    // Normalize hour_slot to hour_slot display string on API layer via our internal tasks endpoint
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
-    const res = await fetch(`${origin}/api/tasks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        cookie: req.headers.get('cookie') || ''
-      },
-      body: JSON.stringify({
-        content: payload.content,
-        due_date: payload.due_date ?? null,
-        hour_slot: typeof payload.hour_slot === 'number' ? payload.hour_slot : undefined,
-        bucket: payload.bucket
-      })
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '')
-      console.error('Supabase task create failed', res.status, (txt || '').slice(0, 200))
-      return { ok: false as const, status: res.status }
-    }
-    const json = await res.json()
-    return { ok: true as const, task: json.task }
-  } catch (e) {
-    console.error('Supabase task create exception', e)
-    return { ok: false as const }
-  }
-}
+import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -153,6 +37,9 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     let systemContext = ''
+    const supabase = supabaseServer()
+    const { data: { user } } = await supabase.auth.getUser()
+
     if (prefs) {
       const bucketSummary = Object.entries(prefs.widgets_by_bucket).map(([b, w]: [string, any[]]) => `${b}: ${w.map(x => x.name || x.type || 'widget').join(', ')}`).join('; ')
 
@@ -163,13 +50,8 @@ export async function POST(req: NextRequest) {
         steps?: number
       } = {}
 
-      // Direct DB queries in parallel instead of self-calling HTTP
-      const supabase = supabaseServer()
-      const { data: { user } } = await supabase.auth.getUser()
-
       if (user) {
         const [tasksResult, calendarResult, shoppingResult] = await Promise.all([
-          // Tasks: all incomplete tasks
           supabase
             .from('lifeboard_tasks')
             .select('id, content, completed, due_date, start_date, hour_slot, bucket, created_at')
@@ -177,7 +59,6 @@ export async function POST(req: NextRequest) {
             .eq('completed', false)
             .order('created_at', { ascending: false })
             .limit(50),
-          // Calendar events: upcoming
           supabase
             .from('calendar_events')
             .select('id, title, description, start_date, end_date, hour_slot, all_day, bucket')
@@ -185,7 +66,6 @@ export async function POST(req: NextRequest) {
             .gte('start_date', today)
             .order('start_date', { ascending: true })
             .limit(20),
-          // Shopping list: unpurchased items
           supabase
             .from('shopping_list_items')
             .select('id, name, quantity, bucket, is_purchased')
@@ -280,37 +160,13 @@ export async function POST(req: NextRequest) {
       systemContext = `System: ${contextParts.join('\n')}`
     }
 
-    // Enhanced instruction with full app context awareness
+    // Build system prompt with all available commands
     const todayIso = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
     const currentYear = todayIso.slice(0,4)
-    const lifeboardInstruction = `You are Lifeboard's AI assistant with full access to the user's dashboard. Today's date is ${todayIso}.
+    const lifeboardInstruction = getCommandsPrompt(todayIso, currentYear)
 
-CONTEXT AWARENESS:
-- You can see all tasks, calendar events, shopping lists, and dashboard widgets
-- Reference specific items when answering questions (e.g., "I see you have 'Call dentist' scheduled for tomorrow")
-- Provide personalized insights based on their actual data
-- Help them understand patterns and prioritize work
-
-TASK CREATION:
-When the user asks to add/create a task, include ONE command block in addition to your natural reply:
-[LIFEBOARD_CMD]{"action":"create_task","content":"<task text>","due_date":"YYYY-MM-DD","hour_slot":<0-23 optional>,"bucket":"<optional bucket name>"}[/LIFEBOARD_CMD]
-
-Rules:
-- Normalize dates to user's local timezone, use year ${currentYear} unless specified
-- Convert times to hour_slot (0=12am to 23=11pm)
-- Infer bucket from context if mentioned (Work, Personal, Health, etc.)
-- Do not include the word "TASK" in content
-- Keep your natural reply separate from the command block
-
-CAPABILITIES:
-- Answer questions about their schedule, tasks, and shopping list
-- Provide summaries and insights
-- Help prioritize and organize
-- Suggest optimizations based on their data
-- Be conversational and helpful`
-
-    // Use GPT-5 Pro via Replicate
-    const gpt5Messages = [
+    // Use Gemini 3.1 Pro via Replicate
+    const geminiMessages = [
       { role: 'system' as const, content: lifeboardInstruction },
       ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
       ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
@@ -318,17 +174,17 @@ CAPABILITIES:
 
     let reply: string | undefined
     try {
-      reply = await runGPT5Pro({
-        messages: gpt5Messages,
-        max_tokens: 1024,
+      reply = await runGemini({
+        messages: geminiMessages,
+        max_tokens: 2048,
         temperature: 0.7,
       })
     } catch (error) {
-      console.error('GPT-5 Pro error:', error instanceof Error ? error.message : String(error))
+      console.error('Gemini 3.1 Pro error:', error instanceof Error ? error.message : String(error))
       try {
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
-          messages: gpt5Messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+          messages: geminiMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
           max_tokens: 1024,
           temperature: 0.7,
         })
@@ -342,142 +198,19 @@ CAPABILITIES:
       reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
     }
 
-    // Detect and execute a task creation command if present
-    // Allow command blocks that span multiple lines
-    const cmdMatch = (process.env.LIFEBOARD_TASK_CMDS === 'false') ? null : reply.match(/\[LIFEBOARD_CMD\]([\s\S]*?)\[\/LIFEBOARD_CMD\]/)
+    // Execute all commands in the reply (create tasks, complete tasks, add events, etc.)
     let createdTask: any | undefined
-
-    // Fallback parser for natural language like "add a task to call John today at 3pm"
-    const parseTaskFromText = (text: string): { content: string; due_date: string | null; hour_slot?: number; bucket?: string } | null => {
-      const raw = (text || '').toLowerCase()
-      const triggers = /(add\s+(a\s+)?task|add\s+to\s+tasks|create\s+task)/i
-      if (!triggers.test(raw)) return null
-
-      let due: string | null = null
-      const now = new Date()
-      if (/\b(today|tonight)\b/i.test(text)) {
-        due = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
-      } else if (/\b(tomorrow)\b/i.test(text)) {
-        const t = new Date(now)
-        t.setDate(t.getDate() + 1)
-        due = new Date(t.getTime() - t.getTimezoneOffset()*60000).toISOString().slice(0,10)
-      }
-
-      let hour_slot: number | undefined
-      const timeMatch = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
-      if (timeMatch) {
-        let h = parseInt(timeMatch[1], 10)
-        const mer = (timeMatch[3] || '').toLowerCase()
-        if (mer === 'pm' && h < 12) h += 12
-        if (mer === 'am' && h === 12) h = 0
-        if (h >= 0 && h <= 23) hour_slot = h
-      } else if (/\btonight\b/i.test(text)) {
-        hour_slot = 20
-      }
-
-      let bucket: string | undefined
-      const bucketMatch = text.match(/\bin\s+(work|personal|health|home|family)\b/i)
-      if (bucketMatch) bucket = bucketMatch[1]
-
-      // Strip leading phrases to get content
-      let content = text
-        .replace(/\b(add\s+(a\s+)?task(\s+to)?|create\s+task)\b/i, '')
-        .replace(/\bfor\s+(today|tomorrow|tonight)\b/ig, '')
-        .replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/ig, '')
-        .replace(/\bin\s+(work|personal|health|home|family)\b/ig, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-      if (!content) return null
-      return { content, due_date: due, hour_slot, bucket }
-    }
-
-    if (cmdMatch) {
-      try {
-        const cmd = JSON.parse(cmdMatch[1]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
-        if (cmd.action === 'create_task' && cmd.content) {
-          // Fallback: if no due_date provided, infer from the latest user message (today/tomorrow). Also fix obviously stale years.
-          let dueDate = cmd.due_date && /^\d{4}-\d{2}-\d{2}$/.test(cmd.due_date) ? cmd.due_date : null
-          try {
-            if (!dueDate) {
-              const lastUser = [...messages].reverse().find(m => m.role === 'user')?.content?.toLowerCase?.() || ''
-              const now = new Date()
-              if (lastUser.includes('today') || lastUser.includes('tonight')) {
-                dueDate = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
-              } else if (lastUser.includes('tomorrow')) {
-                const t = new Date(now)
-                t.setDate(t.getDate() + 1)
-                dueDate = new Date(t.getTime() - t.getTimezoneOffset()*60000).toISOString().slice(0,10)
-              }
-            } else {
-              // If model emitted a past year (e.g., 2023) and the user didn't specify a year, bump to current year
-              const lastUserRaw = [...messages].reverse().find(m => m.role === 'user')?.content || ''
-              const containsYear = /\b\d{4}\b/.test(lastUserRaw)
-              const yr = Number(dueDate.slice(0,4))
-              const nowYr = new Date().getFullYear()
-              if (!containsYear && yr < nowYr) {
-                dueDate = `${nowYr}${dueDate.slice(4)}`
-              }
-            }
-          } catch (dateFallbackError) {
-            console.error('Date inference fallback error:', dateFallbackError)
-          }
-          // Try direct Todoist create first (fast path), then internal API, then Supabase fallback
-          let created: any | undefined
-          const direct = await createTodoistTaskDirect(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
-          if (direct.ok) {
-            created = (direct as any).task
-          } else {
-            const viaApi = await createTodoistTaskViaApi(req, { content: cmd.content, due_date: dueDate, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
-            if (viaApi.ok) {
-              created = (viaApi as any).task
-            } else {
-              // Fallback to Supabase task if Todoist not connected
-              const supa = await createSupabaseTask(req, { content: cmd.content, due_date: dueDate || null, hour_slot: (typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined), bucket: cmd.bucket || undefined })
-              if (supa.ok) created = (supa as any).task
-            }
-          }
-          if (created) {
-            createdTask = created
-            reply = reply.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${dueDate ? ` for ${dueDate}` : ''}.`)
-          } else {
-            // Set a helpful message; auth failure will be handled by API route status
-            reply = reply.replace(cmdMatch[0], `\n\n⚠️ I couldn't create the task right now.`)
-          }
-        }
-      } catch (parseError) {
-        console.error('Failed to parse LIFEBOARD_CMD JSON:', parseError)
-        reply = reply.replace(cmdMatch[0], '')
-      }
-    }
-
-    // If no explicit command created a task, try a lightweight fallback based on the last user message
-    if (!createdTask) {
-      const lastUserText = [...messages].reverse().find(m => m.role === 'user')?.content || ''
-      const parsed = parseTaskFromText(lastUserText)
-      if (parsed) {
-        try {
-          // Try Todoist, then Supabase fallback
-          const direct2 = await createTodoistTaskDirect(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
-          if (direct2.ok) {
-            createdTask = (direct2 as any).task
-            reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
-          } else {
-            const viaApi = await createTodoistTaskViaApi(req, { content: parsed.content, due_date: parsed.due_date, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
-            if (viaApi.ok) {
-              createdTask = (viaApi as any).task
-              reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
-            } else {
-              const supa = await createSupabaseTask(req, { content: parsed.content, due_date: parsed.due_date || null, hour_slot: parsed.hour_slot, bucket: parsed.bucket })
-              if (supa.ok) {
-                createdTask = (supa as any).task
-                reply += `\n\n✅ I added “${parsed.content}”${parsed.due_date ? ` for ${parsed.due_date}` : ''}.`
-              }
-            }
-          }
-        } catch (nlpTaskError) {
-          console.error('NLP task creation fallback failed:', nlpTaskError)
-        }
-      }
+    let commandsExecuted = false
+    if (user) {
+      const cmdResult = await processReplyCommands(reply, {
+        supabase,
+        userId: user.id,
+        req,
+        origin,
+      })
+      reply = cmdResult.cleanReply
+      createdTask = cmdResult.createdTask
+      commandsExecuted = cmdResult.commandsExecuted
     }
 
     // Optional server-side TTS for consistent assistant voice
@@ -497,7 +230,7 @@ CAPABILITIES:
       console.warn('Server TTS failed for /api/chat; returning text only', e)
     }
 
-    return NextResponse.json({ reply, audioUrl, createdTask })
+    return NextResponse.json({ reply, audioUrl, createdTask, commandsExecuted })
   } catch (err) {
     return handleApiError(err, 'POST /api/chat')
   }

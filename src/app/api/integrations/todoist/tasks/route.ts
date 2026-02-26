@@ -231,6 +231,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ tasks });
     };
 
+    // Allow clients to bypass server-side cache (e.g. after chat-created tasks in a
+    // different serverless process that couldn't invalidate this process's in-memory cache).
+    const nocache = searchParams.get('nocache') === '1';
+    if (nocache) {
+      invalidateTodoistTaskCache(user.id);
+    }
+
     const cachedTasks = readTodoistTaskCache(user.id);
     if (cachedTasks) {
       return respondWithTasks(cachedTasks);
