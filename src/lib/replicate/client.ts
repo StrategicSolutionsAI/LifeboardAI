@@ -1,4 +1,8 @@
 import Replicate from 'replicate';
+import { File as NodeFile } from 'buffer';
+
+// Use Node.js File (available in Node 20+ from buffer module)
+const FileImpl = typeof globalThis.File !== 'undefined' ? globalThis.File : NodeFile;
 
 function getReplicate() {
   if (!process.env.REPLICATE_API_TOKEN) {
@@ -211,14 +215,15 @@ export async function runWhisper(options: WhisperOptions): Promise<string> {
   const { audio, mimeType, language, translate = false } = options
   const replicate = getReplicate()
 
-  // Convert Buffer to a data URI so the Replicate SDK can handle it
-  // Use the provided MIME type, or detect from buffer magic bytes, or default to webm
+  // Upload audio as a File object — more reliable than data URIs for webm/opus
   const resolvedMime = mimeType || detectAudioMime(audio) || 'audio/webm'
-  const b64 = audio.toString('base64')
-  const dataUri = `data:${resolvedMime};base64,${b64}`
+  const ext = resolvedMime.includes('webm') ? 'webm' : resolvedMime.includes('ogg') ? 'ogg'
+    : resolvedMime.includes('mp4') ? 'mp4' : resolvedMime.includes('wav') ? 'wav'
+    : resolvedMime.includes('mpeg') ? 'mp3' : 'webm'
+  const file = new FileImpl([audio], `audio.${ext}`, { type: resolvedMime })
 
   const input: Record<string, unknown> = {
-    audio: dataUri,
+    audio: file,
   }
   if (language) input.language = language
   if (translate) input.translate = true
