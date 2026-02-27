@@ -3,8 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 
-import Image from "next/image";
-import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
@@ -66,14 +64,21 @@ const WidgetLibrary = dynamic(
 );
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import type { DropResult } from "@hello-pangea/dnd";
+const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
+const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
+const Draggable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Draggable), { ssr: false });
 import WidgetSelector from "./widget-selector";
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TasksQuickActions } from "@/components/tasks-quick-actions";
 import { TasksGroupedList } from "@/components/tasks-grouped-list";
 import { TasksDailyProgress } from "@/components/tasks-daily-progress";
-import { EnhancedTasksView } from "@/components/enhanced-tasks-view";
+import TaskEditorModal, { type TaskEditorModalHandle } from "@/components/task-editor-modal";
+const EnhancedTasksView = dynamic(
+  () => import("@/components/enhanced-tasks-view").then(m => m.EnhancedTasksView),
+  { ssr: false, loading: () => <Skeleton className="h-64 w-full" /> }
+);
 
 // Dynamic, on-demand heavy widgets and panels
 const NutritionMealTracker = dynamic(
@@ -99,6 +104,10 @@ const ExerciseWidget = dynamic(
 const HomeProjectsWidget = dynamic(
   () => import("./home-projects-widget").then(m => m.HomeProjectsWidget),
   { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+const HabitTrackerWidget = dynamic(
+  () => import("./habit-tracker-widget").then(m => m.HabitTrackerWidget),
+  { ssr: false }
 );
 const TrendsPanel = dynamic(
   () => import("./trends-panel"),
@@ -130,6 +139,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
   const bucketsRef = useRef<string[]>([]);
+  const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const dragIndexRef = useRef<number | null>(null);
   const manageDragIndexRef = useRef<number | null>(null);
   const fetchedYesterdayRef = useRef(false);
@@ -266,10 +276,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
   const [exerciseWidgetOpen, setExerciseWidgetOpen] = useState(false);
   const [homeProjectsWidgetOpen, setHomeProjectsWidgetOpen] = useState(false);
+  const [habitTrackerWidgetOpen, setHabitTrackerWidgetOpen] = useState(false);
+  const [activeHabitWidget, setActiveHabitWidget] = useState<WidgetInstance | null>(null);
   const [shouldLoadNutritionWidget, setShouldLoadNutritionWidget] = useState(false);
   const [shouldLoadMedicationWidget, setShouldLoadMedicationWidget] = useState(false);
   const [shouldLoadExerciseWidget, setShouldLoadExerciseWidget] = useState(false);
   const [shouldLoadHomeProjectsWidget, setShouldLoadHomeProjectsWidget] = useState(false);
+  const [shouldLoadHabitTrackerWidget, setShouldLoadHabitTrackerWidget] = useState(false);
   const [chatBarReady, setChatBarReady] = useState(false);
   const [confirmState, setConfirmState] = useState<DestructiveConfirmState | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
@@ -332,6 +345,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!homeProjectsWidgetOpen) return;
     setShouldLoadHomeProjectsWidget(true);
   }, [homeProjectsWidgetOpen]);
+
+  useEffect(() => {
+    if (!habitTrackerWidgetOpen) return;
+    setShouldLoadHabitTrackerWidget(true);
+  }, [habitTrackerWidgetOpen]);
 
   useEffect(() => {
     if (chatBarReady || typeof window === 'undefined') return;
@@ -2102,12 +2120,17 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         // the current bucket list. This prevents deleted buckets from being
         // resurrected just because they still have leftover widget entries.
         // Use bucketsRef for a synchronous read of the latest bucket list.
+        // IMPORTANT: Skip this filter when bucketsRef is empty — it means
+        // loadBuckets hasn't populated it yet. Filtering against an empty
+        // set would wipe ALL widgets (race condition).
         const currentBuckets = new Set(bucketsRef.current);
         let removedStaleBuckets = false;
-        for (const key of Object.keys(migratedMerged)) {
-          if (!currentBuckets.has(key)) {
-            delete migratedMerged[key];
-            removedStaleBuckets = true;
+        if (currentBuckets.size > 0) {
+          for (const key of Object.keys(migratedMerged)) {
+            if (!currentBuckets.has(key)) {
+              delete migratedMerged[key];
+              removedStaleBuckets = true;
+            }
           }
         }
 
@@ -2225,6 +2248,29 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       return; // Don't save on initial load or if logged out
     }
 
+    // Safety: never overwrite stored widgets with an empty object.
+    // This protects against race conditions where widgets haven't loaded yet
+    // but isWidgetLoadComplete was already set to true.
+    const widgetCount = Object.values(widgetsByBucket).reduce(
+      (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0
+    );
+    if (widgetCount === 0) {
+      // Only allow saving empty if there's genuinely nothing in localStorage
+      const existing = typeof window !== 'undefined' ? localStorage.getItem('widgets_by_bucket') : null;
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing);
+          const existingWidgets = parsed.widgets || parsed;
+          const existingCount = Object.values(existingWidgets).reduce(
+            (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0
+          );
+          if (existingCount > 0) {
+            console.warn('[saveWidgets] Skipping save — would overwrite', existingCount, 'existing widgets with empty state');
+            return;
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    }
 
     // Save to localStorage immediately
     if (typeof window !== 'undefined') {
@@ -2281,6 +2327,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           const parsed: string[] = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length) {
             localBuckets = parsed;
+            bucketsRef.current = parsed;   // sync ref immediately so loadWidgets can see it
             setBuckets(parsed);
             const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
             setActiveBucket(savedActive && parsed.includes(savedActive) ? savedActive : parsed[0]);
@@ -2319,6 +2366,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       if (hasLocal && unsynced) {
         // Local has unsynced changes (e.g. user refreshed before Supabase
         // save completed). Prefer local and push to server in background.
+        bucketsRef.current = localBuckets;
         setBuckets(localBuckets);
         const active = (typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null) || localBuckets[0];
         setActiveBucket(localBuckets.includes(active || '') ? (active as string) : localBuckets[0]);
@@ -2330,6 +2378,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       } else if (hasServer) {
         // Local is fully synced (or empty) — server may have newer data
         // from another device. Use server as source of truth.
+        bucketsRef.current = serverBuckets;
         setBuckets(serverBuckets);
         if (typeof window !== 'undefined') {
           localStorage.setItem('life_buckets', JSON.stringify(serverBuckets));
@@ -2350,6 +2399,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         markBucketsSynced();
       } else if (hasLocal) {
         // No server data but local exists — push local to server in background
+        bucketsRef.current = localBuckets;
         if (localBucketColors) setBucketColors(localBucketColors);
         const mergedColors = { ...(localBucketColors || {}) } as Record<string, string>;
         void updateUserPreferenceFields({ life_buckets: localBuckets, bucket_colors: mergedColors }).then((ok) => {
@@ -2358,6 +2408,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       } else {
         // If no buckets found anywhere, set default buckets
         const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
+        bucketsRef.current = defaultBuckets;
         setBuckets(defaultBuckets);
         const defaultColors: Record<string, string> = Object.fromEntries(
           defaultBuckets.map((n) => [n, getSuggestedColorForBucket(n)])
@@ -3344,13 +3395,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         {/* Greeting + Completion Ring row */}
         <section className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="font-['DM_Sans',sans-serif] text-[24px] text-[#314158] tracking-tight">
-              Welcome back, <span className="text-[#B1916A] font-bold">{greetingName || 'there'}</span>
+            <h1 className=" text-[24px] text-theme-text-primary tracking-tight">
+              Welcome back, <span className="text-theme-primary font-bold">{greetingName || 'there'}</span>
             </h1>
-            <p className="font-['Inter',sans-serif] text-[14px] text-[#8e99a8] mt-1">You've got this! Let's make today productive.</p>
+            <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>
           {/* Completion ring card */}
-          <div className="hidden md:flex items-center gap-3 bg-white border border-[#dbd6cf] rounded-2xl px-5 py-3 shadow-warm-sm">
+          <div className="hidden md:flex items-center gap-3 bg-white border border-theme-neutral-300 rounded-2xl px-5 py-3 shadow-warm-sm">
             <div className="relative w-12 h-12">
               <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
                 <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(219,214,207,0.4)" strokeWidth="3" />
@@ -3363,7 +3414,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   }).length / Math.max(activeWidgets.length, 1)) * 125.6)} 125.6`}
                 />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center font-['DM_Sans',sans-serif] text-[11px] font-medium text-[#314158]">
+              <span className="absolute inset-0 flex items-center justify-center  text-[11px] font-medium text-theme-text-primary">
                 {activeWidgets.length > 0 ? `${Math.round((activeWidgets.filter(w => {
                   const prog = progressByWidget[w.instanceId];
                   const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
@@ -3373,8 +3424,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </span>
             </div>
             <div>
-              <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">Today's Progress</p>
-              <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">
+              <p className=" text-[13px] font-medium text-theme-text-primary">Today's Progress</p>
+              <p className=" text-[11px] text-theme-text-tertiary">
                 {activeWidgets.filter(w => {
                   const prog = progressByWidget[w.instanceId];
                   const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
@@ -3392,7 +3443,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         >
           <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
             {bucketsInitialized && buckets.length === 0 && (
-              <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-[#dbd6cf] bg-white px-5 text-[13px] text-[#8e99a8] font-['Inter',sans-serif]">
+              <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-theme-neutral-300 bg-white px-5 text-[13px] text-theme-text-tertiary ">
                 <span>No tabs yet. Click + to add your first bucket.</span>
               </div>
             )}
@@ -3449,7 +3500,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   color: b === activeBucket ? 'white' : '#314158',
                   marginBottom: '-1px',
                 }}
-                className={`relative flex h-[48px] items-center justify-center whitespace-nowrap rounded-t-[16px] px-5 sm:px-6 font-['Inter',sans-serif] text-[13px] font-medium capitalize transition-all duration-300 border ${b === activeBucket
+                className={`relative flex h-[42px] sm:h-[48px] items-center justify-center whitespace-nowrap rounded-t-[14px] sm:rounded-t-[16px] px-3 sm:px-6  text-xs sm:text-[13px] font-medium capitalize transition-all duration-300 border ${b === activeBucket
                   ? 'shadow-warm-sm text-white'
                   : 'shadow-none'
                   }`}
@@ -3478,9 +3529,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 marginBottom: '-1px',
                 borderBottomColor: 'transparent',
               }}
-              className="relative flex h-[48px] items-center justify-center rounded-t-[16px] bg-white px-6 sm:px-8 text-[18px] font-medium transition-colors hover:bg-[rgba(252,250,248,1)] border border-[#dbd6cf] shadow-none"
+              className="relative flex h-[42px] sm:h-[48px] items-center justify-center rounded-t-[14px] sm:rounded-t-[16px] bg-white px-4 sm:px-8 text-[18px] font-medium transition-colors hover:bg-[rgba(252,250,248,1)] border border-theme-neutral-300 shadow-none"
             >
-              <span className="text-[#B1916A]">
+              <span className="text-theme-primary">
                 +
               </span>
             </button>
@@ -3505,83 +3556,83 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
             {/* Content container: white widget box with subtle shadow */}
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-[#dbd6cf] bg-white shadow-warm-sm">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-white shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center gap-5 border-b border-[rgba(219,214,207,0.7)] px-5 pt-4 text-sm font-semibold">
+              <nav className="flex items-center gap-3 sm:gap-5 border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-4 text-sm font-semibold overflow-x-auto no-scrollbar">
                 {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                   <button
                     key={item}
                     onClick={() => setActiveSubTab(item)}
-                    className={`relative pb-3 font-['DM_Sans',sans-serif] text-[12px] tracking-[0.88px] uppercase transition-colors ${item === activeSubTab
-                      ? 'text-[#314158]'
-                      : 'text-[#596881] hover:text-[#314158]'
+                    className={`relative shrink-0 pb-3  text-xs tracking-[0.88px] uppercase transition-colors ${item === activeSubTab
+                      ? 'text-theme-text-primary'
+                      : 'text-theme-text-secondary hover:text-theme-text-primary'
                       }`}
                   >
                     {item}
                     {item === activeSubTab && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B1916A] rounded-full" />
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-primary rounded-full" />
                     )}
                   </button>
                 ))}
               </nav>
 
               {/* Content area */}
-              <div className="flex-1 overflow-y-auto p-5">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5">
                 {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? '' : 'hidden'}>
                   {/* Stat summary row — Calidora pattern */}
                   {activeWidgets.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.15)] mb-2">
-                          <LayoutDashboard className="h-[18px] w-[18px] text-[#B1916A]" />
+                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-brand-tint-strong mb-2">
+                          <LayoutDashboard className="h-[18px] w-[18px] text-theme-primary" />
                         </div>
-                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.length}</p>
-                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Total Widgets</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.length}</p>
+                        <p className=" text-xs text-theme-text-tertiary mt-1">Total Widgets</p>
                       </div>
-                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.15)] mb-2">
-                          <Activity className="h-[18px] w-[18px] text-[#4AADE0]" />
+                          <Activity className="h-[18px] w-[18px] text-theme-info" />
                         </div>
-                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val > 0 && val < (w.target || 1); }).length}</p>
-                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">In Progress</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val > 0 && val < (w.target || 1); }).length}</p>
+                        <p className=" text-xs text-theme-text-tertiary mt-1">In Progress</p>
                       </div>
-                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.15)] mb-2">
-                          <Check className="h-[18px] w-[18px] text-[#48B882]" />
+                          <Check className="h-[18px] w-[18px] text-theme-success" />
                         </div>
-                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val >= (w.target || 1); }).length}</p>
-                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Completed</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val >= (w.target || 1); }).length}</p>
+                        <p className=" text-xs text-theme-text-tertiary mt-1">Completed</p>
                       </div>
-                      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm">
+                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.15)] mb-2">
                           <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
                         </div>
-                        <p className="font-['DM_Sans',sans-serif] text-[28px] text-[#314158] leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val === 0; }).length}</p>
-                        <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Not Started</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val === 0; }).length}</p>
+                        <p className=" text-xs text-theme-text-tertiary mt-1">Not Started</p>
                       </div>
                     </div>
                   )}
 
                   {/* Widget grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr">
+                  <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-fr">
                   {/* Refresh card */}
                   {activeWidgets.length > 0 && (
                     <div
                       onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                      className="rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm hover:shadow-warm relative cursor-pointer transition-shadow"
+                      className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm hover:shadow-warm relative cursor-pointer transition-shadow"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.15)]">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-brand-tint-strong">
                           {isRefreshing ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-[#B1916A]" />
+                            <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
                           ) : (
-                            <RotateCw className="h-5 w-5 text-[#B1916A]" />
+                            <RotateCw className="h-5 w-5 text-theme-primary" />
                           )}
                         </div>
                         <span className="text-sm font-medium truncate">Refresh</span>
                       </div>
-                      <p className="mt-2 text-xs text-[#8e99a8] truncate">Sync integrations</p>
+                      <p className="mt-2 text-xs text-theme-text-tertiary truncate">Sync integrations</p>
                       {/* Invisible progress bar placeholder to equalize height */}
                       <div className="mt-3 h-1 bg-transparent" />
                     </div>
@@ -3644,7 +3695,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     const wStyles = getWidgetColorStyles(bucketHex);
 
                     return (
-                      <div key={w.instanceId} className={`rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} style={goalMet ? { backgroundColor: wStyles.tint } : undefined} onClick={() => {
+                      <div key={w.instanceId} className={`rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} style={goalMet ? { backgroundColor: wStyles.tint } : undefined} onClick={() => {
                         if (w.id === 'nutrition') {
                           // For nutrition widget, show a modal with the full FatSecret widget
                           setNutritionWidgetOpen(true);
@@ -3657,6 +3708,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         } else if (w.id === 'home_projects') {
                           // For home projects widget, show a modal with the comprehensive project manager
                           setHomeProjectsWidgetOpen(true);
+                        } else if (w.id === 'habit_tracker') {
+                          setActiveHabitWidget(w);
+                          setHabitTrackerWidgetOpen(true);
                         } else {
                           setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
                         }
@@ -3683,15 +3737,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               e.stopPropagation();
                               convertWidgetToTask(w, activeBucket);
                             }}
-                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#B1916A]/40 transition ${w.linkedTaskId
-                              ? "bg-[#B1916A] hover:bg-[#a07f5a]"
-                              : "bg-[rgba(177,145,106,0.12)] hover:bg-[rgba(177,145,106,0.2)]"
+                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary/40 transition ${w.linkedTaskId
+                              ? "bg-theme-primary hover:bg-theme-primary-600"
+                              : "bg-theme-brand-tint hover:bg-theme-primary/20"
                               }`}
                             aria-label={w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"}
                             title={w.linkedTaskId ? "Remove from Tasks tab" : "Show in Tasks tab"}
                           >
                             <ListChecks
-                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-[#B1916A]"
+                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-theme-primary"
                                 }`}
                             />
                           </button>
@@ -3724,7 +3778,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             if (!IconComponent || typeof IconComponent !== 'function') {
                               IconComponent = getIconComponent(w.id);
                             }
-                            if (!IconComponent) return <div className="h-5 w-5 bg-[#dbd6cf] rounded" />;
+                            if (!IconComponent) return <div className="h-5 w-5 bg-theme-neutral-300 rounded" />;
 
                             return (
                               <div
@@ -3750,8 +3804,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         {isLinkedTask && (
                           <div className="mt-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-sm text-[#4a5568]">
-                                <ListChecks className="h-4 w-4 text-[#B1916A]" />
+                              <div className="flex items-center gap-2 text-sm text-theme-text-body">
+                                <ListChecks className="h-4 w-4 text-theme-primary" />
                                 <span className="truncate">{linkedTaskContent}</span>
                               </div>
                               <button
@@ -3764,7 +3818,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 disabled={!linkedTask}
                                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${linkedTaskCompleted
                                   ? ""
-                                  : "border-[#dbd6cf] text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)]"
+                                  : "border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-brand-tint-light"
                                   } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
                                 style={linkedTaskCompleted ? { borderColor: wStyles.solid, color: wStyles.text, backgroundColor: wStyles.tint } : undefined}
                               >
@@ -3772,7 +3826,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               </button>
                             </div>
                             {linkedTaskDueDisplay ? (
-                              <p className="text-xs text-[#8e99a8]">Due {linkedTaskDueDisplay}</p>
+                              <p className="text-xs text-theme-text-tertiary">Due {linkedTaskDueDisplay}</p>
                             ) : null}
                           </div>
                         )}
@@ -3798,10 +3852,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                               return (
                                 <div className="mt-2">
-                                  <div className="text-xs text-[#8e99a8]">
+                                  <div className="text-xs text-theme-text-tertiary">
                                     {birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-[#6b7688] mt-1">
+                                  <div className="text-xs text-theme-text-subtle mt-1">
                                     {daysUntil === 0 ? '🎉 Today!' :
                                       daysUntil === 1 ? '🎂 Tomorrow' :
                                         `🗓️ ${daysUntil} days`}
@@ -3810,7 +3864,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-[#8e99a8]">
+                                <div className="mt-2 text-xs text-theme-text-tertiary">
                                   Click to add birthday details
                                 </div>
                               );
@@ -3827,14 +3881,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               return (
                                 <div className="mt-2">
                                   {w.eventData.description && (
-                                    <div className="text-xs text-[#6b7688]">
+                                    <div className="text-xs text-theme-text-subtle">
                                       {w.eventData.description}
                                     </div>
                                   )}
-                                  <div className="text-xs text-[#8e99a8]">
+                                  <div className="text-xs text-theme-text-tertiary">
                                     {eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-[#6b7688] mt-1">
+                                  <div className="text-xs text-theme-text-subtle mt-1">
                                     {daysUntil === 0 ? '🎉 Today!' :
                                       daysUntil === 1 ? '📅 Tomorrow' :
                                         daysUntil < 0 ? '✅ Past event' :
@@ -3844,7 +3898,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-[#8e99a8]">
+                                <div className="mt-2 text-xs text-theme-text-tertiary">
                                   Click to add event details
                                 </div>
                               );
@@ -3870,10 +3924,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                               return (
                                 <div className="mt-2">
-                                  <div className="text-xs text-[#8e99a8]">
+                                  <div className="text-xs text-theme-text-tertiary">
                                     {holidayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                                   </div>
-                                  <div className="text-xs text-[#6b7688] mt-1">
+                                  <div className="text-xs text-theme-text-subtle mt-1">
                                     {daysUntil === 0 ? '🎄 Today!' :
                                       daysUntil === 1 ? '🎁 Tomorrow' :
                                         `🗓️ ${daysUntil} days`}
@@ -3882,7 +3936,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             } else {
                               return (
-                                <div className="mt-2 text-xs text-[#8e99a8]">
+                                <div className="mt-2 text-xs text-theme-text-tertiary">
                                   Click to add holiday details
                                 </div>
                               );
@@ -3904,12 +3958,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   <div className="flex items-center gap-2">
                                     <span className="text-2xl">{emoji}</span>
                                     <div>
-                                      <div className="text-sm font-medium text-[#314158]">{label}</div>
-                                      <div className="text-xs text-[#8e99a8]">Today's mood</div>
+                                      <div className="text-sm font-medium text-theme-text-primary">{label}</div>
+                                      <div className="text-xs text-theme-text-tertiary">Today's mood</div>
                                     </div>
                                   </div>
                                   {w.moodData.moodNote && (
-                                    <div className="text-xs text-[#6b7688] mt-2 italic">
+                                    <div className="text-xs text-theme-text-subtle mt-2 italic">
                                       "{w.moodData.moodNote}"
                                     </div>
                                   )}
@@ -3930,7 +3984,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">😐</div>
-                                    <div className="text-xs text-[#8e99a8]">Tap to log mood</div>
+                                    <div className="text-xs text-theme-text-tertiary">Tap to log mood</div>
                                   </div>
                                   <div className="flex gap-1 mt-2 justify-center">
                                     {moodEmojis.map((emoji, index) => (
@@ -3957,15 +4011,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   <div className="flex items-center gap-2 mb-2">
                                     <span className="text-lg">📖</span>
                                     <div>
-                                      <div className="text-sm font-medium text-[#314158]">Today's Entry</div>
-                                      <div className="text-xs text-[#8e99a8]">{wordCount} words</div>
+                                      <div className="text-sm font-medium text-theme-text-primary">Today's Entry</div>
+                                      <div className="text-xs text-theme-text-tertiary">{wordCount} words</div>
                                     </div>
                                   </div>
-                                  <div className="text-xs text-[#4a5568] italic bg-[#faf8f5] p-2 rounded">
+                                  <div className="text-xs text-theme-text-body italic bg-theme-surface-alt p-2 rounded">
                                     "{entryPreview}"
                                   </div>
                                   {w.journalData.entryCount && w.journalData.entryCount > 1 && (
-                                    <div className="text-xs text-[#8e99a8] mt-2">
+                                    <div className="text-xs text-theme-text-tertiary mt-2">
                                       📚 {w.journalData.entryCount} total entries
                                     </div>
                                   )}
@@ -3985,12 +4039,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">📝</div>
-                                    <div className="text-xs text-[#8e99a8] mb-2">No entry today</div>
-                                    <div className="text-xs text-[#6b7688] italic px-2">
+                                    <div className="text-xs text-theme-text-tertiary mb-2">No entry today</div>
+                                    <div className="text-xs text-theme-text-subtle italic px-2">
                                       "{randomPrompt}"
                                     </div>
                                     {w.journalData?.entryCount && (
-                                      <div className="text-xs text-[#8e99a8] mt-2">
+                                      <div className="text-xs text-theme-text-tertiary mt-2">
                                         📚 {w.journalData.entryCount} total entries
                                       </div>
                                     )}
@@ -4023,11 +4077,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3 space-y-2">
                                   <div className="flex items-center gap-2 text-xs">
                                     <span className="text-sm">🚫</span>
-                                    <span className="font-medium text-[#4a5568]">
+                                    <span className="font-medium text-theme-text-body">
                                       Quitting {w.quitHabitData.habitName}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-[#6b7688]">
+                                  <div className="flex items-center gap-2 text-xs text-theme-text-subtle">
                                     <span className="text-sm">📅</span>
                                     <span>Since {quitDate.toLocaleDateString()}</span>
                                   </div>
@@ -4036,7 +4090,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     <span className="text-sm font-medium" style={{ color: wStyles.text }}>days clean</span>
                                   </div>
                                   {w.quitHabitData.costPerDay && w.quitHabitData.costPerDay > 0 && (
-                                    <div className="flex items-center gap-2 text-xs text-[#6b7688]">
+                                    <div className="flex items-center gap-2 text-xs text-theme-text-subtle">
                                       <span className="text-sm">💰</span>
                                       <span>
                                         Daily savings: {w.quitHabitData.currency || '$'}{w.quitHabitData.costPerDay.toFixed(2)}
@@ -4053,7 +4107,119 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             } else {
                               return (
-                                <div className="mt-3 text-xs text-[#8e99a8] text-center">
+                                <div className="mt-3 text-xs text-theme-text-tertiary text-center">
+                                  Click to set up habit tracking
+                                </div>
+                              );
+                            }
+                          }
+
+                          // Special handling for habit tracker widget
+                          if (w.id === 'habit_tracker') {
+                            const habitData = w.habitTrackerData;
+                            if (habitData && habitData.habitName) {
+                              const completionSet = new Set(habitData.completionHistory || []);
+                              const todayKey = new Date().toISOString().split('T')[0];
+                              const isCompletedToday = completionSet.has(todayKey);
+
+                              // Calculate streak
+                              const sorted = Array.from(new Set(habitData.completionHistory || [])).sort().reverse();
+                              const yesterdayKey = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                              let streak = 0;
+                              if (sorted.length && (sorted[0] === todayKey || sorted[0] === yesterdayKey)) {
+                                let expected = sorted[0];
+                                for (const date of sorted) {
+                                  if (date === expected) {
+                                    streak++;
+                                    const d = new Date(expected + 'T12:00:00');
+                                    d.setDate(d.getDate() - 1);
+                                    expected = d.toISOString().split('T')[0];
+                                  } else break;
+                                }
+                              }
+
+                              // Last 7 day dots
+                              const last7 = Array.from({ length: 7 }, (_, i) => {
+                                const d = new Date(Date.now() - (6 - i) * 86400000);
+                                return completionSet.has(d.toISOString().split('T')[0]);
+                              });
+
+                              // Next milestone
+                              const milestones = habitData.milestones || [];
+                              const nextMilestone = milestones.find(m => !m.achieved && streak < m.days);
+
+                              return (
+                                <div className="mt-3 space-y-2">
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-sm">{"\uD83C\uDFAF"}</span>
+                                    <span className="font-medium text-theme-text-body">{habitData.habitName}</span>
+                                  </div>
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="text-2xl font-bold" style={{ color: wStyles.text }}>{streak}</span>
+                                    <span className="text-sm font-medium" style={{ color: wStyles.text }}>day streak</span>
+                                    {streak > 0 && <span className="text-sm">{"\uD83D\uDD25"}</span>}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {last7.map((done, i) => (
+                                      <div
+                                        key={i}
+                                        className={`h-2.5 w-2.5 rounded-full ${done ? 'bg-green-500' : 'bg-[#e8e3dc]'}`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    {nextMilestone && (
+                                      <div className="text-[10px] text-theme-text-tertiary">
+                                        {nextMilestone.emoji} {nextMilestone.label} in {nextMilestone.days - streak} days
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const history = [...(habitData.completionHistory || [])];
+                                        let total = habitData.totalCompletions || 0;
+                                        if (isCompletedToday) {
+                                          const idx = history.lastIndexOf(todayKey);
+                                          if (idx !== -1) history.splice(idx, 1);
+                                          total = Math.max(0, total - 1);
+                                        } else {
+                                          history.push(todayKey);
+                                          total++;
+                                          incrementProgress(w);
+                                        }
+                                        const updatedData = {
+                                          habitTrackerData: {
+                                            ...habitData,
+                                            completionHistory: history,
+                                            totalCompletions: total,
+                                            bestStreak: Math.max(habitData.bestStreak || 0, streak + (isCompletedToday ? 0 : 1)),
+                                          },
+                                        };
+                                        setWidgetsByBucket(prev => {
+                                          const next = { ...prev };
+                                          next[activeBucket] = (next[activeBucket] ?? []).map(ww =>
+                                            ww.instanceId === w.instanceId ? { ...ww, ...updatedData } : ww
+                                          );
+                                          if (typeof window !== 'undefined') {
+                                            localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors ${
+                                        isCompletedToday
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-theme-neutral-100 text-theme-text-subtle hover:bg-green-50 hover:text-green-700'
+                                      }`}
+                                    >
+                                      {isCompletedToday ? '\u2714' : '\u25CB'} {isCompletedToday ? 'Done' : 'Log'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="mt-3 text-xs text-theme-text-tertiary text-center">
                                   Click to set up habit tracking
                                 </div>
                               );
@@ -4071,25 +4237,25 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   <div className="flex items-center gap-2 mb-2">
                                     <span className="text-lg">✨</span>
                                     <div>
-                                      <div className="text-sm font-medium text-[#314158]">Today's Gratitude</div>
-                                      <div className="text-xs text-[#8e99a8]">{w.gratitudeData.gratitudeItems.length} items</div>
+                                      <div className="text-sm font-medium text-theme-text-primary">Today's Gratitude</div>
+                                      <div className="text-xs text-theme-text-tertiary">{w.gratitudeData.gratitudeItems.length} items</div>
                                     </div>
                                   </div>
                                   <div className="space-y-1">
                                     {w.gratitudeData.gratitudeItems.slice(0, 2).map((item, index) => (
-                                      <div key={index} className="text-xs text-[#4a5568] flex items-start gap-1">
+                                      <div key={index} className="text-xs text-theme-text-body flex items-start gap-1">
                                         <span className="text-yellow-500 mt-0.5">•</span>
                                         <span className="italic">"{item}"</span>
                                       </div>
                                     ))}
                                     {w.gratitudeData.gratitudeItems.length > 2 && (
-                                      <div className="text-xs text-[#8e99a8]">
+                                      <div className="text-xs text-theme-text-tertiary">
                                         +{w.gratitudeData.gratitudeItems.length - 2} more...
                                       </div>
                                     )}
                                   </div>
                                   {w.gratitudeData.entryCount && w.gratitudeData.entryCount > 1 && (
-                                    <div className="text-xs text-[#8e99a8] mt-2">
+                                    <div className="text-xs text-theme-text-tertiary mt-2">
                                       🙏 {w.gratitudeData.entryCount} grateful days
                                     </div>
                                   )}
@@ -4100,12 +4266,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 <div className="mt-3">
                                   <div className="text-center">
                                     <div className="text-2xl mb-2">🙏</div>
-                                    <div className="text-xs text-[#8e99a8] mb-2">What are you grateful for?</div>
-                                    <div className="text-xs text-[#6b7688] italic">
+                                    <div className="text-xs text-theme-text-tertiary mb-2">What are you grateful for?</div>
+                                    <div className="text-xs text-theme-text-subtle italic">
                                       Tap to add today's gratitude
                                     </div>
                                     {w.gratitudeData?.entryCount && (
-                                      <div className="text-xs text-[#8e99a8] mt-2">
+                                      <div className="text-xs text-theme-text-tertiary mt-2">
                                         🙏 {w.gratitudeData.entryCount} grateful days
                                       </div>
                                     )}
@@ -4123,7 +4289,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {/* Current weight */}
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs">⚖️</span>
-                                    <p className="text-xs font-medium text-[#4a5568]">Current Weight</p>
+                                    <p className="text-xs font-medium text-theme-text-body">Current Weight</p>
                                   </div>
                                   <p className="text-lg font-bold" style={{ color: wStyles.text }}>
                                     {w.weightData.currentWeight} {w.weightData.unit || w.unit || 'lbs'}
@@ -4146,7 +4312,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   {w.weightData.goalWeight !== undefined && (
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs">🎯</span>
-                                      <p className="text-xs text-[#B1916A]">
+                                      <p className="text-xs text-theme-primary">
                                         Goal: {w.weightData.goalWeight} {w.weightData.unit || w.unit || 'lbs'}
                                       </p>
                                     </div>
@@ -4155,7 +4321,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               );
                             }
                             return (
-                              <div className="mt-3 text-xs text-[#8e99a8] text-center">
+                              <div className="mt-3 text-xs text-theme-text-tertiary text-center">
                                 Click to set up weight tracking
                               </div>
                             );
@@ -4179,8 +4345,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             return (
                               <div className="mt-3 text-center">
                                 <div className="text-2xl mb-2">💪</div>
-                                <div className="text-xs text-[#6b7688] mb-1">Exercise Tracker</div>
-                                <div className="text-xs text-[#8e99a8]">
+                                <div className="text-xs text-theme-text-subtle mb-1">Exercise Tracker</div>
+                                <div className="text-xs text-theme-text-tertiary">
                                   Track workouts & goals
                                 </div>
                               </div>
@@ -4202,8 +4368,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               return (
                                 <div className="mt-3 text-center">
                                   <div className="text-2xl mb-2">🔨</div>
-                                  <div className="text-xs text-[#6b7688] mb-1">Home Projects</div>
-                                  <div className="text-xs text-[#8e99a8]">
+                                  <div className="text-xs text-theme-text-subtle mb-1">Home Projects</div>
+                                  <div className="text-xs text-theme-text-tertiary">
                                     Track household tasks & improvements
                                   </div>
                                 </div>
@@ -4222,29 +4388,29 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-2 text-center">
                                   <div>
-                                    <div className="text-sm font-semibold text-[#314158]">{activeProjects.length}</div>
-                                    <div className="text-xs text-[#8e99a8]">Active</div>
+                                    <div className="text-sm font-semibold text-theme-text-primary">{activeProjects.length}</div>
+                                    <div className="text-xs text-theme-text-tertiary">Active</div>
                                   </div>
                                   <div>
                                     <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{urgentProjects.length}</div>
-                                    <div className="text-xs text-[#8e99a8]">Urgent</div>
+                                    <div className="text-xs text-theme-text-tertiary">Urgent</div>
                                   </div>
                                   <div>
                                     <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{completionRate}%</div>
-                                    <div className="text-xs text-[#8e99a8]">Done</div>
+                                    <div className="text-xs text-theme-text-tertiary">Done</div>
                                   </div>
                                 </div>
 
                                 {/* Next priority project */}
                                 {nextProject && (
-                                  <div className="border-t border-[#dbd6cf]/60 pt-2">
-                                    <div className="text-xs text-[#6b7688] mb-1">Next Priority:</div>
+                                  <div className="border-t border-theme-neutral-300/60 pt-2">
+                                    <div className="text-xs text-theme-text-subtle mb-1">Next Priority:</div>
                                     <div className="flex items-center gap-1">
                                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: wStyles.solid }}></span>
-                                      <span className="text-xs font-medium text-[#314158] truncate">{nextProject.title}</span>
+                                      <span className="text-xs font-medium text-theme-text-primary truncate">{nextProject.title}</span>
                                     </div>
                                     {nextProject.room && (
-                                      <div className="text-xs text-[#8e99a8] capitalize mt-1">📍 {nextProject.room}</div>
+                                      <div className="text-xs text-theme-text-tertiary capitalize mt-1">📍 {nextProject.room}</div>
                                     )}
                                   </div>
                                 )}
@@ -4260,10 +4426,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             <div className="mt-2 mb-1">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-lg font-bold text-[#314158]">
+                                  <span className="text-lg font-bold text-theme-text-primary">
                                     {todayVal}
                                   </span>
-                                  <span className="text-sm text-[#8e99a8]">
+                                  <span className="text-sm text-theme-text-tertiary">
                                     / {w.target}
                                   </span>
                                 </div>
@@ -4276,7 +4442,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                   </span>
                                 )}
                               </div>
-                              <div className="w-full bg-[rgba(183,148,106,0.08)] rounded-full h-1 mt-2">
+                              <div className="w-full bg-theme-brand-tint-light rounded-full h-1 mt-2">
                                 <div className="h-1 rounded-full transition-all duration-300" style={{ width: `${displayPct}%`, backgroundColor: wStyles.solid }} />
                               </div>
                               {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
@@ -4289,7 +4455,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                           );
                         })()}
 
-                        {!(['water', 'steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication'].includes(w.id) && !isLinkedTask && (
+                        {!(['water', 'steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication', 'habit_tracker'].includes(w.id) && !isLinkedTask && (
                           <button
                             aria-label="Add one"
                             onClick={(e) => {
@@ -4307,12 +4473,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   })}
 
                   {/* Add Widget card */}
-                  <button className="rounded-xl border border-dashed border-[#dbd6cf] bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-[#dbd6cf] bg-[rgba(177,145,106,0.06)]">
-                      <Plus className="h-5 w-5 text-[#B1916A]" />
+                  <button className="rounded-xl border border-dashed border-theme-neutral-300 bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-theme-neutral-300 bg-theme-brand-tint-subtle">
+                      <Plus className="h-5 w-5 text-theme-primary" />
                     </div>
-                    <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">Add Widget</p>
-                    <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">Track your stats</p>
+                    <p className=" text-[13px] font-medium text-theme-text-primary">Add Widget</p>
+                    <p className=" text-[11px] text-theme-text-tertiary">Track your stats</p>
                   </button>
                   </div>{/* close widget grid */}
                 </div>{/* close overview tab */}
@@ -4327,19 +4493,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 {activeSubTab === 'Tasks' && (
                   <div>
                     {buckets.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-[#dbd6cf] rounded-2xl bg-white/80">
-                        <div className="w-16 h-16 bg-[rgba(177,145,106,0.08)] rounded-full flex items-center justify-center mb-4">
-                          <ListChecks className="h-8 w-8 text-[#B1916A]" />
+                      <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-theme-neutral-300 rounded-2xl bg-white/80">
+                        <div className="w-16 h-16 bg-theme-brand-tint-light rounded-full flex items-center justify-center mb-4">
+                          <ListChecks className="h-8 w-8 text-theme-primary" />
                         </div>
-                        <h3 className="text-xl font-semibold text-[#314158] mb-2">
+                        <h3 className="text-xl font-semibold text-theme-text-primary mb-2">
                           Set up your first bucket
                         </h3>
-                        <p className="text-sm text-[#8e99a8] max-w-md mb-6">
+                        <p className="text-sm text-theme-text-tertiary max-w-md mb-6">
                           Buckets help you organise widgets and tasks together. Create one to unlock the full dashboard experience.
                         </p>
                         <button
                           onClick={() => setIsEditorOpen(true)}
-                          className="px-6 py-3 bg-[#B1916A] text-white rounded-lg hover:bg-[#a07f5a] font-medium transition-colors"
+                          className="px-6 py-3 bg-theme-primary text-white rounded-lg hover:bg-theme-primary-600 font-medium transition-colors"
                         >
                           Create Bucket
                         </button>
@@ -4350,6 +4516,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         buckets={buckets}
                         linkedTaskMap={linkedTaskMap}
                         onToggleTaskWidget={handleToggleTaskWidget}
+                        onEditTask={(taskId: string) => taskEditorRef.current?.openByTaskId(taskId)}
                       />
                     )}
                   </div>
@@ -4360,7 +4527,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h2 className="section-label-sm">Widget Logs</h2>
-                        <p className="font-['Inter',sans-serif] text-[13px] text-[#8e99a8] mt-1">
+                        <p className=" text-[13px] text-theme-text-tertiary mt-1">
                           Recent syncs, entries, and progress updates for this bucket.
                         </p>
                       </div>
@@ -4368,7 +4535,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         <button
                           onClick={() => void loadWidgetHistoryLogs()}
                           disabled={isWidgetLogsLoading || activeWidgets.length === 0}
-                          className="inline-flex h-9 items-center justify-center rounded-md border border-[#dbd6cf] px-3 text-sm text-[#6b7688] transition hover:bg-[#faf8f5] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-theme-neutral-300 px-3 text-sm text-theme-text-subtle transition hover:bg-theme-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
                           title="Refresh widget logs"
                           aria-label="Refresh widget logs"
                         >
@@ -4391,49 +4558,49 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         </div>
                       ) : null}
                       {activeWidgets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
-                            <ClipboardList className="h-6 w-6 text-[#B1916A]" />
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-theme-brand-tint-light mb-3">
+                            <ClipboardList className="h-6 w-6 text-theme-primary" />
                           </div>
-                          <p className="font-['DM_Sans',sans-serif] text-[14px] font-medium text-[#314158]">No activity yet</p>
-                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1 max-w-xs">Add widgets to this bucket to start tracking activity and see your logs here.</p>
-                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#dbd6cf] bg-white px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-                            <Plus className="h-3.5 w-3.5 text-[#B1916A]" />
+                          <p className=" text-sm font-medium text-theme-text-primary">No activity yet</p>
+                          <p className=" text-xs text-theme-text-tertiary mt-1 max-w-xs">Add widgets to this bucket to start tracking activity and see your logs here.</p>
+                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-theme-neutral-300 bg-white px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
+                            <Plus className="h-3.5 w-3.5 text-theme-primary" />
                             Add Widget
                           </button>
                         </div>
                       ) : filteredWidgetLogs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
-                            <ClipboardList className="h-5 w-5 text-[#B1916A]" />
+                        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-theme-brand-tint-light mb-3">
+                            <ClipboardList className="h-5 w-5 text-theme-primary" />
                           </div>
-                          <p className="font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158]">No activity yet</p>
-                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1">Track progress or update a widget to start building logs.</p>
+                          <p className=" text-[13px] font-medium text-theme-text-primary">No activity yet</p>
+                          <p className=" text-xs text-theme-text-tertiary mt-1">Track progress or update a widget to start building logs.</p>
                         </div>
                       ) : (
-                        <div className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
+                        <div className="bg-white rounded-xl border border-theme-neutral-300 shadow-warm-sm overflow-hidden">
                           <div className="flex items-center gap-2 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-                            <ClipboardList className="h-4 w-4 text-[#B1916A]" />
-                            <h3 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">
+                            <ClipboardList className="h-4 w-4 text-theme-primary" />
+                            <h3 className=" text-sm tracking-[0.6px] uppercase text-theme-secondary">
                               {selectedLogsWidget === 'all' ? 'All Widget Activity' :
                                 `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
                             </h3>
-                            <span className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">
+                            <span className=" text-[11px] text-theme-text-tertiary">
                               ({filteredWidgetLogs.length})
                             </span>
                           </div>
                           <div className="max-h-[480px] overflow-y-auto">
                             {filteredWidgetLogs.slice(0, 80).map((entry) => (
-                              <div key={entry.id} className="flex items-start gap-4 px-5 py-3 border-b border-[rgba(219,214,207,0.5)] last:border-b-0 hover:bg-[rgba(252,250,248,0.5)] transition-colors">
+                              <div key={entry.id} className="flex items-start gap-4 px-5 py-3 border-b border-theme-neutral-300/50 last:border-b-0 hover:bg-[rgba(252,250,248,0.5)] transition-colors">
                                 <div className={`mt-1.5 h-2 w-2 rounded-full ${LOG_KIND_DOT_CLASS[entry.kind]}`} />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-[#314158]">{entry.message}</p>
-                                  <p className="truncate text-xs text-[#8e99a8]">
+                                  <p className="truncate text-sm font-medium text-theme-text-primary">{entry.message}</p>
+                                  <p className="truncate text-xs text-theme-text-tertiary">
                                     {entry.widgetName}
                                     {entry.details ? ` • ${entry.details}` : ""}
                                   </p>
                                 </div>
-                                <p className="whitespace-nowrap text-xs text-[#8e99a8]/70">
+                                <p className="whitespace-nowrap text-xs text-theme-text-tertiary/70">
                                   {formatLogTimestamp(entry.occurredAt)}
                                 </p>
                               </div>
@@ -4460,14 +4627,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
                     <div className="space-y-6">
                       {activeWidgets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-[#dbd6cf] bg-white">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[rgba(177,145,106,0.08)] mb-3">
-                            <Settings2 className="h-6 w-6 text-[#B1916A]" />
+                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-theme-brand-tint-light mb-3">
+                            <Settings2 className="h-6 w-6 text-theme-primary" />
                           </div>
-                          <p className="font-['DM_Sans',sans-serif] text-[14px] font-medium text-[#314158]">No widgets to configure</p>
-                          <p className="font-['Inter',sans-serif] text-[12px] text-[#8e99a8] mt-1 max-w-xs">Add widgets to this bucket to customize their targets, colors, and data sources.</p>
-                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#dbd6cf] bg-white px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-                            <Plus className="h-3.5 w-3.5 text-[#B1916A]" />
+                          <p className=" text-sm font-medium text-theme-text-primary">No widgets to configure</p>
+                          <p className=" text-xs text-theme-text-tertiary mt-1 max-w-xs">Add widgets to this bucket to customize their targets, colors, and data sources.</p>
+                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-theme-neutral-300 bg-white px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
+                            <Plus className="h-3.5 w-3.5 text-theme-primary" />
                             Add Widget
                           </button>
                         </div>
@@ -4482,7 +4649,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                               : sourceOptions[0];
 
                             return (
-                              <div key={widget.instanceId} className="bg-white rounded-xl border border-[#dbd6cf] shadow-warm-sm overflow-hidden">
+                              <div key={widget.instanceId} className="bg-white rounded-xl border border-theme-neutral-300 shadow-warm-sm overflow-hidden">
                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
                                   {(() => {
                                     const settingsBucketHex = getBucketColor(activeBucket);
@@ -4498,14 +4665,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     );
                                   })()}
                                   <div>
-                                    <h3 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">{widget.name}</h3>
-                                    <p className="font-['Inter',sans-serif] text-[11px] text-[#8e99a8]">{widget.id}</p>
+                                    <h3 className=" text-sm tracking-[0.6px] uppercase text-theme-secondary">{widget.name}</h3>
+                                    <p className=" text-[11px] text-theme-text-tertiary">{widget.id}</p>
                                   </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
                                   <div>
-                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Daily target</label>
+                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Daily target</label>
                                     <input
                                       type="number"
                                       min={1}
@@ -4518,11 +4685,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                           target: Math.max(1, parsed),
                                         });
                                       }}
-                                      className="w-full px-3 py-2 border border-[#dbd6cf] rounded-lg bg-white font-['Inter',sans-serif] text-[13px] text-[#314158] focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
+                                      className="w-full px-3 py-2 border border-theme-neutral-300 rounded-lg bg-white  text-[13px] text-theme-text-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary transition-colors"
                                     />
                                   </div>
                                   <div>
-                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Data source</label>
+                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Data source</label>
                                     <select
                                       value={selectedDataSource}
                                       onChange={(event) => {
@@ -4531,7 +4698,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                         });
                                         void fetchIntegrationsData();
                                       }}
-                                      className="w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 font-['Inter',sans-serif] text-[13px] text-[#314158] capitalize focus:outline-none focus:ring-2 focus:ring-[#B1916A]/30 focus:border-[#B1916A] transition-colors"
+                                      className="w-full rounded-lg border border-theme-neutral-300 bg-white px-3 py-2  text-[13px] text-theme-text-primary capitalize focus:outline-none focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary transition-colors"
                                     >
                                       {sourceOptions.map((option) => (
                                         <option key={option} value={option}>
@@ -4541,8 +4708,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="block font-['Inter',sans-serif] text-[12px] font-medium text-[#8e99a8] uppercase tracking-wide mb-2">Created</label>
-                                    <span className="text-sm text-[#6b7688]">
+                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Created</label>
+                                    <span className="text-sm text-theme-text-subtle">
                                       {widget.createdAt
                                         ? new Date(widget.createdAt).toLocaleDateString()
                                         : "Unknown"}
@@ -4557,7 +4724,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                       setEditingWidget(widget);
                                       setNewlyCreatedWidgetId(null);
                                     }}
-                                    className="rounded-lg bg-[#B1916A] px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-white shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[#a07f5a] transition-colors"
+                                    className="rounded-lg bg-theme-primary px-4 py-2  text-[13px] font-medium text-white shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-theme-primary-600 transition-colors"
                                   >
                                     Open Editor
                                   </button>
@@ -4565,7 +4732,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     onClick={() => {
                                       void resetWidgetProgress(widget);
                                     }}
-                                    className="rounded-lg border border-[#dbd6cf] px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-[#314158] shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+                                    className="rounded-lg border border-theme-neutral-300 px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
                                   >
                                     Reset Today
                                   </button>
@@ -4573,7 +4740,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                     onClick={() => {
                                       requestRemoveWidget(widget);
                                     }}
-                                    className="rounded-lg border border-red-200 px-4 py-2 font-['DM_Sans',sans-serif] text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                                    className="rounded-lg border border-red-200 px-4 py-2  text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
                                   >
                                     Remove
                                   </button>
@@ -4619,7 +4786,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             className={`w-full sm:w-[800px] max-w-full p-0 sm:p-6 flex flex-col ${isMobileView ? 'max-h-[90vh]' : ''}`}
           >
             <SheetHeader
-              className={`px-4 pt-6 pb-4 sm:px-0 sm:pt-0 sm:pb-6 border-b border-[#dbd6cf] sm:border-none ${isMobileView ? 'sticky top-0 z-10 bg-white/95 backdrop-blur' : ''}`}
+              className={`px-4 pt-6 pb-4 sm:px-0 sm:pt-0 sm:pb-6 border-b border-theme-neutral-300 sm:border-none ${isMobileView ? 'sticky top-0 z-10 bg-white/95 backdrop-blur' : ''}`}
             >
               <SheetTitle>Add a Widget</SheetTitle>
             </SheetHeader>
@@ -4696,11 +4863,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
           <SheetContent side="right" className="w-full sm:w-[520px] md:w-[560px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-[#314158]">Manage Tabs</SheetTitle>
+              <SheetTitle className="text-theme-text-primary">Manage Tabs</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#4a5568] mb-1">Add a new tab</label>
+                <label className="block text-sm font-medium text-theme-text-body mb-1">Add a new tab</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -4708,12 +4875,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     value={newBucket}
                     onChange={(e) => setNewBucket(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddBucket()}
-                    className="flex-1 rounded-lg border border-[#dbd6cf] px-3 py-2 text-sm focus:border-[#B1916A] focus:ring-1 focus:ring-[#B1916A]/30 focus:outline-none transition-colors"
+                    className="flex-1 rounded-lg border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-primary focus:ring-1 focus:ring-theme-primary/30 focus:outline-none transition-colors"
                   />
                   <button
                     onClick={handleAddBucket}
                     disabled={!newBucket.trim() || buckets.includes(newBucket.trim())}
-                    className="px-3 py-2 text-sm rounded-lg bg-[#B1916A] text-white hover:bg-[#a07f5a] disabled:opacity-50 transition-colors"
+                    className="px-3 py-2 text-sm rounded-lg bg-theme-primary text-white hover:bg-theme-primary-600 disabled:opacity-50 transition-colors"
                   >
                     Add
                   </button>
@@ -4721,28 +4888,28 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </div>
 
               <div>
-                <div className="text-sm font-medium text-[#4a5568] mb-2">Suggested tabs</div>
+                <div className="text-sm font-medium text-theme-text-body mb-2">Suggested tabs</div>
                 <div className="flex flex-wrap gap-2">
                   {suggestedToShow.length > 0 ? (
                     suggestedToShow.map((name) => (
                       <button
                         key={name}
                         onClick={() => handleAddBucketQuick(name)}
-                        className="px-3 py-1.5 rounded-full border border-[#dbd6cf] text-sm hover:bg-[#faf8f5] active:bg-[rgba(183,148,106,0.08)]"
+                        className="px-3 py-1.5 rounded-full border border-theme-neutral-300 text-sm hover:bg-theme-surface-alt active:bg-theme-brand-tint-light"
                         aria-label={`Add ${name} tab`}
                       >
                         {name}
                       </button>
                     ))
                   ) : (
-                    <div className="text-xs text-[#8e99a8]">All suggested tabs are already added</div>
+                    <div className="text-xs text-theme-text-tertiary">All suggested tabs are already added</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <div className="text-sm font-medium text-[#4a5568] mb-2">Existing tabs</div>
-                <ul className="divide-y divide-[#dbd6cf] rounded-md border border-[#dbd6cf] overflow-hidden">
+                <div className="text-sm font-medium text-theme-text-body mb-2">Existing tabs</div>
+                <ul className="divide-y divide-theme-neutral-300 rounded-md border border-theme-neutral-300 overflow-hidden">
                   {buckets.map((b, index) => (
                     <li
                       key={b}
@@ -4755,10 +4922,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {editingBucketName !== b && (
-                            <GripVertical className="w-4 h-4 text-[#8e99a8]/70 cursor-grab active:cursor-grabbing" />
+                            <GripVertical className="w-4 h-4 text-theme-text-tertiary/70 cursor-grab active:cursor-grabbing" />
                           )}
                           <span
-                            className="inline-block w-4 h-4 rounded-full border border-[#dbd6cf] flex-shrink-0"
+                            className="inline-block w-4 h-4 rounded-full border border-theme-neutral-300 flex-shrink-0"
                             style={{ backgroundColor: getBucketColor(b) }}
                             aria-hidden
                           />
@@ -4771,11 +4938,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 if (e.key === 'Enter') handleSaveEditBucket();
                                 if (e.key === 'Escape') handleCancelEditBucket();
                               }}
-                              className="flex-1 text-sm border border-[#B1916A] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#B1916A]/30"
+                              className="flex-1 text-sm border border-theme-primary rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-theme-primary/30"
                               autoFocus
                             />
                           ) : (
-                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-[#B1916A]' : 'text-[#4a5568]'}`}>{b}</span>
+                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary' : 'text-theme-text-body'}`}>{b}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -4785,13 +4952,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                                 onClick={handleSaveEditBucket}
                                 className="text-xs p-1.5 rounded-md border border-green-200 text-green-600 hover:bg-green-50"
                                 title="Save"
+                                aria-label="Save bucket name"
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={handleCancelEditBucket}
-                                className="text-xs p-1.5 rounded-md border border-[#dbd6cf] text-[#6b7688] hover:bg-[#faf8f5]"
+                                className="text-xs p-1.5 rounded-md border border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-surface-alt"
                                 title="Cancel"
+                                aria-label="Cancel bucket rename"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -4800,8 +4969,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                             <>
                               <button
                                 onClick={() => handleStartEditBucket(b)}
-                                className="text-xs p-1.5 rounded-lg border border-[#dbd6cf] text-[#B1916A] hover:bg-[rgba(177,145,106,0.06)]"
+                                className="text-xs p-1.5 rounded-lg border border-theme-neutral-300 text-theme-primary hover:bg-theme-brand-tint-subtle"
                                 title="Edit name"
+                                aria-label="Edit bucket name"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
@@ -4817,7 +4987,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       </div>
                       {/* Custom color picker only (auto-assigned initially) */}
                       <div className="mt-3 flex items-center justify-end gap-3">
-                        <label className="flex items-center gap-2 text-xs text-[#8e99a8]">
+                        <label className="flex items-center gap-2 text-xs text-theme-text-tertiary">
                           <span>Custom</span>
                           <input
                             type="color"
@@ -4831,7 +5001,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     </li>
                   ))}
                   {buckets.length === 0 && (
-                    <li className="px-3 py-6 text-sm text-[#8e99a8] text-center">No tabs yet</li>
+                    <li className="px-3 py-6 text-sm text-theme-text-tertiary text-center">No tabs yet</li>
                   )}
                 </ul>
               </div>
@@ -4853,7 +5023,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-[#314158]">Daily Nutrition Tracker</SheetTitle>
+              <SheetTitle className="text-theme-text-primary">Daily Nutrition Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               {(nutritionWidgetOpen || shouldLoadNutritionWidget) && (
@@ -4872,7 +5042,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         }}>
           <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle className="text-[#314158]">Medication Tracker</SheetTitle>
+              <SheetTitle className="text-theme-text-primary">Medication Tracker</SheetTitle>
             </SheetHeader>
             <div className="mt-6">
               {(medicationWidgetOpen || shouldLoadMedicationWidget) && (
@@ -4937,6 +5107,51 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* Habit Tracker Widget Modal */}
+        <Sheet open={habitTrackerWidgetOpen} onOpenChange={(open) => {
+          setHabitTrackerWidgetOpen(open);
+          if (open) {
+            setShouldLoadHabitTrackerWidget(true);
+          }
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Habit Tracker</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(habitTrackerWidgetOpen || shouldLoadHabitTrackerWidget) && activeHabitWidget && (
+                shouldLoadHabitTrackerWidget ? (
+                  <HabitTrackerWidget
+                    widget={activeHabitWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeHabitWidget, ...updates };
+                      setActiveHabitWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeHabitWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeHabitWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeHabitWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Confirm dialog & undo toast rendered outside the z-10 stacking context
@@ -4947,15 +5162,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             role="dialog"
             aria-modal="true"
             aria-label={confirmState.title}
-            className="w-full max-w-md rounded-xl border border-[#dbd6cf] bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-xl border border-theme-neutral-300 bg-white p-5 shadow-xl"
           >
-            <h3 className="text-base font-semibold text-[#314158]">{confirmState.title}</h3>
-            <p className="mt-2 text-sm text-[#6b7688]">{confirmState.description}</p>
+            <h3 className="text-base font-semibold text-theme-text-primary">{confirmState.title}</h3>
+            <p className="mt-2 text-sm text-theme-text-subtle">{confirmState.description}</p>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmState(null)}
-                className="rounded-md border border-[#dbd6cf] px-3 py-2 text-sm text-[#4a5568] hover:bg-[#faf8f5]"
+                className="rounded-md border border-theme-neutral-300 px-3 py-2 text-sm text-theme-text-body hover:bg-theme-surface-alt"
               >
                 Cancel
               </button>
@@ -4979,9 +5194,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-[#dbd6cf] bg-white p-3 shadow-warm-lg"
+          className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-theme-neutral-300 bg-white p-3 shadow-warm-lg"
         >
-          <p className="text-sm text-[#314158]">{undoState.message}</p>
+          <p className="text-sm text-theme-text-primary">{undoState.message}</p>
           <div className="mt-2 flex justify-end gap-2">
             <button
               type="button"
@@ -4989,7 +5204,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 clearUndoTimer();
                 setUndoState(null);
               }}
-              className="rounded-md border border-[#dbd6cf] px-2 py-1 text-xs text-[#6b7688] hover:bg-[#faf8f5]"
+              className="rounded-md border border-theme-neutral-300 px-2 py-1 text-xs text-theme-text-subtle hover:bg-theme-surface-alt"
             >
               Dismiss
             </button>
@@ -5001,7 +5216,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 setUndoState(null);
                 void Promise.resolve(pending.onUndo());
               }}
-              className="rounded-lg bg-[#B1916A] px-2 py-1 text-xs text-white hover:bg-[#a07f5a] transition-colors"
+              className="rounded-lg bg-theme-primary px-2 py-1 text-xs text-white hover:bg-theme-primary-600 transition-colors"
             >
               Undo
             </button>
@@ -5010,6 +5225,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       )}
 
       {chatBarReady && <ChatBarLazy />}
+
+      <TaskEditorModal
+        ref={taskEditorRef}
+        availableBuckets={buckets}
+        selectedBucket={activeBucket}
+        bucketColors={bucketColors}
+      />
     </div>
   );
 }
