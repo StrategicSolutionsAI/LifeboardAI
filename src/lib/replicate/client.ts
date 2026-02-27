@@ -55,17 +55,18 @@ function convertMessagesToGeminiInput(messages: GeminiMessage[]): {
 }
 
 /**
- * Run Gemini 3.1 Pro via Replicate
- * @param options - Configuration for the Gemini 3.1 Pro model
+ * Run a Gemini model via Replicate using replicate.run() (SSE-based, faster than manual polling).
+ * @param model - Replicate model identifier (e.g. 'google/gemini-3.1-pro')
+ * @param options - Configuration for the Gemini model
  * @returns The model's response text
  */
-export async function runGemini(options: GeminiOptions): Promise<string> {
+async function runGeminiModel(model: string, options: GeminiOptions): Promise<string> {
   const {
     messages,
     temperature = 0.7,
     max_tokens = 2048,
     top_p = 0.95,
-    thinking_level = 'medium',
+    thinking_level,
   } = options;
 
   try {
@@ -76,8 +77,12 @@ export async function runGemini(options: GeminiOptions): Promise<string> {
       prompt,
       temperature,
       top_p,
-      thinking_level,
     };
+
+    // Only include thinking_level for models that support it (Pro)
+    if (thinking_level) {
+      input.thinking_level = thinking_level;
+    }
 
     if (system_instruction) {
       input.system_instruction = system_instruction;
@@ -87,41 +92,42 @@ export async function runGemini(options: GeminiOptions): Promise<string> {
       input.max_output_tokens = max_tokens;
     }
 
-    const prediction = await replicate.predictions.create({
-      model: 'google/gemini-3.1-pro',
-      input,
-    });
+    // replicate.run() uses SSE polling — much faster than manual predictions.create() + poll loop
+    const output = await replicate.run(model as `${string}/${string}`, { input }) as unknown;
 
-    let finalPrediction = prediction;
-    const pollStart = Date.now();
-    const pollTimeoutMs = 120_000;
-    const pollDelayMs = 1_000;
-
-    while (finalPrediction.status === 'starting' || finalPrediction.status === 'processing') {
-      if (Date.now() - pollStart > pollTimeoutMs) {
-        throw new Error('Gemini 3.1 Pro prediction timed out after 120s');
-      }
-      await new Promise(resolve => setTimeout(resolve, pollDelayMs));
-      finalPrediction = await replicate.predictions.get(finalPrediction.id);
-    }
-
-    if (finalPrediction.status !== 'succeeded') {
-      throw new Error(`Gemini 3.1 Pro prediction failed with status ${finalPrediction.status}`);
-    }
-
-    const fullResponse = extractText(finalPrediction.output);
+    const fullResponse = extractText(output);
 
     if (!fullResponse || fullResponse.trim().length === 0) {
-      throw new Error('Gemini 3.1 Pro returned an empty response');
+      throw new Error(`${model} returned an empty response`);
     }
 
     return fullResponse.trim();
   } catch (error) {
-    console.error('❌ Error in runGemini:', error);
-    console.error('Error name:', error instanceof Error ? error.name : 'unknown');
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error(`❌ Error in ${model}:`, error instanceof Error ? error.message : String(error));
     throw error;
   }
+}
+
+/**
+ * Run Gemini 3.1 Pro via Replicate (high quality, used for text chat)
+ */
+export async function runGemini(options: GeminiOptions): Promise<string> {
+  return runGeminiModel('google/gemini-3.1-pro', {
+    ...options,
+    thinking_level: options.thinking_level ?? 'medium',
+  });
+}
+
+/**
+ * Run Gemini 2.5 Flash via Replicate (fast, used for voice chat)
+ * ~3-4x faster than Pro with good quality for conversational responses
+ */
+export async function runGeminiFlash(options: GeminiOptions): Promise<string> {
+  return runGeminiModel('google/gemini-2.5-flash', {
+    ...options,
+    // Flash doesn't need thinking_level — it's already fast
+    thinking_level: undefined,
+  });
 }
 
 /**

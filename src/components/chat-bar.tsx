@@ -1123,29 +1123,89 @@ export function ChatBar() {
         throw new Error(`Voice chat request failed: ${res.status} ${res.statusText}`)
       }
 
-      const data = await res.json()
+      // Read streaming NDJSON response — text arrives first, audio follows
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let textData: any = null
+      let audioData: any = null
+      let buffer = ''
 
-      const assistantMessage: Message = {
-        role: "assistant" as const,
-        content: data.reply,
-        audio: data.audioUrl,
-        createdTask: data.createdTask || null,
-      }
-      setMessages([...newMessages, assistantMessage])
-      // If a task was created, inject it optimistically into the task list
-      if (assistantMessage.createdTask?.id) {
-        window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
-      }
-      // Broadcast a global refresh if any commands were executed (tasks, calendar, shopping)
-      if (assistantMessage.createdTask || data.commandsExecuted) {
-        notifyTasksUpdated([1000, 3000])
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          // Parse complete NDJSON lines
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // keep incomplete line in buffer
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const chunk = JSON.parse(line)
+              if (chunk.type === 'text') {
+                textData = chunk
+                // Show text reply immediately — don't wait for audio
+                const assistantMessage: Message = {
+                  role: "assistant" as const,
+                  content: chunk.reply,
+                  audio: undefined,
+                  createdTask: chunk.createdTask || null,
+                }
+                setMessages([...newMessages, assistantMessage])
+                setIsProcessing(false)
+                // Handle commands
+                if (assistantMessage.createdTask?.id) {
+                  window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+                }
+                if (assistantMessage.createdTask || chunk.commandsExecuted) {
+                  notifyTasksUpdated([1000, 3000])
+                }
+              } else if (chunk.type === 'audio') {
+                audioData = chunk
+              }
+            } catch { /* ignore parse errors for partial lines */ }
+          }
+        }
       }
 
-      // Play audio response if server returned TTS audio
-      if (data.audioUrl) {
-        console.log('[Voice] Got audioUrl, length:', data.audioUrl.length, 'prefix:', data.audioUrl.slice(0, 30))
+      // Fallback: if no streaming body, try regular JSON parse
+      if (!textData && !reader) {
+        const data = await res.json()
+        textData = { reply: data.reply, createdTask: data.createdTask, commandsExecuted: data.commandsExecuted }
+        audioData = { audioUrl: data.audioUrl }
+        const assistantMessage: Message = {
+          role: "assistant" as const,
+          content: data.reply,
+          audio: data.audioUrl,
+          createdTask: data.createdTask || null,
+        }
+        setMessages([...newMessages, assistantMessage])
+        if (assistantMessage.createdTask?.id) {
+          window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+        }
+        if (assistantMessage.createdTask || data.commandsExecuted) {
+          notifyTasksUpdated([1000, 3000])
+        }
+      }
+
+      // Play audio when it arrives (may already be available or arrive shortly after text)
+      const audioUrl = audioData?.audioUrl
+      if (audioUrl) {
+        console.log('[Voice] Got audioUrl, length:', audioUrl.length, 'prefix:', audioUrl.slice(0, 30))
         setIsSpeaking(true)
-        const audio = new Audio(data.audioUrl)
+        // Update message with audio
+        if (textData) {
+          setMessages(prev => {
+            const updated = [...prev]
+            const last = updated[updated.length - 1]
+            if (last?.role === 'assistant') {
+              updated[updated.length - 1] = { ...last, audio: audioUrl }
+            }
+            return updated
+          })
+        }
+        const audio = new Audio(audioUrl)
         currentAudioRef.current = audio
 
         // Set output device if selected

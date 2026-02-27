@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { runGemini, runWhisper, runTTS } from '@/lib/replicate/client'
+import { runGeminiFlash, runWhisper, runTTS } from '@/lib/replicate/client'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
@@ -184,7 +184,8 @@ export async function POST(req: NextRequest) {
 
     let reply: string
     try {
-      reply = await runGemini({
+      // Use Gemini 2.5 Flash for voice — ~3.5x faster than Pro
+      reply = await runGeminiFlash({
         messages: [
           { role: 'system', content: lifeboardInstruction },
           ...geminiMessages,
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
         temperature: 0.7,
       })
     } catch (geminiErr) {
-      console.error('Gemini 3.1 Pro error (voice):', geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
+      console.error('Gemini Flash error (voice):', geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
       // Fall back to OpenAI
       const openai = getOpenAI()
       const completion = await openai.chat.completions.create({
@@ -224,34 +225,58 @@ export async function POST(req: NextRequest) {
       commandsExecuted = cmdResult.commandsExecuted
     }
 
-    // Synthesize speech via Chatterbox Turbo on Replicate
-    let audioUrl: string | undefined
-    try {
-      const ttsVoice = requestedVoice || process.env.TTS_VOICE || 'Chloe'
-      console.log(`[TTS] Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
-      const ttsFileUrl = await runTTS({
-        text: reply,
-        voice: ttsVoice,
-        speed: typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? requestedSpeed : undefined,
-      })
-      console.log(`[TTS] Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
-      // Fetch the audio file and convert to base64 data URI (Replicate URLs are temporary)
-      const audioRes = await fetch(ttsFileUrl)
-      if (!audioRes.ok) {
-        console.error(`[TTS] Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
-        throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
-      }
-      const audioBuf = Buffer.from(await audioRes.arrayBuffer())
-      console.log(`[TTS] Audio buffer size: ${audioBuf.length} bytes`)
-      const b64 = audioBuf.toString('base64')
-      audioUrl = `data:audio/wav;base64,${b64}`
-      console.log(`[TTS] Success — data URI length: ${audioUrl.length}`)
-    } catch (e) {
-      console.error('[TTS] Server TTS failed:', e instanceof Error ? e.message : String(e))
-      if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
-    }
+    // Stream response: send text immediately, then audio when TTS completes
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Chunk 1: text reply (sent immediately so client can display it)
+        controller.enqueue(encoder.encode(
+          JSON.stringify({ type: 'text', reply, createdTask, commandsExecuted }) + '\n'
+        ))
 
-    return NextResponse.json({ reply, audioUrl, createdTask, commandsExecuted })
+        // Chunk 2: TTS audio (generated in background, streamed when ready)
+        try {
+          const ttsVoice = requestedVoice || process.env.TTS_VOICE || 'Chloe'
+          console.log(`[TTS] Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
+          const ttsFileUrl = await runTTS({
+            text: reply,
+            voice: ttsVoice,
+            speed: typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? requestedSpeed : undefined,
+          })
+          console.log(`[TTS] Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
+          const audioRes = await fetch(ttsFileUrl)
+          if (!audioRes.ok) {
+            console.error(`[TTS] Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
+            throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
+          }
+          const audioBuf = Buffer.from(await audioRes.arrayBuffer())
+          console.log(`[TTS] Audio buffer size: ${audioBuf.length} bytes`)
+          const b64 = audioBuf.toString('base64')
+          const audioUrl = `data:audio/wav;base64,${b64}`
+          console.log(`[TTS] Success — data URI length: ${audioUrl.length}`)
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: 'audio', audioUrl }) + '\n'
+          ))
+        } catch (e) {
+          console.error('[TTS] Server TTS failed:', e instanceof Error ? e.message : String(e))
+          if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
+          // Send empty audio chunk so client knows TTS is done (failed)
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: 'audio', audioUrl: null }) + '\n'
+          ))
+        }
+
+        controller.close()
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        'Transfer-Encoding': 'chunked',
+      },
+    })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     const errStack = err instanceof Error ? err.stack : undefined
