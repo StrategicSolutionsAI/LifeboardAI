@@ -1193,18 +1193,14 @@ export function ChatBar() {
       const audioUrl = audioData?.audioUrl
       if (audioUrl) {
         console.log('[Voice] Got audioUrl, length:', audioUrl.length, 'prefix:', audioUrl.slice(0, 30))
+
+        // Stop any existing audio before playing new audio (prevents overlap)
+        cancelTTS()
+
         setIsSpeaking(true)
-        // Update message with audio
-        if (textData) {
-          setMessages(prev => {
-            const updated = [...prev]
-            const last = updated[updated.length - 1]
-            if (last?.role === 'assistant') {
-              updated[updated.length - 1] = { ...last, audio: audioUrl }
-            }
-            return updated
-          })
-        }
+        // NOTE: We intentionally do NOT set m.audio on assistant messages here.
+        // The <audio controls> element in JSX is for user recordings only.
+        // Playing via new Audio() avoids duplicate playback from both sources.
         const audio = new Audio(audioUrl)
         currentAudioRef.current = audio
 
@@ -1217,35 +1213,27 @@ export function ChatBar() {
           console.warn('[Voice] Failed to set output device', e)
         }
 
-        audio.onended = () => {
-          console.log('[Voice] Audio playback ended')
+        const restartRecordingAfterPlayback = () => {
           setIsSpeaking(false)
           currentAudioRef.current = null
-          if (isVoiceMode && !isProcessing) {
+          if (isVoiceMode) {
             setTimeout(() => {
               if (isVoiceMode && !isRecording && !isProcessing) startRecording()
             }, 500)
           }
+        }
+
+        audio.onended = () => {
+          console.log('[Voice] Audio playback ended')
+          restartRecordingAfterPlayback()
         }
         audio.onerror = (e) => {
           console.error('[Voice] Audio playback error:', e)
-          setIsSpeaking(false)
-          currentAudioRef.current = null
-          if (isVoiceMode && !isProcessing) {
-            setTimeout(() => {
-              if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-            }, 500)
-          }
+          restartRecordingAfterPlayback()
         }
         audio.play().catch((playErr) => {
           console.error('[Voice] audio.play() failed:', playErr)
-          setIsSpeaking(false)
-          currentAudioRef.current = null
-          if (isVoiceMode && !isProcessing) {
-            setTimeout(() => {
-              if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-            }, 500)
-          }
+          restartRecordingAfterPlayback()
         })
       } else {
         console.log('[Voice] No audioUrl in response — text only')
@@ -1330,7 +1318,8 @@ export function ChatBar() {
       }).finally(() => clearTimeout(timer))
       if (!res.ok) throw new Error("Chat request failed")
       const data = await res.json()
-      const assistantMessage: Message = { role: "assistant", content: data.reply, audio: data.audioUrl, createdTask: data.createdTask || null }
+      // Don't store audioUrl on the message — prevents <audio controls> from also playing it
+      const assistantMessage: Message = { role: "assistant", content: data.reply, createdTask: data.createdTask || null }
       setMessages([...newMessages, assistantMessage])
       setIsProcessing(false) // Hide thinking indicator
       // If a task was created, inject it optimistically into the task list
@@ -1342,9 +1331,10 @@ export function ChatBar() {
         notifyTasksUpdated([1000, 3000])
       }
 
-      // Prefer server TTS audio if present; otherwise use browser TTS
+      // Prefer server TTS audio if present
       if (data.audioUrl) {
         try {
+          cancelTTS() // Stop any existing audio before playing new
           setIsSpeaking(true)
           const audio = new Audio(data.audioUrl)
           currentAudioRef.current = audio
@@ -1430,7 +1420,7 @@ export function ChatBar() {
                   }`}
                 >
                   {m.content}
-                  {m.audio && (
+                  {m.audio && m.role === 'user' && (
                     <div className="mt-2">
                       <audio controls className="w-full max-w-[200px]">
                         <source src={m.audio} type="audio/webm" />
