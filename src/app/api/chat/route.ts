@@ -213,19 +213,19 @@ export async function POST(req: NextRequest) {
       commandsExecuted = cmdResult.commandsExecuted
     }
 
-    // Optional server-side TTS via MiniMax on Replicate
+    // Optional server-side TTS via Chatterbox Turbo on Replicate
     let audioUrl: string | undefined
     try {
       const ttsFileUrl = await runTTS({
         text: reply,
-        voice: body.tts?.voice || process.env.TTS_VOICE || 'alloy',
+        voice: body.tts?.voice || process.env.TTS_VOICE || 'Chloe',
         speed: typeof body.tts?.speed === 'number' && !Number.isNaN(body.tts.speed) ? body.tts.speed : undefined,
       })
       // Fetch the audio file and convert to base64 data URI (Replicate URLs are temporary)
       const audioRes = await fetch(ttsFileUrl)
       const buf = Buffer.from(await audioRes.arrayBuffer())
       const b64 = buf.toString('base64')
-      audioUrl = `data:audio/mpeg;base64,${b64}`
+      audioUrl = `data:audio/wav;base64,${b64}`
     } catch (e) {
       console.warn('Server TTS failed for /api/chat; returning text only', e)
     }

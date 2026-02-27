@@ -26,7 +26,7 @@ export function ChatBar() {
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [speakReplies, setSpeakReplies] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
-  const [ttsVoice, setTtsVoice] = useState<string>('alloy')
+  const [ttsVoice, setTtsVoice] = useState<string>('Chloe')
   const [ttsRate, setTtsRate] = useState<number>(1.0)
   const [useRealtime, setUseRealtime] = useState<boolean>(true)
   // Device selection
@@ -1525,7 +1525,7 @@ export function ChatBar() {
                   onChange={(e) => setTtsVoice(e.target.value)}
                   className="mt-1 w-full border rounded px-2 py-1 text-sm"
                 >
-                  {['alloy','ash','ballad','coral','echo','sage','shimmer','verse','marin','cedar'].map(v => (
+                  {['Chloe','Evelyn','Laura','Madison','Anaya','Abigail','Meera','Marisol','Lucy','Aaron','Ethan','Brian','Gordon','Andy','Dylan','Archer','Emmanuel','Gavin','Ivan','Walter'].map(v => (
                     <option key={v} value={v}>{v}</option>
                   ))}
                 </select>

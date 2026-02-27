@@ -238,78 +238,134 @@ export async function runWhisper(options: WhisperOptions): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// Text-to-Speech (MiniMax Speech-02-Turbo on Replicate)
+// Text-to-Speech (Chatterbox Turbo by Resemble AI on Replicate)
 // ---------------------------------------------------------------------------
 
 export interface TTSOptions {
-  /** Text to synthesize (max 10,000 chars) */
+  /** Text to synthesize (max 500 chars — longer text is auto-chunked) */
   text: string
-  /** Voice name — accepts OpenAI names (mapped) or MiniMax voice_id directly */
+  /** Voice name — accepts legacy names (mapped) or Chatterbox voice names directly */
   voice?: string
-  /** Speed multiplier 0.5–2.0 (default 1.0) */
+  /** Speed multiplier — mapped to temperature (lower temp = more consistent/faster feel) */
   speed?: number
-  /** Emotion: happy, sad, angry, fearful, disgusted, surprised, or neutral */
-  emotion?: string
-}
-
-/** Map OpenAI voice names → MiniMax voice IDs */
-const VOICE_MAP: Record<string, string> = {
-  alloy: 'English_CalmWoman',
-  ash: 'English_Trustworth_Man',
-  ballad: 'English_Gentle_Woman',
-  coral: 'English_Friendly_Woman',
-  echo: 'Deep_Voice_Man',
-  sage: 'English_Wise_Woman',
-  shimmer: 'English_Cheerful_Girl',
-  verse: 'English_Storyteller_Man',
-  marin: 'English_Sweet_Girl',
-  cedar: 'English_Confident_Man',
 }
 
 /**
- * Generate speech audio using MiniMax Speech-02-Turbo on Replicate.
- * @returns URL to the generated audio file
+ * Available Chatterbox Turbo voices:
+ * Aaron, Abigail, Anaya, Andy, Archer, Brian, Chloe, Dylan,
+ * Emmanuel, Ethan, Evelyn, Gavin, Gordon, Ivan, Laura, Lucy,
+ * Madison, Marisol, Meera, Walter
+ */
+export const CHATTERBOX_VOICES = [
+  'Aaron', 'Abigail', 'Anaya', 'Andy', 'Archer', 'Brian', 'Chloe', 'Dylan',
+  'Emmanuel', 'Ethan', 'Evelyn', 'Gavin', 'Gordon', 'Ivan', 'Laura', 'Lucy',
+  'Madison', 'Marisol', 'Meera', 'Walter',
+] as const
+
+/** Map legacy voice names → Chatterbox Turbo voice names */
+const VOICE_MAP: Record<string, string> = {
+  // Legacy OpenAI-style names
+  alloy: 'Chloe',
+  ash: 'Ethan',
+  ballad: 'Evelyn',
+  coral: 'Madison',
+  echo: 'Gordon',
+  sage: 'Laura',
+  shimmer: 'Anaya',
+  verse: 'Brian',
+  marin: 'Abigail',
+  cedar: 'Aaron',
+}
+
+/**
+ * Generate speech audio using Chatterbox Turbo (Resemble AI) on Replicate.
+ * Produces natural, human-like speech with 20 preset voices.
+ * @returns URL to the generated WAV audio file
  */
 export async function runTTS(options: TTSOptions): Promise<string> {
-  const { text, voice = 'alloy', speed = 1.0, emotion } = options
+  const { text, voice = 'Chloe', speed } = options
   const replicate = getReplicate()
 
-  // Resolve voice: check our map first, otherwise pass through as-is
-  const voiceId = VOICE_MAP[voice] || voice
+  // Resolve voice: check legacy map first, then check if it's a valid Chatterbox name, else default
+  const resolvedVoice = VOICE_MAP[voice]
+    || (CHATTERBOX_VOICES.includes(voice as any) ? voice : 'Chloe')
 
-  const input: Record<string, unknown> = {
-    text,
-    voice_id: voiceId,
-    speed: Math.max(0.5, Math.min(2.0, speed)),
-    audio_format: 'mp3',
-    sample_rate: '32000',
-    bitrate: '128000',
-    channel: '1',
-  }
-  if (emotion) input.emotion = emotion
+  // Chatterbox has a 500-char limit — for longer text, chunk and concatenate
+  const maxLen = 500
+  const chunks = text.length <= maxLen
+    ? [text]
+    : splitTextIntoChunks(text, maxLen)
 
-  const output = await replicate.run('minimax/speech-02-turbo', { input }) as any
+  // Map speed to temperature: lower speed → lower temperature (more focused/consistent)
+  // speed 1.0 → temp 0.8 (default), speed 0.5 → temp 0.4, speed 1.5 → temp 1.2
+  const temperature = speed
+    ? Math.max(0.05, Math.min(2.0, 0.8 * speed))
+    : 0.8
 
-  // Output is typically a FileOutput (URL string) or { audio: url }
-  let audioUrl: string | undefined
-  if (typeof output === 'string') {
-    audioUrl = output
-  } else if (output && typeof output === 'object') {
-    // Could be a FileOutput (has toString/href) or an object with audio field
-    if (typeof output.audio === 'string') {
-      audioUrl = output.audio
-    } else if (output.url) {
-      audioUrl = String(output.url)
-    } else {
-      audioUrl = String(output)
+  const audioUrls: string[] = []
+  for (const chunk of chunks) {
+    const input: Record<string, unknown> = {
+      text: chunk,
+      voice: resolvedVoice,
+      temperature,
     }
+
+    const output = await replicate.run('resemble-ai/chatterbox-turbo', { input }) as any
+
+    // Output is a FileOutput (has toString) returning a URL
+    let audioUrl: string | undefined
+    if (typeof output === 'string') {
+      audioUrl = output
+    } else if (output && typeof output === 'object') {
+      audioUrl = output.url ? String(output.url) : String(output)
+    }
+
+    if (!audioUrl || audioUrl === '[object Object]') {
+      throw new Error('Chatterbox Turbo returned unexpected output format')
+    }
+    audioUrls.push(audioUrl)
   }
 
-  if (!audioUrl || audioUrl === '[object Object]') {
-    throw new Error('MiniMax TTS returned unexpected output format')
+  // For single chunks, return the URL directly
+  // For multiple chunks, return the first (caller fetches & concatenates audio buffers)
+  return audioUrls[0]
+}
+
+/** Split text into chunks at sentence boundaries, respecting maxLen */
+function splitTextIntoChunks(text: string, maxLen: number): string[] {
+  const chunks: string[] = []
+  let remaining = text
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining)
+      break
+    }
+    // Find the last sentence-ending punctuation within maxLen
+    let splitIdx = -1
+    for (let i = maxLen - 1; i >= maxLen / 2; i--) {
+      if ('.!?'.includes(remaining[i])) {
+        splitIdx = i + 1
+        break
+      }
+    }
+    // Fallback: split at last space
+    if (splitIdx === -1) {
+      for (let i = maxLen - 1; i >= maxLen / 2; i--) {
+        if (remaining[i] === ' ') {
+          splitIdx = i + 1
+          break
+        }
+      }
+    }
+    // Last resort: hard split
+    if (splitIdx === -1) splitIdx = maxLen
+
+    chunks.push(remaining.slice(0, splitIdx).trim())
+    remaining = remaining.slice(splitIdx).trim()
   }
 
-  return audioUrl
+  return chunks
 }
 
 // ---------------------------------------------------------------------------
