@@ -174,6 +174,8 @@ export async function* streamGemini(options: GeminiOptions) {
 export interface WhisperOptions {
   /** Raw audio buffer (webm, ogg, mp4, wav, etc.) */
   audio: Buffer
+  /** MIME type of the audio (e.g. 'audio/webm', 'audio/mp4'). Defaults to 'audio/webm'. */
+  mimeType?: string
   /** Language code (e.g. 'en', 'es'). Omit for auto-detection. */
   language?: string
   /** Translate to English */
@@ -184,16 +186,36 @@ export interface WhisperOptions {
  * Transcribe audio using OpenAI Whisper running on Replicate.
  * @returns The transcription text
  */
+/** Detect audio MIME type from buffer magic bytes */
+function detectAudioMime(buf: Buffer): string | undefined {
+  if (buf.length < 12) return undefined
+  // WebM: starts with 0x1A45DFA3
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return 'audio/webm'
+  // OGG: starts with 'OggS'
+  if (buf.slice(0, 4).toString() === 'OggS') return 'audio/ogg'
+  // MP4/M4A: has 'ftyp' at offset 4
+  if (buf.slice(4, 8).toString() === 'ftyp') return 'audio/mp4'
+  // WAV: starts with 'RIFF'
+  if (buf.slice(0, 4).toString() === 'RIFF') return 'audio/wav'
+  // MP3: starts with 0xFF 0xFB or ID3
+  if ((buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0) || buf.slice(0, 3).toString() === 'ID3') return 'audio/mpeg'
+  // FLAC: starts with 'fLaC'
+  if (buf.slice(0, 4).toString() === 'fLaC') return 'audio/flac'
+  return undefined
+}
+
 // Whisper requires the version-pinned identifier (doesn't support the /models/ predictions endpoint)
 const WHISPER_VERSION = '8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e'
 
 export async function runWhisper(options: WhisperOptions): Promise<string> {
-  const { audio, language, translate = false } = options
+  const { audio, mimeType, language, translate = false } = options
   const replicate = getReplicate()
 
   // Convert Buffer to a data URI so the Replicate SDK can handle it
+  // Use the provided MIME type, or detect from buffer magic bytes, or default to webm
+  const resolvedMime = mimeType || detectAudioMime(audio) || 'audio/webm'
   const b64 = audio.toString('base64')
-  const dataUri = `data:audio/webm;base64,${b64}`
+  const dataUri = `data:${resolvedMime};base64,${b64}`
 
   const input: Record<string, unknown> = {
     audio: dataUri,

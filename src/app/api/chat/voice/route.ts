@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // Transcribe audio to text via Whisper on Replicate
     const buf = Buffer.from(await audioFile.arrayBuffer())
-    const transcript = await runWhisper({ audio: buf })
+    const transcript = await runWhisper({ audio: buf, mimeType: audioFile.type || undefined })
     if (!transcript) {
       return NextResponse.json({ error: 'Empty transcription' }, { status: 422 })
     }
@@ -243,14 +243,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ reply, audioUrl, createdTask, commandsExecuted })
   } catch (err) {
-    console.error('Voice chat route error', err)
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const errStack = err instanceof Error ? err.stack : undefined
+    console.error('Voice chat route error:', errMsg)
+    if (errStack) console.error(errStack)
 
-    // Map common OpenAI quota/auth errors to a structured reply the client can detect
-    const message: string = String(err instanceof Error ? err.message : 'Internal error')
-    const status = /quota/i.test(message) ? 402 : 500
-    const body = /quota/i.test(message)
+    // Map common quota/auth errors to a structured reply the client can detect
+    const status = /quota/i.test(errMsg) ? 402 : 500
+    const body = /quota/i.test(errMsg)
       ? { reply: 'OpenAI quota exceeded. Please add credits or switch to browser speech.' }
-      : { error: 'Internal error' }
+      : { error: process.env.NODE_ENV === 'development' ? errMsg : 'Internal error' }
 
     return NextResponse.json(body, { status })
   }
