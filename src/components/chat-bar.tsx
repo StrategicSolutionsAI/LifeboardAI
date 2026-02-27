@@ -1072,9 +1072,20 @@ export function ChatBar() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
+        // Empty transcription (silence) — silently restart recording
+        if (res.status === 422 && (errorData as any).error === 'Empty transcription') {
+          console.log('Empty transcription — restarting recording')
+          // Remove the user message we just added (it was silence)
+          setMessages(messages)
+          setIsProcessing(false)
+          if (isVoiceMode && !isRecording) {
+            setTimeout(() => startRecording(), 300)
+          }
+          return
+        }
         console.error('❌ API error:', errorData)
         if ((errorData as any).reply && String((errorData as any).reply).toLowerCase().includes('quota')) {
-          throw new Error("OpenAI quota exceeded. Please add credits to your OpenAI account or I can add browser-based speech recognition instead.")
+          throw new Error("Voice service quota exceeded. Please try again later.")
         }
         throw new Error(`Voice chat request failed: ${res.status} ${res.statusText}`)
       }
@@ -1132,8 +1143,13 @@ export function ChatBar() {
           }
         })
       } else {
-        // No server audio—use browser TTS so the convo stays natural
-        speakText(data.reply)
+        // No server audio — just show the text reply, no browser TTS fallback
+        setIsProcessing(false)
+        if (isVoiceMode && !isRecording) {
+          setTimeout(() => {
+            if (isVoiceMode && !isRecording && !isProcessing) startRecording()
+          }, 500)
+        }
       }
     } catch (err: any) {
       console.error('Voice message error:', err)
@@ -1282,10 +1298,8 @@ export function ChatBar() {
             currentAudioRef.current = null
           })
         } catch {
-          speakText(data.reply)
+          // Server audio playback failed — just show text, no browser TTS fallback
         }
-      } else {
-        speakText(data.reply)
       }
     } catch (err) {
       console.error(err)
