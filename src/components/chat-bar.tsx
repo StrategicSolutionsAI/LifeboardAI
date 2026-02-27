@@ -47,11 +47,17 @@ export function ChatBar() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const currentAudioRef = useRef<HTMLAudioElement | null>(null)
-  const ttsUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const volumeCheckRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const helloTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Track recording state in a ref so silence detection doesn't use stale closure
+  const isRecordingRef = useRef<boolean>(false)
+  // Track when recording started for minimum duration enforcement
+  const recordingStartRef = useRef<number>(0)
+  // Track recording duration for display
+  const [recordingDuration, setRecordingDuration] = useState<number>(0)
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   // Barge-in monitoring refs (listen while speaking)
   const bargeStreamRef = useRef<MediaStream | null>(null)
   const bargeCtxRef = useRef<AudioContext | null>(null)
@@ -227,42 +233,43 @@ export function ChatBar() {
     }
   }, [])
 
-  // Silence detection function
+  // Silence detection function — uses refs (not state) to avoid stale closures
   function detectSilence() {
-    if (!analyserRef.current) {
-      console.warn('⚠️ No analyser available for silence detection')
+    if (!analyserRef.current || !isRecordingRef.current) {
       return
     }
 
     const bufferLength = analyserRef.current.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)
     analyserRef.current.getByteFrequencyData(dataArray)
-    
+
     // Calculate RMS (Root Mean Square) for better volume detection
     const rms = Math.sqrt(dataArray.reduce((sum, value) => sum + value * value, 0) / bufferLength)
-    const threshold = 15 // Amplitude threshold
-    
-    // Log volume for debugging (less frequently)
-    if (Math.random() < 0.1) { // Only log 10% of the time to reduce spam
-    }
-    
-    if (rms < threshold) {
-      // Start silence timer if not already started
+    const threshold = 10 // Lowered threshold — less sensitive to background noise
+
+    // Enforce minimum recording duration of 2 seconds before silence detection
+    const elapsed = Date.now() - recordingStartRef.current
+    const MIN_RECORDING_MS = 2000
+
+    if (elapsed > MIN_RECORDING_MS && rms < threshold) {
+      // Start silence timer if not already started — 2.5s of silence before auto-send
       if (!silenceTimeoutRef.current) {
         silenceTimeoutRef.current = setTimeout(() => {
-          stopRecording()
-        }, 1000) // 1 second of silence for snappier flow
+          if (isRecordingRef.current) {
+            stopRecording()
+          }
+        }, 2500) // 2.5 seconds of silence (was 1s — that's why it kept cutting off)
       }
     } else {
-      // Clear silence timer if sound detected
+      // Clear silence timer if sound detected (or still within minimum duration)
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current)
         silenceTimeoutRef.current = null
       }
     }
-    
-    // Continue monitoring if still recording
-    if (isRecording) {
+
+    // Continue monitoring if still recording (use ref, not state)
+    if (isRecordingRef.current) {
       volumeCheckRef.current = requestAnimationFrame(detectSilence)
     }
   }
@@ -408,7 +415,7 @@ export function ChatBar() {
       
       recorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: (recorder as any).mimeType || chosenType || 'audio/webm' })
-        
+
         // Clean up audio analysis
         if (volumeCheckRef.current) {
           cancelAnimationFrame(volumeCheckRef.current)
@@ -418,7 +425,12 @@ export function ChatBar() {
           clearTimeout(silenceTimeoutRef.current)
           silenceTimeoutRef.current = null
         }
-        
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current)
+          recordingTimerRef.current = null
+        }
+        setRecordingDuration(0)
+
         if (audioBlob.size > 0) {
           setIsProcessing(true)
           await handleVoiceMessage(audioBlob)
@@ -426,33 +438,35 @@ export function ChatBar() {
         } else {
           console.warn('⚠️ No audio data recorded')
         }
-        
+
         stream.getTracks().forEach(track => track.stop())
       }
       
       // Record in chunks to get better data
       recorder.start(100) // Record data every 100ms
       mediaRecorderRef.current = recorder
+      isRecordingRef.current = true
+      recordingStartRef.current = Date.now()
       setIsRecording(true)
-      
+      setRecordingDuration(0)
+
+      // Start a timer to display recording duration
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(Math.floor((Date.now() - recordingStartRef.current) / 1000))
+      }, 1000)
+
       // Start silence detection
       detectSilence()
       
     } catch (error: any) {
       console.error('❌ Error accessing microphone:', error)
-      console.error('Error details:', {
-        name: error?.name,
-        message: error?.message,
-        micDeviceId,
-        hasRequestedDeviceAccess
-      })
-      
+
       // Provide more helpful error messages based on the error type
       let errorMessage = 'Microphone access error. '
-      
+
       if (error?.name === 'NotAllowedError' || error?.message?.includes('Permission denied')) {
         errorMessage += 'Permission denied. To use voice mode:\n\n' +
-          '1. Click the 🔒 or ⓘ icon in your browser\'s address bar\n' +
+          '1. Click the lock or info icon in your browser\'s address bar\n' +
           '2. Find "Microphone" permissions\n' +
           '3. Change it to "Allow"\n' +
           '4. Refresh the page and try again'
@@ -463,29 +477,43 @@ export function ChatBar() {
       } else {
         errorMessage += `${error?.message || 'Unknown error'}. Please check your browser permissions and try again.`
       }
-      
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
+
+      setMessages(prev => [...prev, {
+        role: "assistant",
         content: errorMessage
       }])
-      
+
       // Reset voice mode state on error
+      isRecordingRef.current = false
       setIsVoiceMode(false)
       setIsRecording(false)
+      setRecordingDuration(0)
     }
   }
 
   function stopRecording() {
+    isRecordingRef.current = false
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
     setIsRecording(false)
-    
+    setRecordingDuration(0)
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current)
       silenceTimeoutRef.current = null
     }
-    
+
+    if (volumeCheckRef.current) {
+      cancelAnimationFrame(volumeCheckRef.current)
+      volumeCheckRef.current = null
+    }
+
     if (audioContextRef.current) {
       audioContextRef.current.close()
       audioContextRef.current = null
@@ -493,7 +521,12 @@ export function ChatBar() {
   }
 
   function toggleVoiceMode() {
-    
+    if (isVoiceMode && isRecording) {
+      // Already recording — tap again to stop and send (push-to-talk UX)
+      stopRecording()
+      return
+    }
+
     if (isVoiceMode) {
       // Exit voice mode
       // Reset Realtime state guards
@@ -1175,9 +1208,6 @@ export function ChatBar() {
         currentAudioRef.current.pause()
         currentAudioRef.current = null
       }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel()
-      }
     } finally {
       setIsSpeaking(false)
     }
@@ -1203,40 +1233,6 @@ export function ChatBar() {
   function handleQuickPrompt(prompt: string) {
     setInput(prompt)
     setTimeout(() => inputRef.current?.focus(), 0)
-  }
-
-  function speakText(text: string) {
-    if (!speakReplies || !text) return
-    cancelTTS()
-
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const utter = new SpeechSynthesisUtterance(text)
-      // Apply basic settings to browser TTS
-      utter.rate = Math.min(4, Math.max(0.25, ttsRate || 1))
-      ttsUtteranceRef.current = utter
-      setIsSpeaking(true)
-
-      utter.onend = () => {
-        setIsSpeaking(false)
-        ttsUtteranceRef.current = null
-        if (isVoiceMode && !isProcessing) {
-          setTimeout(() => {
-            if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-          }, 500)
-        }
-      }
-      utter.onerror = () => {
-        setIsSpeaking(false)
-        ttsUtteranceRef.current = null
-        if (isVoiceMode && !isProcessing) {
-          setTimeout(() => {
-            if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-          }, 500)
-        }
-      }
-
-      window.speechSynthesis.speak(utter)
-    }
   }
 
   async function handleSend() {
@@ -1429,24 +1425,50 @@ export function ChatBar() {
 
           {/* Input */}
           <div className="border-t flex items-center gap-2 px-3 py-2 relative">
-            <input
-              type="text"
-              className="flex-1 text-sm outline-none placeholder-[#8e99a8]"
-              placeholder={
-                isVoiceMode
-                  ? (isSpeaking ? "AI is speaking…" :
-                     isProcessing ? "Processing…" :
-                     isRecording ? "Listening… (you can also type)" :
-                     "Voice mode active (you can also type)")
-                  : "Type a message…"
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend()
-              }}
-              ref={inputRef}
-            />
+            {/* Recording indicator replaces input when actively recording */}
+            {isVoiceMode && isRecording ? (
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-red-600">
+                    {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                  </span>
+                </div>
+                <div className="flex-1 flex items-center gap-[3px] px-2">
+                  {/* Audio level bars animation */}
+                  {[0, 1, 2, 3, 4].map(i => (
+                    <div
+                      key={i}
+                      className="w-1 bg-red-400 rounded-full animate-pulse"
+                      style={{
+                        height: `${8 + Math.random() * 12}px`,
+                        animationDelay: `${i * 100}ms`,
+                        animationDuration: '0.6s',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] text-[#8e99a8]">Tap mic to send</span>
+              </div>
+            ) : (
+              <input
+                type="text"
+                className="flex-1 text-sm outline-none placeholder-[#8e99a8]"
+                placeholder={
+                  isVoiceMode
+                    ? (isSpeaking ? "AI is speaking…" :
+                       isProcessing ? "Processing…" :
+                       "Tap mic to speak")
+                    : "Type a message…"
+                }
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSend()
+                }}
+                ref={inputRef}
+              />
+            )}
             {/* Settings Toggle */}
             <button
               onClick={() => setShowSettings(s => !s)}
@@ -1477,26 +1499,29 @@ export function ChatBar() {
               {speakReplies ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
 
-            {/* Voice Mode Toggle */}
-            <button 
+            {/* Voice Mode Toggle / Push-to-talk */}
+            <button
               onClick={toggleVoiceMode}
-              className={`transition-colors ${
-                isVoiceMode 
-                  ? 'text-green-500 bg-green-50 rounded-full p-1' 
-                  : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'
+              className={`transition-all ${
+                isRecording
+                  ? 'text-white bg-red-500 rounded-full p-1.5 shadow-md hover:bg-red-600'
+                  : isVoiceMode
+                    ? 'text-green-500 bg-green-50 rounded-full p-1 hover:bg-green-100'
+                    : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'
               }`}
-              aria-label={isVoiceMode ? "Exit voice mode" : "Start voice conversation"}
+              aria-label={isRecording ? "Stop recording and send" : isVoiceMode ? "Start recording" : "Start voice conversation"}
+              title={isRecording ? "Tap to send" : isVoiceMode ? "Tap to record" : "Voice mode"}
             >
-              {isVoiceMode ? (
+              {isRecording ? (
+                <Send className="w-4 h-4" />
+              ) : isVoiceMode ? (
                 <div className="flex items-center gap-1">
                   {isSpeaking ? (
                     <div className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-pulse"></div>
                   ) : isProcessing ? (
                     <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                  ) : isRecording ? (
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   ) : (
-                    <div className="w-2 h-2 bg-[#b8b0a8] rounded-full"></div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   )}
                   <Mic className="w-4 h-4" />
                 </div>
@@ -1504,9 +1529,11 @@ export function ChatBar() {
                 <Mic className="w-4 h-4" />
               )}
             </button>
-            <button onClick={handleSend} className="text-[#bb9e7b]" aria-label="Send message">
-              <Send className="w-4 h-4" />
-            </button>
+            {!isRecording && (
+              <button onClick={handleSend} className="text-[#bb9e7b]" aria-label="Send message">
+                <Send className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Hidden audio element for realtime playback */}
