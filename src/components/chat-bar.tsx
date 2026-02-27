@@ -1141,14 +1141,24 @@ export function ChatBar() {
         notifyTasksUpdated([1000, 3000])
       }
 
-      // Auto-play OpenAI TTS audio if available and handle continuous conversation
-      // Play audio response (server TTS or browser TTS fallback)
+      // Play audio response if server returned TTS audio
       if (data.audioUrl) {
+        console.log('[Voice] Got audioUrl, length:', data.audioUrl.length, 'prefix:', data.audioUrl.slice(0, 30))
         setIsSpeaking(true)
         const audio = new Audio(data.audioUrl)
         currentAudioRef.current = audio
 
+        // Set output device if selected
+        try {
+          if (speakerDeviceId && typeof (audio as any).setSinkId === 'function') {
+            await (audio as any).setSinkId(speakerDeviceId)
+          }
+        } catch (e) {
+          console.warn('[Voice] Failed to set output device', e)
+        }
+
         audio.onended = () => {
+          console.log('[Voice] Audio playback ended')
           setIsSpeaking(false)
           currentAudioRef.current = null
           if (isVoiceMode && !isProcessing) {
@@ -1157,7 +1167,8 @@ export function ChatBar() {
             }, 500)
           }
         }
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+          console.error('[Voice] Audio playback error:', e)
           setIsSpeaking(false)
           currentAudioRef.current = null
           if (isVoiceMode && !isProcessing) {
@@ -1166,7 +1177,8 @@ export function ChatBar() {
             }, 500)
           }
         }
-        audio.play().catch(() => {
+        audio.play().catch((playErr) => {
+          console.error('[Voice] audio.play() failed:', playErr)
           setIsSpeaking(false)
           currentAudioRef.current = null
           if (isVoiceMode && !isProcessing) {
@@ -1176,7 +1188,8 @@ export function ChatBar() {
           }
         })
       } else {
-        // No server audio — just show the text reply, no browser TTS fallback
+        console.log('[Voice] No audioUrl in response — text only')
+        // No server audio — just show the text reply
         setIsProcessing(false)
         if (isVoiceMode && !isRecording) {
           setTimeout(() => {

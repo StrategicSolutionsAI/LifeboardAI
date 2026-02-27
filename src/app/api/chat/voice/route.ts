@@ -227,18 +227,28 @@ export async function POST(req: NextRequest) {
     // Synthesize speech via Chatterbox Turbo on Replicate
     let audioUrl: string | undefined
     try {
+      const ttsVoice = requestedVoice || process.env.TTS_VOICE || 'Chloe'
+      console.log(`[TTS] Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
       const ttsFileUrl = await runTTS({
         text: reply,
-        voice: requestedVoice || process.env.TTS_VOICE || 'Chloe',
+        voice: ttsVoice,
         speed: typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? requestedSpeed : undefined,
       })
+      console.log(`[TTS] Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
       // Fetch the audio file and convert to base64 data URI (Replicate URLs are temporary)
       const audioRes = await fetch(ttsFileUrl)
+      if (!audioRes.ok) {
+        console.error(`[TTS] Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
+        throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
+      }
       const audioBuf = Buffer.from(await audioRes.arrayBuffer())
+      console.log(`[TTS] Audio buffer size: ${audioBuf.length} bytes`)
       const b64 = audioBuf.toString('base64')
       audioUrl = `data:audio/wav;base64,${b64}`
+      console.log(`[TTS] Success — data URI length: ${audioUrl.length}`)
     } catch (e) {
-      console.warn('Server TTS failed, falling back to client TTS', e)
+      console.error('[TTS] Server TTS failed:', e instanceof Error ? e.message : String(e))
+      if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
     }
 
     return NextResponse.json({ reply, audioUrl, createdTask, commandsExecuted })

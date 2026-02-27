@@ -317,12 +317,19 @@ export async function runTTS(options: TTSOptions): Promise<string> {
 
     const output = await replicate.run('resemble-ai/chatterbox-turbo', { input }) as any
 
-    // Output is a FileOutput (has toString) returning a URL
+    // Output is a FileOutput — its toString() returns the download URL
     let audioUrl: string | undefined
     if (typeof output === 'string') {
       audioUrl = output
     } else if (output && typeof output === 'object') {
-      audioUrl = output.url ? String(output.url) : String(output)
+      // FileOutput.toString() returns the URL; output.url is a function that returns a URL object
+      const str = String(output)
+      if (str && str !== '[object Object]' && (str.startsWith('http') || str.startsWith('data:'))) {
+        audioUrl = str
+      } else if (typeof output.url === 'function') {
+        const urlObj = output.url()
+        audioUrl = urlObj?.href || String(urlObj)
+      }
     }
 
     if (!audioUrl || audioUrl === '[object Object]') {
