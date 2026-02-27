@@ -28,7 +28,7 @@ export function ChatBar() {
   const [showSettings, setShowSettings] = useState(false)
   const [ttsVoice, setTtsVoice] = useState<string>('Chloe')
   const [ttsRate, setTtsRate] = useState<number>(1.0)
-  const [useRealtime, setUseRealtime] = useState<boolean>(true)
+  const [useRealtime, setUseRealtime] = useState<boolean>(false)
   // Device selection
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [micDeviceId, setMicDeviceId] = useState<string>('')
@@ -1062,7 +1062,7 @@ export function ChatBar() {
 
       // Send to API for processing
       const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 20000)
+      const timer = setTimeout(() => controller.abort(), 90000) // 90s for STT + LLM + TTS pipeline
       const res = await fetch("/api/chat/voice", {
         method: "POST",
         body: formData,
