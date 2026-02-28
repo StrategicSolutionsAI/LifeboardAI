@@ -207,14 +207,14 @@ export default function OnboardingStep4() {
       title="Connect Your Apps"
       subtitle="Sync your favorite tools and services"
       description="Connect apps you already use to automatically import your data and get better insights. You can always add more later."
-      buttonText="CONTINUE"
+      buttonText="Continue"
       onNext={handleNext}
       onBack={handleBack}
     >
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h2 className="text-[18px] font-medium text-[#171A1F]">Popular integrations</h2>
-          <p className="text-[14px] text-[#565E6C]">Click any service below to connect instantly</p>
+          <p className="text-sm text-[#565E6C]">Click any service below to connect instantly</p>
         </div>
         
         <div className="grid grid-cols-1 gap-3">
@@ -244,7 +244,7 @@ export default function OnboardingStep4() {
                     </span>
                   )}
                 </div>
-                <p className="text-[14px] text-[#6B7280]">
+                <p className="text-sm text-[#6B7280]">
                   {integration.description}
                 </p>
               </div>
@@ -288,8 +288,8 @@ export default function OnboardingStep4() {
 
         {/* Info text */}
         <div className="flex flex-col gap-2 mt-4">
-          <div className="p-3 bg-[#faf8f5] rounded-lg">
-            <p className="text-[12px] text-[#6B7280]">
+          <div className="p-3 bg-theme-surface-alt rounded-lg">
+            <p className="text-xs text-[#6B7280]">
               💡 Don't see your app? More integrations are coming soon! You can always manage connections later from settings.
             </p>
           </div>

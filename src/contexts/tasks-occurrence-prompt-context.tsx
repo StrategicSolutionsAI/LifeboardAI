@@ -106,17 +106,17 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
         onClick={() => resolve("cancel")}
       >
         <div
-          className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-[#dbd6cf]"
+          className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-theme-neutral-300"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="px-6 pt-6">
-            <h2 id="occurrence-prompt-title" className="text-lg font-semibold text-[#314158]">
+            <h2 id="occurrence-prompt-title" className="text-lg font-semibold text-theme-text-primary">
               {title}
             </h2>
-            <p className="mt-3 text-sm text-[#6b7688]">
+            <p className="mt-3 text-sm text-theme-text-subtle">
               {actionDescription}.
             </p>
-            <p className="mt-2 text-sm text-[#6b7688]">
+            <p className="mt-2 text-sm text-theme-text-subtle">
               Would you like to apply this change to only this occurrence on the selected date or to the entire series?
             </p>
           </div>
@@ -140,7 +140,7 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
             <button
               type="button"
               onClick={() => resolve("cancel")}
-              className="w-full rounded-lg border border-transparent bg-white text-sm font-medium text-[#8e99a8] hover:text-[#4a5568]"
+              className="w-full rounded-lg border border-transparent bg-white text-sm font-medium text-theme-text-tertiary hover:text-theme-text-body"
             >
               Cancel
             </button>

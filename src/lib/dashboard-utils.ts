@@ -62,7 +62,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
-import { widgetTemplates } from "@/components/widget-library";
+import { widgetTemplates } from "@/lib/widget-templates";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -159,6 +159,7 @@ export const iconMap: Record<string, LucideIcon> = {
   doctor_appt: CalendarClock,
   medication: Pill,
   quit_habit: ShieldOff,
+  habit_tracker: Target,
   symptom_log: ClipboardList,
   medical_bills: DollarSign,
   home_projects: Hammer,
@@ -186,11 +187,11 @@ export const iconMap: Record<string, LucideIcon> = {
 };
 
 export const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
-  progress: "bg-[#4AADE0]",
-  integration: "bg-[#48B882]",
+  progress: "bg-theme-info",
+  integration: "bg-theme-success",
   entry: "bg-[#8B7FD4]",
-  task: "bg-[#C4A44E]",
-  system: "bg-[#b8b0a8]",
+  task: "bg-theme-warning",
+  system: "bg-theme-neutral-400",
 };
 
 // ---------------------------------------------------------------------------
@@ -260,6 +261,13 @@ export const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
 export const hexToRgba = (hex: string, alpha: number): string => {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/** Returns '#314158' for light backgrounds, '#ffffff' for dark backgrounds (WCAG AA compliant) */
+export const getContrastText = (hex: string): string => {
+  const { r, g, b } = hexToRgb(hex);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55 ? '#314158' : '#ffffff';
 };
 
 export const getWidgetColorStyles = (hex: string) => {

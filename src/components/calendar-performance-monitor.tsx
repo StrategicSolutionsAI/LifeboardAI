@@ -98,7 +98,7 @@ export function CalendarPerformanceMonitor() {
         <h3 className="text-sm font-bold">Performance Metrics</h3>
         <button 
           onClick={() => setIsVisible(false)}
-          className="text-[#8e99a8] hover:text-white"
+          className="text-theme-text-tertiary hover:text-white"
         >
           ✕
         </button>
@@ -106,42 +106,42 @@ export function CalendarPerformanceMonitor() {
       
       <div className="space-y-1">
         <div className="flex justify-between gap-4">
-          <span className="text-[#8e99a8]">FCP:</span>
+          <span className="text-theme-text-tertiary">FCP:</span>
           <span className={metrics.firstContentfulPaint < 1000 ? 'text-green-400' : metrics.firstContentfulPaint < 2000 ? 'text-yellow-400' : 'text-red-400'}>
             {metrics.firstContentfulPaint}ms
           </span>
         </div>
         
         <div className="flex justify-between gap-4">
-          <span className="text-[#8e99a8]">DOM Interactive:</span>
+          <span className="text-theme-text-tertiary">DOM Interactive:</span>
           <span className={metrics.domInteractive < 2000 ? 'text-green-400' : metrics.domInteractive < 3000 ? 'text-yellow-400' : 'text-red-400'}>
             {metrics.domInteractive}ms
           </span>
         </div>
         
         <div className="flex justify-between gap-4">
-          <span className="text-[#8e99a8]">Load Complete:</span>
+          <span className="text-theme-text-tertiary">Load Complete:</span>
           <span className={metrics.loadComplete < 3000 ? 'text-green-400' : metrics.loadComplete < 5000 ? 'text-yellow-400' : 'text-red-400'}>
             {metrics.loadComplete}ms
           </span>
         </div>
         
         <div className="flex justify-between gap-4">
-          <span className="text-[#8e99a8]">API Calls:</span>
+          <span className="text-theme-text-tertiary">API Calls:</span>
           <span className={metrics.apiCallsCount < 5 ? 'text-green-400' : metrics.apiCallsCount < 10 ? 'text-yellow-400' : 'text-red-400'}>
             {metrics.apiCallsCount}
           </span>
         </div>
         
         <div className="flex justify-between gap-4">
-          <span className="text-[#8e99a8]">Cache Hit Rate:</span>
+          <span className="text-theme-text-tertiary">Cache Hit Rate:</span>
           <span className={metrics.cacheHitRate > 80 ? 'text-green-400' : metrics.cacheHitRate > 50 ? 'text-yellow-400' : 'text-red-400'}>
             {metrics.cacheHitRate}%
           </span>
         </div>
       </div>
       
-      <div className="mt-2 pt-2 border-t border-[#4a5568] text-[10px] text-[#8e99a8]">
+      <div className="mt-2 pt-2 border-t border-theme-text-body text-[10px] text-theme-text-tertiary">
         Press Ctrl+Shift+P to toggle
       </div>
     </div>

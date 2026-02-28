@@ -232,7 +232,7 @@ export default function WidgetTrendChart({
             </Badge>
           )}
           {analysis.trend === 'stable' && (
-            <Badge variant="secondary" className="bg-[#f5ede4] text-[#9a7b5a] text-xs px-1.5 py-0.5">
+            <Badge variant="secondary" className="bg-theme-surface-selected text-theme-primary-600 text-xs px-1.5 py-0.5">
               <Minus className="w-2.5 h-2.5 mr-1" />
               Stable
             </Badge>

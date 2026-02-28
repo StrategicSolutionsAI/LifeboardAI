@@ -1,13 +1,14 @@
 "use client";
 
 import { WidgetInstance } from "@/types/widgets";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/hooks/use-tasks";
 import { format } from "date-fns";
+import { card, form } from "@/lib/styles";
 
 // Calidora-aligned colour palette
 const COLORS = [
@@ -38,17 +39,13 @@ const getHolidaySuggestions = () => {
 
 const getColorClass = (color: string): string => {
   const colorMap: Record<string, string> = {
-    tan: "bg-[#B1916A]", green: "bg-[#48B882]", blue: "bg-[#4AADE0]", purple: "bg-[#8B7FD4]", pink: "bg-[#D07AA4]", gold: "bg-[#C4A44E]", orange: "bg-[#E28A5D]", teal: "bg-[#5E9B8C]", slate: "bg-[#8e99a8]", stone: "bg-[#b8b0a8]"
+    tan: "bg-theme-primary", green: "bg-theme-success", blue: "bg-theme-info", purple: "bg-[#8B7FD4]", pink: "bg-[#D07AA4]", gold: "bg-theme-warning", orange: "bg-[#E28A5D]", teal: "bg-[#5E9B8C]", slate: "bg-theme-text-tertiary", stone: "bg-theme-neutral-400"
   }
-  return colorMap[color] || "bg-[#B1916A]"
+  return colorMap[color] || "bg-theme-primary"
 }
 
-const PANEL_SECTION_CLASS = "space-y-4 rounded-2xl border border-[#dbd6cf] bg-white p-4 shadow-[0px_4px_16px_rgba(163,133,96,0.06)]";
-const FIELD_LABEL_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-[#8e99a8]";
-const FORM_CONTROL_CLASS = "w-full rounded-lg border border-[#dbd6cf] bg-white px-3 py-2.5 text-sm text-[#314158] shadow-[0px_4px_16px_rgba(163,133,96,0.06)] transition focus:border-[#bb9e7b] focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]";
-const TEXTAREA_CLASS = `${FORM_CONTROL_CLASS} min-h-[88px] resize-y`;
-const RADIO_CONTROL_CLASS = "h-4 w-4 border-[#dbd6cf] text-[#B1916A] focus:ring-[#B1916A]/40";
-const CHECKBOX_CONTROL_CLASS = "h-4 w-4 rounded border-[#dbd6cf] text-[#B1916A] focus:ring-[#B1916A]/40";
+const RADIO_CONTROL_CLASS = "h-5 w-5 border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/40";
+const CHECKBOX_CONTROL_CLASS = "h-5 w-5 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/40";
 
 interface WidgetEditorProps {
   widget: WidgetInstance | null;
@@ -134,9 +131,11 @@ export default function WidgetEditorSheet({
   const [saveError, setSaveError] = useState<string | null>(null);
   const { createTask, batchUpdateTasks, deleteTask } = useTasksContext();
 
-  // Only check integration connections when the editor is actually open
+  // Session cache: only fetch integration status once per editor mount
+  const connectionStatusChecked = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || connectionStatusChecked.current) return;
     const checkConnections = async () => {
       try {
         const [fitbitRes, gfRes, wRes] = await Promise.all([
@@ -152,6 +151,7 @@ export default function WidgetEditorSheet({
         setIsFitbitConnected(fitbitData.connected);
         setIsGoogleFitConnected(gfData.connected);
         setIsWithingsConnected(wData.connected);
+        connectionStatusChecked.current = true;
       } catch (error) {
         console.error('Error checking integration connections:', error);
       }
@@ -361,13 +361,13 @@ export default function WidgetEditorSheet({
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full p-0 sm:w-[min(560px,95vw)]">
-        <div className="flex h-full flex-col bg-gradient-to-b from-white via-white to-[#faf8f5]/80">
-          <SheetHeader className="border-b border-[#dbd6cf] bg-white px-4 py-4 pr-12 sm:px-6">
-            <SheetTitle className="text-xl font-semibold text-[#314158]">
+      <SheetContent side="right" className="w-full max-h-[95vh] sm:max-h-full p-0 sm:w-[min(560px,95vw)]">
+        <div className="flex h-full flex-col bg-gradient-to-b from-white via-white to-theme-surface-alt/80">
+          <SheetHeader className="border-b border-theme-neutral-300 bg-white px-4 py-4 pr-12 sm:px-6">
+            <SheetTitle className="text-xl font-semibold text-theme-text-primary">
               {isNewWidget ? "Add Widget" : "Edit Widget"}
             </SheetTitle>
-            <p className="text-sm text-[#8e99a8]">
+            <p className="text-sm text-theme-text-tertiary">
               {isNewWidget
                 ? "Customize this widget before adding it to your dashboard."
                 : "Update widget details, schedule, and linked task settings."}
@@ -375,15 +375,15 @@ export default function WidgetEditorSheet({
           </SheetHeader>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-            <div className="rounded-2xl border border-[#dbd6cf]/80 bg-gradient-to-b from-[#faf8f5] to-white p-3 shadow-sm">
+            <div className="rounded-2xl border border-theme-neutral-300/80 bg-gradient-to-b from-theme-surface-alt to-white p-3 shadow-sm">
               <WidgetPreview widget={draft} bucketColor={bucketColor} />
             </div>
 
             {/* Birthday, Events, and Holiday specific fields */}
             {draft.id === 'birthdays' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Friend's Name</p>
+                  <p className={form.label}>Friend's Name</p>
                   <input
                     type="text"
                     value={draft.birthdayData?.friendName || ''}
@@ -396,11 +396,11 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Enter friend's name"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Birth Date</p>
+                  <p className={form.label}>Birth Date</p>
                   <input
                     type="date"
                     value={draft.birthdayData?.birthDate || ''}
@@ -412,14 +412,14 @@ export default function WidgetEditorSheet({
                         birthDate: e.target.value
                       }
                     } : p)}
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
               </div>
             ) : draft.id === 'social_events' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Event Name</p>
+                  <p className={form.label}>Event Name</p>
                   <input
                     type="text"
                     value={draft.eventData?.eventName || ''}
@@ -433,11 +433,11 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Enter event name"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Event Date</p>
+                  <p className={form.label}>Event Date</p>
                   <input
                     type="date"
                     value={draft.eventData?.eventDate || ''}
@@ -450,11 +450,11 @@ export default function WidgetEditorSheet({
                         description: p.eventData?.description || ''
                       }
                     } : p)}
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Description (Optional)</p>
+                  <p className={form.label}>Description (Optional)</p>
                   <textarea
                     value={draft.eventData?.description || ''}
                     onChange={e => setDraft(p => p ? {
@@ -467,14 +467,14 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Enter event description"
-                    className={`${TEXTAREA_CLASS} min-h-[5rem]`}
+                    className={`${form.textarea} min-h-[5rem]`}
                   />
                 </div>
               </div>
             ) : draft.id === 'holidays' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Holiday Name</p>
+                  <p className={form.label}>Holiday Name</p>
                   <input
                     type="text"
                     value={draft.holidayData?.holidayName || ''}
@@ -487,11 +487,11 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Enter holiday name"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Holiday Date</p>
+                  <p className={form.label}>Holiday Date</p>
                   <input
                     type="date"
                     value={draft.holidayData?.holidayDate || ''}
@@ -503,13 +503,13 @@ export default function WidgetEditorSheet({
                         holidayDate: e.target.value
                       }
                     } : p)}
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
 
                 {/* Holiday Suggestions */}
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Popular Holidays</p>
+                  <p className={form.label}>Popular Holidays</p>
                   <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                     {getHolidaySuggestions().map((holiday) => (
                       <button
@@ -522,19 +522,19 @@ export default function WidgetEditorSheet({
                             holidayDate: holiday.date
                           }
                         } : p)}
-                        className="rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-2 py-1.5 text-left text-xs text-[#4a5568] transition hover:bg-[#f5f0eb]"
+                        className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-2 py-1.5 text-left text-xs text-theme-text-body transition hover:bg-theme-progress-track"
                       >
                         {holiday.name}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-[#8e99a8]">Click a suggestion to auto-fill</p>
+                  <p className="text-xs text-theme-text-tertiary">Click a suggestion to auto-fill</p>
                 </div>
               </div>
             ) : draft.id === 'mood' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>How are you feeling today?</p>
+                  <p className={form.label}>How are you feeling today?</p>
                   <div className="grid grid-cols-5 gap-2">
                     {[
                       { emoji: '😢', label: 'Very Poor', value: 1 },
@@ -556,8 +556,8 @@ export default function WidgetEditorSheet({
                           }
                         } : p)}
                         className={`flex flex-col items-center rounded-lg border p-2 transition-all ${draft.moodData?.currentMood === mood.value
-                            ? "border-[#B1916A] bg-[rgba(177,145,106,0.06)]"
-                            : 'border-[#dbd6cf] hover:border-[#dbd6cf]'
+                            ? "border-theme-primary bg-theme-brand-tint-subtle"
+                            : 'border-theme-neutral-300 hover:border-theme-neutral-300'
                           }`}
                       >
                         <span className="text-xl mb-1">{mood.emoji}</span>
@@ -568,7 +568,7 @@ export default function WidgetEditorSheet({
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Mood Note (Optional)</p>
+                  <p className={form.label}>Mood Note (Optional)</p>
                   <textarea
                     value={draft.moodData?.moodNote || ''}
                     onChange={e => setDraft(p => p ? {
@@ -581,20 +581,20 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="What's affecting your mood today?"
-                    className={`${TEXTAREA_CLASS} min-h-[4rem]`}
+                    className={`${form.textarea} min-h-[4rem]`}
                   />
                 </div>
 
                 {draft.moodData?.currentMood && (
-                  <div className="rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-xs text-[#6b7688]">
+                  <div className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-xs text-theme-text-subtle">
                     Current mood: {['😢 Very Poor', '😕 Poor', '😐 Neutral', '😊 Good', '😁 Excellent'][draft.moodData.currentMood - 1]}
                   </div>
                 )}
               </div>
             ) : draft.id === 'journal' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Today's Journal Entry</p>
+                  <p className={form.label}>Today's Journal Entry</p>
                   <textarea
                     value={draft.journalData?.todaysEntry || ''}
                     onChange={e => {
@@ -610,9 +610,9 @@ export default function WidgetEditorSheet({
                       } : p);
                     }}
                     placeholder="What's on your mind today? How are you feeling? What happened that was meaningful?"
-                    className={`${TEXTAREA_CLASS} min-h-[9rem]`}
+                    className={`${form.textarea} min-h-[9rem]`}
                   />
-                  <div className="flex justify-between text-xs text-[#8e99a8]">
+                  <div className="flex justify-between text-xs text-theme-text-tertiary">
                     <span>
                       {draft.journalData?.todaysEntry ?
                         `${draft.journalData.todaysEntry.split(' ').filter(word => word.length > 0).length} words` :
@@ -624,7 +624,7 @@ export default function WidgetEditorSheet({
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Writing Prompts</p>
+                  <p className={form.label}>Writing Prompts</p>
                   <div className="grid grid-cols-1 gap-1">
                     {[
                       "What are three things that went well today?",
@@ -650,19 +650,19 @@ export default function WidgetEditorSheet({
                             }
                           } : p);
                         }}
-                        className="rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-2 py-1.5 text-left text-xs text-[#4a5568] transition hover:bg-[#f5f0eb]"
+                        className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-2 py-1.5 text-left text-xs text-theme-text-body transition hover:bg-theme-progress-track"
                       >
                         {prompt}
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-[#8e99a8]">Click a prompt to add it to your entry</p>
+                  <p className="text-xs text-theme-text-tertiary">Click a prompt to add it to your entry</p>
                 </div>
               </div>
             ) : draft.id === 'gratitude' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>What are you grateful for today?</p>
+                  <p className={form.label}>What are you grateful for today?</p>
                   {(draft.gratitudeData?.gratitudeItems || []).map((item, index) => (
                     <div key={index} className="flex gap-2">
                       <input
@@ -682,7 +682,7 @@ export default function WidgetEditorSheet({
                           } : p);
                         }}
                         placeholder={`Gratitude item ${index + 1}`}
-                        className={`${FORM_CONTROL_CLASS} flex-1`}
+                        className={`${form.input} flex-1`}
                       />
                       <button
                         type="button"
@@ -721,20 +721,101 @@ export default function WidgetEditorSheet({
                         } : p);
                       }
                     }}
-                    className="w-full rounded-lg border border-dashed border-[#dbd6cf] px-3 py-2 text-sm text-[#8e99a8] transition hover:border-[#c5beb6] hover:text-[#4a5568]"
+                    className="w-full rounded-lg border border-dashed border-theme-neutral-300 px-3 py-2 text-sm text-theme-text-tertiary transition hover:border-theme-neutral-400 hover:text-theme-text-body"
                   >
                     + Add gratitude item
                   </button>
 
-                  <div className="text-xs text-[#8e99a8]">
+                  <div className="text-xs text-theme-text-tertiary">
                     {draft.gratitudeData?.gratitudeItems?.length || 0} / 5 items
                   </div>
                 </div>
               </div>
-            ) : draft.id === 'quit_habit' ? (
-              <div className={PANEL_SECTION_CLASS}>
+            ) : draft.id === 'habit_tracker' ? (
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>What habit are you quitting?</p>
+                  <p className={form.label}>Habit Name</p>
+                  <input
+                    type="text"
+                    value={draft.habitTrackerData?.habitName || ''}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      habitTrackerData: {
+                        habitName: e.target.value,
+                        habitDescription: p.habitTrackerData?.habitDescription || '',
+                        startDate: p.habitTrackerData?.startDate || new Date().toISOString().split('T')[0],
+                        bestStreak: p.habitTrackerData?.bestStreak || 0,
+                        totalCompletions: p.habitTrackerData?.totalCompletions || 0,
+                        completionHistory: p.habitTrackerData?.completionHistory || [],
+                        milestones: p.habitTrackerData?.milestones || [
+                          { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
+                          { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
+                          { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
+                          { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
+                          { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
+                          { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
+                          { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
+                          { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
+                        ],
+                      }
+                    } : p)}
+                    placeholder="e.g., Read 30 minutes, Meditate, Exercise"
+                    className={form.input}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className={form.label}>Description (Optional)</p>
+                  <textarea
+                    value={draft.habitTrackerData?.habitDescription || ''}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      habitTrackerData: {
+                        ...p.habitTrackerData!,
+                        habitDescription: e.target.value,
+                      }
+                    } : p)}
+                    placeholder="Why is this habit important to you?"
+                    className={`${form.textarea} min-h-[4rem]`}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className={form.label}>Start Date</p>
+                  <input
+                    type="date"
+                    value={draft.habitTrackerData?.startDate || new Date().toISOString().split('T')[0]}
+                    onChange={e => setDraft(p => p ? {
+                      ...p,
+                      habitTrackerData: {
+                        ...p.habitTrackerData!,
+                        startDate: e.target.value,
+                      }
+                    } : p)}
+                    className={form.input}
+                  />
+                </div>
+
+                {draft.habitTrackerData?.habitName && (
+                  <div className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt p-3 text-xs text-theme-text-subtle">
+                    <div className="font-medium mb-1">Preview:</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{"\uD83C\uDFAF"}</span>
+                      <span className="font-medium text-theme-text-body">{draft.habitTrackerData.habitName}</span>
+                    </div>
+                    {draft.habitTrackerData.habitDescription && (
+                      <div className="text-theme-text-tertiary mt-1">{draft.habitTrackerData.habitDescription}</div>
+                    )}
+                    <div className="mt-1">
+                      {"\uD83D\uDD25"} 0 day streak {"\u2022"} Click widget card to start tracking
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : draft.id === 'quit_habit' ? (
+              <div className={card.panel}>
+                <div className="space-y-2">
+                  <p className={form.label}>What habit are you quitting?</p>
                   <input
                     type="text"
                     value={draft.quitHabitData?.habitName || ''}
@@ -752,12 +833,12 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="e.g., smoking, drinking, social media"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Quit Date</p>
+                  <p className={form.label}>Quit Date</p>
                   <input
                     type="date"
                     value={draft.quitHabitData?.quitDate || ''}
@@ -774,12 +855,12 @@ export default function WidgetEditorSheet({
                         motivationalNote: p.quitHabitData?.motivationalNote || ''
                       }
                     } : p)}
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Daily Cost (Optional)</p>
+                  <p className={form.label}>Daily Cost (Optional)</p>
                   <div className="flex gap-2">
                     <select
                       value={draft.quitHabitData?.currency || '$'}
@@ -790,7 +871,7 @@ export default function WidgetEditorSheet({
                           currency: e.target.value
                         }
                       } : p)}
-                      className={`${FORM_CONTROL_CLASS} w-16`}
+                      className={`${form.input} w-16`}
                     >
                       <option value="$">$</option>
                       <option value="€">€</option>
@@ -809,14 +890,14 @@ export default function WidgetEditorSheet({
                         }
                       } : p)}
                       placeholder="0.00"
-                      className={`${FORM_CONTROL_CLASS} flex-1`}
+                      className={`${form.input} flex-1`}
                     />
                   </div>
-                  <p className="text-xs text-[#8e99a8]">How much did you spend per day on this habit?</p>
+                  <p className="text-xs text-theme-text-tertiary">How much did you spend per day on this habit?</p>
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Motivation (Optional)</p>
+                  <p className={form.label}>Motivation (Optional)</p>
                   <textarea
                     value={draft.quitHabitData?.motivationalNote || ''}
                     onChange={e => setDraft(p => p ? {
@@ -827,13 +908,13 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Why are you quitting? What motivates you to stay clean?"
-                    className={`${TEXTAREA_CLASS} min-h-[5rem]`}
+                    className={`${form.textarea} min-h-[5rem]`}
                   />
                 </div>
 
                 {draft.quitHabitData?.quitDate && draft.quitHabitData?.habitName && (
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-[#dbd6cf] bg-[#faf8f5] p-3 text-xs text-[#6b7688]">
+                    <div className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt p-3 text-xs text-theme-text-subtle">
                       <div className="font-medium mb-1">Preview:</div>
                       <div>🚭 Quitting {draft.quitHabitData.habitName}</div>
                       <div>📅 Since {new Date(draft.quitHabitData.quitDate).toLocaleDateString()}</div>
@@ -852,7 +933,7 @@ export default function WidgetEditorSheet({
 
                     <div className="border-t pt-3 space-y-3">
                       <div>
-                        <p className={`${FIELD_LABEL_CLASS} mb-2`}>Daily Check-in</p>
+                        <p className={`${form.label} mb-2`}>Daily Check-in</p>
                         <button
                           type="button"
                           onClick={() => {
@@ -884,11 +965,11 @@ export default function WidgetEditorSheet({
                         >
                           ✅ Check In for Today
                         </button>
-                        <p className="text-xs text-[#8e99a8] mt-1">Mark your progress for today and celebrate your commitment</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Mark your progress for today and celebrate your commitment</p>
                       </div>
 
                       <div>
-                        <p className={`${FIELD_LABEL_CLASS} mb-2`}>Reset Options</p>
+                        <p className={`${form.label} mb-2`}>Reset Options</p>
                         <button
                           type="button"
                           onClick={() => {
@@ -915,16 +996,16 @@ export default function WidgetEditorSheet({
                         >
                           🔄 Reset to Today
                         </button>
-                        <p className="text-xs text-[#8e99a8] mt-1">Use if you had a setback and want to start fresh</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Use if you had a setback and want to start fresh</p>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
             ) : draft.id === 'weight' ? (
-              <div className={PANEL_SECTION_CLASS}>
+              <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Current Weight</p>
+                  <p className={form.label}>Current Weight</p>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -941,7 +1022,7 @@ export default function WidgetEditorSheet({
                         }
                       } : p)}
                       placeholder="Enter current weight"
-                      className={`${FORM_CONTROL_CLASS} flex-1`}
+                      className={`${form.input} flex-1`}
                     />
                     <select
                       value={draft.weightData?.unit || draft.unit || 'lbs'}
@@ -953,7 +1034,7 @@ export default function WidgetEditorSheet({
                           unit: e.target.value
                         }
                       } : p)}
-                      className={`${FORM_CONTROL_CLASS} w-20`}
+                      className={`${form.input} w-20`}
                     >
                       <option value="lbs">lbs</option>
                       <option value="kg">kg</option>
@@ -962,7 +1043,7 @@ export default function WidgetEditorSheet({
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Starting Weight (Optional)</p>
+                  <p className={form.label}>Starting Weight (Optional)</p>
                   <input
                     type="number"
                     step="0.1"
@@ -976,12 +1057,12 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Starting weight for progress tracking"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <p className={FIELD_LABEL_CLASS}>Goal Weight (Optional)</p>
+                  <p className={form.label}>Goal Weight (Optional)</p>
                   <input
                     type="number"
                     step="0.1"
@@ -995,15 +1076,15 @@ export default function WidgetEditorSheet({
                       }
                     } : p)}
                     placeholder="Target weight goal"
-                    className={FORM_CONTROL_CLASS}
+                    className={form.input}
                   />
                 </div>
 
                 {/* Data Source Selector */}
                 <div className="space-y-2 border-t pt-3">
-                  <p className={FIELD_LABEL_CLASS}>Data Source</p>
+                  <p className={form.label}>Data Source</p>
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-sm text-[#4a5568]">
+                    <label className="flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-sm text-theme-text-body">
                       <input
                         type="radio"
                         name="weightDataSource"
@@ -1015,7 +1096,7 @@ export default function WidgetEditorSheet({
                       <span className="text-xs">Manual</span>
                     </label>
                     {isWithingsConnected && (
-                      <label className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-sm text-[#4a5568]">
+                      <label className="flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-sm text-theme-text-body">
                         <input
                           type="radio"
                           name="weightDataSource"
@@ -1028,14 +1109,14 @@ export default function WidgetEditorSheet({
                       </label>
                     )}
                     {!isWithingsConnected && (
-                      <p className="ml-1 text-[10px] text-[#8e99a8]">Connect Withings to enable automatic sync</p>
+                      <p className="ml-1 text-[10px] text-theme-text-tertiary">Connect Withings to enable automatic sync</p>
                     )}
                   </div>
                 </div>
 
                 {/* Quick Log Entry */}
                 <div className="space-y-2 border-t pt-3">
-                  <p className={FIELD_LABEL_CLASS}>Quick Log Entry</p>
+                  <p className={form.label}>Quick Log Entry</p>
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -1043,7 +1124,7 @@ export default function WidgetEditorSheet({
                       min="0"
                       placeholder="Weight"
                       disabled={draft.dataSource === 'withings'}
-                      className={`${FORM_CONTROL_CLASS} flex-1`}
+                      className={`${form.input} flex-1`}
                       id="quick-weight-input"
                     />
                     <button
@@ -1074,18 +1155,18 @@ export default function WidgetEditorSheet({
                           alert(`Weight logged: ${weight} ${draft.weightData?.unit || draft.unit || 'lbs'}`);
                         }
                       }}
-                      className="rounded-lg border border-[#dbd6cf] bg-[rgba(177,145,106,0.08)] px-4 py-2 text-sm font-medium text-[#314158] transition hover:bg-[rgba(177,145,106,0.14)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg border border-theme-neutral-300 bg-theme-brand-tint-light px-4 py-2 text-sm font-medium text-theme-text-primary transition hover:bg-theme-brand-tint disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Log
                     </button>
                   </div>
-                  <p className="text-xs text-[#8e99a8]">Enter today's weight measurement</p>
+                  <p className="text-xs text-theme-text-tertiary">Enter today's weight measurement</p>
                 </div>
 
                 {/* Weight Progress Display */}
                 {draft.weightData && (draft.weightData.currentWeight || draft.weightData.entries?.length) && (
                   <div className="space-y-3 border-t pt-3">
-                    <div className="rounded-lg border border-[#dbd6cf] bg-[#faf8f5] p-3 text-xs text-[#6b7688]">
+                    <div className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt p-3 text-xs text-theme-text-subtle">
                       <div className="font-medium mb-1">Weight Tracking Preview:</div>
 
                       {draft.weightData.currentWeight && (
@@ -1098,14 +1179,14 @@ export default function WidgetEditorSheet({
                             ? "text-green-600"
                             : draft.weightData.currentWeight > draft.weightData.startingWeight
                               ? "text-orange-600"
-                              : "text-[#6b7688]"
+                              : "text-theme-text-subtle"
                         }>
                           📈 Change: {(draft.weightData.currentWeight - draft.weightData.startingWeight > 0 ? '+' : '')}{(draft.weightData.currentWeight - draft.weightData.startingWeight).toFixed(1)} {draft.weightData.unit || draft.unit || 'lbs'}
                         </div>
                       )}
 
                       {draft.weightData.goalWeight && draft.weightData.currentWeight && (
-                        <div className="text-[#9a7b5a]">
+                        <div className="text-theme-primary-600">
                           🎯 To Goal: {(draft.weightData.goalWeight - draft.weightData.currentWeight > 0 ? '+' : '')}{(draft.weightData.goalWeight - draft.weightData.currentWeight).toFixed(1)} {draft.weightData.unit || draft.unit || 'lbs'}
                         </div>
                       )}
@@ -1119,12 +1200,12 @@ export default function WidgetEditorSheet({
               </div>
             ) : (
               /* Target */
-              <div className={PANEL_SECTION_CLASS}>
-                <p className={FIELD_LABEL_CLASS}>Daily target</p>
+              <div className={card.panel}>
+                <p className={form.label}>Daily target</p>
                 <div className="flex items-center gap-2">
                   <button
                     aria-label="Decrease target"
-                    className="rounded-lg border border-[#dbd6cf] bg-[#f5f0eb] px-3 py-2 text-sm font-medium text-[#4a5568] transition hover:bg-[#ebe5de]"
+                    className="rounded-lg border border-theme-neutral-300 bg-theme-progress-track px-3 py-2 text-sm font-medium text-theme-text-body transition hover:bg-theme-skeleton"
                     onClick={() => setDraft(p => p ? { ...p, target: Math.max(0, p.target - 1) } : p)}
                   >
                     -
@@ -1134,11 +1215,11 @@ export default function WidgetEditorSheet({
                     type="number"
                     value={draft.target}
                     onChange={e => setDraft(p => p ? { ...p, target: Number(e.target.value) } : p)}
-                    className="w-20 rounded-lg border border-[#dbd6cf] bg-white px-3 py-2 text-center text-sm text-[#314158] shadow-sm focus:border-[#B1916A] focus:outline-none focus:ring-2 focus:ring-[#B1916A]/20"
+                    className="w-20 rounded-lg border border-theme-neutral-300 bg-white px-3 py-2 text-center text-sm text-theme-text-primary shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/20"
                   />
-                  <span className="text-sm text-[#6b7688]">{draft.unit}</span>
+                  <span className="text-sm text-theme-text-subtle">{draft.unit}</span>
                   <button
-                    className="rounded-lg border border-[#dbd6cf] bg-[#f5f0eb] px-3 py-2 text-sm font-medium text-[#4a5568] transition hover:bg-[#ebe5de]"
+                    className="rounded-lg border border-theme-neutral-300 bg-theme-progress-track px-3 py-2 text-sm font-medium text-theme-text-body transition hover:bg-theme-skeleton"
                     onClick={() => setDraft(p => p ? { ...p, target: p.target + 1 } : p)}
                   >
                     +
@@ -1149,10 +1230,10 @@ export default function WidgetEditorSheet({
 
             {/* Data Source Selector - Only for water widget with Fitbit connected */}
             {['water', 'steps'].includes(draft.id) && (
-              <div className={PANEL_SECTION_CLASS}>
-                <p className={FIELD_LABEL_CLASS}>Data Source</p>
+              <div className={card.panel}>
+                <p className={form.label}>Data Source</p>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-sm text-[#4a5568]">
+                  <label className="flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-sm text-theme-text-body">
                     <input
                       type="radio"
                       name="dataSource"
@@ -1164,7 +1245,7 @@ export default function WidgetEditorSheet({
                     <span className="text-sm">Manual tracking</span>
                   </label>
                   {isFitbitConnected && (
-                    <label className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-sm text-[#4a5568]">
+                    <label className="flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-sm text-theme-text-body">
                       <input
                         type="radio"
                         name="dataSource"
@@ -1177,7 +1258,7 @@ export default function WidgetEditorSheet({
                     </label>
                   )}
                   {isGoogleFitConnected && (
-                    <label className="flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-2 text-sm text-[#4a5568]">
+                    <label className="flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-2 text-sm text-theme-text-body">
                       <input
                         type="radio"
                         name="dataSource"
@@ -1191,7 +1272,7 @@ export default function WidgetEditorSheet({
                   )}
                 </div>
                 {draft.dataSource === 'fitbit' && (
-                  <p className="text-xs text-[#8e99a8] mt-1">
+                  <p className="text-xs text-theme-text-tertiary mt-1">
                     {draft.name} will sync automatically from your Fitbit device
                   </p>
                 )}
@@ -1201,10 +1282,10 @@ export default function WidgetEditorSheet({
 
 
             {/* Task / Event Details */}
-            <div className={PANEL_SECTION_CLASS}>
+            <div className={card.panel}>
               <div className="flex items-center justify-between">
-                <p className={FIELD_LABEL_CLASS}>Task &amp; Event</p>
-                <label className="inline-flex items-center gap-2 rounded-lg border border-[#dbd6cf] bg-[#faf8f5] px-3 py-1.5 text-xs text-[#4a5568]">
+                <p className={form.label}>Task &amp; Event</p>
+                <label className="inline-flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-1.5 text-xs text-theme-text-body">
                   <input
                     type="checkbox"
                     checked={Boolean(taskConfig.enabled)}
@@ -1218,22 +1299,22 @@ export default function WidgetEditorSheet({
               {taskConfig.enabled && (
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <p className={FIELD_LABEL_CLASS}>Title</p>
+                    <p className={form.label}>Title</p>
                     <input
                       type="text"
                       value={taskConfig.title ?? ""}
                       onChange={e => updateTaskConfig({ title: e.target.value })}
                       placeholder="Task title"
-                      className={FORM_CONTROL_CLASS}
+                      className={form.input}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <p className={FIELD_LABEL_CLASS}>Bucket</p>
+                    <p className={form.label}>Bucket</p>
                     <select
                       value={taskConfig.bucket ?? ""}
                       onChange={e => updateTaskConfig({ bucket: e.target.value })}
-                      className={FORM_CONTROL_CLASS}
+                      className={form.input}
                     >
                       <option value="">Select bucket</option>
                       {derivedBuckets.map(bucket => (
@@ -1243,16 +1324,16 @@ export default function WidgetEditorSheet({
                   </div>
 
                   <div className="space-y-2">
-                    <p className={FIELD_LABEL_CLASS}>Due Date</p>
+                    <p className={form.label}>Due Date</p>
                     <input
                       type="date"
                       value={taskConfig.dueDate ?? ""}
                       onChange={e => updateTaskConfig({ dueDate: e.target.value })}
-                      className={FORM_CONTROL_CLASS}
+                      className={form.input}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-[#6b7688]">
+                  <div className="flex items-center justify-between text-xs text-theme-text-subtle">
                     <label className="inline-flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -1262,7 +1343,7 @@ export default function WidgetEditorSheet({
                       />
                       All-day
                     </label>
-                    <span className="text-[11px] text-[#8e99a8]">
+                    <span className="text-[11px] text-theme-text-tertiary">
                       {draft.linkedTaskId ? "Updating linked task" : "Will create task"}
                     </span>
                   </div>
@@ -1270,32 +1351,32 @@ export default function WidgetEditorSheet({
                   {!taskConfig.allDay && (
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <p className={FIELD_LABEL_CLASS}>Start Time</p>
+                        <p className={form.label}>Start Time</p>
                         <input
                           type="time"
                           value={taskConfig.startTime ?? ""}
                           onChange={e => updateTaskConfig({ startTime: e.target.value })}
-                          className={FORM_CONTROL_CLASS}
+                          className={form.input}
                         />
                       </div>
                       <div className="space-y-1">
-                        <p className={FIELD_LABEL_CLASS}>End Time</p>
+                        <p className={form.label}>End Time</p>
                         <input
                           type="time"
                           value={taskConfig.endTime ?? ""}
                           onChange={e => updateTaskConfig({ endTime: e.target.value })}
-                          className={FORM_CONTROL_CLASS}
+                          className={form.input}
                         />
                       </div>
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <p className={FIELD_LABEL_CLASS}>Repeat</p>
+                    <p className={form.label}>Repeat</p>
                     <select
                       value={taskConfig.repeat ?? "none"}
                       onChange={e => updateTaskConfig({ repeat: e.target.value as RepeatOption })}
-                      className={FORM_CONTROL_CLASS}
+                      className={form.input}
                     >
                       {REPEAT_OPTIONS.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -1304,7 +1385,7 @@ export default function WidgetEditorSheet({
                   </div>
 
                   {draft.linkedTaskId && (
-                    <p className="text-[11px] text-[#8e99a8]">
+                    <p className="text-[11px] text-theme-text-tertiary">
                       Linked task ID: <span className="font-mono">{draft.linkedTaskId}</span>
                     </p>
                   )}
@@ -1314,13 +1395,13 @@ export default function WidgetEditorSheet({
 
             {/* Schedule */}
             {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'nutrition'].includes(draft.id) && (
-              <div className={PANEL_SECTION_CLASS}>
-                <p className={FIELD_LABEL_CLASS}>Schedule</p>
+              <div className={card.panel}>
+                <p className={form.label}>Schedule</p>
                 <div className="flex flex-wrap gap-2">
                   {WEEKDAYS.map((d, idx) => (
                     <button
                       key={d}
-                      className={`h-9 w-9 rounded-full border text-[11px] font-semibold transition ${draft.schedule[idx] ? "border-[#B1916A] bg-[#B1916A] text-white shadow-sm" : "border-[#dbd6cf] bg-white text-[#6b7688] hover:border-[#c5beb6]"}`}
+                      className={`h-9 w-9 rounded-full border text-[11px] font-semibold transition ${draft.schedule[idx] ? "border-theme-primary bg-theme-primary text-white shadow-sm" : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"}`}
                       onClick={() => setDraft(p => p ? { ...p, schedule: p.schedule.map((v, i) => i === idx ? !v : v) as boolean[] } : p)}
                     >
                       {d.charAt(0)}
@@ -1332,7 +1413,7 @@ export default function WidgetEditorSheet({
 
           </div>
 
-          <div className="border-t border-[#dbd6cf] bg-white/95 px-4 py-3 sm:px-6">
+          <div className="border-t border-theme-neutral-300 bg-white/95 px-4 py-3 sm:px-6">
             {saveError && (
               <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {saveError}

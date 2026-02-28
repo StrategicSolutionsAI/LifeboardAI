@@ -41,7 +41,9 @@ type UpdateItemInput = Partial<Omit<CreateItemInput, "name">> & {
 
 export function useShoppingList() {
   const [items, setItems] = useState<ShoppingListItem[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<ShoppingListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPurchased, setLoadingPurchased] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
@@ -65,6 +67,28 @@ export function useShoppingList() {
       setError("Failed to load shopping list items.");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadPurchasedItems = useCallback(async () => {
+    setLoadingPurchased(true);
+    try {
+      const response = await fetch("/api/shopping-list?includePurchased=true", {
+        method: "GET",
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const json = await response.json();
+      const fetched: ShoppingListItem[] = Array.isArray(json?.items) ? json.items : [];
+      setPurchasedItems(fetched.filter((item) => item.isPurchased));
+    } catch (err: any) {
+      console.error("Failed to load purchased items", err);
+    } finally {
+      setLoadingPurchased(false);
     }
   }, []);
 
@@ -137,6 +161,7 @@ export function useShoppingList() {
     }
 
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setPurchasedItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   const togglePurchased = useCallback(async (id: string, nextValue: boolean) => {
@@ -158,12 +183,15 @@ export function useShoppingList() {
       return undefined;
     }
 
-    setItems((prev) => {
-      if (updated.isPurchased) {
-        return prev.filter((item) => item.id !== id);
-      }
-      return prev.map((item) => (item.id === id ? updated : item));
-    });
+    if (updated.isPurchased) {
+      // Move from active to purchased
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setPurchasedItems((prev) => [...prev, updated]);
+    } else {
+      // Move from purchased to active
+      setPurchasedItems((prev) => prev.filter((item) => item.id !== id));
+      setItems((prev) => [...prev, updated]);
+    }
 
     return updated;
   }, []);
@@ -181,10 +209,13 @@ export function useShoppingList() {
 
   return {
     items,
+    purchasedItems,
     itemsByBucket,
     loading,
+    loadingPurchased,
     error,
     reload: loadItems,
+    loadPurchasedItems,
     createItem,
     updateItem,
     deleteItem,

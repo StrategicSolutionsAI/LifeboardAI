@@ -11,16 +11,18 @@ import {
 } from "date-fns";
 import type { Task } from "@/hooks/use-tasks";
 import { useTasksContext } from "@/contexts/tasks-context";
+import { useToast } from "@/components/ui/use-toast";
 import { TasksQuickActions, type TasksQuickActionFilter } from "./tasks-quick-actions";
 import { TasksGroupedList } from "./tasks-grouped-list";
 import { TasksDailyProgress } from "./tasks-daily-progress";
-import { ExternalLink, LayoutDashboard, ListChecks, Zap } from "lucide-react";
+import { ExternalLink, LayoutDashboard, ListChecks, Pencil, Zap } from "lucide-react";
 
 interface EnhancedTasksViewProps {
   activeBucket: string;
   buckets: string[];
   linkedTaskMap?: Record<string, { bucket: string; widgetId: string }>;
   onToggleTaskWidget?: (task: Task) => Promise<void>;
+  onEditTask?: (taskId: string) => void;
 }
 
 type DueBadgeTone = "default" | "accent" | "destructive";
@@ -73,8 +75,8 @@ const getDueBadge = (task: Task): DueBadge | null => {
 };
 
 const dueBadgeClasses: Record<DueBadgeTone, string> = {
-  default: "border-[#dbd6cf] bg-[rgba(250,248,245,0.5)] text-[#8e99a8]",
-  accent: "border-[rgba(177,145,106,0.3)] bg-[rgba(177,145,106,0.1)] text-[#B1916A]",
+  default: "border-theme-neutral-300 bg-[rgba(250,248,245,0.5)] text-theme-text-tertiary",
+  accent: "border-theme-primary/30 bg-theme-brand-tint-light text-theme-primary",
   destructive: "border-red-200 bg-red-50 text-red-600",
 };
 
@@ -83,8 +85,10 @@ export function EnhancedTasksView({
   buckets,
   linkedTaskMap,
   onToggleTaskWidget,
+  onEditTask,
 }: EnhancedTasksViewProps) {
   const { allTasks, createTask, toggleTaskCompletion } = useTasksContext();
+  const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState("open");
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
   const [updatingCompletion, setUpdatingCompletion] = useState<Set<string>>(new Set());
@@ -212,11 +216,21 @@ export function EnhancedTasksView({
 
   const handleToggleCompletion = async (task: Task) => {
     const taskId = task.id.toString();
+    const wasCompleted = task.completed;
     setUpdatingCompletion((prev) => new Set(prev).add(taskId));
     try {
       await toggleTaskCompletion(task.id);
+      toast({
+        title: wasCompleted ? "Task reopened" : "Task completed",
+        type: "success",
+        duration: 2500,
+      });
     } catch (error) {
       console.error("Failed to toggle task completion:", error);
+      toast({
+        title: "Failed to update task",
+        type: "error",
+      });
     } finally {
       setUpdatingCompletion((prev) => {
         const next = new Set(prev);
@@ -251,14 +265,21 @@ export function EnhancedTasksView({
     };
 
     return (
-      <div className="p-4 transition-colors hover:bg-[rgba(250,248,245,0.5)]">
+      <div
+        className="group p-4 transition-colors hover:bg-[rgba(250,248,245,0.5)] cursor-pointer"
+        onClick={() => onEditTask?.(taskId)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEditTask?.(taskId); } }}
+      >
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
             checked={Boolean(task.completed)}
             onChange={() => void handleToggleCompletion(task)}
+            onClick={(e) => e.stopPropagation()}
             disabled={isUpdating}
-            className="mt-0.5 h-4 w-4 rounded border-[#dbd6cf] text-[#B1916A] focus:ring-[rgba(177,145,106,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-0.5 h-4 w-4 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-focus/30 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <div className="min-w-0 flex-1">
@@ -266,30 +287,43 @@ export function EnhancedTasksView({
               <h4
                 className={`text-sm font-medium ${
                   task.completed
-                    ? "text-[#8e99a8] line-through"
-                    : "text-[#314158]"
+                    ? "text-theme-text-tertiary line-through"
+                    : "text-theme-text-primary"
                 }`}
               >
                 {task.content}
               </h4>
-              {onToggleTaskWidget ? (
-                <button
-                  type="button"
-                  onClick={onToggleOverview}
-                  disabled={isTogglingWidget}
-                  className={`rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
-                    linkedInfo
-                      ? "border-[rgba(177,145,106,0.4)] bg-[rgba(177,145,106,0.1)] text-[#B1916A] hover:bg-[rgba(177,145,106,0.2)]"
-                      : "border-[#dbd6cf] text-[#8e99a8] hover:bg-[#faf8f5]"
-                  } ${isTogglingWidget ? "cursor-progress opacity-60" : ""}`}
-                  title={linkedInfo ? "Remove from overview" : "Show on overview"}
-                >
-                  <span className="flex items-center gap-1">
-                    <LayoutDashboard className="h-3.5 w-3.5" />
-                    {linkedInfo ? "On overview" : "To overview"}
-                  </span>
-                </button>
-              ) : null}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {onEditTask ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onEditTask(taskId); }}
+                    className="rounded-full border border-transparent p-1 text-theme-text-tertiary opacity-0 transition-all group-hover:opacity-100 hover:border-theme-neutral-300 hover:bg-theme-surface-alt hover:text-theme-text-primary"
+                    title="Edit task"
+                    aria-label="Edit task"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+                {onToggleTaskWidget ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void onToggleOverview(e); }}
+                    disabled={isTogglingWidget}
+                    className={`rounded-full border px-2 py-1 text-xs font-medium transition-colors ${
+                      linkedInfo
+                        ? "border-theme-primary/40 bg-theme-brand-tint-light text-theme-primary hover:bg-theme-primary/20"
+                        : "border-theme-neutral-300 text-theme-text-tertiary hover:bg-theme-surface-alt"
+                    } ${isTogglingWidget ? "cursor-progress opacity-60" : ""}`}
+                    title={linkedInfo ? "Remove from overview" : "Show on overview"}
+                  >
+                    <span className="flex items-center gap-1">
+                      <LayoutDashboard className="h-3.5 w-3.5" />
+                      {linkedInfo ? "On overview" : "To overview"}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -302,13 +336,13 @@ export function EnhancedTasksView({
               ) : null}
 
               {linkedInfo ? (
-                <span className="text-xs text-[#B1916A]/90">
+                <span className="text-xs text-theme-primary/90">
                   Showing on overview ({linkedInfo.bucket})
                 </span>
               ) : null}
 
               {isUpdating ? (
-                <span className="text-xs text-[#8e99a8]">Updating...</span>
+                <span className="text-xs text-theme-text-tertiary">Updating...</span>
               ) : null}
             </div>
           </div>
@@ -364,15 +398,15 @@ export function EnhancedTasksView({
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-[#314158]">Tasks for {bucketLabel}</h2>
-          <p className="mt-1 text-sm text-[#8e99a8]">
+          <h2 className="text-xl font-semibold text-theme-text-primary">Tasks for {bucketLabel}</h2>
+          <p className="mt-1 text-sm text-theme-text-tertiary">
             {taskCounts.open} open · {taskCounts.dueSoon} due soon · {taskCounts.completed} completed
             {buckets.length > 1 ? ` · ${buckets.length} buckets` : ""}
           </p>
         </div>
         <Link
           href="/tasks"
-          className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#dbd6cf]/80 bg-white px-3 text-sm font-medium text-[#596881] shadow-sm transition-all duration-200 ease-out hover:bg-[#faf8f5] hover:text-[#314158] hover:shadow-warm"
+          className="inline-flex h-9 items-center gap-1 rounded-lg border border-theme-neutral-300/80 bg-white px-3 text-sm font-medium text-theme-text-secondary shadow-sm transition-all duration-200 ease-out hover:bg-theme-surface-alt hover:text-theme-text-primary hover:shadow-warm"
         >
           Open full board
           <ExternalLink className="h-4 w-4" />
@@ -397,13 +431,13 @@ export function EnhancedTasksView({
 
       {showMarketingEmpty ? (
         <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(177,145,106,0.08)]">
-            <ListChecks className="h-8 w-8 text-[#B1916A]" />
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-theme-brand-tint-light">
+            <ListChecks className="h-8 w-8 text-theme-primary" />
           </div>
-          <h3 className="mb-2 text-xl font-semibold text-[#314158]">
+          <h3 className="mb-2 text-xl font-semibold text-theme-text-primary">
             Add tasks to {bucketLabel}
           </h3>
-          <p className="mb-6 max-w-md text-sm text-[#8e99a8]">
+          <p className="mb-6 max-w-md text-sm text-theme-text-tertiary">
             Connect Todoist for automatic sync, or add tasks manually with quick add.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -414,14 +448,14 @@ export function EnhancedTasksView({
                   window.location.href = "/integrations";
                 }
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#B1916A] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#96784f]"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-theme-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-theme-primary-600"
             >
               <Zap className="h-4 w-4" />
               Connect Todoist
             </button>
             <Link
               href="/tasks"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#dbd6cf]/80 bg-white px-5 py-2.5 text-sm font-medium text-[#314158] transition-colors hover:bg-[#faf8f5]"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-theme-neutral-300/80 bg-white px-5 py-2.5 text-sm font-medium text-theme-text-primary transition-colors hover:bg-theme-surface-alt"
             >
               <ExternalLink className="h-4 w-4" />
               Open task board
@@ -429,10 +463,10 @@ export function EnhancedTasksView({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[#dbd6cf]/80 bg-white">
+        <div className="overflow-hidden rounded-xl border border-theme-neutral-300/80 bg-white">
           {filteredTasks.length === 0 ? (
-            <div className="py-12 text-center text-[#8e99a8]">
-              <p className="mb-2 text-lg font-medium text-[#314158]">
+            <div className="py-12 text-center text-theme-text-tertiary">
+              <p className="mb-2 text-lg font-medium text-theme-text-primary">
                 {emptyStateCopy.title}
               </p>
               <p className="text-sm">{emptyStateCopy.description}</p>
@@ -442,7 +476,7 @@ export function EnhancedTasksView({
               <TasksGroupedList tasks={filteredTasks} renderTask={renderTask} />
             </div>
           ) : (
-            <div className="divide-y divide-[#dbd6cf]/60">
+            <div className="divide-y divide-theme-neutral-300/60">
               {filteredTasks.map((task) => (
                 <div key={task.id}>{renderTask(task)}</div>
               ))}

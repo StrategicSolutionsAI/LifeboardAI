@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,6 +204,17 @@ function TaskCard({
     () => formatTaskDateBadge(task),
     [task.dueDate, task.startDate, task.endDate]
   );
+  const [justCompleted, setJustCompleted] = useState(false);
+  const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleToggle = useCallback(() => {
+    if (task.status !== "done") {
+      setJustCompleted(true);
+      clearTimeout(justCompletedTimer.current);
+      justCompletedTimer.current = setTimeout(() => setJustCompleted(false), 600);
+    }
+    onToggle?.(task.id, task.status !== "done");
+  }, [task.id, task.status, onToggle]);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -212,9 +223,9 @@ function TaskCard({
           ref={provided.innerRef}
           {...provided.draggableProps}
           className={cn(
-            "group bg-white rounded-xl border border-[#dbd6cf]/80 p-3.5 transition-all cursor-default",
-            "hover:border-[rgba(177,145,106,0.35)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.08)]",
-            snapshot.isDragging && "opacity-40 shadow-warm-lg border-[#B1916A]/40"
+            "group bg-white rounded-xl border border-theme-neutral-300/80 p-3.5 transition-all cursor-default",
+            "hover:border-theme-primary/35 hover:shadow-warm-sm",
+            snapshot.isDragging && "opacity-40 shadow-warm-lg border-theme-primary/40"
           )}
         >
           <div className="flex items-start gap-2.5">
@@ -223,26 +234,27 @@ function TaskCard({
               {...provided.dragHandleProps}
               className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-30 transition-opacity shrink-0 mt-0.5"
             >
-              <GripVertical size={14} className="text-[#596881]" />
+              <GripVertical size={14} className="text-theme-text-secondary" />
             </div>
 
             {/* Checkbox */}
             <button
               type="button"
-              onClick={() => onToggle?.(task.id, task.status !== "done")}
+              onClick={handleToggle}
               disabled={isLoading}
               aria-label={task.status === "done" ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
               className={cn(
                 "w-[18px] h-[18px] rounded-[5px] shrink-0 mt-0.5 transition-all flex items-center justify-center",
                 task.status === "done"
-                  ? "bg-[#48B882]"
-                  : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]",
-                isLoading && "animate-pulse opacity-50"
+                  ? "bg-theme-success"
+                  : "bg-white border-[1.5px] border-theme-neutral-300/80 hover:border-theme-secondary",
+                isLoading && "animate-pulse opacity-50",
+                justCompleted && "animate-check-pop"
               )}
             >
-              {task.status === "done" && (
+              {(task.status === "done" || justCompleted) && (
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={justCompleted ? "animate-check-stroke" : ""} />
                 </svg>
               )}
             </button>
@@ -252,8 +264,8 @@ function TaskCard({
               <button
                 onClick={() => onOpen?.(task.id)}
                 className={cn(
-                  "text-[13px] text-[#314158] text-left hover:text-[#B1916A] transition-colors cursor-pointer leading-snug w-full",
-                  task.status === "done" && "line-through text-[#8e99a8]"
+                  "text-[13px] text-theme-text-primary text-left hover:text-theme-primary transition-colors cursor-pointer leading-snug w-full",
+                  task.status === "done" && "line-through text-theme-text-tertiary"
                 )}
               >
                 {task.title}
@@ -267,8 +279,8 @@ function TaskCard({
                       className={cn(
                         "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium",
                         dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
-                        dateBadge.tone === "accent" && "bg-[rgba(177,145,106,0.08)] text-[#96784f]",
-                        dateBadge.tone === "default" && "bg-[#f4f6f8] text-[#596881]"
+                        dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
+                        dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
                       )}
                     >
                       <CalendarDays size={9} />
@@ -278,7 +290,7 @@ function TaskCard({
                   {task.tags?.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-md bg-[#f4f6f8] px-1.5 py-0.5 text-[10px] text-[#8e99a8]"
+                      className="rounded-md bg-[#f4f6f8] px-1.5 py-0.5 text-[10px] text-theme-text-tertiary"
                     >
                       {tag}
                     </span>
@@ -293,9 +305,9 @@ function TaskCard({
                 <button
                   type="button"
                   aria-label="Task actions"
-                  className="p-0.5 rounded hover:bg-[rgba(177,145,106,0.06)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  className="p-0.5 rounded hover:bg-theme-brand-tint-subtle opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                 >
-                  <MoreHorizontal size={15} className="text-[#8e99a8]" />
+                  <MoreHorizontal size={15} className="text-theme-text-tertiary" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
@@ -306,13 +318,13 @@ function TaskCard({
                 {availableBuckets.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 text-[11px] font-medium text-[#8e99a8] uppercase tracking-wide">
+                    <div className="px-2 py-1.5 text-[11px] font-medium text-theme-text-tertiary uppercase tracking-wide">
                       Move to
                     </div>
                     <DropdownMenuItem
                       onClick={() => onBucketChange?.(task.id, "__unassigned")}
                     >
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#b5b0a8]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-theme-neutral-400" />
                       No bucket
                     </DropdownMenuItem>
                     {availableBuckets.map((bucket) => (
@@ -326,7 +338,7 @@ function TaskCard({
                         />
                         {bucket.name}
                         {task.bucketId === bucket.id && (
-                          <span className="ml-auto text-[#B1916A] font-semibold text-xs">
+                          <span className="ml-auto text-theme-primary font-semibold text-xs">
                             current
                           </span>
                         )}
@@ -353,6 +365,7 @@ function BucketColumn({
   viewMode,
   loadingTasks = new Set(),
   onTaskOpen,
+  justDroppedId,
 }: {
   bucket: Bucket;
   summary: BucketSummary;
@@ -363,6 +376,7 @@ function BucketColumn({
   viewMode: TasksBoardViewMode;
   loadingTasks?: Set<string>;
   onTaskOpen?: (taskId: string) => void;
+  justDroppedId?: string | null;
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -381,7 +395,7 @@ function BucketColumn({
   };
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-[#dbd6cf]/80 bg-[rgba(252,250,248,0.5)] overflow-hidden">
+    <div className="flex flex-col h-full rounded-xl border border-theme-neutral-300/80 bg-[rgba(252,250,248,0.5)] overflow-hidden">
       {/* Color accent bar */}
       <div className="h-[3px] shrink-0" style={{ backgroundColor: color }} />
 
@@ -395,15 +409,15 @@ function BucketColumn({
             <ClipboardList size={18} style={{ color: styles.text }} />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-[13px] text-[#314158] font-semibold truncate">
+            <span className="text-[13px] text-theme-text-primary font-semibold truncate">
               {bucket.name}
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[#8e99a8]">
+              <span className="text-[11px] text-theme-text-tertiary">
                 {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
               </span>
               {!isCompletedView && dueSoonCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 rounded-md bg-[rgba(177,145,106,0.1)] px-1.5 py-0.5 text-[10px] font-medium text-[#96784f]">
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-theme-brand-tint-light px-1.5 py-0.5 text-[10px] font-medium text-theme-primary-600">
                   <Clock3 className="h-2.5 w-2.5" />
                   {dueSoonCount} due soon
                 </span>
@@ -415,9 +429,9 @@ function BucketColumn({
           type="button"
           onClick={() => setIsAdding(true)}
           aria-label={`Add task in ${bucket.name}`}
-          className="p-1.5 hover:bg-[rgba(177,145,106,0.06)] rounded-lg transition-colors"
+          className="p-1.5 hover:bg-theme-brand-tint-subtle rounded-lg transition-colors"
         >
-          <Plus size={16} className="text-[#bb9e7b]" />
+          <Plus size={16} className="text-theme-secondary" />
         </button>
       </div>
 
@@ -447,7 +461,7 @@ function BucketColumn({
               )}
 
               {tasks.length === 0 && !snapshot.isDraggingOver && (
-                <div className="flex flex-col items-center justify-center py-12 rounded-xl bg-[rgba(177,145,106,0.03)]">
+                <div className="flex flex-col items-center justify-center py-12 rounded-xl bg-theme-brand-tint-subtle">
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-lg mb-3"
                     style={{ backgroundColor: styles.iconTint }}
@@ -458,10 +472,10 @@ function BucketColumn({
                       <ClipboardList size={18} style={{ color: styles.text, opacity: 0.6 }} />
                     )}
                   </div>
-                  <span className="text-[13px] text-[#8e99a8] mb-1">
+                  <span className="text-[13px] text-theme-text-tertiary mb-1">
                     {isCompletedView ? "No completed tasks" : "No tasks yet"}
                   </span>
-                  <span className="text-[11px] text-[#b5b0a8]">
+                  <span className="text-[11px] text-theme-neutral-400">
                     {isCompletedView
                       ? `Completed tasks in ${bucket.name} appear here`
                       : "Drag tasks here or add a new one"}
@@ -470,7 +484,10 @@ function BucketColumn({
               )}
 
               {tasks.map((task, index) => (
-                <div key={task.id} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div key={task.id} className={cn(
+                  "animate-in fade-in slide-in-from-bottom-2 duration-300",
+                  justDroppedId === task.id && "animate-drop-snap"
+                )}>
                   <TaskCard
                     task={task}
                     index={index}
@@ -491,13 +508,13 @@ function BucketColumn({
       {/* Add Task */}
       <div className="p-3 pt-0">
         {isAdding ? (
-          <div className="flex items-center gap-2 p-2 rounded-lg border border-[#dbd6cf]/80 bg-white">
+          <div className="flex items-center gap-2 p-2 rounded-lg border border-theme-neutral-300/80 bg-white">
             <Input
               autoFocus
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Task name..."
-              className="flex-1 border-0 focus-visible:ring-0 h-7 text-[13px] text-[#314158] placeholder:text-[#b5b0a8]"
+              className="flex-1 border-0 focus-visible:ring-0 h-7 text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -514,7 +531,7 @@ function BucketColumn({
               size="sm"
               onClick={handleSubmit}
               type="button"
-              className="h-7 px-3 text-xs bg-[#B1916A] hover:bg-[#96784f]"
+              className="h-7 px-3 text-xs bg-theme-primary hover:bg-theme-primary-600"
             >
               Add
             </Button>
@@ -522,10 +539,10 @@ function BucketColumn({
         ) : (
           <button
             onClick={() => setIsAdding(true)}
-            className="flex items-center justify-center gap-1.5 py-2.5 w-full rounded-lg border border-dashed border-[rgba(219,214,207,0.6)] text-[#bb9e7b] hover:bg-[rgba(177,145,106,0.04)] hover:border-[rgba(177,145,106,0.3)] transition-all"
+            className="flex items-center justify-center gap-1.5 py-2.5 w-full rounded-lg border border-dashed border-[rgba(219,214,207,0.6)] text-theme-secondary hover:bg-theme-brand-tint-subtle hover:border-theme-primary/30 transition-all"
           >
             <Plus size={14} />
-            <span className="text-[12px]">Add task</span>
+            <span className="text-xs">Add task</span>
           </button>
         )}
       </div>
@@ -547,6 +564,7 @@ function TasksBoard({
   const buckets = bucketsProp ?? [];
   const tasks = tasksProp ?? [];
   const summaries = useMemo(() => groupByBucket(tasks), [tasks]);
+  const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -561,6 +579,8 @@ function TasksBoard({
 
     if (source.droppableId !== destination.droppableId) {
       onMoveTask?.(draggableId, destination.droppableId);
+      setJustDroppedId(draggableId);
+      setTimeout(() => setJustDroppedId(null), 300);
     }
   };
 
@@ -594,6 +614,7 @@ function TasksBoard({
                   viewMode={viewMode}
                   loadingTasks={loadingTasks}
                   onTaskOpen={onTaskOpen}
+                  justDroppedId={justDroppedId}
                 />
               </div>
             ))}

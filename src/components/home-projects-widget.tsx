@@ -312,10 +312,10 @@ export function HomeProjectsWidget({
         <div className="space-y-3">
           {/* Next Priority Project */}
           {nextProject && (
-            <div className="border-t border-[#dbd6cf] pt-3">
-              <div className="bg-[#faf8f5] rounded-lg p-3 hover:bg-[#f5f0eb] transition-colors group">
+            <div className="border-t border-theme-neutral-300 pt-3">
+              <div className="bg-theme-surface-alt rounded-lg p-3 hover:bg-theme-progress-track transition-colors group">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium text-[#6b7688] uppercase tracking-wide">Next Priority:</span>
+                  <span className="text-xs font-medium text-theme-text-subtle uppercase tracking-wide">Next Priority:</span>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                     <button
                       onClick={(e) => {
@@ -358,11 +358,11 @@ export function HomeProjectsWidget({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {getStatusIcon(nextProject.status)}
-                      <span className="text-sm font-medium text-[#314158] truncate">
+                      <span className="text-sm font-medium text-theme-text-primary truncate">
                         {nextProject.title}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-[#8e99a8] flex-wrap">
+                    <div className="flex items-center gap-2 text-xs text-theme-text-tertiary flex-wrap">
                       <div className="flex items-center gap-1">
                         {getCategoryIcon(nextProject.category)}
                         <span className="capitalize">{nextProject.category}</span>
@@ -375,14 +375,14 @@ export function HomeProjectsWidget({
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-[#8e99a8]" />
+                  <ChevronRight className="w-4 h-4 text-theme-text-tertiary" />
                 </div>
               </div>
             </div>
           )}
 
           {/* Today's Focus */}
-          <div className="border-t border-[#dbd6cf] pt-3">
+          <div className="border-t border-theme-neutral-300 pt-3">
             {urgentProjects.length > 0 ? (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -417,9 +417,9 @@ export function HomeProjectsWidget({
           </div>
 
           {/* Smart Actions */}
-          <div className="border-t border-[#dbd6cf] pt-3">
+          <div className="border-t border-theme-neutral-300 pt-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-[#6b7688]">
+              <div className="text-sm text-theme-text-subtle">
                 {urgentProjects.length > 0 
                   ? "Focus on urgent items first" 
                   : activeProjects.length > 0 

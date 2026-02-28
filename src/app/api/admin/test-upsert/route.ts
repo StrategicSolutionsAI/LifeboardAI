@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { validateAdminAuth } from '@/lib/admin-auth';
 
 /**
  * Test endpoint to diagnose upsert issues
@@ -7,26 +8,18 @@ import { supabaseServer } from '@/utils/supabase/server';
  * Requires: authenticated admin user + ADMIN_SECRET header
  */
 export async function GET(request: Request) {
-  // Block in production unless explicitly enabled
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_ROUTES !== 'true') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  // Require admin secret header
-  const adminSecret = request.headers.get('x-admin-secret');
-  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const authError = await validateAdminAuth(request);
+  if (authError) return authError;
 
   try {
     const supabase = supabaseServer();
-    
+
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
       return NextResponse.json(
-        { error: 'Not authenticated', details: authError?.message },
+        { error: 'Not authenticated', details: userError?.message },
         { status: 401 }
       );
     }

@@ -353,7 +353,7 @@ export default function IntegrationsPageClient() {
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             {[...Array(6)].map((_, i) => (
-              <Card key={i}><CardHeader><div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-[#ebe5de] rounded animate-pulse" /><div><div className="h-5 w-32 bg-[#ebe5de] rounded animate-pulse mb-2" /><div className="h-4 w-48 bg-[#ebe5de] rounded animate-pulse" /></div></div><div className="w-20 h-6 bg-[#ebe5de] rounded animate-pulse" /></div></CardHeader><CardContent><div className="h-10 w-full bg-[#ebe5de] rounded animate-pulse" /></CardContent></Card>
+              <Card key={i}><CardHeader><div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-8 h-8 bg-theme-skeleton rounded animate-pulse" /><div><div className="h-5 w-32 bg-theme-skeleton rounded animate-pulse mb-2" /><div className="h-4 w-48 bg-theme-skeleton rounded animate-pulse" /></div></div><div className="w-20 h-6 bg-theme-skeleton rounded animate-pulse" /></div></CardHeader><CardContent><div className="h-10 w-full bg-theme-skeleton rounded animate-pulse" /></CardContent></Card>
             ))}
           </div>
         </div>
@@ -445,10 +445,10 @@ export default function IntegrationsPageClient() {
                   return (
                     <div
                       key={calendar.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-[#dbd6cf] bg-white px-4 py-3 shadow-sm"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-theme-neutral-300 bg-white px-4 py-3 shadow-sm"
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-[#314158]">{calendar.name}</p>
+                        <p className="text-sm font-semibold text-theme-text-primary">{calendar.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {eventCount} event{eventCount === 1 ? '' : 's'}
                           {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
@@ -461,7 +461,7 @@ export default function IntegrationsPageClient() {
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <label htmlFor={`calendar-bucket-${calendar.id}`} className="text-xs font-medium text-[#6b7688]">
+                          <label htmlFor={`calendar-bucket-${calendar.id}`} className="text-xs font-medium text-theme-text-subtle">
                             Bucket
                           </label>
                           <div className="relative">
@@ -478,7 +478,7 @@ export default function IntegrationsPageClient() {
                                 void handleUpdateImportBucket(calendar.id, nextValue, previousValue);
                               }}
                               disabled={isUpdatingBucket || deletingImportId === calendar.id}
-                              className="text-xs border border-[#dbd6cf] rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#bb9e7b] min-w-[140px]"
+                              className="text-xs border border-theme-neutral-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-theme-secondary min-w-[140px]"
                             >
                               <option value="">Unassigned</option>
                               {bucketOptions.map((bucketOption) => (
@@ -582,9 +582,9 @@ export default function IntegrationsPageClient() {
           })}
         </div>
 
-        <div className="mt-8 p-4 bg-[#fdf8f6] rounded-lg border border-[#dbd6cf]">
-          <h3 className="font-semibold text-[#314158] mb-2">Need Help?</h3>
-          <p className="text-sm text-[#314158]">If you're having trouble connecting an integration, try refreshing the page or disconnecting and reconnecting the service. Make sure you have the necessary permissions enabled in your connected apps.</p>
+        <div className="mt-8 p-4 bg-theme-primary-50 rounded-lg border border-theme-neutral-300">
+          <h3 className="font-semibold text-theme-text-primary mb-2">Need Help?</h3>
+          <p className="text-sm text-theme-text-primary">If you're having trouble connecting an integration, try refreshing the page or disconnecting and reconnecting the service. Make sure you have the necessary permissions enabled in your connected apps.</p>
         </div>
       </div>
     </>

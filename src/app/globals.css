@@ -134,6 +134,18 @@
     --theme-text-tertiary: #8e99a8;
     --theme-text-quaternary: #b0b8c4;
     --theme-text-inverse: #ffffff;
+    --theme-text-subtle: #6b7688;
+    --theme-text-body: #4a5568;
+
+    --theme-surface-alt: #faf8f5;
+    --theme-surface-selected: #f5ede4;
+    --theme-skeleton: #ebe5de;
+    --theme-progress-track: #f5f0eb;
+
+    --theme-brand-tint-subtle: rgba(177, 145, 106, 0.04);
+    --theme-brand-tint-light: rgba(177, 145, 106, 0.08);
+    --theme-brand-tint: rgba(177, 145, 106, 0.12);
+    --theme-brand-tint-strong: rgba(177, 145, 106, 0.15);
 
     --theme-primary: var(--theme-primary-500);
     --theme-secondary: var(--theme-secondary-500);
@@ -185,6 +197,18 @@
     --theme-text-tertiary: #a3a3a3;
     --theme-text-quaternary: #666666;
     --theme-text-inverse: #0a0a0a;
+    --theme-text-subtle: #9ca3af;
+    --theme-text-body: #d1d5db;
+
+    --theme-surface-alt: #1a1a1a;
+    --theme-surface-selected: #2d2d2d;
+    --theme-skeleton: #2a2a2a;
+    --theme-progress-track: #333333;
+
+    --theme-brand-tint-subtle: rgba(177, 145, 106, 0.06);
+    --theme-brand-tint-light: rgba(177, 145, 106, 0.1);
+    --theme-brand-tint: rgba(177, 145, 106, 0.16);
+    --theme-brand-tint-strong: rgba(177, 145, 106, 0.2);
   }
 }
 
@@ -196,11 +220,13 @@
 
   html {
     font-size: var(--font-size);
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground;
     cursor: auto;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -302,6 +328,77 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Toast animations */
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toast-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
+}
+.toast-enter { animation: toast-enter 250ms ease-out forwards; }
+.toast-exit { animation: toast-exit 200ms ease-in forwards; }
+
+/* Task completion animations */
+@keyframes check-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+@keyframes check-stroke {
+  0% { stroke-dashoffset: 12; }
+  100% { stroke-dashoffset: 0; }
+}
+.animate-check-pop { animation: check-pop 300ms ease-out; }
+.animate-check-stroke {
+  stroke-dasharray: 12;
+  animation: check-stroke 250ms ease-out 100ms forwards;
+  stroke-dashoffset: 12;
+}
+
+/* Progress celebration */
+@keyframes celebration-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(177, 145, 106, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(177, 145, 106, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(177, 145, 106, 0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-celebration-pulse { animation: celebration-pulse 600ms ease-out 2; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1s ease-in-out;
+}
+
+/* Drag-drop snap feedback */
+@keyframes drop-snap {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-drop-snap { animation: drop-snap 250ms ease-out; }
+
+/* List item enter animation */
+@keyframes row-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-row-enter { animation: row-enter 250ms ease-out; }
+
+/* Shopping list strikethrough */
+@keyframes strike-through {
+  0% { text-decoration-color: transparent; }
+  100% { text-decoration-color: currentColor; }
+}
+.animate-strike {
+  text-decoration: line-through;
+  animation: strike-through 300ms ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

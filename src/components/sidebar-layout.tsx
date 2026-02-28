@@ -13,11 +13,20 @@ import {
   Zap,
   Menu,
   ShoppingCart,
+  MoreHorizontal,
 } from "lucide-react"
+import dynamic from "next/dynamic"
 import { supabase } from "@/utils/supabase/client"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { prefetchCalendarExperience } from "@/lib/prefetch-calendar"
+
+// Sheet is only used for mobile hamburger menu — lazy-load to keep Radix Dialog out of desktop bundle
+const Sheet = dynamic(() => import("@/components/ui/sheet").then(m => m.Sheet), { ssr: false })
+const SheetContent = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetContent), { ssr: false })
+const SheetHeader = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetHeader), { ssr: false })
+const SheetTitle = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTitle), { ssr: false })
+const SheetTrigger = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTrigger), { ssr: false })
+import { nav, interactive } from "@/lib/styles"
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -37,8 +46,7 @@ const mobileNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
-  { href: "/integrations", icon: Zap, label: "Integrations" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
 ]
 
 const routeContext = [
@@ -89,6 +97,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const router = useRouter()
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // Clear navigatingTo when pathname changes (navigation completed)
   useEffect(() => {
@@ -161,9 +170,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </a>
 
       {/* Sidebar - Floating Panel */}
-      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-[#dbd6cf] py-3 w-[92px] h-[calc(100vh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
+      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-theme-neutral-300 py-3 w-[92px] h-[calc(100vh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-1 px-2 pb-3 mb-1 border-b border-[rgba(219,214,207,0.5)]">
+        <div className="flex flex-col items-center gap-1 px-2 pb-3 mb-1 border-b border-theme-neutral-300/50">
           <div className="w-9 h-9 bg-theme-primary rounded-xl flex items-center justify-center shadow-sm">
             <span className="text-white text-sm font-bold">L</span>
           </div>
@@ -180,38 +189,40 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 href={href}
                 onClick={(e) => handleNavClick(e, href)}
                 {...getPrefetchHandlers(href)}
-                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${activeOrNav
-                  ? "bg-[rgba(183,148,106,0.12)] text-[#314158]"
-                  : "text-[#6b7688] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
+                className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[11px] font-medium ${interactive.transitionFast} ${activeOrNav
+                  ? "bg-theme-brand-tint text-theme-text-primary"
+                  : "text-theme-text-subtle hover:bg-theme-brand-tint-light hover:text-theme-text-primary"
                   }`}
                 aria-label={label}
+                aria-current={isActiveRoute(href) ? "page" : undefined}
                 title={label}
               >
-                {activeOrNav && <span className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-[#B1916A] ${isNavigating ? "animate-pulse" : ""}`} aria-hidden="true" />}
-                <Icon className={`h-5 w-5 ${activeOrNav ? "text-[#B1916A]" : "text-[#8e99a8] group-hover:text-[#314158]"} ${isNavigating ? "animate-pulse" : ""}`} />
+                {activeOrNav && <span className={`${nav.sidebarIndicator} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} aria-hidden="true" />}
+                <Icon className={`h-5 w-5 ${activeOrNav ? "text-theme-primary" : "text-theme-text-tertiary group-hover:text-theme-text-primary"} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} />
                 <span className="leading-none">{label}</span>
               </Link>
             )
           })}
         </nav>
 
-        <div className="mt-auto px-2 pt-3 border-t border-[rgba(219,214,207,0.5)]">
+        <div className="mt-auto px-2 pt-3 border-t border-theme-neutral-300/50">
           <Link
             href="/dashboard/settings"
             onClick={(e) => handleNavClick(e, "/dashboard/settings")}
-            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${isActiveOrNavigating("/dashboard/settings")
-              ? "bg-[rgba(183,148,106,0.12)] text-[#314158]"
-              : "text-[#8e99a8] hover:bg-[rgba(183,148,106,0.08)] hover:text-[#314158]"
+            className={`group relative flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[11px] font-medium ${interactive.transitionFast} ${isActiveOrNavigating("/dashboard/settings")
+              ? "bg-theme-brand-tint text-theme-text-primary"
+              : "text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary"
               }`}
             aria-label="Settings"
+            aria-current={isActiveRoute("/dashboard/settings") ? "page" : undefined}
             title="Settings"
           >
             {isActiveOrNavigating("/dashboard/settings") && (
-              <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-theme-primary ${navigatingTo === "/dashboard/settings" ? "animate-pulse" : ""}`} aria-hidden="true" />
+              <span className={`${nav.sidebarIndicator} ${navigatingTo === "/dashboard/settings" ? "opacity-50 transition-opacity" : ""}`} aria-hidden="true" />
             )}
             <Settings
-              className={`h-5 w-5 ${isActiveOrNavigating("/dashboard/settings") ? "text-theme-primary" : "text-[#8e99a8] group-hover:text-[#314158]"
-                } ${navigatingTo === "/dashboard/settings" ? "animate-pulse" : ""}`}
+              className={`h-5 w-5 ${isActiveOrNavigating("/dashboard/settings") ? "text-theme-primary" : "text-theme-text-tertiary group-hover:text-theme-text-primary"
+                } ${navigatingTo === "/dashboard/settings" ? "opacity-50 transition-opacity" : ""}`}
             />
             <span className="leading-none">Settings</span>
           </Link>
@@ -222,8 +233,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       <div className="flex flex-1 flex-col min-w-0 md:gap-5">
         {/* Mobile Header */}
         <header
-          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-[#dbd6cf] px-4 md:hidden"
-          style={{ backgroundImage: "linear-gradient(173.681deg, rgba(255, 255, 255, 0.98) 41.319%, rgb(255, 255, 255) 81.558%)" }}
+          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-theme-neutral-300 px-4 md:hidden bg-gradient-to-b from-white/[0.98] to-white"
         >
           <div className="flex min-w-0 items-center gap-4">
             <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
@@ -231,14 +241,14 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             </div>
             <div className="hidden sm:flex items-baseline gap-1 text-[22px] font-semibold leading-none">
               <span className="text-theme-primary">Lifeboard</span>
-              <span className="text-[#314158]">AI</span>
+              <span className="text-theme-text-primary">AI</span>
             </div>
           </div>
 
-          <Sheet>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <button className="p-2 rounded-lg hover:bg-[rgba(183,148,106,0.08)] active:bg-[rgba(183,148,106,0.14)] transition-[background-color] duration-150 ease-out" aria-label="Open quick actions">
-                <Menu className="h-5 w-5 text-[#314158]" />
+              <button className={`p-2 rounded-lg hover:bg-theme-brand-tint-light active:bg-[rgba(183,148,106,0.14)] ${interactive.transitionFast}`} aria-label="Open quick actions">
+                <Menu className="h-5 w-5 text-theme-text-primary" />
               </button>
             </SheetTrigger>
             <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -251,11 +261,14 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                   <Link
                     key={href}
                     href={href}
-                    onClick={(e) => handleNavClick(e, href)}
+                    onClick={(e) => {
+                      handleNavClick(e, href)
+                      setSheetOpen(false)
+                    }}
                     {...getPrefetchHandlers(href)}
-                    className={`flex items-center gap-2 rounded-xl border border-[#dbd6cf]/80 px-3 py-3 text-sm font-medium text-[#314158] hover:bg-[rgba(183,148,106,0.08)] transition-[background-color] duration-150 ease-out ${navigatingTo === href ? "bg-[rgba(183,148,106,0.08)]" : ""}`}
+                    className={`flex items-center gap-2 rounded-xl border border-theme-neutral-300/80 px-3 py-3 text-sm font-medium text-theme-text-primary hover:bg-theme-brand-tint-light ${interactive.transitionFast} ${navigatingTo === href ? "bg-theme-brand-tint-light" : ""}`}
                   >
-                    <Icon className="h-4 w-4 text-[#8e99a8]" />
+                    <Icon className="h-4 w-4 text-theme-text-tertiary" />
                     {label}
                   </Link>
                 ))}
@@ -279,10 +292,10 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Mobile bottom nav */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#dbd6cf] bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-theme-neutral-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <ul className="grid grid-cols-5 items-center py-1">
+        <ul className="grid grid-cols-5 items-center py-1.5">
           {mobileNavItems.map(({ href, icon: Icon, label }) => {
             const activeOrNav = isActiveOrNavigating(href)
             return (
@@ -293,16 +306,26 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                   {...getPrefetchHandlers(href)}
                   aria-label={label}
                   aria-current={isActiveRoute(href) ? "page" : undefined}
-                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium transition-[background-color,color] duration-150 ease-out ${activeOrNav ? "text-[#314158] bg-[rgba(183,148,106,0.1)]" : "text-[#6b7688]"
+                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium ${interactive.transitionFast} ${activeOrNav ? "text-theme-text-primary bg-[rgba(183,148,106,0.1)]" : "text-theme-text-subtle"
                     }`}
                 >
-                  {activeOrNav && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[#B1916A]" aria-hidden="true" />}
-                  <Icon className={`mb-0.5 h-5 w-5 ${activeOrNav ? "text-[#B1916A]" : "text-[#8e99a8]"}`} />
+                  {activeOrNav && <span className={nav.bottomIndicator} aria-hidden="true" />}
+                  <Icon className={`mb-0.5 h-5 w-5 ${activeOrNav ? "text-theme-primary" : "text-theme-text-tertiary"}`} />
                   {label}
                 </Link>
               </li>
             )
           })}
+          <li className="flex justify-center">
+            <button
+              onClick={() => setSheetOpen(true)}
+              aria-label="More navigation options"
+              className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium ${interactive.transitionFast} text-theme-text-subtle`}
+            >
+              <MoreHorizontal className="mb-0.5 h-5 w-5 text-theme-text-tertiary" />
+              More
+            </button>
+          </li>
         </ul>
       </nav>
     </div>

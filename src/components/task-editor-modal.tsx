@@ -332,16 +332,16 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             onClick={(e) => e.stopPropagation()}
           >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(219,214,207,0.5)] shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-theme-neutral-300/50 shrink-0">
             <div className="min-w-0">
-              <h3 className="text-[16px] font-semibold text-[#314158]">
+              <h3 className="text-[16px] font-semibold text-theme-text-primary">
                 {editTaskId ? "Edit Task" : "New Task"}
               </h3>
-              <p className="text-[12px] text-[#8e99a8] mt-0.5 truncate">{modalDateLabel}</p>
+              <p className="text-xs text-theme-text-tertiary mt-0.5 truncate">{modalDateLabel}</p>
             </div>
             <button
               onClick={resetState}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8e99a8] hover:bg-[rgba(177,145,106,0.08)] hover:text-[#596881] transition-colors shrink-0 ml-4"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-secondary transition-colors shrink-0 ml-4"
               aria-label="Close"
             >
               <X size={18} />
@@ -352,12 +352,12 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             {/* Task Name */}
             <div>
-              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
                 Task
               </label>
               <input
                 autoFocus
-                className="w-full border border-[#dbd6cf] rounded-lg px-3 py-2.5 text-[14px] text-[#314158] placeholder:text-[#b5b0a8] focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
+                className="w-full border border-theme-neutral-300 rounded-lg px-3 py-2.5 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
                 placeholder="What needs to be done?"
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
@@ -366,25 +366,25 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
             {/* Schedule Section */}
             <div>
-              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
                 Schedule
               </label>
-              <div className="rounded-xl border border-[#dbd6cf] overflow-hidden">
+              <div className="rounded-xl border border-theme-neutral-300 overflow-hidden">
                 {/* Start row */}
                 <div className="grid grid-cols-2">
                   <div className="p-3">
-                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Starts</span>
+                    <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Starts</span>
                     <input
                       type="date"
-                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none"
+                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none"
                       value={startDate ?? ""}
                       onChange={(e) => setStartDate(e.target.value || null)}
                     />
                   </div>
-                  <div className="p-3 border-l border-[rgba(219,214,207,0.5)]">
-                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Time</span>
+                  <div className="p-3 border-l border-theme-neutral-300/50">
+                    <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Time</span>
                     <select
-                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none disabled:text-[#b5b0a8]"
+                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
                       value={formTime}
                       onChange={(e) => setFormTime(e.target.value)}
                       disabled={formAllDay}
@@ -397,21 +397,21 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   </div>
                 </div>
                 {/* End row */}
-                <div className="grid grid-cols-2 border-t border-[rgba(219,214,207,0.5)]">
+                <div className="grid grid-cols-2 border-t border-theme-neutral-300/50">
                   <div className="p-3">
-                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Ends</span>
+                    <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Ends</span>
                     <input
                       type="date"
-                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none"
+                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none"
                       value={formEndDate ?? startDate ?? ""}
                       min={startDate ?? undefined}
                       onChange={(e) => setFormEndDate(e.target.value || null)}
                     />
                   </div>
-                  <div className="p-3 border-l border-[rgba(219,214,207,0.5)]">
-                    <span className="text-[11px] text-[#8e99a8] mb-1.5 block">Time</span>
+                  <div className="p-3 border-l border-theme-neutral-300/50">
+                    <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Time</span>
                     <select
-                      className="w-full text-[13px] text-[#314158] bg-transparent focus:outline-none disabled:text-[#b5b0a8]"
+                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
                       value={formEndTime}
                       onChange={(e) => setFormEndTime(e.target.value)}
                       disabled={formAllDay}
@@ -424,11 +424,11 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   </div>
                 </div>
                 {/* All day toggle */}
-                <div className="px-3 py-2.5 border-t border-[rgba(219,214,207,0.5)] bg-[rgba(252,250,248,0.5)]">
-                  <label className="inline-flex items-center text-[12px] text-[#596881] select-none cursor-pointer">
+                <div className="px-3 py-2.5 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)]">
+                  <label className="inline-flex items-center text-xs text-theme-text-secondary select-none cursor-pointer">
                     <input
                       type="checkbox"
-                      className="mr-2 h-3.5 w-3.5 rounded border-[#dbd6cf] accent-[#B1916A]"
+                      className="mr-2 h-3.5 w-3.5 rounded border-theme-neutral-300 accent-theme-primary"
                       checked={formAllDay}
                       onChange={(e) => {
                         const checked = e.target.checked;
@@ -448,7 +448,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             {/* Category — Visual bucket picker */}
             {availableBuckets.length > 0 && (
               <div>
-                <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+                <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
                   Category
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -458,11 +458,11 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
                       !formBucket
-                        ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158] font-medium"
-                        : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                        ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary font-medium"
+                        : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                     )}
                   >
-                    <span className="w-2 h-2 rounded-full bg-[#b5b0a8]" />
+                    <span className="w-2 h-2 rounded-full bg-theme-neutral-400" />
                     {UNASSIGNED_BUCKET_LABEL}
                   </button>
                   {availableBuckets.map((bucket) => {
@@ -476,8 +476,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                         className={cn(
                           "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
                           active
-                            ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158] font-medium"
-                            : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                            ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary font-medium"
+                            : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                         )}
                       >
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
@@ -491,11 +491,11 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
             {/* Repeat */}
             <div>
-              <label className="block text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium mb-2">
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
                 Repeat
               </label>
               <select
-                className="w-full border border-[#dbd6cf] rounded-lg px-3 py-2.5 text-[13px] text-[#314158] bg-white focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
+                className="w-full border border-theme-neutral-300 rounded-lg px-3 py-2.5 text-[13px] text-theme-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
                 value={formRepeat}
                 onChange={(e) => setFormRepeat(e.target.value as RepeatOption)}
               >
@@ -509,22 +509,22 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-[rgba(219,214,207,0.5)] bg-[rgba(252,250,248,0.5)] shrink-0">
+          <div className="px-6 py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 {editTaskId && (
                   showDeleteConfirm ? (
                     <div className="flex items-center gap-3">
-                      <span className="text-[12px] text-red-600">Delete this task?</span>
+                      <span className="text-xs text-red-600">Delete this task?</span>
                       <button
                         onClick={handleDelete}
-                        className="text-[12px] text-red-600 font-semibold hover:text-red-700 transition-colors"
+                        className="text-xs text-red-600 font-semibold hover:text-red-700 transition-colors"
                       >
                         Yes, delete
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="text-[12px] text-[#8e99a8] hover:text-[#596881] transition-colors"
+                        className="text-xs text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
                       >
                         Cancel
                       </button>
@@ -532,7 +532,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   ) : (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 text-[13px] text-[#8e99a8] hover:text-red-500 transition-colors"
+                      className="flex items-center gap-1.5 text-[13px] text-theme-text-tertiary hover:text-red-500 transition-colors"
                     >
                       <Trash2 size={14} />
                       Delete
@@ -542,13 +542,13 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className="h-9 px-4 text-[13px] rounded-lg border border-[#dbd6cf] text-[#596881] hover:bg-[rgba(177,145,106,0.06)] transition-colors"
+                  className="h-9 px-4 text-[13px] rounded-lg border border-theme-neutral-300 text-theme-text-secondary hover:bg-theme-brand-tint-subtle transition-colors"
                   onClick={resetState}
                 >
                   Cancel
                 </button>
                 <button
-                  className="h-9 px-4 text-[13px] rounded-lg bg-[#B1916A] text-white font-medium hover:bg-[#96784f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="h-9 px-4 text-[13px] rounded-lg bg-theme-primary text-white font-medium hover:bg-theme-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                   disabled={!formContent.trim() || isSubmitting}
                   onClick={handleSubmit}
                 >

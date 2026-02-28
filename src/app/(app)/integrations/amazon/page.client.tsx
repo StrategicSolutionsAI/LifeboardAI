@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
-import { useToast, ToastProvider } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import Link from "next/link";
 import { invalidateIntegrationCaches } from "@/hooks/use-data-cache";
 
@@ -169,15 +169,15 @@ function AmazonIntegrationPageInner() {
           <Badge variant={connected ? "default" : "secondary"} className={connected ? "bg-green-500 text-white hover:bg-green-600" : ""}>
             {statusLabel}
           </Badge>
-          <div className="flex items-center gap-2 text-xs text-[#8e99a8]">
+          <div className="flex items-center gap-2 text-xs text-theme-text-tertiary">
             {statusIcon}
             {updatedAt ? `Last updated ${new Date(updatedAt).toLocaleString()}` : "No credentials saved yet"}
           </div>
         </div>
 
         <header className="space-y-2">
-          <h1 className="text-3xl font-semibold text-[#314158]">Amazon integration</h1>
-          <p className="text-sm text-[#6b7688]">
+          <h1 className="text-3xl font-semibold text-theme-text-primary">Amazon integration</h1>
+          <p className="text-sm text-theme-text-subtle">
             Store your Amazon credentials and preferred delivery defaults. These settings unlock one-click purchases and recurring deliveries from your shopping list.
           </p>
         </header>
@@ -191,7 +191,7 @@ function AmazonIntegrationPageInner() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center gap-2 text-sm text-[#8e99a8]">
+              <div className="flex items-center gap-2 text-sm text-theme-text-tertiary">
                 <Loader2 className="h-4 w-4 animate-spin text-theme-primary" />
                 Loading current configuration…
               </div>
@@ -205,7 +205,7 @@ function AmazonIntegrationPageInner() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                       Access key<span className="text-red-500">*</span>
                     </label>
                     <Input
@@ -214,12 +214,12 @@ function AmazonIntegrationPageInner() {
                       placeholder="AKIA..."
                       required
                     />
-                    <p className="text-xs text-[#8e99a8]">
+                    <p className="text-xs text-theme-text-tertiary">
                       Generated from your Amazon Selling Partner or Product Advertising API console.
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                       Secret key
                     </label>
                     <Input
@@ -228,7 +228,7 @@ function AmazonIntegrationPageInner() {
                       placeholder="Leave blank to keep existing secret"
                       type="password"
                     />
-                    <p className="text-xs text-[#8e99a8]">
+                    <p className="text-xs text-theme-text-tertiary">
                       Optional. We keep existing secrets untouched when left blank.
                     </p>
                   </div>
@@ -236,13 +236,13 @@ function AmazonIntegrationPageInner() {
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                       Region
                     </label>
                     <select
                       value={region}
                       onChange={(event) => setRegion(event.target.value)}
-                      className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                      className="h-10 w-full rounded-md border border-theme-neutral-300 px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
                     >
                       <option value="us">United States</option>
                       <option value="ca">Canada</option>
@@ -253,7 +253,7 @@ function AmazonIntegrationPageInner() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                       Default frequency (days)
                     </label>
                     <Input
@@ -263,7 +263,7 @@ function AmazonIntegrationPageInner() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                       Default quantity
                     </label>
                     <Input
@@ -275,7 +275,7 @@ function AmazonIntegrationPageInner() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                     Default purchase mode
                   </label>
                   <div className="flex gap-2">
@@ -294,7 +294,7 @@ function AmazonIntegrationPageInner() {
                       Subscription
                     </Button>
                   </div>
-                  <p className="text-xs text-[#8e99a8]">
+                  <p className="text-xs text-theme-text-tertiary">
                     These defaults fill in when you open the Amazon checkout drawer from your shopping list.
                   </p>
                 </div>
@@ -304,7 +304,7 @@ function AmazonIntegrationPageInner() {
                     {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     {saving ? "Saving…" : connected ? "Update integration" : "Connect integration"}
                   </Button>
-                  <p className="text-xs text-[#8e99a8]">
+                  <p className="text-xs text-theme-text-tertiary">
                     Credentials are stored securely in Supabase and scoped to your account.
                   </p>
                 </div>
@@ -317,9 +317,5 @@ function AmazonIntegrationPageInner() {
 }
 
 export default function AmazonIntegrationPageClient() {
-  return (
-    <ToastProvider>
-      <AmazonIntegrationPageInner />
-    </ToastProvider>
-  );
+  return <AmazonIntegrationPageInner />;
 }

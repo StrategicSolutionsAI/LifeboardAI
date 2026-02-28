@@ -23,7 +23,7 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Upload, Sparkles, Heart, Coffee, Sun, BookOpen, Dumbbell, Sticker } from "lucide-react";
+import { Plus, Upload, Sparkles, Heart, Coffee, Sun, BookOpen, Dumbbell, Sticker, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
@@ -95,9 +95,9 @@ const STICKER_OPTIONS: StickerOption[] = [
     id: 'focus',
     label: 'Focus',
     icon: BookOpen,
-    backgroundClass: 'bg-[#fdf8f6]',
-    textClass: 'text-[#bb9e7b]',
-    ringClass: 'ring-[#dbd6cf]/70',
+    backgroundClass: 'bg-theme-primary-50',
+    textClass: 'text-theme-secondary',
+    ringClass: 'ring-theme-neutral-300/70',
   },
   {
     id: 'movement',
@@ -131,7 +131,7 @@ const CalendarFileUpload = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-2xl border border-[#dbd6cf] bg-white p-5 text-sm text-[#8e99a8] shadow-sm">
+      <div className="rounded-2xl border border-theme-neutral-300 bg-white p-5 text-sm text-theme-text-tertiary shadow-sm">
         Loading calendar uploader...
       </div>
     ),
@@ -173,71 +173,71 @@ const getBucketEventStyles = (bucketName?: string | null, bucketColors?: Record<
   // Map hex colors to Tailwind classes for calendar events (Calidora palette)
   const colorMap: Record<string, any> = {
     "#6B8AF7": { // blue (Calidora)
-      container: 'bg-[#f0f3fe] border-l-4 border-[#6B8AF7] text-[#314158] hover:bg-[#e3e9fd]',
+      container: 'bg-[#f0f3fe] border-l-4 border-[#6B8AF7] text-theme-text-primary hover:bg-[#e3e9fd]',
       time: 'text-[#5570c7]',
       dot: 'bg-[#6B8AF7]',
       badge: 'text-[#5570c7]'
     },
     "#48B882": { // green (Calidora)
-      container: 'bg-[#eefaf3] border-l-4 border-[#48B882] text-[#314158] hover:bg-[#dcf5e7]',
+      container: 'bg-[#eefaf3] border-l-4 border-[#48B882] text-theme-text-primary hover:bg-[#dcf5e7]',
       time: 'text-[#3a9468]',
-      dot: 'bg-[#48B882]',
+      dot: 'bg-theme-success',
       badge: 'text-[#3a9468]'
     },
     "#D07AA4": { // rose (Calidora)
-      container: 'bg-[#fdf1f6] border-l-4 border-[#D07AA4] text-[#314158] hover:bg-[#fbe3ed]',
+      container: 'bg-[#fdf1f6] border-l-4 border-[#D07AA4] text-theme-text-primary hover:bg-[#fbe3ed]',
       time: 'text-[#b05c86]',
       dot: 'bg-[#D07AA4]',
       badge: 'text-[#b05c86]'
     },
     "#4AADE0": { // sky blue (Calidora)
-      container: 'bg-[#eef7fc] border-l-4 border-[#4AADE0] text-[#314158] hover:bg-[#dcf0fa]',
+      container: 'bg-[#eef7fc] border-l-4 border-[#4AADE0] text-theme-text-primary hover:bg-[#dcf0fa]',
       time: 'text-[#3889b5]',
-      dot: 'bg-[#4AADE0]',
+      dot: 'bg-theme-info',
       badge: 'text-[#3889b5]'
     },
     "#C4A44E": { // golden (Calidora)
-      container: 'bg-[#faf6ec] border-l-4 border-[#C4A44E] text-[#314158] hover:bg-[#f5edd8]',
+      container: 'bg-[#faf6ec] border-l-4 border-[#C4A44E] text-theme-text-primary hover:bg-[#f5edd8]',
       time: 'text-[#9e843e]',
-      dot: 'bg-[#C4A44E]',
+      dot: 'bg-theme-warning',
       badge: 'text-[#9e843e]'
     },
     "#8B7FD4": { // plum (Calidora)
-      container: 'bg-[#f3f1fb] border-l-4 border-[#8B7FD4] text-[#314158] hover:bg-[#e7e3f7]',
+      container: 'bg-[#f3f1fb] border-l-4 border-[#8B7FD4] text-theme-text-primary hover:bg-[#e7e3f7]',
       time: 'text-[#6f65aa]',
       dot: 'bg-[#8B7FD4]',
       badge: 'text-[#6f65aa]'
     },
     "#E28A5D": { // orange (Calidora)
-      container: 'bg-[#fdf3ee] border-l-4 border-[#E28A5D] text-[#314158] hover:bg-[#fbe7dc]',
+      container: 'bg-[#fdf3ee] border-l-4 border-[#E28A5D] text-theme-text-primary hover:bg-[#fbe7dc]',
       time: 'text-[#b56e4a]',
       dot: 'bg-[#E28A5D]',
       badge: 'text-[#b56e4a]'
     },
     "#5E9B8C": { // teal (Calidora)
-      container: 'bg-[#eff7f5] border-l-4 border-[#5E9B8C] text-[#314158] hover:bg-[#dff0ec]',
+      container: 'bg-[#eff7f5] border-l-4 border-[#5E9B8C] text-theme-text-primary hover:bg-[#dff0ec]',
       time: 'text-[#4b7c70]',
       dot: 'bg-[#5E9B8C]',
       badge: 'text-[#4b7c70]'
     },
     "#8e99a8": { // gray (unassigned - Calidora)
-      container: 'bg-[#faf8f5] border-l-4 border-[#b8b0a8] text-[#314158] hover:bg-[rgba(183,148,106,0.08)]',
-      time: 'text-[#6b7688]',
-      dot: 'bg-[#b8b0a8]',
-      badge: 'text-[#6b7688]'
+      container: 'bg-theme-surface-alt border-l-4 border-theme-neutral-400 text-theme-text-primary hover:bg-theme-brand-tint-light',
+      time: 'text-theme-text-subtle',
+      dot: 'bg-theme-neutral-400',
+      badge: 'text-theme-text-subtle'
     },
     // Legacy colors for backwards compatibility
     "#4F46E5": { // indigo (legacy)
-      container: 'bg-[#fdf8f6] border-l-4 border-[#bb9e7b] text-[#314158] hover:bg-[#f5ede4]',
-      time: 'text-[#9a7b5a]',
-      dot: 'bg-[#bb9e7b]',
-      badge: 'text-[#9a7b5a]'
+      container: 'bg-theme-primary-50 border-l-4 border-theme-secondary text-theme-text-primary hover:bg-theme-surface-selected',
+      time: 'text-theme-primary-600',
+      dot: 'bg-theme-secondary',
+      badge: 'text-theme-primary-600'
     },
     "#94A3B8": { // gray (legacy unassigned)
-      container: 'bg-[#faf8f5] border-l-4 border-[#b8b0a8] text-[#314158] hover:bg-[rgba(183,148,106,0.08)]',
-      time: 'text-[#6b7688]',
-      dot: 'bg-[#b8b0a8]',
-      badge: 'text-[#6b7688]'
+      container: 'bg-theme-surface-alt border-l-4 border-theme-neutral-400 text-theme-text-primary hover:bg-theme-brand-tint-light',
+      time: 'text-theme-text-subtle',
+      dot: 'bg-theme-neutral-400',
+      badge: 'text-theme-text-subtle'
     },
     "#ff52bf": { // pink (custom)
       container: 'bg-pink-50 border-l-4 border-pink-400 text-pink-900 hover:bg-pink-100',
@@ -253,13 +253,14 @@ const getBucketEventStyles = (bucketName?: string | null, bucketColors?: Record<
     return predefinedStyle;
   }
 
-  // For custom colors, return dynamic styles
+  // For custom colors, return dynamic styles (fallback to brand primary if color is missing)
+  const safeColor = color || '#B1916A';
   return {
-    container: 'border-l-4 text-[#314158] hover:opacity-90',
-    time: 'text-[#6b7688]',
+    container: 'border-l-4 text-theme-text-primary hover:opacity-90',
+    time: 'text-theme-text-subtle',
     dot: 'w-2 h-2 rounded-full',
-    badge: 'text-[#6b7688]',
-    customColor: color
+    badge: 'text-theme-text-subtle',
+    customColor: safeColor
   };
 };
 
@@ -503,7 +504,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   // Component to display stickers on a date (without add button)
   const StickerDisplay = ({ dayStr, className }: { dayStr: string; className?: string }) => {
     const dayStickers = stickersByDate[dayStr] ?? [];
-    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]';
+    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15';
 
     if (dayStickers.length === 0) return null;
 
@@ -565,10 +566,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             }
           }}
           className={[
-            'inline-flex items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#6b7688] shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]',
+            'inline-flex items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-theme-text-subtle shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15',
             reachedLimit
               ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
-              : 'border-[#dbd6cf] hover:border-[#bb9e7b] hover:text-[#9a7b5a]'
+              : 'border-theme-neutral-300 hover:border-theme-secondary hover:text-theme-primary-600'
           ].join(' ')}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
@@ -582,15 +583,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
           <div
             ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
-            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-[#dbd6cf] bg-white/95 p-2 shadow-xl ring-1 ring-[#dbd6cf] backdrop-blur-sm"
+            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-theme-neutral-300 bg-white/95 p-2 shadow-xl ring-1 ring-theme-neutral-300 backdrop-blur-sm"
             style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-[#8e99a8]/70">
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
               <span>Choose sticker</span>
               <button
                 type="button"
-                className="text-[#8e99a8]/70 transition hover:text-[#6b7688] focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
+                className="text-theme-text-tertiary/70 transition hover:text-theme-text-subtle focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   setActiveStickerDay(null);
@@ -603,14 +604,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
             {showDatePicker && (
               <div className="mb-3">
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#8e99a8]/70">
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
                   Select Date
                 </label>
                 <input
                   type="date"
                   value={selectedStickerDate || dayStr}
                   onChange={(e) => setSelectedStickerDate(e.target.value)}
-                  className="w-full rounded-lg border border-[#dbd6cf] px-2 py-1.5 text-xs focus:border-[#bb9e7b] focus:outline-none focus:ring-1 focus:ring-[#bb9e7b]"
+                  className="w-full rounded-lg border border-theme-neutral-300 px-2 py-1.5 text-xs focus:border-theme-secondary focus:outline-none focus:ring-1 focus:ring-theme-secondary"
                   onClick={(event) => event.stopPropagation()}
                 />
               </div>
@@ -625,7 +626,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   <button
                     key={option.id}
                     type="button"
-                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-[#faf8f5] text-[#8e99a8] transition hover:bg-[rgba(183,148,106,0.08)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] ${
+                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-theme-surface-alt text-theme-text-tertiary transition hover:bg-theme-brand-tint-light focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 ${
                       isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
                     } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     onClick={(event) => {
@@ -647,7 +648,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               })}
             </div>
 
-            <div className="mt-2 space-y-1 text-[10px] text-[#8e99a8]/70">
+            <div className="mt-2 space-y-1 text-[10px] text-theme-text-tertiary/70">
               <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
               <p>Tap a sticker again to remove it.</p>
             </div>
@@ -655,7 +656,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             {dayStickers.length > 0 && (
               <button
                 type="button"
-                className="mt-2 w-full rounded-lg border border-[#dbd6cf] px-2 py-1 text-[11px] font-medium text-[#8e99a8] transition hover:bg-[#faf8f5] focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
+                className="mt-2 w-full rounded-lg border border-theme-neutral-300 px-2 py-1 text-[11px] font-medium text-theme-text-tertiary transition hover:bg-theme-surface-alt focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   clearStickersForDate(targetDate);
@@ -678,7 +679,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     const isOpen = activeStickerDay === dayStr;
     const reachedLimit = dayStickers.length >= MAX_STICKERS_PER_DAY;
 
-    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)]';
+    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15';
 
     return (
       <div className={className ?? ''}>
@@ -700,10 +701,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               setActiveStickerDay(dayStr);
             }}
             className={[
-              'order-first inline-flex w-full items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#6b7688] shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] sm:order-none sm:w-auto sm:px-3',
+              'order-first inline-flex w-full items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-theme-text-subtle shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 sm:order-none sm:w-auto sm:px-3',
               reachedLimit
                 ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
-                : 'border-[#dbd6cf] hover:border-[#bb9e7b] hover:text-[#9a7b5a]'
+                : 'border-theme-neutral-300 hover:border-theme-secondary hover:text-theme-primary-600'
             ].join(' ')}
             aria-haspopup="dialog"
             aria-expanded={isOpen}
@@ -739,15 +740,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
           <div
             ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
-            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-[#dbd6cf] bg-white/95 p-2 shadow-xl ring-1 ring-[#dbd6cf] backdrop-blur-sm"
+            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-theme-neutral-300 bg-white/95 p-2 shadow-xl ring-1 ring-theme-neutral-300 backdrop-blur-sm"
             style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-[#8e99a8]/70">
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
               <span>Choose sticker</span>
               <button
                 type="button"
-                className="text-[#8e99a8]/70 transition hover:text-[#6b7688] focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
+                className="text-theme-text-tertiary/70 transition hover:text-theme-text-subtle focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   setActiveStickerDay(null);
@@ -766,7 +767,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   <button
                     key={option.id}
                     type="button"
-                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-[#faf8f5] text-[#8e99a8] transition hover:bg-[rgba(183,148,106,0.08)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] ${
+                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-theme-surface-alt text-theme-text-tertiary transition hover:bg-theme-brand-tint-light focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 ${
                       isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
                     } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     onClick={(event) => {
@@ -788,7 +789,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               })}
             </div>
 
-            <div className="mt-2 space-y-1 text-[10px] text-[#8e99a8]/70">
+            <div className="mt-2 space-y-1 text-[10px] text-theme-text-tertiary/70">
               <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
               <p>Tap a sticker again to remove it.</p>
             </div>
@@ -796,7 +797,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             {dayStickers.length > 0 && (
               <button
                 type="button"
-                className="mt-2 w-full rounded-lg border border-[#dbd6cf] px-2 py-1 text-[11px] font-medium text-[#8e99a8] transition hover:bg-[#faf8f5] focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
+                className="mt-2 w-full rounded-lg border border-theme-neutral-300 px-2 py-1 text-[11px] font-medium text-theme-text-tertiary transition hover:bg-theme-surface-alt focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   clearStickersForDate(dayStr);
@@ -869,7 +870,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   }, [handleDateChange, jumpDateValue]);
 
   const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
-  const today = new Date();
+  // Stabilize `today` so it doesn't create a new Date on every render.
+  // Updates only when the calendar day actually changes.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const today = useMemo(() => new Date(), [todayStr]);
   const currentDateKey = useMemo(() => toDayKey(currentDate), [currentDate]);
   const isOnToday = isSameDay(currentDate, today);
 
@@ -895,13 +899,16 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   // Get tasks from context
   const { allTasks, deleteTask, refetch, getTaskForOccurrence, createTask } = useTasksContext();
-  
-  // Use calendar sync hook
+
+  // O(1) task lookup by ID instead of O(n) linear scan
+  const taskLookup = useMemo(
+    () => new Map(allTasks.map(t => [t.id?.toString(), t])),
+    [allTasks]
+  );
   const resolveTaskById = useCallback((taskId?: string | null) => {
     if (!taskId) return undefined;
-    const lookup = taskId.toString();
-    return allTasks.find((t) => t.id?.toString?.() === lookup);
-  }, [allTasks]);
+    return taskLookup.get(taskId.toString());
+  }, [taskLookup]);
 
   const hourSlotToISO = useCallback((hourSlot: string | undefined, dateStr: string): string | undefined => {
     if (!hourSlot) return undefined;
@@ -925,71 +932,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     return trimmed.length > 10 ? trimmed.slice(0, 10) : trimmed;
   }, []);
 
-  const shouldIncludeTaskOnDate = useCallback((task: Task, dateStr: string): boolean => {
-    if (!task || task.completed) return false;
-    const normalizedStart = normalizeDateString(task.startDate ?? task.due?.date);
-    if (!normalizedStart) return false;
-    const normalizedEnd = normalizeDateString(task.endDate) ?? normalizedStart;
-    const startDateStr = normalizedStart;
-    const endDateStr = normalizedEnd;
-    if (!startDateStr) return false;
+  // Single-pass: iterate tasks once and compute which visible dates each belongs to.
+  // Returns a map of dateStr → DayEvent[]. O(tasks * avgSpan) instead of O(tasks * visibleDates).
+  const buildAllLifeboardEvents = useCallback((rangeStart: Date, rangeEnd: Date): Record<string, DayEvent[]> => {
+    const result: Record<string, DayEvent[]> = {};
+    const rangeStartMs = rangeStart.getTime();
+    const rangeEndMs = rangeEnd.getTime();
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const filterAll = selectedBucketFilters.includes('all');
 
-    if (!task.repeatRule) {
-      const targetDate = normalizeDateString(dateStr);
-      if (!targetDate) return false;
-      return targetDate >= startDateStr && targetDate <= endDateStr;
-    }
+    const addEvent = (dateStr: string, event: DayEvent) => {
+      const bucket = result[dateStr] ?? (result[dateStr] = []);
+      bucket.push(event);
+    };
 
-    const target = new Date(`${dateStr}T00:00:00`);
-    const due = new Date(`${startDateStr}T00:00:00`);
-    if (target < due) return false;
-
-    const day = target.getDay();
-    const dueDay = due.getDay();
-    const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
-
-    switch (task.repeatRule) {
-      case 'daily':
-        return true;
-      case 'weekdays':
-        return day >= 1 && day <= 5;
-      case 'weekly':
-        return diffDays % 7 === 0 && day === dueDay;
-      case 'monthly': {
-        const dueDateNum = due.getDate();
-        const targetDateNum = target.getDate();
-        const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-        if (dueDateNum > daysInTargetMonth) {
-          return targetDateNum === daysInTargetMonth;
-        }
-        return targetDateNum === dueDateNum;
-      }
-      default:
-        return false;
-    }
-  }, [normalizeDateString]);
-
-  const buildLifeboardEventsForDate = useCallback((dateStr: string): DayEvent[] => {
-    const events: DayEvent[] = [];
-
-    allTasks.forEach((task: Task) => {
-      if (!shouldIncludeTaskOnDate(task, dateStr)) return;
-
+    const buildEventForDate = (task: Task, dateStr: string, taskStartStr: string, taskEndStr: string) => {
       const adjustedTask = getTaskForOccurrence(task, dateStr);
       if (!adjustedTask) return;
 
-      // Apply bucket filter - multi-select logic
-      if (!selectedBucketFilters.includes('all')) {
+      if (!filterAll) {
         const taskBucket = adjustedTask.bucket || 'unassigned';
         if (!selectedBucketFilters.includes(taskBucket)) return;
       }
 
       const repeatRule = adjustedTask.repeatRule ? (adjustedTask.repeatRule as RepeatOption) : undefined;
-      const startDateStr = adjustedTask.startDate ?? adjustedTask.due?.date;
-      const endDateStr = adjustedTask.endDate ?? startDateStr;
-      const isRangeStart = dateStr === startDateStr;
-      const isRangeEnd = dateStr === endDateStr;
-      const eventAllDay = adjustedTask.allDay ?? (!adjustedTask.hourSlot && !adjustedTask.endHourSlot);
+      const adjStart = adjustedTask.startDate ?? adjustedTask.due?.date;
+      const adjEnd = adjustedTask.endDate ?? adjStart;
+      const isRangeStart = dateStr === (adjStart ?? taskStartStr);
+      const isRangeEnd = dateStr === (adjEnd ?? taskEndStr);
+      const eventAllDay = adjustedTask.allDay === true;
 
       const baseEvent: DayEvent = {
         source: 'lifeboard',
@@ -998,8 +969,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         taskId: adjustedTask.id,
         repeatRule,
         bucket: adjustedTask.bucket,
-        startDate: startDateStr ?? undefined,
-        endDate: endDateStr ?? undefined,
+        startDate: adjStart ?? undefined,
+        endDate: adjEnd ?? undefined,
         isRangeStart,
         isRangeEnd,
       };
@@ -1014,11 +985,99 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         baseEvent.duration = adjustedTask.duration;
       }
 
-      events.push(baseEvent);
+      addEvent(dateStr, baseEvent);
+    };
+
+    allTasks.forEach((task: Task) => {
+      if (!task || task.completed) return;
+      const startRaw = normalizeDateString(task.startDate ?? task.due?.date);
+      if (!startRaw) return;
+      const endRaw = normalizeDateString(task.endDate) ?? startRaw;
+
+      if (!task.repeatRule) {
+        // Non-repeating: clamp [startRaw, endRaw] to visible range and iterate
+        const clampedStart = startRaw < format(rangeStart, 'yyyy-MM-dd') ? format(rangeStart, 'yyyy-MM-dd') : startRaw;
+        const clampedEnd = endRaw > format(rangeEnd, 'yyyy-MM-dd') ? format(rangeEnd, 'yyyy-MM-dd') : endRaw;
+        if (clampedStart > clampedEnd) return;
+
+        let cursor = new Date(`${clampedStart}T00:00:00`);
+        const end = new Date(`${clampedEnd}T00:00:00`);
+        while (cursor <= end) {
+          const dateStr = format(cursor, 'yyyy-MM-dd');
+          buildEventForDate(task, dateStr, startRaw, endRaw);
+          cursor = addDays(cursor, 1);
+        }
+        return;
+      }
+
+      // Repeating tasks: generate occurrences within visible range
+      const due = new Date(`${startRaw}T00:00:00`);
+      const dueMs = due.getTime();
+      if (dueMs > rangeEndMs) return; // starts after visible range
+
+      switch (task.repeatRule) {
+        case 'daily': {
+          // Every day from max(due, rangeStart) to rangeEnd
+          let cursor = dueMs >= rangeStartMs ? due : rangeStart;
+          while (cursor.getTime() <= rangeEndMs) {
+            buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+            cursor = addDays(cursor, 1);
+          }
+          break;
+        }
+        case 'weekdays': {
+          let cursor = dueMs >= rangeStartMs ? due : rangeStart;
+          while (cursor.getTime() <= rangeEndMs) {
+            const day = cursor.getDay();
+            if (day >= 1 && day <= 5) {
+              buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+            }
+            cursor = addDays(cursor, 1);
+          }
+          break;
+        }
+        case 'weekly': {
+          const dueDay = due.getDay();
+          // Find the first matching day >= rangeStart
+          let cursor = dueMs >= rangeStartMs ? due : new Date(rangeStartMs);
+          // Align to the correct weekday
+          const cursorDay = cursor.getDay();
+          let daysUntilMatch = (dueDay - cursorDay + 7) % 7;
+          // Also ensure the diff from due is a multiple of 7
+          if (daysUntilMatch === 0) {
+            const diffFromDue = Math.floor((cursor.getTime() - dueMs) / MS_PER_DAY);
+            if (diffFromDue % 7 !== 0) daysUntilMatch = 7;
+          }
+          cursor = addDays(cursor, daysUntilMatch);
+          while (cursor.getTime() <= rangeEndMs) {
+            buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+            cursor = addDays(cursor, 7);
+          }
+          break;
+        }
+        case 'monthly': {
+          const dueDateNum = due.getDate();
+          // Iterate each month in the visible range
+          let month = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+          const rangeEndMonth = new Date(rangeEnd.getFullYear(), rangeEnd.getMonth() + 1, 0);
+          while (month <= rangeEndMonth) {
+            const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+            const targetDateNum = dueDateNum > daysInMonth ? daysInMonth : dueDateNum;
+            const candidate = new Date(month.getFullYear(), month.getMonth(), targetDateNum);
+            if (candidate.getTime() >= dueMs && candidate.getTime() >= rangeStartMs && candidate.getTime() <= rangeEndMs) {
+              buildEventForDate(task, format(candidate, 'yyyy-MM-dd'), startRaw, endRaw);
+            }
+            month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+          }
+          break;
+        }
+        default:
+          break;
+      }
     });
 
-    return events;
-  }, [allTasks, getTaskForOccurrence, hourSlotToISO, shouldIncludeTaskOnDate, selectedBucketFilters]);
+    return result;
+  }, [allTasks, getTaskForOccurrence, hourSlotToISO, normalizeDateString, selectedBucketFilters]);
 
   const openTaskEditor = useCallback((event: DayEvent, dateStr: string) => {
     if (!event.taskId) return;
@@ -1583,6 +1642,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     importedDayEvents.filter((event) => event.allDay || !event.time)
   ), [importedDayEvents]);
 
+  // Day view summary stats
+  const dayViewStats = useMemo(() => {
+    const events = selectedDateEvents;
+    const taskCount = events.filter(e => e.source === 'lifeboard').length;
+    const totalMinutes = events.reduce((sum, e) => sum + (e.duration ?? 0), 0);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const plannedLabel = hours > 0 && mins > 0
+      ? `${hours}h ${mins}m`
+      : hours > 0
+      ? `${hours}h`
+      : mins > 0
+      ? `${mins}m`
+      : null;
+    const allDayEvents = events.filter(e => e.allDay && e.source === 'lifeboard');
+    const googleCount = events.filter(e => e.source === 'google').length;
+    return { taskCount, plannedLabel, allDayEvents, googleCount };
+  }, [selectedDateEvents]);
+
   // Sync propSelectedDate prop with currentDate state
   useEffect(() => {
     if (propSelectedDate && propSelectedDate.getTime() !== currentDate.getTime()) {
@@ -1771,27 +1849,24 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       }
     });
 
-    let cursor = startOfDay(new Date(rangeStartMs));
-    const rangeEndDate = startOfDay(new Date(rangeEndMs));
-
-    while (cursor.getTime() <= rangeEndDate.getTime()) {
-      const dateStr = format(cursor, 'yyyy-MM-dd');
-      const lifeboardEvents = buildLifeboardEventsForDate(dateStr);
-      if (lifeboardEvents.length > 0) {
-        const bucket = map[dateStr] ?? (map[dateStr] = []);
-        lifeboardEvents.forEach(event => {
-          const taskIdKey = event.taskId ? event.taskId.toString() : undefined;
-          const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
-          if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
-            return;
-          }
-          bucket.push(event);
-          if (seenKey) {
-            seenTaskInstanceKeys.add(seenKey);
-          }
-        });
+    // Single-pass: build all lifeboard events at once instead of per-date
+    const lifeboardMap = buildAllLifeboardEvents(
+      startOfDay(new Date(rangeStartMs)),
+      startOfDay(new Date(rangeEndMs))
+    );
+    for (const dateStr of Object.keys(lifeboardMap)) {
+      const bucket = map[dateStr] ?? (map[dateStr] = []);
+      for (const event of lifeboardMap[dateStr]) {
+        const taskIdKey = event.taskId ? event.taskId.toString() : undefined;
+        const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
+        if (seenKey && seenTaskInstanceKeys.has(seenKey)) {
+          continue;
+        }
+        bucket.push(event);
+        if (seenKey) {
+          seenTaskInstanceKeys.add(seenKey);
+        }
       }
-      cursor = addDays(cursor, 1);
     }
 
     // Prefer task-backed Lifeboard entries over imported/Google items only when they represent
@@ -1819,7 +1894,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     uploadedEvents,
     rangeStartMs,
     rangeEndMs,
-    buildLifeboardEventsForDate,
+    buildAllLifeboardEvents,
     selectedBucketFilters,
     allTasks,
     hourSlotToISO
@@ -1931,7 +2006,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const weekdayHeader = (
     <div className="grid grid-cols-7 border-b border-[rgba(219,214,207,0.7)]">
       {weekDayLabels.map((label) => (
-        <div key={label} className="py-2.5 text-center text-[11px] tracking-[0.5px] uppercase text-[#8e99a8]">
+        <div key={label} className="py-2.5 text-center text-[11px] tracking-[0.5px] uppercase text-theme-text-tertiary">
           {label}
         </div>
       ))}
@@ -1943,10 +2018,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       switch (source) {
         case 'google':
           return {
-            container: 'border border-[#dbd6cf] bg-[#fdf8f6]/90 text-[#314158] shadow-sm hover:bg-[#fdf8f6]',
-            time: 'text-[#bb9e7b]',
-            dot: 'bg-[#bb9e7b]',
-            badge: 'text-[#bb9e7b]'
+            container: 'border border-theme-neutral-300 bg-theme-primary-50/90 text-theme-text-primary shadow-sm hover:bg-theme-primary-50',
+            time: 'text-theme-secondary',
+            dot: 'bg-theme-secondary',
+            badge: 'text-theme-secondary'
           };
         case 'uploaded':
           return {
@@ -1959,10 +2034,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           return getBucketEventStyles(ev?.bucket, bucketColors);
         default:
           return {
-            container: 'border border-[#dbd6cf] bg-[#faf8f5]/90 text-[#314158] shadow-sm hover:bg-[#faf8f5]',
-            time: 'text-[#8e99a8]',
-            dot: 'bg-[#b8b0a8]',
-            badge: 'text-[#8e99a8]'
+            container: 'border border-theme-neutral-300 bg-theme-surface-alt/90 text-theme-text-primary shadow-sm hover:bg-theme-surface-alt',
+            time: 'text-theme-text-tertiary',
+            dot: 'bg-theme-neutral-400',
+            badge: 'text-theme-text-tertiary'
           };
       }
     },
@@ -1972,25 +2047,25 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const showFilterControls = filterableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0;
 
   return (
-    <div className="w-full max-w-none mx-2 sm:mx-4 bg-white border border-[#dbd6cf] rounded-xl shadow-sm overflow-hidden">
+    <div className="w-full max-w-none mx-0 sm:mx-4 bg-white border border-theme-neutral-300 rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
       {/* Calidora-style Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-[rgba(219,214,207,0.7)]">
         <h3 className="section-label-sm">
           {headerTitle}
         </h3>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* View Mode Toggle */}
-          <div className="flex items-center rounded-lg border border-[#dbd6cf] overflow-hidden">
+          <div className="flex items-center rounded-lg border border-theme-neutral-300 overflow-hidden">
             {(['month', 'week', 'day'] as CalendarView[]).map((viewOption) => (
               <button
                 type="button"
                 key={viewOption}
                 onClick={() => handleViewChange(viewOption)}
                 aria-pressed={view === viewOption}
-                className={`px-3 py-1.5 font-['DM_Sans',sans-serif] text-[11px] tracking-[0.6px] uppercase transition-colors ${
+                className={`px-3 py-1.5  text-[11px] tracking-[0.6px] uppercase transition-colors ${
                   view === viewOption
-                    ? 'bg-[#B1916A] text-white'
-                    : 'text-[#596881] hover:bg-[rgba(252,250,248,0.5)]'
+                    ? 'bg-theme-primary text-white'
+                    : 'text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)]'
                 }`}
               >
                 {viewOption}
@@ -2002,10 +2077,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             type="button"
             onClick={() => handleDateChange(new Date())}
             disabled={isOnToday}
-            className={`px-3 py-1.5 rounded-lg border border-[#dbd6cf] text-[12px] transition-colors ${
+            className={`px-3 py-1.5 rounded-lg border border-theme-neutral-300 text-xs transition-colors ${
               isOnToday
                 ? 'cursor-default text-[#c5c9d0]'
-                : 'text-[#596881] hover:bg-[rgba(252,250,248,0.5)]'
+                : 'text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)]'
             }`}
             title="Jump to today (T)"
           >
@@ -2018,7 +2093,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             className="p-1.5 rounded-lg hover:bg-[rgba(252,250,248,0.5)] transition-colors"
             aria-label="Previous period"
           >
-            <svg className="h-[18px] w-[18px] text-[#596881]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-[18px] w-[18px] text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
@@ -2028,7 +2103,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             className="p-1.5 rounded-lg hover:bg-[rgba(252,250,248,0.5)] transition-colors"
             aria-label="Next period"
           >
-            <svg className="h-[18px] w-[18px] text-[#596881]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-[18px] w-[18px] text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -2036,8 +2111,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <button
             type="button"
             onClick={() => setIsUploadModalOpen(true)}
-            className="p-1.5 rounded-lg border border-[#dbd6cf] text-[#596881] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+            className="p-1.5 rounded-lg border border-theme-neutral-300 text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)] transition-colors"
             title="Upload calendar file"
+            aria-label="Upload calendar file"
           >
             <Upload className="h-4 w-4" />
           </button>
@@ -2047,7 +2123,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <button
                 type="button"
                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                className="flex items-center gap-1 rounded-lg border border-[#dbd6cf] px-2.5 py-1.5 text-[12px] text-[#596881] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-theme-neutral-300 px-2.5 py-1.5 text-xs text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)] transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={isFilterDropdownOpen}
               >
@@ -2058,34 +2134,34 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </button>
 
               {isFilterDropdownOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-[#dbd6cf] bg-white shadow-warm-lg">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg">
                   <div className="py-1">
                     <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
-                      <input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-[#B1916A]" />
-                      <span className="text-xs text-[#596881]">All Categories</span>
+                      <input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                      <span className="text-xs text-theme-text-secondary">All Categories</span>
                     </label>
                     {filterableBuckets.map((bucket) => (
                       <label key={bucket} className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
-                        <input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-[#B1916A]" />
-                        <span className="text-xs text-[#596881]">{bucket}</span>
+                        <input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                        <span className="text-xs text-theme-text-secondary">{bucket}</span>
                       </label>
                     ))}
                     {filterableBuckets.length > 0 && (
                       <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
-                        <input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-[#B1916A]" />
-                        <span className="text-xs text-[#596881]">Unassigned</span>
+                        <input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                        <span className="text-xs text-theme-text-secondary">Unassigned</span>
                       </label>
                     )}
                     {googleEvents.length > 0 && (
                       <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
-                        <input type="checkbox" checked={selectedBucketFilters.includes('google')} onChange={() => toggleBucketFilter('google')} className="mr-2 h-3 w-3 rounded accent-[#B1916A]" />
-                        <span className="text-xs text-[#596881]">Google Calendar</span>
+                        <input type="checkbox" checked={selectedBucketFilters.includes('google')} onChange={() => toggleBucketFilter('google')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                        <span className="text-xs text-theme-text-secondary">Google Calendar</span>
                       </label>
                     )}
                     {uploadedEvents.length > 0 && (
                       <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
-                        <input type="checkbox" checked={selectedBucketFilters.includes('uploaded')} onChange={() => toggleBucketFilter('uploaded')} className="mr-2 h-3 w-3 rounded accent-[#B1916A]" />
-                        <span className="text-xs text-[#596881]">Uploaded Calendar</span>
+                        <input type="checkbox" checked={selectedBucketFilters.includes('uploaded')} onChange={() => toggleBucketFilter('uploaded')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                        <span className="text-xs text-theme-text-secondary">Uploaded Calendar</span>
                       </label>
                     )}
                   </div>
@@ -2098,56 +2174,153 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
       {/* Calendar Grid */}
       {view === 'day' ? (
-        // Day view: Calidora-style
-        <div className="w-full">
-          <div className="bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[rgba(219,214,207,0.7)]">
-              <div className="flex items-center gap-3">
-                <h2 className="font-['DM_Sans',sans-serif] text-[14px] tracking-[0.6px] uppercase text-[#bb9e7b]">
-                  {format(currentDate, "EEEE, MMMM d, yyyy")}
-                </h2>
-                <StickerRow dayStr={currentDateKey} className="flex" />
+        // Day view: Enhanced Calidora-style
+        <div className="w-full flex-1 flex flex-col">
+          <div className="bg-theme-surface-base overflow-hidden flex-1 flex flex-col">
+            {/* Enhanced Day Header */}
+            <div className="px-5 pt-4 pb-3 border-b border-theme-neutral-300/50 bg-gradient-to-b from-theme-surface-alt/60 to-theme-surface-base">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-theme-text-tertiary mb-0.5">
+                    {format(currentDate, "EEEE")}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-semibold text-theme-text-primary tracking-tight">
+                      {format(currentDate, "MMMM d, yyyy")}
+                    </h2>
+                    <StickerRow dayStr={currentDateKey} className="flex" />
+                  </div>
+
+                  {/* Day Summary Stats */}
+                  <div className="flex items-center gap-3 mt-2.5">
+                    {dayViewStats.taskCount > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
+                        <CheckCircle2 size={12} className="text-theme-primary-500" />
+                        {dayViewStats.taskCount} {dayViewStats.taskCount === 1 ? 'task' : 'tasks'}
+                      </span>
+                    )}
+                    {dayViewStats.plannedLabel && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
+                        <Clock size={12} className="text-theme-primary-500" />
+                        {dayViewStats.plannedLabel} planned
+                      </span>
+                    )}
+                    {dayViewStats.googleCount > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600">
+                        <CalendarDays size={12} />
+                        {dayViewStats.googleCount} {dayViewStats.googleCount === 1 ? 'event' : 'events'}
+                      </span>
+                    )}
+                    {dayViewStats.taskCount === 0 && !dayViewStats.plannedLabel && dayViewStats.googleCount === 0 && (
+                      <span className="text-[11px] text-theme-text-quaternary italic">No events scheduled</span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
+                  className="flex items-center gap-2 rounded-lg bg-theme-primary px-3.5 py-2 text-xs font-medium text-white shadow-warm-sm transition-all hover:bg-[#a8896a] hover:shadow-warm active:scale-[0.97]"
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                  <span>Add task</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
-                className="flex items-center gap-2 rounded-lg bg-[#B1916A] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#a8896a]"
-              >
-                <Plus size={14} />
-                <span>Add task</span>
-              </button>
-            </div>
-            
-            <div className="p-4 space-y-4">
-              {importedDayEvents.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Imported Calendar</p>
-                      <p className="text-sm text-amber-800/80">Events from your uploaded calendar are now visible in Day view.</p>
+
+              {/* All-day events strip — always rendered so dnd can clean up drop animations */}
+              <Droppable droppableId="allday-strip" direction="horizontal">
+                {(alldayProvided) => (
+                  <div
+                    ref={alldayProvided.innerRef}
+                    {...alldayProvided.droppableProps}
+                    className="flex items-center gap-2 mt-3 pt-2.5 border-t border-theme-neutral-300/30"
+                    style={dayViewStats.allDayEvents.length === 0 ? { height: 0, overflow: 'hidden', margin: 0, padding: 0, border: 'none' } : undefined}
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-[1px] text-theme-text-quaternary shrink-0">All day</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dayViewStats.allDayEvents.map((event, idx) => {
+                        const bucketColor = event.bucket ? getBucketColorSync(event.bucket, bucketColors) : null;
+                        const draggableTaskId = event.taskId;
+                        if (!draggableTaskId) {
+                          return (
+                            <span
+                              key={`allday-${idx}`}
+                              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary bg-theme-surface-alt border border-theme-neutral-300/40 shadow-sm"
+                              style={bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}}
+                              title={event.title}
+                            >
+                              <span className="truncate max-w-[180px]">{event.title}</span>
+                            </span>
+                          );
+                        }
+                        return (
+                          <Draggable
+                            key={`allday-${draggableTaskId}`}
+                            draggableId={`allday::${draggableTaskId}`}
+                            index={idx}
+                          >
+                            {(dragProv, dragSnap) => (
+                              <span
+                                ref={dragProv.innerRef}
+                                {...dragProv.draggableProps}
+                                {...dragProv.dragHandleProps}
+                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-theme-text-secondary bg-white border border-theme-neutral-300/50 cursor-grab active:cursor-grabbing transition-all ${
+                                  dragSnap.isDragging ? 'shadow-warm-lg ring-2 ring-theme-primary-300/60 scale-105 bg-white' : 'shadow-sm hover:shadow-warm hover:border-theme-primary-300/60'
+                                }`}
+                                style={{
+                                  ...(dragProv.draggableProps.style || {}),
+                                  ...(bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}),
+                                }}
+                                title={`${event.title} — drag to a time slot to schedule`}
+                              >
+                                <GripVertical size={10} className="text-theme-text-quaternary shrink-0 -ml-0.5" />
+                                <span className="truncate max-w-[180px]">{event.title}</span>
+                              </span>
+                            )}
+                          </Draggable>
+                        );
+                      })}
+                      {alldayProvided.placeholder}
                     </div>
-                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                      {importedDayEvents.length} {importedDayEvents.length === 1 ? 'event' : 'events'}
-                    </span>
+                  </div>
+                )}
+              </Droppable>
+            </div>
+
+            <div className="p-4 space-y-3 flex-1 flex flex-col min-h-0">
+              {/* Imported calendar events */}
+              {importedDayEvents.length > 0 && (
+                <div className="rounded-xl border border-amber-200/70 bg-amber-50/60 px-4 py-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-md bg-amber-100">
+                        <CalendarDays size={13} className="text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-amber-800">Imported Calendar</p>
+                        <p className="text-[11px] text-amber-600/80">{importedDayEvents.length} {importedDayEvents.length === 1 ? 'event' : 'events'} from your uploaded calendar</p>
+                      </div>
+                    </div>
                   </div>
 
                   {importedTimedEvents.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-2.5 space-y-1.5">
                       {importedTimedEvents.map((event, idx) => {
                         const displayTime = event.parsedTime ? format(event.parsedTime, 'h:mm a') : '';
                         return (
                           <div
                             key={`${event.eventId || event.taskId || idx}-timed-${idx}`}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-amber-200/80 bg-white/70 px-3 py-2 shadow-sm"
+                            className="flex items-center justify-between gap-3 rounded-lg border border-amber-200/60 bg-white/80 px-3 py-2"
                           >
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-amber-900 truncate" title={event.title}>{event.title}</p>
+                            <div className="min-w-0 flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                              <p className="text-sm font-medium text-amber-900 truncate" title={event.title}>{event.title}</p>
                               {event.location && (
-                                <p className="mt-0.5 text-xs text-amber-700 truncate" title={event.location}>{event.location}</p>
+                                <p className="text-[11px] text-amber-600 truncate hidden sm:block" title={event.location}>{event.location}</p>
                               )}
                             </div>
                             {displayTime && (
-                              <span className="flex-shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                              <span className="flex-shrink-0 rounded-md bg-amber-100/80 px-2 py-0.5 text-[11px] font-semibold text-amber-700 tabular-nums">
                                 {displayTime}
                               </span>
                             )}
@@ -2158,48 +2331,47 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   )}
 
                   {importedAllDayEvents.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">All-day</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {importedAllDayEvents.map((event, idx) => (
-                          <span
-                            key={`${event.eventId || event.title}-all-day-${idx}`}
-                            className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/70 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm"
-                            title={event.title}
-                          >
-                            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-                            <span className="truncate max-w-[160px]">{event.title}</span>
-                          </span>
-                        ))}
-                      </div>
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {importedAllDayEvents.map((event, idx) => (
+                        <span
+                          key={`${event.eventId || event.title}-all-day-${idx}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/60 bg-white/80 px-2.5 py-0.5 text-[11px] font-medium text-amber-700"
+                          title={event.title}
+                        >
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          <span className="truncate max-w-[160px]">{event.title}</span>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
 
-              <HourlyPlanner 
+              <HourlyPlanner
                 ref={hourlyPlannerRef}
-                className="max-h-[75vh] overflow-y-auto rounded-xl" 
+                className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
                 showTimeIndicator={true}
                 allowResize={true}
                 availableBuckets={availableBuckets}
                 selectedBucket={selectedBucket}
+                isDragging={isDragging}
                 wrapWithContext={false}
                 plannerDate={format(currentDate, 'yyyy-MM-dd')}
                 onTaskOpen={openTaskEditorById}
+                bucketColors={bucketColors}
               />
             </div>
           </div>
         </div>
       ) : (
-        <div className="relative">
-          <div className="overflow-x-auto sm:overflow-visible">
-            <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0`}>
+        <div className="relative flex-1 flex flex-col">
+          <div className="overflow-x-auto sm:overflow-visible flex-1 flex flex-col">
+            <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 flex-1 flex flex-col`}>
               {view === 'week' ? (
                 // Week view: Calidora-style columns
-                <div>
+                <div className="flex-1 flex flex-col">
                   {weekdayHeader}
-                  <div className="grid grid-cols-7 min-h-[350px]">
+                  <div className="grid grid-cols-7 flex-1 min-h-[350px]">
                     {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = toDayKey(day);
                 const dayEvents = eventsByDate[dayStr] ?? [];
@@ -2215,11 +2387,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                       const cellClasses = [
                         'p-2 transition-colors relative group',
-                        idx < 6 ? 'border-r border-[rgba(219,214,207,0.5)]' : '',
+                        idx < 6 ? 'border-r border-theme-neutral-300/50' : '',
                         snapshot.isDraggingOver
-                          ? 'bg-[rgba(177,145,106,0.08)]'
+                          ? 'bg-theme-brand-tint-light'
                           : isToday
-                          ? 'bg-[rgba(177,145,106,0.03)]'
+                          ? 'bg-theme-brand-tint-subtle'
                           : 'bg-white',
                       ].filter(Boolean).join(' ');
                       const visibleEvents = getEventsForDisplay(dayEvents);
@@ -2243,17 +2415,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDateChange(day); handleViewChange('day'); }}
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full mt-1 text-[16px] hover:bg-[rgba(177,145,106,0.15)] transition-colors ${
+                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full mt-1 text-[16px] hover:bg-theme-brand-tint-strong transition-colors ${
                                 isToday
-                                  ? 'bg-[#B1916A] text-white hover:bg-[#a8896a]'
-                                  : 'text-[#314158]'
+                                  ? 'bg-theme-primary text-white hover:bg-[#a8896a]'
+                                  : 'text-theme-text-primary'
                               }`}
                             >
                               {format(day, "d")}
                             </button>
                             <button
                               type="button"
-                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[rgba(177,145,106,0.15)] text-[#8e99a8] hover:text-[#596881] transition-all"
+                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedModalDate(null);
@@ -2306,7 +2478,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
                                           style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
                                         />
-                                        <span className="text-[11px] text-[#314158] truncate">
+                                        <span className="text-[11px] text-theme-text-primary truncate">
                                           {ev.title}
                                         </span>
                                       </div>
@@ -2330,28 +2502,32 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 </div>
               ) : (
                 // Month view: Calidora-style grid
-                <div>
+                <div className="flex-1 flex flex-col">
                   {weekdayHeader}
-                  <div className="grid auto-rows-[minmax(100px,_auto)] grid-cols-7">
+                  <div className="grid auto-rows-[minmax(120px,_1fr)] grid-cols-7 flex-1">
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = toDayKey(day);
                 const dayEvents = eventsByDate[dayStr] ?? [];
-                
+
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 const isToday = isSameDay(day, today);
                 const formattedDayLabel = format(day, 'MMMM d, yyyy');
                 const mobileDayLabel = format(day, 'EEE');
+                const isLastRow = idx >= (rows.length - 1) * 7;
 
                 return (
                   <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
                     {(provided, snapshot) => {
                       const dayOfWeek = day.getDay();
                       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      const borderClasses = [
+                        idx % 7 < 6 ? 'border-r' : '',
+                        !isLastRow ? 'border-b' : '',
+                      ].filter(Boolean).join(' ');
                       const cellClasses = [
-                        'min-h-[100px] p-2 transition-colors relative group',
-                        idx % 7 < 6 ? 'border-r border-[rgba(219,214,207,0.5)]' : '',
+                        'p-2 transition-colors relative group h-full',
                         snapshot.isDraggingOver
-                          ? 'bg-[rgba(177,145,106,0.08)]'
+                          ? 'bg-theme-brand-tint-light'
                           : isCurrentMonth
                           ? 'bg-white'
                           : 'bg-[rgba(252,250,248,0.3)]',
@@ -2364,7 +2540,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className="h-full"
+                          className={`h-full border-theme-neutral-300/50 ${borderClasses}`}
                         >
                           <div
                             onClick={(e) => {
@@ -2382,14 +2558,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDateChange(day); handleViewChange('day'); }}
                               className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
-                                isToday ? 'bg-[#B1916A] text-white hover:bg-[#a8896a]' : 'text-[#596881] hover:bg-[rgba(177,145,106,0.15)]'
+                                isToday ? 'bg-theme-primary text-white hover:bg-[#a8896a]' : 'text-theme-text-secondary hover:bg-theme-brand-tint-strong'
                               }`}
                             >
-                              <span className="text-[12px]">{format(day, "d")}</span>
+                              <span className="text-xs">{format(day, "d")}</span>
                             </button>
                             <button
                               type="button"
-                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[rgba(177,145,106,0.15)] text-[#8e99a8] hover:text-[#596881] transition-all"
+                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedModalDate(null);
@@ -2441,7 +2617,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
                                           style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
                                         />
-                                        <span className="text-[11px] text-[#314158] truncate">
+                                        <span className="text-[11px] text-theme-text-primary truncate">
                                           {ev.title}
                                         </span>
                                       </div>
@@ -2456,7 +2632,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   event.stopPropagation();
                                   setSelectedModalDate(dayStr);
                                 }}
-                                className="text-[10px] text-[#8e99a8] pl-1.5 hover:text-[#596881] transition-colors text-left"
+                                className="text-[10px] text-theme-text-tertiary pl-1.5 hover:text-theme-text-secondary transition-colors text-left"
                               >
                                 +{dayEvents.length - 3} more
                               </button>
@@ -2498,7 +2674,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <button
                 type="button"
                 onClick={() => setSelectedModalDate(null)}
-                className="text-[#8e99a8]/70 hover:text-[#6b7688] rounded-md focus:outline-none"
+                className="text-theme-text-tertiary/70 hover:text-theme-text-subtle rounded-md focus:outline-none"
+                aria-label="Close event details"
               >
                 &times;
               </button>
@@ -2508,14 +2685,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 const getDotColor = (source: string, ev?: DayEvent) => {
                   switch (source) {
                     case 'google':
-                      return 'bg-[#fdf8f6]0';
+                      return 'bg-theme-primary-500';
                     case 'uploaded':
                       return 'bg-purple-500';
                     case 'lifeboard':
                       const styles = getBucketEventStyles(ev?.bucket, bucketColors);
                       return styles.customColor || styles.dot;
                     default:
-                      return 'bg-[#faf8f5]0';
+                      return 'bg-theme-surface-alt0';
                   }
                 };
                 
@@ -2548,8 +2725,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     }}
                   >
                     <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium text-[#314158] leading-snug">{ev.title}</p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#8e99a8]">
+                      <p className="text-sm font-medium text-theme-text-primary leading-snug">{ev.title}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-theme-text-tertiary">
                         <span className="inline-flex items-center px-2 py-0.5 bg-white/60 rounded-lg font-medium">
                           {getSourceLabel(ev.source)}
                         </span>
@@ -2557,7 +2734,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           <span className="font-medium">
                             {ev.allDay ? 'All day' : format(new Date(ev.time), 'h:mm a')}
                             {ev.duration && ev.source === 'lifeboard' && (
-                              <span className="ml-1 text-[#8e99a8]/70">• {ev.duration} min</span>
+                              <span className="ml-1 text-theme-text-tertiary/70">• {ev.duration} min</span>
                             )}
                           </span>
                         )}
@@ -2567,7 +2744,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 );
               })}
               {(eventsByDate[selectedModalDate || '']?.length ?? 0) === 0 && (
-                <p className="text-sm text-[#8e99a8]">No events</p>
+                <p className="text-sm text-theme-text-tertiary">No events</p>
               )}
             </div>
           </div>
@@ -2596,22 +2773,23 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           >
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-[#314158]">Delete Task</h3>
-                <p className="text-sm text-[#6b7688] mt-1">
+                <h3 className="text-lg font-semibold text-theme-text-primary">Delete Task</h3>
+                <p className="text-sm text-theme-text-subtle mt-1">
                   Are you sure you want to delete this task?
                 </p>
               </div>
-              <button 
+              <button
                 type="button"
-                className="text-[#8e99a8]/70 hover:text-[#6b7688]" 
+                className="text-theme-text-tertiary/70 hover:text-theme-text-subtle"
                 onClick={() => setDeleteConfirmTask(null)}
+                aria-label="Close delete confirmation"
               >
                 &times;
               </button>
             </div>
 
-            <div className="bg-[#faf8f5] rounded-lg p-3 mb-4">
-              <p className="text-sm font-medium text-[#314158] truncate">
+            <div className="bg-theme-surface-alt rounded-lg p-3 mb-4">
+              <p className="text-sm font-medium text-theme-text-primary truncate">
                 {deleteConfirmTask.title}
               </p>
             </div>
@@ -2619,7 +2797,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                className="px-4 py-2 text-sm rounded border border-[#dbd6cf] text-[#4a5568] hover:bg-[#faf8f5] transition-colors"
+                className="px-4 py-2 text-sm rounded border border-theme-neutral-300 text-theme-text-body hover:bg-theme-surface-alt transition-colors"
                 onClick={() => setDeleteConfirmTask(null)}
               >
                 Cancel

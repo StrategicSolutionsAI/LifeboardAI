@@ -73,7 +73,7 @@ export function CalendarEvents({ maxEvents = 5 }: CalendarEventsProps) {
     return (
       <div className="text-center py-8">
         <p className="text-red-500">{error}</p>
-        <p className="text-sm text-[#8e99a8] mt-2">
+        <p className="text-sm text-theme-text-tertiary mt-2">
           Make sure you've connected your Google Calendar.
         </p>
       </div>
@@ -83,7 +83,7 @@ export function CalendarEvents({ maxEvents = 5 }: CalendarEventsProps) {
   if (events.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-[#8e99a8]">No upcoming events found</p>
+        <p className="text-theme-text-tertiary">No upcoming events found</p>
       </div>
     );
   }
@@ -115,13 +115,13 @@ export function CalendarEvents({ maxEvents = 5 }: CalendarEventsProps) {
           {events.map((event) => (
             <div 
               key={event.id} 
-              className="border-b border-[#dbd6cf] pb-3 last:border-0 last:pb-0"
+              className="border-b border-theme-neutral-300 pb-3 last:border-0 last:pb-0"
             >
               <a 
                 href={event.htmlLink} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="block hover:bg-[#faf8f5] rounded-md p-2 -mx-2 transition-colors"
+                className="block hover:bg-theme-surface-alt rounded-md p-2 -mx-2 transition-colors"
               >
                 <h3 className="font-medium text-[#171A1F]">{event.summary}</h3>
                 <div className="flex items-center text-[#6B7280] text-sm mt-1">

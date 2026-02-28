@@ -6,13 +6,14 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { format } from "date-fns";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import {
   Droppable,
   Draggable,
 } from "@hello-pangea/dnd";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import type { RepeatOption } from "@/hooks/use-tasks";
+import { getBucketColorSync } from "@/lib/bucket-colors";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -24,6 +25,8 @@ interface PlannerItem {
   content: string;
   /** Duration in minutes (15-min increments, min 15) */
   duration?: number;
+  /** Bucket name for color-coding */
+  bucket?: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -51,6 +54,13 @@ const HOURS = Array.from({ length: 15 }, (_, i) => {
 
 const RESIZE_INCREMENT = 15; // minutes
 const MIN_DURATION = 15; // minutes
+
+// Period labels for visual grouping
+const PERIOD_LABELS: Record<string, string> = {
+  '7AM': 'Morning',
+  '12PM': 'Afternoon',
+  '5PM': 'Evening',
+};
 
 const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
   { value: 'none', label: 'Do not repeat' },
@@ -107,6 +117,8 @@ interface HourlyPlannerProps {
   wrapWithContext?: boolean;
   plannerDate?: string; // yyyy-MM-dd for creating tasks on selected day
   onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => void;
+  /** User-saved bucket→color map from preferences, for accurate color matching */
+  bucketColors?: Record<string, string>;
 }
 
 export interface HourlyPlannerHandle {
@@ -114,7 +126,7 @@ export interface HourlyPlannerHandle {
 }
 
 const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
-  className = "", 
+  className = "",
   showTimeIndicator = true,
   allowResize = true,
   availableBuckets = [],
@@ -122,6 +134,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   isDragging = false,
   wrapWithContext = true,
   plannerDate,
+  bucketColors: propBucketColors,
   onTaskOpen,
 }, ref) => {
   const {
@@ -367,6 +380,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
         id: t.id.toString(),
         content: t.content,
         duration: t.duration ?? 60,
+        bucket: t.bucket,
       });
     });
     
@@ -413,6 +427,8 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     const endResize = () => {
       if (ended) return;
       ended = true;
+      // Cancel any pending RAF
+      if (rafId) cancelAnimationFrame(rafId);
       // Only update if duration actually changed
       if (currentDuration !== startDuration) {
         // Persist duration and re-assert current hourSlot to avoid accidental moves
@@ -430,17 +446,23 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
       window.removeEventListener("mouseleave", endResize);
     };
 
+    let rafId = 0;
     const handleMouseMove = (ev: MouseEvent) => {
       if (!resizeStartRef.current) return;
-      
+
       const delta = ev.clientY - resizeStartRef.current.y;
       const newDuration = Math.max(
         MIN_DURATION,
         Math.round((resizeStartRef.current.duration + (delta / HOUR_HEIGHT) * 60) / RESIZE_INCREMENT) * RESIZE_INCREMENT
       );
-      
+
       currentDuration = newDuration;
-      setResizingTask(prev => prev ? { ...prev, currentDuration: newDuration } : null);
+      // Throttle state updates to once per animation frame
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        setResizingTask(prev => prev ? { ...prev, currentDuration: newDuration } : null);
+      });
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -518,38 +540,41 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     },
   }), [openAddModal, currentSlot]);
 
-  // Auto-scroll to current time slot on mount
+  // Auto-scroll to current time slot ONCE on mount only
+  const hasAutoScrolled = useRef(false);
   useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const currentHour = currentTime.getHours();
-    const currentMinutes = currentTime.getMinutes();
+    if (!containerRef.current || hasAutoScrolled.current) return;
+    hasAutoScrolled.current = true;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
     let targetSlotIndex = -1;
-    
+
     // Find current time slot in our TIME_SLOTS array
     for (let i = 0; i < TIME_SLOTS.length; i++) {
       const slotMinutes = parseTimeSlot(TIME_SLOTS[i]);
       const totalCurrentMinutes = currentHour * 60 + currentMinutes;
-      
+
       if (slotMinutes <= totalCurrentMinutes && (i === TIME_SLOTS.length - 1 || parseTimeSlot(TIME_SLOTS[i + 1]) > totalCurrentMinutes)) {
         targetSlotIndex = Math.max(0, i - 4); // Show a few slots above current time
         break;
       }
     }
-    
+
     // Handle edge cases
     if (targetSlotIndex === -1) {
       const totalCurrentMinutes = currentHour * 60 + currentMinutes;
       const startMinutes = 7 * 60; // 7 AM
       const endMinutes = 21 * 60; // 9 PM
-      
+
       if (totalCurrentMinutes < startMinutes) {
         targetSlotIndex = 0;
       } else if (totalCurrentMinutes > endMinutes) {
         targetSlotIndex = TIME_SLOTS.length - 1;
       }
     }
-    
+
     if (targetSlotIndex >= 0) {
       const scrollPosition = Math.floor(targetSlotIndex / 4) * 68; // Each hour (4 slots) = 68px
       containerRef.current.scrollTo({
@@ -557,7 +582,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
         behavior: 'smooth'
       });
     }
-  }, [currentTime]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -570,13 +595,13 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
       >
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-[#314158]">Schedule task</h3>
-            <p className="text-sm text-[#8e99a8] mt-1">
+            <h3 className="text-lg font-semibold text-theme-text-primary">Schedule task</h3>
+            <p className="text-sm text-theme-text-tertiary mt-1">
               {activePlannerDate} · {addModalSlot}
             </p>
           </div>
           <button
-            className="text-[#8e99a8]/70 hover:text-[#6b7688]"
+            className="text-theme-text-tertiary/70 hover:text-theme-text-subtle"
             onClick={handleCancelCreation}
             aria-label="Close"
           >
@@ -591,12 +616,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           }}
           className="space-y-3"
         >
-          <label className="block text-xs text-[#6b7688] font-medium">
+          <label className="block text-xs text-theme-text-subtle font-medium">
             <span className="block mb-1 uppercase tracking-wide">Start time</span>
             <select
               value={newTaskStart || addModalSlot || ''}
               onChange={(e) => setNewTaskStart(e.target.value)}
-              className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
+              className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
             >
               {TIME_SLOTS.map((slot) => (
                 <option key={slot} value={slot}>{slot}</option>
@@ -606,12 +631,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
 
           <div className="flex flex-col sm:flex-row gap-2">
             {availableBuckets.length > 0 && (
-              <label className="flex-1 text-xs text-[#6b7688] font-medium">
+              <label className="flex-1 text-xs text-theme-text-subtle font-medium">
                 <span className="block mb-1 uppercase tracking-wide">Bucket</span>
                 <select
                   value={taskBucket}
                   onChange={(e) => setTaskBucket(e.target.value)}
-                  className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
+                  className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
                 >
                   {availableBuckets.map((bucket) => (
                     <option key={bucket} value={bucket}>{bucket}</option>
@@ -619,12 +644,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                 </select>
               </label>
             )}
-            <label className="w-full sm:w-40 text-xs text-[#6b7688] font-medium">
+            <label className="w-full sm:w-40 text-xs text-theme-text-subtle font-medium">
               <span className="block mb-1 uppercase tracking-wide">Duration</span>
               <select
                 value={newTaskDuration}
                 onChange={(e) => setNewTaskDuration(parseInt(e.target.value, 10))}
-                className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
+                className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
               >
                 {[15, 30, 45, 60, 90, 120].map((minutes) => (
                   <option key={minutes} value={minutes}>{minutes} min</option>
@@ -633,12 +658,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             </label>
           </div>
 
-          <label className="block text-xs text-[#6b7688] font-medium">
+          <label className="block text-xs text-theme-text-subtle font-medium">
             <span className="block mb-1 uppercase tracking-wide">Repeat</span>
             <select
               value={newTaskRepeat}
               onChange={(e) => setNewTaskRepeat(e.target.value as RepeatOption)}
-              className="w-full rounded border border-[#dbd6cf] px-2 py-1.5 text-sm focus:border-[#bb9e7b] focus:outline-none"
+              className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
             >
               {REPEAT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -646,7 +671,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             </select>
           </label>
 
-          <label className="block text-xs text-[#6b7688] font-medium">
+          <label className="block text-xs text-theme-text-subtle font-medium">
             <span className="block mb-1 uppercase tracking-wide">Task</span>
             <input
               type="text"
@@ -660,14 +685,14 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
               }}
               autoFocus
               placeholder="What needs to be done?"
-              className="w-full rounded border border-[#dbd6cf] px-3 py-2 text-sm focus:border-[#bb9e7b] focus:outline-none"
+              className="w-full rounded border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-secondary focus:outline-none"
             />
           </label>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              className="px-3 py-1.5 text-sm text-[#6b7688] hover:text-gray-800"
+              className="px-3 py-1.5 text-sm text-theme-text-subtle hover:text-gray-800"
               onClick={handleCancelCreation}
             >
               Cancel
@@ -675,7 +700,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             <button
               type="submit"
               disabled={!newTaskContent.trim() || isCreatingTask}
-              className="px-4 py-1.5 text-sm rounded bg-[#bb9e7b] text-white hover:bg-[#9a7b5a] disabled:opacity-50"
+              className="px-4 py-1.5 text-sm rounded bg-theme-secondary text-white hover:bg-theme-primary-600 disabled:opacity-50"
             >
               {isCreatingTask ? 'Adding…' : 'Add task'}
             </button>
@@ -686,350 +711,388 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   ) : null;
 
   const content = (
-    <div 
+    <div
       ref={containerRef}
-      className={`space-y-0 ${className} max-h-[600px] overflow-y-auto`}
+      className={`space-y-0 ${className} max-h-[600px] overflow-y-auto scrollbar-thin`}
     >
         {TIME_SLOTS.map((timeSlot, index) => {
           // Check if this is a major hour (on the hour)
           const isMainHour = timeSlot.indexOf(':') === -1;
           const hasTask = hourlyPlan[timeSlot].length > 0;
           const isCurrentSlot = currentSlot === timeSlot;
-          
+          const periodLabel = PERIOD_LABELS[timeSlot];
+          // Determine if this slot is in the past (before current time)
+          const slotMinutes = parseTimeSlot(timeSlot);
+          const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+          const isPast = showTimeIndicator && slotMinutes < nowMinutes;
+
           return (
-          <Droppable key={timeSlot} droppableId={`hour-${timeSlot}`}>
-            {(provided, snapshot) => (
-              <div
-                className={`relative flex items-start gap-4 border-[#dbd6cf] transition-colors h-[17px] group ${
-                  isMainHour 
-                    ? 'border-t' 
-                    : hasTask ? 'group-hover:border-t group-hover:border-dashed group-hover:border-[#dbd6cf]' : ''
-                } ${index === 0 ? 'border-t-0' : ''} ${
-                  snapshot.isDraggingOver ? 'bg-[#fdf8f6] border-[#dbd6cf]' : isCurrentSlot ? 'bg-[#fdf8f6]/70 border-[#dbd6cf]/60' : ''
-                }`}
-                style={{ minHeight: SLOT_HEIGHT }}
-                onMouseEnter={() => handleSlotHover(timeSlot, true)}
-                onMouseLeave={() => handleSlotHover(timeSlot, false)}
-              >
-                {/* Enhanced time label with better typography - only show for main hours */}
-                <div className="w-16 shrink-0 flex flex-col items-end text-right pt-1">
-                  {isMainHour ? (
-                    <>
-                      <span className={`text-sm font-medium leading-none ${timeSlot === currentHourDisplay ? 'text-[#bb9e7b]' : 'text-[#314158]'}`}>
-                        {timeSlot}
-                      </span>
-                      {timeSlot === currentHourDisplay ? (
-                        <span className="mt-0.5 inline-flex items-center rounded-full bg-[rgba(183,148,106,0.12)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#9a7b5a]">
-                          Now
-                        </span>
-                      ) : (
-                        <div className="h-3" />
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="h-3" />
-                      <div className="h-3" />
-                    </>
-                  )}
-                </div>
-                
-                <ul
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="flex-1 relative overflow-visible min-h-[15px]"
-                  style={{ minHeight: SLOT_HEIGHT }}
-                >
-                  {effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) && (
-                    <>
-                      <div
-                        className="pointer-events-none absolute inset-0 rounded-lg border border-[#dbd6cf]/70 bg-[#fdf8f6]/60"
-                        style={{ zIndex: 0 }}
-                      />
-                      <div
-                        className="pointer-events-none absolute right-0 top-2 text-[11px] font-semibold uppercase tracking-wide text-[#bb9e7b]"
-                        style={{ zIndex: 0 }}
-                      >
-                        {timeSlot}
-                      </div>
-                    </>
-                  )}
-                  {hourlyPlan[timeSlot].map((t, index) => {
-                    const taskCount = hourlyPlan[timeSlot].length;
-                    // Better spacing calculation for multiple tasks
-                    const taskWidth = taskCount > 1 ? `${Math.floor(100 / taskCount) - 2}%` : '100%';
-                    const leftOffset = taskCount > 1 ? `${(index * Math.floor(100 / taskCount)) + 1}%` : '0%';
-                    
-                    return (
-                    <Draggable 
-                      key={t.id} 
-                      draggableId={t.id.toString()} 
-                      index={index} 
-                      isDragDisabled={Boolean(resizingTask && resizingTask.taskId === t.id)}
-                    >
-                      {(prov, dragSnapshot) => {
-                        const isResizing = resizingTask?.taskId === t.id;
-                        const taskDuration = isResizing ? resizingTask.currentDuration : t.duration ?? 60;
-                        const isDraggingNow = dragSnapshot.isDragging;
-                        const endTime = calculateEndTime(timeSlot, taskDuration);
-
-                        return (
-                        <li
-                          ref={prov.innerRef}
-                          {...prov.draggableProps}
-                          style={{
-                            // Let DnD control transform entirely during drag
-                            ...(prov.draggableProps.style || {}),
-                            height: `${Math.max(32, (taskDuration / 60) * HOUR_HEIGHT)}px`,
-                            // Simplified positioning for better drag compatibility
-                            position: isDraggingNow ? 'relative' : 'absolute',
-                            top: isDraggingNow ? 'auto' : (taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px'),
-                            left: isDraggingNow ? 'auto' : leftOffset,
-                            width: isDraggingNow ? 'auto' : taskWidth,
-                            zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : (frontTaskId === t.id.toString() ? 999 : index + 1)),
-                            ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const taskId = t.id.toString();
-                            if (onTaskOpen) {
-                              const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
-                              onTaskOpen(taskId, {
-                                hourSlot: normalizedSlot,
-                                plannerDate: activePlannerDate,
-                              });
-                              return;
-                            }
-                            setFrontTaskId(taskId);
-                            // Reset after 3 seconds to avoid permanent z-index changes
-                            setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
-                          }}
-                          aria-label={`${t.content}. ${timeSlot} to ${endTime}`}
-                          className={`group relative flex items-start gap-3 px-4 py-3 
-                            bg-white border border-[#dbd6cf] 
-                            shadow-sm hover:shadow-warm 
-                            rounded-xl transition-all duration-200 
-                            cursor-grab active:cursor-grabbing
-                            hover:border-[#bb9e7b] hover:bg-[#faf8f5]
-                            ${isDraggingNow ? 'shadow-warm-lg rotate-1 scale-105 border-[#bb9e7b] cursor-grabbing' : ''}
-                            ${resizingTask?.taskId === t.id ? 'ring-2 ring-[#dbd6cf]' : ''}
-                          `}
-                        >
-                          <div
-                            className="flex items-start gap-3 w-full h-full min-h-[32px]"
-                            {...(() => {
-                              const handleProps = prov.dragHandleProps ?? {};
-                              const { onMouseDown, onTouchStart, ...rest } = handleProps as any;
-                              return {
-                                ...rest,
-                                onMouseDown: (event: React.MouseEvent<any, MouseEvent>) => {
-                                  if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    return;
-                                  }
-                                  onMouseDown?.(event);
-                                },
-                                onTouchStart: (event: React.TouchEvent<any>) => {
-                                  if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    return;
-                                  }
-                                  onTouchStart?.(event);
-                                },
-                              };
-                            })()}
-                          >
-                            {/* Enhanced status indicator with brand colors */}
-                            <div className="flex-shrink-0 mt-1">
-                              <div className="w-2.5 h-2.5 bg-[#fdf8f6]0 rounded-full ring-2 ring-[#dbd6cf]" />
-                            </div>
-                            
-                            <div className="flex flex-col w-full justify-center min-w-0">
-                              {/* Conditional layout based on task height */}
-                              {taskDuration >= 45 ? (
-                                // Tall tasks: time on top, title below
-                                <>
-                                  <div className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-[#bb9e7b] leading-tight tracking-wide">
-                                    <span>{timeSlot}</span>
-                                    <span className="text-[11px] font-medium text-[#8e99a8]">– {endTime}</span>
-                                  </div>
-                                  {editingTaskId === t.id.toString() ? (
-                                    <input
-                                      type="text"
-                                      value={editingContent}
-                                      onChange={(e) => setEditingContent(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSaveEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          handleCancelEdit();
-                                        }
-                                      }}
-                                      onBlur={handleSaveEdit}
-                                      autoFocus
-                                      className="font-semibold text-[#314158] text-sm leading-tight bg-white border border-[#dbd6cf] rounded px-1 py-0.5 w-full focus:outline-none focus:border-[#bb9e7b]"
-                                      data-no-drag="true"
-                                    />
-                                  ) : (
-                                    <div 
-                                      className="font-semibold text-[#314158] truncate text-sm leading-tight cursor-pointer hover:bg-[rgba(183,148,106,0.08)] rounded px-1 py-0.5 -mx-1 -my-0.5"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const taskId = t.id.toString();
-                                        if (onTaskOpen) {
-                                          const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
-                                          onTaskOpen(taskId, {
-                                            hourSlot: normalizedSlot,
-                                            plannerDate: activePlannerDate,
-                                          });
-                                          return;
-                                        }
-                                        setFrontTaskId(taskId);
-                                        setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
-                                        handleStartEdit(t);
-                                      }}
-                                      onDoubleClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartEdit(t);
-                                      }}
-                                    >
-                                      {t.content}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                // Short tasks: time and title on same row
-                                <div className="flex items-center gap-2 w-full">
-                                  <div className="inline-flex items-center gap-1 text-xs font-medium text-[#bb9e7b] leading-tight tracking-wide flex-shrink-0">
-                                    <span>{timeSlot}</span>
-                                    <span className="text-[11px] font-medium text-[#8e99a8]">– {endTime}</span>
-                                  </div>
-                                  {editingTaskId === t.id.toString() ? (
-                                    <input
-                                      type="text"
-                                      value={editingContent}
-                                      onChange={(e) => setEditingContent(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSaveEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          handleCancelEdit();
-                                        }
-                                      }}
-                                      onBlur={handleSaveEdit}
-                                      autoFocus
-                                      className="font-semibold text-[#314158] text-sm leading-tight bg-white border border-[#dbd6cf] rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-[#bb9e7b]"
-                                      data-no-drag="true"
-                                    />
-                                  ) : (
-                                    <div 
-                                      className="font-semibold text-[#314158] truncate text-sm leading-tight flex-1 cursor-pointer hover:bg-[rgba(183,148,106,0.08)] rounded px-1 py-0.5 -mx-1 -my-0.5"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const taskId = t.id.toString();
-                                        if (onTaskOpen) {
-                                          const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
-                                          onTaskOpen(taskId, {
-                                            hourSlot: normalizedSlot,
-                                            plannerDate: activePlannerDate,
-                                          });
-                                          return;
-                                        }
-                                        setFrontTaskId(taskId);
-                                        setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
-                                        handleStartEdit(t);
-                                      }}
-                                      onDoubleClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartEdit(t);
-                                      }}
-                                    >
-                                      {t.content}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Improved delete button */}
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                await deleteTask(t.id, activePlannerDate);
-                              }}
-                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 
-                                hover:bg-theme-error-100 hover:text-theme-error-600
-                                rounded-md p-1.5 transition-all duration-200
-                                focus:opacity-100 focus:ring-2 focus:ring-theme-error-200"
-                              title="Delete task permanently"
-                              data-no-drag="true"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                          
-                          {/* Enhanced resize handle with better visual feedback */}
-                          {allowResize && (
-                            <div className="absolute -bottom-1 left-2 right-2 flex justify-center">
-                              <div
-                                onMouseDown={(e) => startResize(e, timeSlot, t.id)}
-                                className="h-3 w-10 cursor-ns-resize 
-                                  bg-[#dbd6cf] hover:bg-[#bb9e7b] 
-                                  rounded-full transition-all duration-200
-                                  opacity-60 group-hover:opacity-100 hover:scale-110
-                                  flex items-center justify-center shadow-sm"
-                                data-no-drag="true"
-                              >
-                                <div className="w-3 h-0.5 bg-[#bb9e7b] rounded-full" />
-                              </div>
-                            </div>
-                          )}
-                          {isResizing && (
-                            <div className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 rounded-md bg-[#bb9e7b] px-2 py-1 text-[11px] font-semibold text-white shadow-warm-lg">
-                              Ends {endTime}
-                            </div>
-                          )}
-                        </li>
-                        );
-                      }}
-                    </Draggable>
-                    );
-                  })}
-                  {provided.placeholder}
-
-                </ul>
-
-                {/* Enhanced current-time indicator */}
-                {showTimeIndicator && isCurrentSlot && (
-                  <div
-                    className="absolute left-0 right-0 pointer-events-none flex items-center z-10"
-                    style={{ top: `calc(${(((currentTime.getMinutes() % 15) / 15) * 100).toFixed(2)}% - 1px)` }}
-                  >
-                    <div className="w-16 shrink-0" />
-                    <div className="flex items-center flex-1">
-                      <div className="w-3 h-3 bg-theme-primary rounded-full shadow-warm-lg 
-                        ring-2 ring-blue-200 animate-pulse" />
-                      <div className="flex-1 h-0.5 bg-theme-primary shadow-sm" />
-                      <div className="px-2 py-1 bg-theme-primary text-white 
-                        text-xs font-medium rounded-md shadow-sm ml-2">
-                        {currentTime.toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
+          <React.Fragment key={timeSlot}>
+            {/* Period section divider */}
+            {periodLabel && (
+              <div className="flex items-center gap-3 px-3 pt-4 pb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-[1.5px] text-theme-primary-500/70">
+                  {periodLabel}
+                </span>
+                <div className="flex-1 h-px bg-gradient-to-r from-theme-primary-300/30 to-transparent" />
               </div>
             )}
-          </Droppable>
+
+            <Droppable droppableId={`hour-${timeSlot}`}>
+              {(provided, snapshot) => (
+                <div
+                  className={`relative flex items-start gap-3 transition-colors group ${
+                    isMainHour
+                      ? 'border-t border-theme-neutral-300/30 h-[18px]'
+                      : hasTask ? 'h-[17px]' : 'h-[17px]'
+                  } ${index === 0 && !periodLabel ? 'border-t-0' : ''} ${
+                    snapshot.isDraggingOver
+                      ? 'bg-theme-primary-50/80'
+                      : isPast && !hasTask
+                      ? 'opacity-40'
+                      : ''
+                  }`}
+                  style={{ minHeight: SLOT_HEIGHT }}
+                  onMouseEnter={() => handleSlotHover(timeSlot, true)}
+                  onMouseLeave={() => handleSlotHover(timeSlot, false)}
+                >
+                  {/* Time label - only for main hours, hidden when now line is active */}
+                  <div className="w-[56px] shrink-0 flex flex-col items-end text-right -mt-[1px] pr-1">
+                    {isMainHour && !(showTimeIndicator && isCurrentSlot) ? (
+                      <span className={`text-[11px] font-semibold leading-none tabular-nums ${
+                        isPast ? 'text-theme-text-quaternary/60' : 'text-theme-text-tertiary'
+                      }`}>
+                        {timeSlot}
+                      </span>
+                    ) : (
+                      <div className="h-3" />
+                    )}
+                  </div>
+
+                  <ul
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="flex-1 relative overflow-visible min-h-[15px]"
+                    style={{ minHeight: SLOT_HEIGHT }}
+                  >
+                    {/* Drag-over indicator */}
+                    {effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) && (
+                      <>
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-theme-primary-300/60 bg-theme-primary-50/40"
+                          style={{ zIndex: 0 }}
+                        />
+                        <div
+                          className="pointer-events-none absolute right-2 top-0.5 text-[10px] font-semibold text-theme-primary-500/70"
+                          style={{ zIndex: 0 }}
+                        >
+                          {timeSlot}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Hover-to-add affordance for empty main hour slots */}
+                    {isMainHour && !hasTask && !effectiveDragging && (
+                      <button
+                        type="button"
+                        onClick={() => openAddModal(timeSlot)}
+                        className="absolute inset-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-[1] cursor-pointer pl-1"
+                        aria-label={`Add task at ${timeSlot}`}
+                      >
+                        <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-theme-neutral-300/60 bg-theme-surface-alt/40 px-2 py-0.5 text-[10px] font-medium text-theme-text-quaternary hover:text-theme-text-secondary hover:bg-theme-brand-tint-subtle hover:border-theme-primary-300/40 transition-colors">
+                          <Plus size={10} />
+                          Add task
+                        </span>
+                      </button>
+                    )}
+
+                    {hourlyPlan[timeSlot].map((t, index) => {
+                      const taskCount = hourlyPlan[timeSlot].length;
+                      const taskWidth = taskCount > 1 ? `${Math.floor(100 / taskCount) - 2}%` : '100%';
+                      const leftOffset = taskCount > 1 ? `${(index * Math.floor(100 / taskCount)) + 1}%` : '0%';
+                      const bucketColor = t.bucket ? getBucketColorSync(t.bucket, propBucketColors) : null;
+
+                      return (
+                      <Draggable
+                        key={t.id}
+                        draggableId={t.id.toString()}
+                        index={index}
+                        isDragDisabled={Boolean(resizingTask && resizingTask.taskId === t.id)}
+                      >
+                        {(prov, dragSnapshot) => {
+                          const isResizing = resizingTask?.taskId === t.id;
+                          const taskDuration = isResizing ? resizingTask.currentDuration : t.duration ?? 60;
+                          const isDraggingNow = dragSnapshot.isDragging;
+                          const endTime = calculateEndTime(timeSlot, taskDuration);
+
+                          return (
+                          <li
+                            ref={prov.innerRef}
+                            {...prov.draggableProps}
+                            style={{
+                              ...(prov.draggableProps.style || {}),
+                              height: `${Math.max(32, (taskDuration / 60) * HOUR_HEIGHT)}px`,
+                              position: isDraggingNow ? 'relative' : 'absolute',
+                              top: isDraggingNow ? 'auto' : (taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px'),
+                              left: isDraggingNow ? 'auto' : leftOffset,
+                              width: isDraggingNow ? 'auto' : taskWidth,
+                              zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : (frontTaskId === t.id.toString() ? 999 : index + 1)),
+                              ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const taskId = t.id.toString();
+                              if (onTaskOpen) {
+                                const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                onTaskOpen(taskId, {
+                                  hourSlot: normalizedSlot,
+                                  plannerDate: activePlannerDate,
+                                });
+                                return;
+                              }
+                              setFrontTaskId(taskId);
+                              setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
+                            }}
+                            aria-label={`${t.content}. ${timeSlot} to ${endTime}`}
+                            className={`group relative flex items-start gap-2.5 py-2.5 pr-3 pl-0
+                              bg-white border border-theme-neutral-300/80
+                              shadow-sm hover:shadow-warm
+                              rounded-xl transition-all duration-200
+                              cursor-grab active:cursor-grabbing
+                              hover:border-theme-primary-300 hover:bg-theme-surface-alt
+                              overflow-hidden
+                              ${isDraggingNow ? 'shadow-warm-lg rotate-1 scale-105 border-theme-primary-300 cursor-grabbing' : ''}
+                              ${resizingTask?.taskId === t.id ? 'ring-2 ring-theme-neutral-300' : ''}
+                            `}
+                          >
+                            {/* Bucket color accent bar */}
+                            <div
+                              className="w-1 self-stretch rounded-l-xl shrink-0"
+                              style={{ backgroundColor: bucketColor || 'var(--theme-primary-300)' }}
+                            />
+
+                            <div
+                              className="flex items-start gap-2.5 w-full h-full min-h-[28px] pl-1"
+                              {...(() => {
+                                const handleProps = prov.dragHandleProps ?? {};
+                                const { onMouseDown, onTouchStart, ...rest } = handleProps as any;
+                                return {
+                                  ...rest,
+                                  onMouseDown: (event: React.MouseEvent<any, MouseEvent>) => {
+                                    if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      return;
+                                    }
+                                    onMouseDown?.(event);
+                                  },
+                                  onTouchStart: (event: React.TouchEvent<any>) => {
+                                    if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      return;
+                                    }
+                                    onTouchStart?.(event);
+                                  },
+                                };
+                              })()}
+                            >
+                              <div className="flex flex-col w-full justify-center min-w-0">
+                                {/* Conditional layout based on task height */}
+                                {taskDuration >= 45 ? (
+                                  // Tall tasks: time on top, title below
+                                  <>
+                                    <div className="mb-0.5 inline-flex items-center gap-1.5 text-[11px] font-medium leading-tight tracking-wide">
+                                      <span className="text-theme-text-tertiary tabular-nums">{timeSlot}</span>
+                                      <span className="text-theme-text-quaternary">–</span>
+                                      <span className="text-theme-text-tertiary tabular-nums">{endTime}</span>
+                                      {t.bucket && (
+                                        <span
+                                          className="ml-1 rounded px-1.5 py-px text-[10px] font-medium"
+                                          style={{
+                                            backgroundColor: bucketColor ? bucketColor + '18' : undefined,
+                                            color: bucketColor || undefined,
+                                          }}
+                                        >
+                                          {t.bucket}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {editingTaskId === t.id.toString() ? (
+                                      <input
+                                        type="text"
+                                        value={editingContent}
+                                        onChange={(e) => setEditingContent(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSaveEdit();
+                                          } else if (e.key === 'Escape') {
+                                            e.preventDefault();
+                                            handleCancelEdit();
+                                          }
+                                        }}
+                                        onBlur={handleSaveEdit}
+                                        autoFocus
+                                        className="font-semibold text-theme-text-primary text-sm leading-tight bg-white border border-theme-neutral-300 rounded px-1 py-0.5 w-full focus:outline-none focus:border-theme-secondary"
+                                        data-no-drag="true"
+                                      />
+                                    ) : (
+                                      <div
+                                        className="font-semibold text-theme-text-primary truncate text-sm leading-tight cursor-pointer hover:bg-theme-brand-tint-light rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const taskId = t.id.toString();
+                                          if (onTaskOpen) {
+                                            const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                            onTaskOpen(taskId, {
+                                              hourSlot: normalizedSlot,
+                                              plannerDate: activePlannerDate,
+                                            });
+                                            return;
+                                          }
+                                          setFrontTaskId(taskId);
+                                          setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
+                                          handleStartEdit(t);
+                                        }}
+                                        onDoubleClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartEdit(t);
+                                        }}
+                                      >
+                                        {t.content}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  // Short tasks: time and title on same row
+                                  <div className="flex items-center gap-2 w-full">
+                                    <div className="inline-flex items-center gap-1 text-[11px] font-medium leading-tight tracking-wide flex-shrink-0 tabular-nums">
+                                      <span className="text-theme-text-tertiary">{timeSlot}</span>
+                                      <span className="text-theme-text-quaternary">–</span>
+                                      <span className="text-theme-text-tertiary">{endTime}</span>
+                                    </div>
+                                    {editingTaskId === t.id.toString() ? (
+                                      <input
+                                        type="text"
+                                        value={editingContent}
+                                        onChange={(e) => setEditingContent(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSaveEdit();
+                                          } else if (e.key === 'Escape') {
+                                            e.preventDefault();
+                                            handleCancelEdit();
+                                          }
+                                        }}
+                                        onBlur={handleSaveEdit}
+                                        autoFocus
+                                        className="font-semibold text-theme-text-primary text-sm leading-tight bg-white border border-theme-neutral-300 rounded px-1 py-0.5 flex-1 focus:outline-none focus:border-theme-secondary"
+                                        data-no-drag="true"
+                                      />
+                                    ) : (
+                                      <div
+                                        className="font-semibold text-theme-text-primary truncate text-sm leading-tight flex-1 cursor-pointer hover:bg-theme-brand-tint-light rounded px-1 py-0.5 -mx-1 -my-0.5"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const taskId = t.id.toString();
+                                          if (onTaskOpen) {
+                                            const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                            onTaskOpen(taskId, {
+                                              hourSlot: normalizedSlot,
+                                              plannerDate: activePlannerDate,
+                                            });
+                                            return;
+                                          }
+                                          setFrontTaskId(taskId);
+                                          setTimeout(() => setFrontTaskId(prev => prev === taskId ? null : prev), 3000);
+                                          handleStartEdit(t);
+                                        }}
+                                        onDoubleClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartEdit(t);
+                                        }}
+                                      >
+                                        {t.content}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Delete button */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await deleteTask(t.id, activePlannerDate);
+                                }}
+                                className="flex-shrink-0 opacity-0 group-hover:opacity-100
+                                  hover:bg-red-50 hover:text-red-500
+                                  rounded-md p-1 transition-all duration-150
+                                  focus:opacity-100 focus:ring-2 focus:ring-red-200"
+                                title="Delete task permanently"
+                                data-no-drag="true"
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+
+                            {/* Resize handle */}
+                            {allowResize && (
+                              <div className="absolute -bottom-1 left-3 right-3 flex justify-center">
+                                <div
+                                  onMouseDown={(e) => startResize(e, timeSlot, t.id)}
+                                  className="h-2.5 w-8 cursor-ns-resize
+                                    bg-theme-neutral-300/60 hover:bg-theme-primary-400
+                                    rounded-full transition-all duration-150
+                                    opacity-0 group-hover:opacity-100 hover:scale-110
+                                    flex items-center justify-center"
+                                  data-no-drag="true"
+                                >
+                                  <div className="w-3 h-px bg-theme-text-quaternary rounded-full" />
+                                </div>
+                              </div>
+                            )}
+                            {isResizing && (
+                              <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded-md bg-theme-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-warm-lg tabular-nums">
+                                {endTime}
+                              </div>
+                            )}
+                          </li>
+                          );
+                        }}
+                      </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </ul>
+
+                  {/* Current-time "now" line */}
+                  {showTimeIndicator && isCurrentSlot && (
+                    <div
+                      className="absolute left-0 right-0 pointer-events-none flex items-center z-20"
+                      style={{ top: `calc(${(((currentTime.getMinutes() % 15) / 15) * 100).toFixed(2)}% - 1px)` }}
+                    >
+                      <div className="w-[60px] shrink-0 flex justify-end pr-1">
+                        <span className="text-[11px] font-bold text-theme-primary-600 tabular-nums leading-none">
+                          {currentTime.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center flex-1">
+                        <div className="w-3 h-3 rounded-full shadow-warm-sm bg-theme-primary-500 -ml-[5px]" />
+                        <div className="flex-1 h-[2px] bg-gradient-to-r from-theme-primary-500 to-theme-primary-300/40" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Droppable>
+          </React.Fragment>
           );
         })}
     </div>

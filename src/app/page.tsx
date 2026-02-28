@@ -18,14 +18,14 @@ import {
 
 function DashboardMockup() {
   return (
-    <div className="relative max-w-5xl mx-auto mt-16 px-4">
+    <div role="img" aria-label="Preview of the LifeboardAI dashboard" className="relative max-w-5xl mx-auto mt-10 sm:mt-16 px-0 sm:px-4">
       {/* Subtle radial glow behind */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(177,145,106,0.1)_0%,_transparent_70%)] scale-125" />
 
       {/* Main dashboard card */}
       <div className="relative bg-white rounded-2xl shadow-warm-lg border border-warm-200 overflow-hidden">
         {/* Browser chrome */}
-        <div className="h-10 border-b border-warm-200 flex items-center px-4 gap-2 bg-[#faf8f5]">
+        <div className="h-10 border-b border-warm-200 flex items-center px-4 gap-2 bg-theme-surface-alt">
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-300" />
             <div className="w-2.5 h-2.5 rounded-full bg-yellow-300" />
@@ -37,13 +37,13 @@ function DashboardMockup() {
         {/* App body */}
         <div className="flex min-h-[300px] md:min-h-[380px]">
           {/* Sidebar - matches actual app sidebar */}
-          <div className="hidden md:flex flex-col items-center w-16 bg-[#faf8f5] border-r border-warm-200 py-4 gap-3">
+          <div className="hidden md:flex flex-col items-center w-16 bg-theme-surface-alt border-r border-warm-200 py-4 gap-3">
             <div className="w-8 h-8 rounded-lg bg-warm-500 flex items-center justify-center text-white text-xs font-bold">L</div>
             <div className="mt-2 w-8 h-8 rounded-lg bg-warm-100 flex items-center justify-center"><LayoutGrid className="w-4 h-4 text-warm-600" /></div>
-            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><Calendar className="w-4 h-4 text-[#8e99a8]" /></div>
-            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><CheckCircle className="w-4 h-4 text-[#8e99a8]" /></div>
-            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><ShoppingCart className="w-4 h-4 text-[#8e99a8]" /></div>
-            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><BarChart3 className="w-4 h-4 text-[#8e99a8]" /></div>
+            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><Calendar className="w-4 h-4 text-theme-text-tertiary" /></div>
+            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><CheckCircle className="w-4 h-4 text-theme-text-tertiary" /></div>
+            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><ShoppingCart className="w-4 h-4 text-theme-text-tertiary" /></div>
+            <div className="w-8 h-8 rounded-lg hover:bg-warm-50 flex items-center justify-center"><BarChart3 className="w-4 h-4 text-theme-text-tertiary" /></div>
           </div>
 
           {/* Main content area */}
@@ -54,12 +54,12 @@ function DashboardMockup() {
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-32 bg-warm-200 rounded" />
                   <CloudSun className="w-4 h-4 text-warm-400" />
-                  <span className="text-[10px] text-[#8e99a8]">72&#176;F</span>
+                  <span className="text-[10px] text-theme-text-tertiary">72&#176;F</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-7 flex-1 min-w-[120px] bg-warm-50 rounded-lg border border-warm-200 px-2 flex items-center">
-                  <span className="text-[10px] text-[#8e99a8]">Quick add task...</span>
+                  <span className="text-[10px] text-theme-text-tertiary">Quick add task...</span>
                 </div>
               </div>
             </div>
@@ -78,7 +78,7 @@ function DashboardMockup() {
                   className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all ${
                     tab.active
                       ? 'text-white shadow-sm'
-                      : 'bg-warm-50 text-[#8e99a8] border border-warm-200'
+                      : 'bg-warm-50 text-theme-text-tertiary border border-warm-200'
                   }`}
                   style={tab.active ? { backgroundColor: tab.color } : undefined}
                 >
@@ -109,9 +109,9 @@ function DashboardMockup() {
               <div className="bg-white rounded-xl border border-warm-200 p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Activity className="w-3 h-3 text-green-500" />
-                  <span className="text-[9px] font-semibold text-[#6b7688]">Daily Steps</span>
+                  <span className="text-[9px] font-semibold text-theme-text-subtle">Daily Steps</span>
                 </div>
-                <div className="text-base font-bold text-[#111]">8,432</div>
+                <div className="text-base font-bold text-theme-text-primary">8,432</div>
                 <div className="mt-1 h-1.5 w-full bg-warm-100 rounded-full overflow-hidden">
                   <div className="h-full bg-green-400 rounded-full" style={{ width: '84%' }} />
                 </div>
@@ -120,9 +120,9 @@ function DashboardMockup() {
               <div className="bg-white rounded-xl border border-warm-200 p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Droplets className="w-3 h-3 text-blue-500" />
-                  <span className="text-[9px] font-semibold text-[#6b7688]">Water Intake</span>
+                  <span className="text-[9px] font-semibold text-theme-text-subtle">Water Intake</span>
                 </div>
-                <div className="text-base font-bold text-[#111]">6 / 8</div>
+                <div className="text-base font-bold text-theme-text-primary">6 / 8</div>
                 <div className="mt-1 h-1.5 w-full bg-warm-100 rounded-full overflow-hidden">
                   <div className="h-full bg-blue-400 rounded-full" style={{ width: '75%' }} />
                 </div>
@@ -131,47 +131,47 @@ function DashboardMockup() {
               <div className="hidden md:block bg-white rounded-xl border border-warm-200 p-3">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Heart className="w-3 h-3 text-pink-500" />
-                  <span className="text-[9px] font-semibold text-[#6b7688]">Mood</span>
+                  <span className="text-[9px] font-semibold text-theme-text-subtle">Mood</span>
                 </div>
-                <div className="text-base font-bold text-[#111]">8/10</div>
-                <div className="text-[9px] text-[#8e99a8]">Feeling great</div>
+                <div className="text-base font-bold text-theme-text-primary">8/10</div>
+                <div className="text-[9px] text-theme-text-tertiary">Feeling great</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Chat bar at bottom - matches actual app */}
-        <div className="border-t border-warm-200 bg-[#faf8f5] px-4 py-2.5 flex items-center gap-2">
+        <div className="border-t border-warm-200 bg-theme-surface-alt px-4 py-2.5 flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-warm-400" />
           <div className="flex-1 h-7 bg-white rounded-full border border-warm-200 px-3 flex items-center">
-            <span className="text-[10px] text-[#8e99a8]">Ask AI anything about your day...</span>
+            <span className="text-[10px] text-theme-text-tertiary">Ask AI anything about your day...</span>
           </div>
           <Mic className="w-4 h-4 text-warm-400" />
         </div>
       </div>
 
       {/* Floating widget: AI Insight */}
-      <div className="absolute -top-3 right-2 md:-right-4 z-10 bg-white p-3 rounded-xl shadow-warm border border-warm-200 animate-float">
+      <div className="hidden sm:block absolute -top-3 right-2 md:-right-4 z-10 bg-white p-3 rounded-xl shadow-warm border border-warm-200 animate-float">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-warm-50 flex items-center justify-center">
             <Brain className="w-4 h-4 text-warm-600" />
           </div>
           <div>
             <div className="text-[9px] text-warm-500 font-semibold">AI INSIGHT</div>
-            <div className="text-xs font-semibold text-[#111]">Focus time at 2pm</div>
+            <div className="text-xs font-semibold text-theme-text-primary">Focus time at 2pm</div>
           </div>
         </div>
       </div>
 
       {/* Floating widget: Nutrition */}
-      <div className="absolute -bottom-3 left-2 md:-left-4 z-10 bg-white p-3 rounded-xl shadow-warm border border-warm-200 animate-float" style={{ animationDelay: '3s' }}>
+      <div className="hidden sm:block absolute -bottom-3 left-2 md:-left-4 z-10 bg-white p-3 rounded-xl shadow-warm border border-warm-200 animate-float" style={{ animationDelay: '3s' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
             <Apple className="w-4 h-4 text-green-600" />
           </div>
           <div>
             <div className="text-[9px] text-green-600 font-semibold">NUTRITION</div>
-            <div className="text-xs font-semibold text-[#111]">1,420 / 2,000 cal</div>
+            <div className="text-xs font-semibold text-theme-text-primary">1,420 / 2,000 cal</div>
           </div>
         </div>
       </div>
@@ -181,24 +181,24 @@ function DashboardMockup() {
 
 function StatItem({ value, label, icon: Icon }: { value: string; label: string; icon?: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="flex flex-col items-center px-6 md:px-10">
+    <div className="flex flex-col items-center px-4 sm:px-6 md:px-10">
       <div className="flex items-center gap-1.5">
-        <span className="text-2xl md:text-3xl font-bold text-[#111]">{value}</span>
+        <span className="text-2xl md:text-3xl font-bold text-theme-text-primary">{value}</span>
         {Icon && <Icon className="w-5 h-5 text-warm-500" />}
       </div>
-      <span className="text-xs text-[#8e99a8] uppercase tracking-wider mt-1">{label}</span>
+      <span className="text-[10px] sm:text-xs text-theme-text-tertiary uppercase tracking-wider mt-1">{label}</span>
     </div>
   )
 }
 
 function FeatureCard({ icon: Icon, title, desc, color }: { icon: React.ComponentType<{ className?: string }>; title: string; desc: string; color: string }) {
   return (
-    <div className="scroll-reveal bg-white rounded-2xl border border-warm-200 p-8 hover:shadow-warm transition-shadow duration-300">
+    <div className="scroll-reveal bg-white rounded-2xl border border-warm-200 p-5 sm:p-8 hover:shadow-warm transition-shadow duration-300">
       <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
         <Icon className="w-6 h-6" />
       </div>
-      <h3 className="text-xl font-bold mt-5 mb-3 text-[#111]">{title}</h3>
-      <p className="text-[#6b7688] leading-relaxed">{desc}</p>
+      <h3 className="text-lg sm:text-xl font-bold mt-5 mb-3 text-theme-text-primary">{title}</h3>
+      <p className="text-theme-text-subtle leading-relaxed">{desc}</p>
     </div>
   )
 }
@@ -215,11 +215,11 @@ function FeatureRow({ reverse, label, title, desc, bullets, visual }: {
     <div className={`scroll-reveal flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} items-center gap-10 md:gap-16`}>
       <div className="md:w-1/2">
         <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">{label}</p>
-        <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-[#111]">{title}</h3>
-        <p className="text-[#6b7688] leading-relaxed mb-6">{desc}</p>
+        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4 text-theme-text-primary">{title}</h3>
+        <p className="text-theme-text-subtle leading-relaxed mb-6">{desc}</p>
         <ul className="space-y-2.5">
           {bullets.map((b) => (
-            <li key={b} className="flex items-start gap-2.5 text-sm text-[#4a5568]">
+            <li key={b} className="flex items-start gap-2.5 text-sm text-theme-text-body">
               <CheckCircle className="w-4 h-4 text-warm-500 mt-0.5 shrink-0" />
               {b}
             </li>
@@ -239,8 +239,8 @@ function Step({ number, title, desc }: { number: string; title: string; desc: st
   return (
     <div className="scroll-reveal text-center">
       <span className="text-6xl font-bold text-warm-200">{number}</span>
-      <h3 className="text-xl font-bold mt-3 mb-2 text-[#111]">{title}</h3>
-      <p className="text-[#6b7688] leading-relaxed">{desc}</p>
+      <h3 className="text-xl font-bold mt-3 mb-2 text-theme-text-primary">{title}</h3>
+      <p className="text-theme-text-subtle leading-relaxed">{desc}</p>
     </div>
   )
 }
@@ -301,11 +301,11 @@ export default function Page() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-[#FDFCF8] text-[#111] selection:bg-warm-600 selection:text-white overflow-x-hidden">
+    <main className="min-h-screen bg-[#FDFCF8] text-theme-text-primary selection:bg-warm-600 selection:text-white overflow-x-hidden">
 
       {/* ── Navigation ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'py-3' : 'py-6'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'py-3' : 'py-4 sm:py-6'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold tracking-tighter z-50" onClick={() => setIsMobileMenuOpen(false)}>
             Lifeboard<span className="text-warm-500">.</span>
           </Link>
@@ -313,14 +313,14 @@ export default function Page() {
           {/* Desktop floating pill */}
           <div className={`fixed inset-x-0 top-4 mx-auto w-fit hidden md:flex items-center gap-8 px-8 py-3 bg-white/80 backdrop-blur-md rounded-full border border-warm-200 shadow-sm transition-all duration-500 ${isScrolled ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="text-sm font-medium hover:text-warm-500 transition-colors">
+              <Link key={link.href} href={link.href} className="text-sm font-medium hover:text-warm-500 transition-colors focus-visible:text-warm-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm-400 rounded-sm">
                 {link.label}
               </Link>
             ))}
           </div>
 
           <div className="z-50 flex items-center gap-3">
-            <Link href="/login" className="hidden md:block text-sm font-medium text-[#6b7688] hover:text-[#111] transition-colors">
+            <Link href="/login" className="hidden md:block text-sm font-medium text-theme-text-subtle hover:text-theme-text-primary transition-colors">
               Log In
             </Link>
             <Link href="/signup" className="hidden md:block">
@@ -334,7 +334,7 @@ export default function Page() {
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
               aria-expanded={isMobileMenuOpen}
               aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-              className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-full border border-warm-200 bg-white/95 text-[#4a5568] shadow-sm"
+              className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-full border border-warm-200 bg-white/95 text-theme-text-body shadow-sm"
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -347,6 +347,7 @@ export default function Page() {
         <button
           type="button"
           aria-label="Close navigation menu"
+          tabIndex={-1}
           className="fixed inset-0 z-40 bg-black/20 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -359,11 +360,11 @@ export default function Page() {
             <Link
               key={link.href}
               href={link.href}
-              className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-[#4a5568] hover:bg-warm-50"
+              className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-theme-text-body hover:bg-warm-50 focus-visible:bg-warm-50 focus-visible:outline-2 focus-visible:outline-warm-400"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <span>{link.label}</span>
-              <ArrowRight className="h-4 w-4 text-[#8e99a8]" />
+              <ArrowRight className="h-4 w-4 text-theme-text-tertiary" />
             </Link>
           ))}
           <Link href="/signup" className="mt-1 block" onClick={() => setIsMobileMenuOpen(false)}>
@@ -375,27 +376,27 @@ export default function Page() {
       </div>
 
       {/* ── Hero ── */}
-      <section className="pt-36 md:pt-44 pb-16 px-6 relative">
+      <section className="pt-28 sm:pt-36 md:pt-44 pb-16 px-4 sm:px-6 relative">
         <div className="max-w-7xl mx-auto text-center mb-4">
           <div className="animate-fade-in-up inline-block mb-6 px-4 py-1.5 rounded-full border border-warm-200 bg-white/60 backdrop-blur text-xs font-semibold uppercase tracking-[0.15em] text-warm-500">
             Your life, one dashboard
           </div>
-          <h1 className="animate-fade-in-up delay-100 text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 leading-[1.05] text-[#111]">
+          <h1 className="animate-fade-in-up delay-100 text-[2rem] sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 leading-[1.2] sm:leading-[1.1] text-theme-text-primary">
             Tasks, health &amp; AI<br />
             <span className="text-warm-500">all in one place.</span>
           </h1>
-          <p className="animate-fade-in-up delay-200 text-base md:text-xl text-[#6b7688] max-w-2xl mx-auto leading-relaxed mb-10 font-light px-2 sm:px-0">
+          <p className="animate-fade-in-up delay-200 text-[0.95rem] sm:text-base md:text-xl text-theme-text-subtle max-w-2xl mx-auto leading-relaxed mb-10 font-light px-0">
             Organize your life with customizable buckets, 30+ tracking widgets, an AI assistant, and integrations with the tools you already use.
           </p>
 
           <div className="animate-fade-in-up delay-300 flex flex-col sm:flex-row justify-center items-center gap-4">
-            <Link href="/signup">
-              <Button className="bg-warm-600 text-white hover:bg-warm-700 h-12 px-7 rounded-full text-base transition-all hover:scale-105 shadow-warm">
+            <Link href="/signup" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto bg-warm-600 text-white hover:bg-warm-700 h-12 px-7 rounded-full text-base transition-all hover:scale-105 shadow-warm">
                 Start Free Trial <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            <Link href="#features">
-              <Button variant="outline" className="h-12 px-7 rounded-full text-base border-warm-300 text-warm-700 hover:bg-warm-50">
+            <Link href="#features" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full sm:w-auto h-12 px-7 rounded-full text-base border-warm-300 text-warm-700 hover:bg-warm-50">
                 See all features
               </Button>
             </Link>
@@ -409,7 +410,7 @@ export default function Page() {
 
       {/* ── Social Proof Bar ── */}
       <section className="py-10 md:py-12 border-y border-warm-200 bg-white">
-        <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-y-6 divide-x divide-warm-200">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-0 sm:divide-x sm:divide-warm-200 px-6 sm:px-0">
           <StatItem value="30+" label="Tracking widgets" />
           <StatItem value="3" label="Task views" />
           <StatItem value="5+" label="Integrations" />
@@ -422,8 +423,8 @@ export default function Page() {
         <div className="max-w-7xl mx-auto">
           <div className="scroll-reveal mb-16 max-w-2xl">
             <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">Features</p>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-[#111]">Everything you need, nothing you don&apos;t.</h2>
-            <p className="text-lg text-[#6b7688] leading-relaxed">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary">Everything you need, nothing you don&apos;t.</h2>
+            <p className="text-lg text-theme-text-subtle leading-relaxed">
               Lifeboard adapts to you. Organize tasks your way, track what matters, and let AI handle the rest.
             </p>
           </div>
@@ -462,23 +463,23 @@ export default function Page() {
         <div className="max-w-7xl mx-auto">
           <div className="scroll-reveal text-center mb-14 max-w-2xl mx-auto">
             <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">Widgets</p>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-[#111]">30+ widgets for every part of your life.</h2>
-            <p className="text-lg text-[#6b7688]">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary">30+ widgets for every part of your life.</h2>
+            <p className="text-lg text-theme-text-subtle">
               Health, wellness, nutrition, finance, family, and productivity &mdash; all in one dashboard.
             </p>
           </div>
 
-          <div className="scroll-reveal grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 max-w-3xl mx-auto">
+          <div className="scroll-reveal grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 sm:gap-4 max-w-3xl mx-auto">
             {widgetShowcase.map((w) => (
-              <div key={w.label} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-[#faf8f5] border border-warm-200 hover:shadow-warm-sm transition-shadow">
+              <div key={w.label} className="flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-2xl bg-theme-surface-alt border border-warm-200 hover:shadow-warm-sm transition-shadow">
                 <div className={`w-10 h-10 rounded-xl ${w.color} flex items-center justify-center`}>
                   <w.icon className="w-5 h-5" />
                 </div>
-                <span className="text-xs font-medium text-[#6b7688]">{w.label}</span>
+                <span className="text-xs font-medium text-theme-text-subtle">{w.label}</span>
               </div>
             ))}
           </div>
-          <p className="scroll-reveal text-center mt-6 text-sm text-[#8e99a8]">
+          <p className="scroll-reveal text-center mt-6 text-sm text-theme-text-tertiary">
             Plus meditation, gratitude journal, chores, meal planning, pomodoro timer, and many more.
           </p>
         </div>
@@ -507,10 +508,10 @@ export default function Page() {
                     <span className="text-[10px] font-semibold text-warm-600">AI ASSISTANT</span>
                   </div>
                   <div className="space-y-2">
-                    <div className="bg-warm-50 rounded-lg p-2.5 text-xs text-[#4a5568]">
+                    <div className="bg-warm-50 rounded-lg p-2.5 text-xs text-theme-text-body">
                       What should I focus on today?
                     </div>
-                    <div className="bg-[#faf8f5] rounded-lg p-2.5 text-xs text-[#4a5568] border border-warm-100">
+                    <div className="bg-theme-surface-alt rounded-lg p-2.5 text-xs text-theme-text-body border border-warm-100">
                       Based on your energy patterns, tackle the project report now. You have a 2-hour focus window before lunch.
                     </div>
                   </div>
@@ -518,11 +519,11 @@ export default function Page() {
                 <div className="flex gap-2">
                   <div className="flex-1 bg-white rounded-lg p-3 shadow-sm border border-warm-200 flex items-center gap-2">
                     <Mic className="w-4 h-4 text-warm-400" />
-                    <span className="text-[10px] text-[#8e99a8]">Voice mode available</span>
+                    <span className="text-[10px] text-theme-text-tertiary">Voice mode available</span>
                   </div>
                   <div className="flex-1 bg-white rounded-lg p-3 shadow-sm border border-warm-200 text-center">
-                    <div className="text-sm font-bold text-[#111]">92%</div>
-                    <div className="text-[9px] text-[#8e99a8]">Focus score</div>
+                    <div className="text-sm font-bold text-theme-text-primary">92%</div>
+                    <div className="text-[9px] text-theme-text-tertiary">Focus score</div>
                   </div>
                 </div>
               </div>
@@ -546,26 +547,26 @@ export default function Page() {
                 {/* View switcher */}
                 <div className="flex gap-1.5 mb-2">
                   <div className="px-3 py-1 bg-warm-500 text-white rounded-md text-[10px] font-semibold flex items-center gap-1"><Columns3 className="w-3 h-3" /> Kanban</div>
-                  <div className="px-3 py-1 bg-white border border-warm-200 text-[#8e99a8] rounded-md text-[10px] font-semibold flex items-center gap-1"><List className="w-3 h-3" /> List</div>
-                  <div className="px-3 py-1 bg-white border border-warm-200 text-[#8e99a8] rounded-md text-[10px] font-semibold flex items-center gap-1"><LayoutGrid className="w-3 h-3" /> Board</div>
+                  <div className="px-3 py-1 bg-white border border-warm-200 text-theme-text-tertiary rounded-md text-[10px] font-semibold flex items-center gap-1"><List className="w-3 h-3" /> List</div>
+                  <div className="px-3 py-1 bg-white border border-warm-200 text-theme-text-tertiary rounded-md text-[10px] font-semibold flex items-center gap-1"><LayoutGrid className="w-3 h-3" /> Board</div>
                 </div>
                 {/* Kanban columns mockup */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white rounded-lg p-2 border border-warm-200">
-                    <div className="text-[9px] font-bold text-[#8e99a8] mb-2 uppercase">To Do</div>
+                    <div className="text-[9px] font-bold text-theme-text-tertiary mb-2 uppercase">To Do</div>
                     <div className="space-y-1.5">
-                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-[#4a5568] border-l-2 border-[#6B8AF7]">Review proposal</div>
-                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-[#4a5568] border-l-2 border-[#48B882]">Grocery run</div>
+                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-theme-text-body border-l-2 border-[#6B8AF7]">Review proposal</div>
+                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-theme-text-body border-l-2 border-[#48B882]">Grocery run</div>
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-warm-200">
-                    <div className="text-[9px] font-bold text-[#8e99a8] mb-2 uppercase">In Progress</div>
+                    <div className="text-[9px] font-bold text-theme-text-tertiary mb-2 uppercase">In Progress</div>
                     <div className="space-y-1.5">
-                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-[#4a5568] border-l-2 border-[#C4A44E]">Budget Q2</div>
+                      <div className="bg-warm-50 rounded p-1.5 text-[9px] text-theme-text-body border-l-2 border-[#C4A44E]">Budget Q2</div>
                     </div>
                   </div>
                   <div className="bg-white rounded-lg p-2 border border-warm-200">
-                    <div className="text-[9px] font-bold text-[#8e99a8] mb-2 uppercase">Done</div>
+                    <div className="text-[9px] font-bold text-theme-text-tertiary mb-2 uppercase">Done</div>
                     <div className="space-y-1.5">
                       <div className="bg-green-50 rounded p-1.5 text-[9px] text-green-600 border-l-2 border-green-400 line-through">Call dentist</div>
                       <div className="bg-green-50 rounded p-1.5 text-[9px] text-green-600 border-l-2 border-green-400 line-through">Send invoice</div>
@@ -602,7 +603,7 @@ export default function Page() {
                     <div className={`w-10 h-10 rounded-lg ${item.color} flex items-center justify-center`}>
                       <item.icon className="w-5 h-5" />
                     </div>
-                    <span className="text-[10px] font-medium text-[#6b7688]">{item.name}</span>
+                    <span className="text-[10px] font-medium text-theme-text-subtle">{item.name}</span>
                   </div>
                 ))}
               </div>
@@ -616,7 +617,7 @@ export default function Page() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="scroll-reveal mb-16">
             <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">How it works</p>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-[#111]">Up and running in minutes.</h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-theme-text-primary">Up and running in minutes.</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
@@ -640,12 +641,12 @@ export default function Page() {
       </section>
 
       {/* ── Pricing ── */}
-      <section id="pricing" className="border-y border-warm-200 bg-[#faf8f5] py-24 md:py-28 px-6">
+      <section id="pricing" className="border-y border-warm-200 bg-theme-surface-alt py-24 md:py-28 px-6">
         <div className="mx-auto max-w-7xl">
           <div className="scroll-reveal mx-auto mb-14 max-w-2xl text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-warm-500">Pricing</p>
-            <h2 className="text-4xl font-bold tracking-tight md:text-5xl text-[#111]">Start simple. Scale when you need it.</h2>
-            <p className="mt-4 text-lg text-[#6b7688]">All plans include bucket tabs, task management, and your AI assistant.</p>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight md:text-5xl text-theme-text-primary">Start simple. Scale when you need it.</h2>
+            <p className="mt-4 text-lg text-theme-text-subtle">All plans include bucket tabs, task management, and your AI assistant.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -680,14 +681,14 @@ export default function Page() {
             ].map((plan) => (
               <article
                 key={plan.name}
-                className={`scroll-reveal rounded-3xl border p-7 shadow-sm transition-all duration-200 hover:scale-[1.02] ${
+                className={`scroll-reveal rounded-3xl border p-5 sm:p-7 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-warm ${
                   plan.popular
                     ? "border-warm-300 bg-white ring-2 ring-warm-400 shadow-warm"
                     : "border-warm-200 bg-white"
                 }`}
               >
                 <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-[#111]">{plan.name}</h3>
+                  <h3 className="text-xl font-semibold text-theme-text-primary">{plan.name}</h3>
                   {plan.popular && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warm-700 border border-warm-300">
                       <Zap className="h-3.5 w-3.5" />
@@ -696,15 +697,15 @@ export default function Page() {
                   )}
                 </div>
 
-                <p className="mb-4 text-4xl font-bold tracking-tight text-[#111]">
+                <p className="mb-4 text-4xl font-bold tracking-tight text-theme-text-primary">
                   {plan.price}
-                  <span className="ml-1 text-base font-medium text-[#8e99a8]">{plan.cadence}</span>
+                  <span className="ml-1 text-base font-medium text-theme-text-tertiary">{plan.cadence}</span>
                 </p>
-                <p className="mb-6 text-sm leading-6 text-[#6b7688]">{plan.summary}</p>
+                <p className="mb-6 text-sm leading-6 text-theme-text-subtle">{plan.summary}</p>
 
                 <ul className="mb-8 space-y-2">
                   {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm text-[#4a5568]">
+                    <li key={feature} className="flex items-center gap-2 text-sm text-theme-text-body">
                       <CheckCircle className="h-4 w-4 text-warm-500 shrink-0" />
                       {feature}
                     </li>
@@ -716,7 +717,7 @@ export default function Page() {
                     className={`w-full rounded-xl ${
                       plan.popular
                         ? "bg-warm-600 text-white hover:bg-warm-700"
-                        : "bg-[#111] text-white hover:bg-[#314158]"
+                        : "bg-[#111] text-white hover:bg-theme-text-primary"
                     }`}
                   >
                     {plan.cta}
@@ -726,7 +727,7 @@ export default function Page() {
             ))}
           </div>
 
-          <p className="text-sm text-[#8e99a8] text-center mt-8">
+          <p className="text-sm text-theme-text-tertiary text-center mt-8">
             All plans include a 14-day free trial. No credit card required.
           </p>
         </div>

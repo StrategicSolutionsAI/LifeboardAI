@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
+import { getPrefetchedGreetingName } from "@/lib/prefetch-user-prefs";
 import {
   type ProfileNameRow,
   type WidgetLogEntry,
@@ -127,18 +128,68 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // State for task management
   const [newOpenTask, setNewOpenTask] = useState('');
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
-  const [buckets, setBuckets] = useState<string[]>([]);
-  const [activeBucket, setActiveBucket] = useState<string>('');
+
+  // Lazy-initialize critical state from localStorage so the FIRST render
+  // shows cached data instead of waiting for useEffect chains to populate it.
+  const [buckets, setBuckets] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('life_buckets');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch { /* fall through */ }
+    return [];
+  });
+  const [activeBucket, setActiveBucket] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const savedActive = localStorage.getItem('active_bucket');
+      const stored = localStorage.getItem('life_buckets');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length) {
+          return savedActive && parsed.includes(savedActive) ? savedActive : parsed[0];
+        }
+      }
+    } catch { /* fall through */ }
+    return '';
+  });
   const [bucketsInitialized, setBucketsInitialized] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [newBucket, setNewBucket] = useState("");
-  const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
+  const [bucketColors, setBucketColors] = useState<Record<string, string>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem('bucket_colors');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch { /* fall through */ }
+    return {};
+  });
   const [editingBucketName, setEditingBucketName] = useState<string | null>(null);
   const [editingBucketNewName, setEditingBucketNewName] = useState("");
   const [draggedBucketIndex, setDraggedBucketIndex] = useState<number | null>(null);
   const [isWidgetSheetOpen, setIsWidgetSheetOpen] = useState(false);
-  const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>({});
-  const bucketsRef = useRef<string[]>([]);
+  const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem('widgets_by_bucket');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const widgets = (parsed.widgets && parsed.savedAt) ? parsed.widgets : parsed;
+        if (widgets && typeof widgets === 'object' && !Array.isArray(widgets)) {
+          const count = Object.values(widgets).reduce((sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+          if (count > 0) return widgets;
+        }
+      }
+    } catch { /* fall through */ }
+    return {};
+  });
+  const bucketsRef = useRef<string[]>(buckets);
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const dragIndexRef = useRef<number | null>(null);
   const manageDragIndexRef = useRef<number | null>(null);
@@ -381,7 +432,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Progress tracking state  { [instanceId]: { value:number; streak:number; lastCompleted:string } }
   // ----------------------------------------------------------------------
   interface ProgressEntry { value: number; date: string; streak: number; lastCompleted: string; }
-  const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>({});
+  const [progressByWidget, setProgressByWidget] = useState<Record<string, ProgressEntry>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('widget_progress');
+      if (raw) return JSON.parse(raw);
+    } catch { /* fall through */ }
+    return {};
+  });
 
   // ----------------------------------------------------------------------
   // Persist active bucket selection
@@ -426,53 +484,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   const [isLoadingFitbit, setIsLoadingFitbit] = useState(false);
 
-  // Fetch Google Fit metrics on mount & when widgets change
-  useEffect(() => {
-    const widgets = Object.values(widgetsByBucketRef.current).flat();
-    const needGF = widgets.some(
-      (w) => ["water", "steps"].includes(w.id) && w.dataSource === "googlefit"
-    );
-    if (!needGF) return;
-
-    let cancelled = false;
-    async function fetchGF() {
-      try {
-        const res = await fetch(`/api/integrations/googlefit/metrics?cb=${Date.now()}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const obj: Record<string, number> = {
-          water: data.water || 0,
-          steps: data.steps || 0,
-        };
-        if (cancelled) return;
-        setGoogleFitData(obj);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('googlefit_metrics', JSON.stringify({ ...obj, savedAt: Date.now() }));
-        }
-
-        // Update progress for each Google Fit widget (only today)
-        const todayStr = todayStrGlobal;
-        const updated: Record<string, ProgressEntry> = { ...progressByWidgetRef.current };
-        widgets.forEach((w) => {
-          if (w.dataSource !== 'googlefit') return;
-          const val = w.id === 'water' ? obj.water : obj.steps;
-          const existing = updated[w.instanceId] ?? { value: 0, date: todayStr, streak: 0, lastCompleted: '' };
-          if (existing.date !== todayStr) existing.value = 0;
-          existing.value = val;
-          updated[w.instanceId] = existing;
-        });
-        setProgressByWidget(updated);
-      } catch (e) {
-        console.error('Failed to fetch Google Fit metrics', e);
-      }
-    }
-    fetchGF();
-    const id = setInterval(fetchGF, 1000 * 60 * 15); // refresh every 15min
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [widgetsByBucketRef.current]);
+  // Google Fit metrics are fetched inside fetchIntegrationsData() which runs
+  // on mount (deferred) and every 30 minutes. No separate effect needed.
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Todoist task state
@@ -1514,8 +1527,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!isWidgetLoadComplete || hasFetchedIntegrationsRef.current) return;
     hasFetchedIntegrationsRef.current = true;
 
-    // Small delay so the browser can paint the widget grid first
-    const timeout = setTimeout(fetchIntegrationsData, 200);
+    // Delay so the browser can paint the widget grid first. Users see cached
+    // integration data from localStorage instantly; this refresh just gets
+    // the latest values from external APIs.
+    const timeout = setTimeout(fetchIntegrationsData, 1500);
     const int = setInterval(fetchIntegrationsData, 30 * 60 * 1000); // 30 min
     return () => {
       clearTimeout(timeout);
@@ -2192,6 +2207,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         return;
       }
 
+      // Try prefetched greeting name first (started at module eval time)
+      try {
+        const prefetched = await getPrefetchedGreetingName();
+        if (!isCancelled && prefetched) {
+          setGreetingName(deriveGreetingName({ first_name: prefetched } as ProfileNameRow, user));
+          return;
+        }
+      } catch { /* fall through to direct query */ }
+
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -2726,7 +2750,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
   };
 
-  // Fetch current weather using browser geolocation and open-meteo API (no key required)
+  // Fetch current weather using browser geolocation and open-meteo API (no key required).
+  // Deferred via requestIdleCallback so it doesn't compete with critical rendering.
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
     const fetchWeather = async (lat: number, lon: number) => {
@@ -2768,15 +2793,27 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        fetchWeather(pos.coords.latitude, pos.coords.longitude);
-      },
-      () => {
-        // fallback: New York City
-        fetchWeather(40.7128, -74.006);
-      }
-    );
+    const startWeatherFetch = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          fetchWeather(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          // fallback: New York City
+          fetchWeather(40.7128, -74.006);
+        }
+      );
+    };
+
+    // Defer geolocation + weather API call so it doesn't compete with
+    // critical rendering. Weather is decorative and low-priority.
+    if (typeof requestIdleCallback !== 'undefined') {
+      const id = requestIdleCallback(startWeatherFetch, { timeout: 3000 });
+      return () => cancelIdleCallback(id);
+    }
+    // Fallback for browsers without requestIdleCallback (e.g. Safari)
+    const timeout = setTimeout(startWeatherFetch, 2000);
+    return () => clearTimeout(timeout);
   }, []);
 
   // ----------------------------------------------------------------------

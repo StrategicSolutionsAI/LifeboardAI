@@ -90,6 +90,29 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
              sourceId.startsWith('upcoming-');
     };
 
+    // Handle drag from all-day strip to calendar hour slots
+    // Allday draggables use "allday::<taskId>" to avoid ID collisions with hourly draggables
+    if (source.droppableId === 'allday-strip' && isHour(destination.droppableId)) {
+      const dstHour = destination.droppableId;
+      const dateStr = selectedDateStr;
+      const taskId = draggableId.replace('allday::', '');
+
+      batchUpdateTasks([
+        {
+          taskId,
+          updates: {
+            hourSlot: dstHour,
+            allDay: false,
+            due: { date: dateStr },
+          },
+          occurrenceDate: dateStr,
+        }
+      ]).catch(error => {
+        console.error('Failed to schedule all-day task to hour slot:', error);
+      });
+      return;
+    }
+
     // Handle drag from sidebar to calendar hour slots
     if (isFromSidebar(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId; // Keep full 'hour-<time>' format
@@ -127,6 +150,25 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
         }
       ]).catch(error => {
         console.error('Failed to move task to calendar day:', error);
+      });
+      return;
+    }
+
+    // Handle drag from hour slot back to all-day strip
+    if (isHour(source.droppableId) && destination.droppableId === 'allday-strip') {
+      const dateStr = selectedDateStr;
+      batchUpdateTasks([
+        {
+          taskId: draggableId,
+          updates: {
+            hourSlot: null as any,
+            allDay: true,
+            due: { date: dateStr },
+          },
+          occurrenceDate: dateStr,
+        }
+      ]).catch(error => {
+        console.error('Failed to move task back to all-day:', error);
       });
       return;
     }
@@ -353,9 +395,9 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     >
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">
         {/* Main calendar area with Suspense */}
-        <div className={`flex-1 min-w-0 transition-[margin] duration-300 ${isSidebarCollapsed ? 'lg:mr-0' : ''}`}>
+        <div className={`flex-1 min-w-0 min-h-0 transition-[margin] duration-300 ${isSidebarCollapsed ? 'lg:mr-0' : ''}`}>
           <Suspense fallback={<CalendarLoading />}>
-            <FullCalendar 
+            <FullCalendar
               selectedDate={selectedDate} 
               onDateChange={handleDateChange}
               availableBuckets={buckets}

@@ -98,10 +98,10 @@ export function NutritionSummaryWidget({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-[#314158]">
+              <span className="text-lg font-bold text-theme-text-primary">
                 {Math.round(dailyTotals.calories)}
               </span>
-              <span className="text-sm text-[#8e99a8]">/ {nutritionGoals.calories} cal</span>
+              <span className="text-sm text-theme-text-tertiary">/ {nutritionGoals.calories} cal</span>
             </div>
             {calorieProgress < 25 && (
               <span
@@ -112,14 +112,14 @@ export function NutritionSummaryWidget({
               </span>
             )}
           </div>
-          <div className="w-full bg-[#f5f0eb] rounded-full h-1">
+          <div className="w-full bg-theme-progress-track rounded-full h-1">
             <div
               className="h-1 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(calorieProgress, 100)}%`, backgroundColor: bucketColor || '#B1916A' }}
             />
           </div>
           {mealsWithFood.length > 0 && (
-            <div className="text-xs text-[#8e99a8]">
+            <div className="text-xs text-theme-text-tertiary">
               {mealsWithFood.length} meal{mealsWithFood.length !== 1 ? 's' : ''} logged
             </div>
           )}
@@ -130,7 +130,7 @@ export function NutritionSummaryWidget({
 
   if (isLoading) {
     return (
-      <div className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative animate-pulse">
+      <div className="w-48 rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-sm relative animate-pulse">
         <div className="flex items-center gap-2 mb-2">
           <div
             className="w-9 h-9 rounded-lg shadow-sm"
@@ -140,15 +140,15 @@ export function NutritionSummaryWidget({
           </div>
           <span className="text-sm font-medium truncate">Daily Nutrition</span>
         </div>
-        <div className="w-20 h-8 bg-[#ebe5de] rounded mb-2 mt-1"></div>
-        <div className="w-full h-1 bg-[#f5f0eb] rounded"></div>
+        <div className="w-20 h-8 bg-theme-skeleton rounded mb-2 mt-1"></div>
+        <div className="w-full h-1 bg-theme-progress-track rounded"></div>
       </div>
     )
   }
 
   return (
     <div 
-      className="w-48 rounded-xl border border-[#dbd6cf] bg-white p-4 shadow-sm relative cursor-pointer hover:bg-[#faf8f5] hover:shadow-warm transition-all"
+      className="w-48 rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-sm relative cursor-pointer hover:bg-theme-surface-alt hover:shadow-warm transition-all"
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
@@ -162,10 +162,10 @@ export function NutritionSummaryWidget({
       </div>
       
       <div className="mt-2 mb-1">
-        <span className="text-3xl font-black text-[#314158]">
+        <span className="text-3xl font-black text-theme-text-primary">
           {Math.round(dailyTotals.calories)}
         </span>
-        <span className="text-sm text-[#8e99a8]">
+        <span className="text-sm text-theme-text-tertiary">
           {" "}/ {nutritionGoals.calories}
         </span>
         {calorieProgress < 25 && (
@@ -178,7 +178,7 @@ export function NutritionSummaryWidget({
         )}
       </div>
 
-      <div className="w-full bg-[#f5f0eb] rounded-full h-1 mt-2">
+      <div className="w-full bg-theme-progress-track rounded-full h-1 mt-2">
         <div
           className="h-1 rounded-full transition-all duration-300"
           style={{ width: `${Math.min(calorieProgress, 100)}%`, backgroundColor: bucketColor || '#B1916A' }}

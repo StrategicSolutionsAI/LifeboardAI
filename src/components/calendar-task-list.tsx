@@ -19,7 +19,7 @@ const normalizeBucketId = (name?: string | null) => {
 };
 
 const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
-  if (!bucketName) return "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]";
+  if (!bucketName) return "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300";
 
   const bucketId = normalizeBucketId(bucketName);
   const color = getBucketColorSync(bucketId, bucketColors);
@@ -34,9 +34,9 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
     "#8B7FD4": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // plum (Calidora)
     "#E28A5D": "bg-[#fdf3ee] text-[#b56e4a] border-[#f0c8b3]", // orange (Calidora)
     "#5E9B8C": "bg-[#eff7f5] text-[#4b7c70] border-[#b8d8cf]", // teal (Calidora)
-    "#8e99a8": "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]", // gray (unassigned - Calidora)
+    "#8e99a8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300", // gray (unassigned - Calidora)
     // Legacy colors for backwards compatibility
-    "#4F46E5": "bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]", // indigo (legacy)
+    "#4F46E5": "bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300", // indigo (legacy)
     "#22C55E": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]", // green (legacy)
     "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange (legacy)
     "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink (legacy)
@@ -44,7 +44,7 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
     "#8B5CF6": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // violet (legacy)
     "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber (legacy)
     "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan (legacy)
-    "#94A3B8": "bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]", // gray (legacy)
+    "#94A3B8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300", // gray (legacy)
     "#ff52bf": "bg-pink-100 text-pink-700 border-pink-200"      // custom pink
   };
 
@@ -54,7 +54,7 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
   }
 
   // For custom colors, return a generic class and let parent apply inline styles
-  return "border border-[#dbd6cf] custom-bucket-color";
+  return "border border-theme-neutral-300 custom-bucket-color";
 };
 
 const getCustomBucketStyles = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
@@ -202,23 +202,23 @@ function EnhancedTaskCard({
       };
       case 'medium':
       case '2': return {
-        border: 'border-l-[#bb9e7b] border-[#dbd6cf]/50',
-        bg: 'bg-gradient-to-r from-[#fdf8f6]/80 to-white',
-        icon: 'text-[#9a7b5a]',
-        badge: 'bg-[#f5ede4] text-[#9a7b5a] border-[#dbd6cf]'
+        border: 'border-l-theme-secondary border-theme-neutral-300/50',
+        bg: 'bg-gradient-to-r from-theme-primary-50/80 to-white',
+        icon: 'text-theme-primary-600',
+        badge: 'bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300'
       };
       case 'low':
       case '1': return {
-        border: 'border-l-[#b8b0a8] border-[#dbd6cf]/50',
-        bg: 'bg-gradient-to-r from-[#faf8f5]/80 to-white',
-        icon: 'text-[#6b7688]',
-        badge: 'bg-[rgba(183,148,106,0.08)] text-[#4a5568] border-[#dbd6cf]'
+        border: 'border-l-theme-neutral-400 border-theme-neutral-300/50',
+        bg: 'bg-gradient-to-r from-theme-surface-alt/80 to-white',
+        icon: 'text-theme-text-subtle',
+        badge: 'bg-theme-brand-tint-light text-theme-text-body border-theme-neutral-300'
       };
       default: return {
-        border: 'border-l-[#dbd6cf] border-[#dbd6cf]/50',
+        border: 'border-l-theme-neutral-300 border-theme-neutral-300/50',
         bg: 'bg-white',
-        icon: 'text-[#8e99a8]/70',
-        badge: 'bg-[rgba(183,148,106,0.08)] text-[#6b7688] border-[#dbd6cf]'
+        icon: 'text-theme-text-tertiary/70',
+        badge: 'bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300'
       };
     }
   };
@@ -231,10 +231,10 @@ function EnhancedTaskCard({
     const diffDays = differenceInDays(date, startOfDay(today));
 
     if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, color: 'text-red-600', urgent: true };
-    if (diffDays === 0) return { text: 'Today', color: 'text-[#9a7b5a]', urgent: false };
+    if (diffDays === 0) return { text: 'Today', color: 'text-theme-primary-600', urgent: false };
     if (diffDays === 1) return { text: 'Tomorrow', color: 'text-green-600', urgent: false };
-    if (diffDays <= 7) return { text: `${diffDays} days`, color: 'text-[#6b7688]', urgent: false };
-    return { text: format(date, 'MMM d'), color: 'text-[#8e99a8]', urgent: false };
+    if (diffDays <= 7) return { text: `${diffDays} days`, color: 'text-theme-text-subtle', urgent: false };
+    return { text: format(date, 'MMM d'), color: 'text-theme-text-tertiary', urgent: false };
   };
 
   const dueDateInfo = formatDueDate(task.due);
@@ -265,8 +265,8 @@ function EnhancedTaskCard({
 
   const currentDueDate = task.due?.date ?? null;
   const rescheduleButtonClasses = `group flex items-center gap-2 px-3 py-2 text-xs font-medium transition-all duration-200 rounded-lg shadow-sm border ${isRescheduleActive
-      ? 'text-[#9a7b5a] bg-[#fdf8f6] border-[#dbd6cf] hover:bg-[#f5ede4] hover:border-[#c5beb6]'
-      : 'text-[#6b7688] hover:text-[#9a7b5a] bg-white/80 hover:bg-[#fdf8f6] border-[#dbd6cf] hover:border-[#dbd6cf]'
+      ? 'text-theme-primary-600 bg-theme-primary-50 border-theme-neutral-300 hover:bg-theme-surface-selected hover:border-theme-neutral-400'
+      : 'text-theme-text-subtle hover:text-theme-primary-600 bg-white/80 hover:bg-theme-primary-50 border-theme-neutral-300 hover:border-theme-neutral-300'
     }`;
 
   return (
@@ -277,7 +277,7 @@ function EnhancedTaskCard({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           style={provided.draggableProps.style}
-          className={`group relative ${priorityStyles.bg} rounded-2xl border border-[#dbd6cf] transition-all duration-200 shadow-[0_4px_16px_rgba(163,133,96,0.06)] hover:shadow-[0_6px_20px_rgba(163,133,96,0.1)] hover:-translate-y-0.5 ${isExpanded ? 'shadow-[0_8px_30px_rgba(163,133,96,0.1)]' : ''
+          className={`group relative ${priorityStyles.bg} rounded-2xl border border-theme-neutral-300 transition-all duration-200 shadow-[0_4px_16px_rgba(163,133,96,0.06)] hover:shadow-[0_6px_20px_rgba(163,133,96,0.1)] hover:-translate-y-0.5 ${isExpanded ? 'shadow-[0_8px_30px_rgba(163,133,96,0.1)]' : ''
             } cursor-grab active:cursor-grabbing`}
         >
           {/* Premium Task Row */}
@@ -293,8 +293,8 @@ function EnhancedTaskCard({
                 className="sr-only"
               />
               <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${task.completed
-                  ? 'bg-[#bb9e7b] border-[#bb9e7b] scale-110'
-                  : 'border-[#dbd6cf] hover:border-[#bb9e7b] group-hover:border-[#bb9e7b] group-hover:scale-110'
+                  ? 'bg-theme-secondary border-theme-secondary scale-110'
+                  : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary group-hover:scale-110'
                 }`}>
                 {task.completed && (
                   <svg className="w-3 h-3 text-white animate-in fade-in duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,7 +310,7 @@ function EnhancedTaskCard({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${task.completed ? 'line-through text-[#8e99a8]/70' : 'text-[#314158]'
+                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${task.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
                     }`}>
                     {task.content}
                   </p>
@@ -319,7 +319,7 @@ function EnhancedTaskCard({
                   <div className="flex items-center gap-2 mt-2">
                     {task.bucket && (
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-black/5 text-[#4a5568]"
+                        className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-black/5 text-theme-text-body"
                         style={getCustomBucketStyles(task.bucket, bucketColors)}
                       >
                         {task.bucket}
@@ -341,7 +341,7 @@ function EnhancedTaskCard({
                   {dueDateInfo && (
                     <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium ${dueDateInfo.urgent
                         ? 'bg-red-50 text-red-700'
-                        : 'bg-[#faf8f5] text-[#6b7688]'
+                        : 'bg-theme-surface-alt text-theme-text-subtle'
                       }`}>
                       {dueDateInfo.urgent && <AlertCircle size={11} />}
                       <span>{dueDateInfo.text}</span>
@@ -349,9 +349,9 @@ function EnhancedTaskCard({
                   )}
 
                   {/* Expand/Collapse Indicator */}
-                  <div className={`w-6 h-6 rounded-lg bg-[rgba(183,148,106,0.08)]/80 flex items-center justify-center transition-all duration-200 ${isExpanded ? 'bg-[#f5ede4] rotate-90' : 'group-hover:bg-[#ebe5de]/80'
+                  <div className={`w-6 h-6 rounded-lg bg-theme-brand-tint-light/80 flex items-center justify-center transition-all duration-200 ${isExpanded ? 'bg-theme-surface-selected rotate-90' : 'group-hover:bg-theme-skeleton/80'
                     }`}>
-                    <ChevronRight size={12} className={`transition-colors duration-200 ${isExpanded ? 'text-[#9a7b5a]' : 'text-[#8e99a8] group-hover:text-[#4a5568]'
+                    <ChevronRight size={12} className={`transition-colors duration-200 ${isExpanded ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-text-body'
                       }`} />
                   </div>
                 </div>
@@ -361,11 +361,11 @@ function EnhancedTaskCard({
 
           {/* Premium Expanded Content */}
           {isExpanded && (
-            <div className="px-5 pb-4 border-t border-[#dbd6cf] bg-gradient-to-b from-[#faf8f5]/30 to-[#faf8f5]/60 animate-in slide-in-from-top-2 duration-300">
+            <div className="px-5 pb-4 border-t border-theme-neutral-300 bg-gradient-to-b from-theme-surface-alt/30 to-theme-surface-alt/60 animate-in slide-in-from-top-2 duration-300">
               {/* Task Details */}
               {task.description && (
-                <div className="mt-4 mb-4 p-3 bg-white/80 rounded-lg border border-[#dbd6cf]">
-                  <p className="text-sm text-[#4a5568] leading-relaxed">
+                <div className="mt-4 mb-4 p-3 bg-white/80 rounded-lg border border-theme-neutral-300">
+                  <p className="text-sm text-theme-text-body leading-relaxed">
                     {task.description}
                   </p>
                 </div>
@@ -384,7 +384,7 @@ function EnhancedTaskCard({
                   >
                     <Calendar
                       size={14}
-                      className={`transition-transform duration-200 ${isRescheduleActive ? 'text-[#9a7b5a]' : 'text-[#8e99a8] group-hover:text-[#9a7b5a]'
+                      className={`transition-transform duration-200 ${isRescheduleActive ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-primary-600'
                         } group-hover:scale-110`}
                     />
                     Reschedule
@@ -399,7 +399,7 @@ function EnhancedTaskCard({
                           { taskId: task.id.toString(), updates: { bucket: val || undefined } }
                         ]).catch((err: any) => console.error('Failed to update bucket', err));
                       }}
-                      className="px-3 py-2 text-xs font-medium bg-white/80 border border-[#dbd6cf] rounded-lg hover:bg-[#faf8f5] focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200 shadow-sm"
+                      className="px-3 py-2 text-xs font-medium bg-white/80 border border-theme-neutral-300 rounded-lg hover:bg-theme-surface-alt focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200 shadow-sm"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <option value="">No project</option>
@@ -412,10 +412,10 @@ function EnhancedTaskCard({
 
                 {isRescheduleActive && (
                   <div
-                    className="w-full rounded-lg border border-[#dbd6cf] bg-[#fdf8f6]/70 p-3 shadow-inner"
+                    className="w-full rounded-lg border border-theme-neutral-300 bg-theme-primary-50/70 p-3 shadow-inner"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <p className="text-xs font-semibold text-[#9a7b5a] mb-2">Quick reschedule</p>
+                    <p className="text-xs font-semibold text-theme-primary-600 mb-2">Quick reschedule</p>
                     <div className="flex flex-wrap gap-2">
                       {quickRescheduleOptions.map(({ label, value }) => {
                         const isCurrent = value === currentDueDate || (!value && !currentDueDate);
@@ -424,8 +424,8 @@ function EnhancedTaskCard({
                             key={label}
                             type="button"
                             className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors duration-200 ${isCurrent
-                                ? 'bg-[#bb9e7b] text-white border-[#bb9e7b] shadow-sm'
-                                : 'bg-white text-[#6b7688] border-[#dbd6cf] hover:bg-[#f5ede4] hover:text-[#9a7b5a]'
+                                ? 'bg-theme-secondary text-white border-theme-secondary shadow-sm'
+                                : 'bg-white text-theme-text-subtle border-theme-neutral-300 hover:bg-theme-surface-selected hover:text-theme-primary-600'
                               }`}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -444,11 +444,11 @@ function EnhancedTaskCard({
                         value={customRescheduleDate}
                         onClick={(event) => event.stopPropagation()}
                         onChange={(event) => setCustomRescheduleDate(event.target.value)}
-                        className="rounded-lg border border-[#dbd6cf] bg-white px-2 py-1.5 text-xs text-[#4a5568] focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none"
+                        className="rounded-lg border border-theme-neutral-300 bg-white px-2 py-1.5 text-xs text-theme-text-body focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none"
                       />
                       <button
                         type="button"
-                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-[#bb9e7b] text-white hover:bg-[#9a7b5a] disabled:bg-[#ebe5de] disabled:text-[#8e99a8] disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-theme-secondary text-white hover:bg-theme-primary-600 disabled:bg-theme-skeleton disabled:text-theme-text-tertiary disabled:cursor-not-allowed"
                         disabled={!customRescheduleDate}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -460,7 +460,7 @@ function EnhancedTaskCard({
                       </button>
                       <button
                         type="button"
-                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-transparent text-[#9a7b5a] hover:underline"
+                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-transparent text-theme-primary-600 hover:underline"
                         onClick={(event) => {
                           event.stopPropagation();
                           onRescheduleCancel?.();
@@ -1055,13 +1055,13 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
   if (isCollapsed) {
     return (
-      <div className="w-14 bg-white/95 backdrop-blur-sm border border-[#dbd6cf] rounded-xl shadow-sm p-3">
+      <div className="w-14 bg-white/95 backdrop-blur-sm border border-theme-neutral-300 rounded-xl shadow-sm p-3">
         <button
           onClick={() => setIsCollapsed(false)}
-          className="w-8 h-8 hover:bg-[rgba(183,148,106,0.08)]/80 rounded-lg transition-all duration-200 flex items-center justify-center group"
+          className="w-8 h-8 hover:bg-theme-brand-tint-light/80 rounded-lg transition-all duration-200 flex items-center justify-center group"
           aria-label="Expand task list"
         >
-          <ChevronLeft size={18} className="text-[#8e99a8] group-hover:text-[#4a5568] transition-colors" />
+          <ChevronLeft size={18} className="text-theme-text-tertiary group-hover:text-theme-text-body transition-colors" />
         </button>
       </div>
     );
@@ -1075,23 +1075,23 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
               <div key={i} className="animate-pulse">
-                <div className="bg-[rgba(183,148,106,0.08)] h-16 rounded-xl"></div>
+                <div className="bg-theme-brand-tint-light h-16 rounded-xl"></div>
               </div>
             ))}
           </div>
         ) : !loading && dashboardTasks.length === 0 ? (
           <div className="text-center py-8">
-            <div className="w-12 h-12 rounded-xl bg-[#f5ede4] flex items-center justify-center mx-auto mb-3">
-              <Clock size={20} className="text-[#9a7b5a]" />
+            <div className="w-12 h-12 rounded-xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-3">
+              <Clock size={20} className="text-theme-primary-600" />
             </div>
-            <h5 className="text-sm font-medium text-[#314158] mb-1">No tasks</h5>
-            <p className="text-xs text-[#8e99a8]">Add a task to get started</p>
+            <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks</h5>
+            <p className="text-xs text-theme-text-tertiary">Add a task to get started</p>
           </div>
         ) : (
           dashboardTasks.map((task: any, index: number) => (
             <div
               key={task.id}
-              className="group relative bg-white border border-[#dbd6cf] hover:border-[#dbd6cf] rounded-xl p-4 transition-all duration-200 hover:shadow-warm"
+              className="group relative bg-white border border-theme-neutral-300 hover:border-theme-neutral-300 rounded-xl p-4 transition-all duration-200 hover:shadow-warm"
             >
               <div className="flex items-start gap-3">
                 <label className="flex items-center cursor-pointer">
@@ -1102,8 +1102,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     className="sr-only"
                   />
                   <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${task.completed
-                      ? 'bg-[#bb9e7b] border-[#bb9e7b]'
-                      : 'border-[#dbd6cf] hover:border-[#bb9e7b] group-hover:border-[#bb9e7b]'
+                      ? 'bg-theme-secondary border-theme-secondary'
+                      : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary'
                     }`}>
                     {task.completed && (
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1116,14 +1116,14 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                   className="flex-1 min-w-0 cursor-pointer"
                   onClick={() => onTaskClick?.(task.id.toString(), task.due?.date || todayStr)}
                 >
-                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${task.completed ? 'line-through text-[#8e99a8]/70' : 'text-[#314158]'
+                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${task.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
                     }`}>
                     {task.content}
                   </p>
                   {/* Display due date if available */}
                   {task.due?.date && (
                     <div className="mt-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[rgba(183,148,106,0.08)] text-[#6b7688] border border-[#dbd6cf]">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-theme-brand-tint-light text-theme-text-subtle border border-theme-neutral-300">
                         {format(parse(task.due.date, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy')}
                       </span>
                     </div>
@@ -1135,14 +1135,14 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
         )}
 
         {/* Add task form for dashboard view */}
-        <div className="p-4 bg-gradient-to-r from-[#faf8f5]/80 to-[#faf8f5]/40 rounded-xl border border-[#dbd6cf] space-y-4">
+        <div className="p-4 bg-gradient-to-r from-theme-surface-alt/80 to-theme-surface-alt/40 rounded-xl border border-theme-neutral-300 space-y-4">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-lg bg-[#bb9e7b] flex items-center justify-center flex-shrink-0">
+            <div className="w-5 h-5 rounded-lg bg-theme-secondary flex items-center justify-center flex-shrink-0">
               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </div>
-            <h5 className="text-sm font-medium text-[#314158]">Add task</h5>
+            <h5 className="text-sm font-medium text-theme-text-primary">Add task</h5>
           </div>
 
           <div className="flex gap-3">
@@ -1152,12 +1152,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               value={newOpenTask}
               onChange={(e) => setNewOpenTask(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && newOpenTask.trim()) handleAddOpenTask(); }}
-              className="flex-1 rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200 placeholder-[#8e99a8]/70"
+              className="flex-1 rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200 placeholder-theme-text-tertiary/70"
             />
             <button
               onClick={handleAddOpenTask}
               disabled={!newOpenTask.trim()}
-              className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-[#ebe5de] text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
+              className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-theme-skeleton text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
             >
               Add
             </button>
@@ -1168,30 +1168,30 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   }
 
   return (
-    <div className="w-full max-w-full bg-white/95 backdrop-blur-sm border border-[#dbd6cf] rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
+    <div className="w-full max-w-full bg-white/95 backdrop-blur-sm border border-theme-neutral-300 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-[#dbd6cf]/60/80 bg-gradient-to-r from-[#faf8f5]/30 to-transparent">
+      <div className="px-6 py-5 border-b border-theme-neutral-300/60/80 bg-gradient-to-r from-theme-surface-alt/30 to-transparent">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="section-label-sm">Tasks</h3>
-            <p className="font-['Inter',sans-serif] text-[13px] text-[#8e99a8] mt-1">Organize your workflow</p>
+            <p className=" text-[13px] text-theme-text-tertiary mt-1">Organize your workflow</p>
           </div>
           <button
             onClick={() => setIsCollapsed(true)}
-            className="w-8 h-8 hover:bg-[rgba(183,148,106,0.08)]/80 rounded-lg transition-all duration-200 flex items-center justify-center group"
+            className="w-8 h-8 hover:bg-theme-brand-tint-light/80 rounded-lg transition-all duration-200 flex items-center justify-center group"
             aria-label="Collapse task list"
           >
-            <ChevronRight size={18} className="text-[#8e99a8]/70 group-hover:text-[#6b7688] transition-colors" />
+            <ChevronRight size={18} className="text-theme-text-tertiary/70 group-hover:text-theme-text-subtle transition-colors" />
           </button>
         </div>
       </div>
 
       {/* Premium Task view toggle */}
-      <div className="px-6 py-4 bg-[#faf8f5]/40">
-        <div className="relative flex rounded-xl bg-white border border-[#dbd6cf] p-1 shadow-sm">
+      <div className="px-6 py-4 bg-theme-surface-alt/40">
+        <div className="relative flex rounded-xl bg-white border border-theme-neutral-300 p-1 shadow-sm">
           {/* Background slider */}
           <div
-            className={`absolute top-1 h-8 bg-[#bb9e7b] rounded-lg shadow-sm transition-all duration-300 ease-out`}
+            className={`absolute top-1 h-8 bg-theme-secondary rounded-lg shadow-sm transition-all duration-300 ease-out`}
             style={{
               width: 'calc(33.333% - 4px)',
               transform: `translateX(${taskView === 'Today' ? '2px' : taskView === 'Upcoming' ? 'calc(100% + 2px)' : 'calc(200% + 2px)'})`
@@ -1203,7 +1203,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               onClick={() => setTaskView(tab)}
               className={`relative z-10 flex-1 h-8 px-4 text-sm font-medium rounded-lg transition-all duration-300 ease-out ${taskView === tab
                   ? 'text-white'
-                  : 'text-[#6b7688] hover:text-[#314158]'
+                  : 'text-theme-text-subtle hover:text-theme-text-primary'
                 }`}
             >
               {tab}
@@ -1245,12 +1245,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     onClick={() => setIsDailyCollapsed((c) => !c)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-lg bg-[#bb9e7b] flex items-center justify-center transition-transform duration-200 ${isDailyCollapsed ? 'rotate-0' : 'rotate-90'}`}>
+                      <div className={`w-6 h-6 rounded-lg bg-theme-secondary flex items-center justify-center transition-transform duration-200 ${isDailyCollapsed ? 'rotate-0' : 'rotate-90'}`}>
                         <ChevronRight size={14} className="text-white" />
                       </div>
                       <div>
                         <h4 className="section-label">Today&apos;s Tasks</h4>
-                        <p className="text-sm text-[#8e99a8]">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
+                        <p className="text-sm text-theme-text-tertiary">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>
                   </div>
@@ -1264,17 +1264,17 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <div className="space-y-3">
                           {[1, 2, 3].map(i => (
                             <div key={i} className="animate-pulse">
-                              <div className="bg-[rgba(183,148,106,0.08)] h-16 rounded-xl"></div>
+                              <div className="bg-theme-brand-tint-light h-16 rounded-xl"></div>
                             </div>
                           ))}
                         </div>
                       ) : !loading && todayTasks.length === 0 ? (
                         <div className="text-center py-8">
-                          <div className="w-12 h-12 rounded-xl bg-[#f5ede4] flex items-center justify-center mx-auto mb-3">
-                            <Clock size={20} className="text-[#9a7b5a]" />
+                          <div className="w-12 h-12 rounded-xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-3">
+                            <Clock size={20} className="text-theme-primary-600" />
                           </div>
-                          <h5 className="text-sm font-medium text-[#314158] mb-1">No tasks for today</h5>
-                          <p className="text-xs text-[#8e99a8]">Add a task to get started</p>
+                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks for today</h5>
+                          <p className="text-xs text-theme-text-tertiary">Add a task to get started</p>
                         </div>
                       ) : (
                         todayTasksOrdered.map((t: any, index: number) => (
@@ -1285,7 +1285,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 style={provided.draggableProps.style}
-                                className="group relative bg-white border border-[#dbd6cf] hover:border-[#dbd6cf] rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
+                                className="group relative bg-white border border-theme-neutral-300 hover:border-theme-neutral-300 rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
                               >
                                 <div className="flex items-start gap-3">
                                   <label className="flex items-center cursor-pointer">
@@ -1296,8 +1296,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                       className="sr-only"
                                     />
                                     <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${t.completed
-                                        ? 'bg-[#bb9e7b] border-[#bb9e7b]'
-                                        : 'border-[#dbd6cf] hover:border-[#bb9e7b] group-hover:border-[#bb9e7b]'
+                                        ? 'bg-theme-secondary border-theme-secondary'
+                                        : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary'
                                       }`}>
                                       {t.completed && (
                                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1310,7 +1310,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                     className="flex-1 min-w-0 cursor-pointer"
                                     onClick={() => onTaskClick?.(t.id.toString(), todayStr)}
                                   >
-                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-[#8e99a8]/70' : 'text-[#314158]'
+                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
                                       }`}>
                                       {t.content}
                                     </p>
@@ -1337,7 +1337,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                         { taskId: t.id.toString(), updates: { bucket: val || undefined } }
                                       ]).catch(err => console.error('Failed to update bucket', err));
                                     }}
-                                    className="absolute right-3 top-3 text-xs rounded-md border border-[#dbd6cf] px-2 py-1 bg-white focus:border-[#bb9e7b] focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                    className="absolute right-3 top-3 text-xs rounded-md border border-theme-neutral-300 px-2 py-1 bg-white focus:border-theme-secondary focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <option value="">No bucket</option>
@@ -1360,23 +1360,23 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
             {/* Premium Add Task Form */}
             {!isDailyCollapsed && (
-              <div className="p-4 bg-gradient-to-r from-[#faf8f5]/80 to-[#faf8f5]/40 rounded-xl border border-[#dbd6cf] space-y-4">
+              <div className="p-4 bg-gradient-to-r from-theme-surface-alt/80 to-theme-surface-alt/40 rounded-xl border border-theme-neutral-300 space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-lg bg-[#bb9e7b] flex items-center justify-center flex-shrink-0">
+                  <div className="w-5 h-5 rounded-lg bg-theme-secondary flex items-center justify-center flex-shrink-0">
                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                   </div>
-                  <h5 className="text-sm font-medium text-[#314158]">Add task for today</h5>
+                  <h5 className="text-sm font-medium text-theme-text-primary">Add task for today</h5>
                 </div>
 
                 {availableBuckets.length > 0 && (
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-[#4a5568] block">Project</label>
+                    <label className="text-xs font-medium text-theme-text-body block">Project</label>
                     <select
                       value={taskBucket}
                       onChange={(e) => setTaskBucket(e.target.value)}
-                      className="w-full rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200"
+                      className="w-full rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200"
                     >
                       {availableBuckets.map(bucket => (
                         <option key={bucket} value={bucket}>{bucket}</option>
@@ -1392,12 +1392,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     value={newDailyTask}
                     onChange={(e) => setNewDailyTask(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && newDailyTask.trim()) handleAddDailyTask(); }}
-                    className="flex-1 rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200 placeholder-[#8e99a8]/70"
+                    className="flex-1 rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200 placeholder-theme-text-tertiary/70"
                   />
                   <button
                     onClick={handleAddDailyTask}
                     disabled={!newDailyTask.trim()}
-                    className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-[#ebe5de] text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
+                    className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-theme-skeleton text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
                   >
                     Add
                   </button>
@@ -1416,12 +1416,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
               const groupConfig = {
                 overdue: { title: 'Overdue', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
-                today: { title: 'Today', color: 'text-[#9a7b5a]', bgColor: 'bg-[#fdf8f6]', borderColor: 'border-[#dbd6cf]' },
+                today: { title: 'Today', color: 'text-theme-primary-600', bgColor: 'bg-theme-primary-50', borderColor: 'border-theme-neutral-300' },
                 tomorrow: { title: 'Tomorrow', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
                 thisWeek: { title: 'This Week', color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-                nextWeek: { title: 'Next Week', color: 'text-[#9a7b5a]', bgColor: 'bg-[#fdf8f6]', borderColor: 'border-[#dbd6cf]' },
-                later: { title: 'Later', color: 'text-[#6b7688]', bgColor: 'bg-[#faf8f5]', borderColor: 'border-[#dbd6cf]' }
-              }[groupKey] || { title: groupKey, color: 'text-[#6b7688]', bgColor: 'bg-[#faf8f5]', borderColor: 'border-[#dbd6cf]' };
+                nextWeek: { title: 'Next Week', color: 'text-theme-primary-600', bgColor: 'bg-theme-primary-50', borderColor: 'border-theme-neutral-300' },
+                later: { title: 'Later', color: 'text-theme-text-subtle', bgColor: 'bg-theme-surface-alt', borderColor: 'border-theme-neutral-300' }
+              }[groupKey] || { title: groupKey, color: 'text-theme-text-subtle', bgColor: 'bg-theme-surface-alt', borderColor: 'border-theme-neutral-300' };
 
               const isCollapsed = groupCollapsed[groupKey];
 
@@ -1455,10 +1455,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               })();
 
               return (
-                <div key={groupKey} className="rounded-xl border border-[#dbd6cf] bg-white/80 shadow-sm overflow-hidden">
+                <div key={groupKey} className="rounded-xl border border-theme-neutral-300 bg-white/80 shadow-sm overflow-hidden">
                   {/* Premium Group Header */}
                   <div
-                    className={`flex items-center justify-between px-5 py-4 cursor-pointer select-none transition-all duration-200 hover:bg-[#faf8f5]/50`}
+                    className={`flex items-center justify-between px-5 py-4 cursor-pointer select-none transition-all duration-200 hover:bg-theme-surface-alt/50`}
                     onClick={() => toggleGroupCollapse(groupKey)}
                   >
                     <div className="flex items-center gap-3">
@@ -1469,10 +1469,10 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <h4 className={`font-semibold text-sm ${groupConfig.color}`}>
                           {groupConfig.title}
                         </h4>
-                        <p className="text-xs text-[#8e99a8] mt-0.5">
+                        <p className="text-xs text-theme-text-tertiary mt-0.5">
                           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                           {subtitle && (
-                            <span className="ml-2 text-[#8e99a8]/70">{subtitle}</span>
+                            <span className="ml-2 text-theme-text-tertiary/70">{subtitle}</span>
                           )}
                           {groupKey === 'overdue' && tasks.length > 0 && (
                             <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
@@ -1529,11 +1529,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
             {/* Premium Empty State */}
             {Object.values(taskGroups).every(group => group.length === 0) && !loading && (
               <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-2xl bg-[#f5ede4] flex items-center justify-center mx-auto mb-4">
-                  <Clock size={28} className="text-[#9a7b5a]" />
+                <div className="w-16 h-16 rounded-2xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-4">
+                  <Clock size={28} className="text-theme-primary-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-[#314158] mb-2">All caught up!</h3>
-                <p className="text-sm text-[#8e99a8] mb-6 max-w-sm mx-auto">
+                <h3 className="text-lg font-semibold text-theme-text-primary mb-2">All caught up!</h3>
+                <p className="text-sm text-theme-text-tertiary mb-6 max-w-sm mx-auto">
                   You have no upcoming tasks. Take a moment to plan ahead or enjoy the calm.
                 </p>
                 <button
@@ -1542,7 +1542,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     const input = document.querySelector('[placeholder*="upcoming"]') as HTMLInputElement;
                     input?.focus();
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#bb9e7b] hover:bg-[#9a7b5a] text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-warm"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-theme-secondary hover:bg-theme-primary-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-warm"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1553,23 +1553,23 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
             )}
 
             {/* Premium Add Upcoming Task Form */}
-            <div className="mt-6 p-5 bg-gradient-to-r from-[#faf8f5]/80 to-[#faf8f5]/40 rounded-xl border border-[#dbd6cf] space-y-5">
+            <div className="mt-6 p-5 bg-gradient-to-r from-theme-surface-alt/80 to-theme-surface-alt/40 rounded-xl border border-theme-neutral-300 space-y-5">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-lg bg-[#bb9e7b] flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 rounded-lg bg-theme-secondary flex items-center justify-center flex-shrink-0">
                   <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h5 className="text-sm font-medium text-[#314158]">Plan ahead</h5>
+                <h5 className="text-sm font-medium text-theme-text-primary">Plan ahead</h5>
               </div>
 
               {availableBuckets.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-[#4a5568] block">Project</label>
+                  <label className="text-xs font-medium text-theme-text-body block">Project</label>
                   <select
                     value={taskBucket}
                     onChange={(e) => setTaskBucket(e.target.value)}
-                    className="w-full rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200"
+                    className="w-full rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200"
                   >
                     {availableBuckets.map(bucket => (
                       <option key={bucket} value={bucket}>{bucket}</option>
@@ -1580,33 +1580,33 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-[#4a5568] block">Task description</label>
+                  <label className="text-xs font-medium text-theme-text-body block">Task description</label>
                   <input
                     type="text"
                     placeholder="What do you need to do?"
                     value={newUpcomingTask}
                     onChange={(e) => setNewUpcomingTask(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && newUpcomingTask.trim() && newUpcomingTaskDate) handleAddUpcomingTask(); }}
-                    className="w-full rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200 placeholder-[#8e99a8]/70"
+                    className="w-full rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200 placeholder-theme-text-tertiary/70"
                   />
                 </div>
 
                 <div className="flex gap-3">
                   <div className="flex-1 space-y-2">
-                    <label className="text-xs font-medium text-[#4a5568] block">Due date</label>
+                    <label className="text-xs font-medium text-theme-text-body block">Due date</label>
                     <input
                       type="date"
                       value={newUpcomingTaskDate}
                       onChange={(e) => setNewUpcomingTaskDate(e.target.value)}
                       min={format(addDays(new Date(), 1), 'yyyy-MM-dd')}
-                      className="w-full rounded-lg border border-[#dbd6cf] px-3 py-2.5 text-sm bg-white focus:border-[#bb9e7b] focus:ring-[3px] focus:ring-[rgba(163,133,96,0.15)] focus:outline-none transition-all duration-200"
+                      className="w-full rounded-lg border border-theme-neutral-300 px-3 py-2.5 text-sm bg-white focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200"
                     />
                   </div>
                   <div className="flex items-end">
                     <button
                       onClick={handleAddUpcomingTask}
                       disabled={!newUpcomingTask.trim() || !newUpcomingTaskDate}
-                      className="px-5 py-2.5 bg-[#bb9e7b] hover:bg-[#9a7b5a] disabled:bg-[#ebe5de] text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
+                      className="px-5 py-2.5 bg-theme-secondary hover:bg-theme-primary-600 disabled:bg-theme-skeleton text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
                     >
                       Add Task
                     </button>
@@ -1633,12 +1633,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                     onClick={() => setIsDailyCollapsed((c) => !c)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-lg bg-[#bb9e7b] flex items-center justify-center transition-transform duration-200 ${isDailyCollapsed ? 'rotate-0' : 'rotate-90'}`}>
+                      <div className={`w-6 h-6 rounded-lg bg-theme-secondary flex items-center justify-center transition-transform duration-200 ${isDailyCollapsed ? 'rotate-0' : 'rotate-90'}`}>
                         <ChevronRight size={14} className="text-white" />
                       </div>
                       <div>
                         <h4 className="section-label">Today&apos;s Tasks</h4>
-                        <p className="text-sm text-[#8e99a8]">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
+                        <p className="text-sm text-theme-text-tertiary">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>
                   </div>
@@ -1652,17 +1652,17 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <div className="space-y-3">
                           {[1, 2, 3].map(i => (
                             <div key={i} className="animate-pulse">
-                              <div className="bg-[rgba(183,148,106,0.08)] h-16 rounded-xl"></div>
+                              <div className="bg-theme-brand-tint-light h-16 rounded-xl"></div>
                             </div>
                           ))}
                         </div>
                       ) : !loading && todayTasks.length === 0 ? (
                         <div className="text-center py-8">
-                          <div className="w-12 h-12 rounded-xl bg-[#f5ede4] flex items-center justify-center mx-auto mb-3">
-                            <Clock size={20} className="text-[#9a7b5a]" />
+                          <div className="w-12 h-12 rounded-xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-3">
+                            <Clock size={20} className="text-theme-primary-600" />
                           </div>
-                          <h5 className="text-sm font-medium text-[#314158] mb-1">No tasks for today</h5>
-                          <p className="text-xs text-[#8e99a8]">Drag a task from "All Open Tasks" below to add it to today</p>
+                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks for today</h5>
+                          <p className="text-xs text-theme-text-tertiary">Drag a task from "All Open Tasks" below to add it to today</p>
                         </div>
                       ) : (
                         todayTasksOrdered.map((t: any, index: number) => (
@@ -1673,7 +1673,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 style={provided.draggableProps.style}
-                                className="group relative bg-white border border-[#dbd6cf] hover:border-[#dbd6cf] rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
+                                className="group relative bg-white border border-theme-neutral-300 hover:border-theme-neutral-300 rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
                               >
                                 <div className="flex items-start gap-3">
                                   <label className="flex items-center cursor-pointer">
@@ -1684,8 +1684,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                       className="sr-only"
                                     />
                                     <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${t.completed
-                                        ? 'bg-[#bb9e7b] border-[#bb9e7b]'
-                                        : 'border-[#dbd6cf] hover:border-[#bb9e7b] group-hover:border-[#bb9e7b]'
+                                        ? 'bg-theme-secondary border-theme-secondary'
+                                        : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary'
                                       }`}>
                                       {t.completed && (
                                         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1698,7 +1698,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                     className="flex-1 min-w-0 cursor-pointer"
                                     onClick={() => onTaskClick?.(t.id.toString(), todayStr)}
                                   >
-                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-[#8e99a8]/70' : 'text-[#314158]'
+                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
                                       }`}>
                                       {t.content}
                                     </p>
@@ -1725,7 +1725,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                         { taskId: t.id.toString(), updates: { bucket: val || undefined } }
                                       ]).catch(err => console.error('Failed to update bucket', err));
                                     }}
-                                    className="absolute right-3 top-3 text-xs rounded-md border border-[#dbd6cf] px-2 py-1 bg-white focus:border-[#bb9e7b] focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                    className="absolute right-3 top-3 text-xs rounded-md border border-theme-neutral-300 px-2 py-1 bg-white focus:border-theme-secondary focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <option value="">No bucket</option>
@@ -1750,7 +1750,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div
-                  className="flex items-center gap-2 text-sm font-medium text-[#314158] select-none cursor-pointer"
+                  className="flex items-center gap-2 text-sm font-medium text-theme-text-primary select-none cursor-pointer"
                   onClick={() => setIsOpenCollapsed((c) => !c)}
                 >
                   <span>All Open Tasks</span>
@@ -1763,18 +1763,18 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                   <ul
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="space-y-2 text-sm text-[#4a5568] pr-1 transition-[max-height] duration-200"
+                    className="space-y-2 text-sm text-theme-text-body pr-1 transition-[max-height] duration-200"
                     style={{
                       maxHeight: isOpenCollapsed ? 0 : '60vh',
                       overflowY: isOpenCollapsed ? 'hidden' : 'auto'
                     }}
                   >
                     {loading && openTasksToShow.length === 0 ? (
-                      <li className="text-[#8e99a8]">Loading…</li>
+                      <li className="text-theme-text-tertiary">Loading…</li>
                     ) : null}
 
                     {!loading && openTasksToShow.length === 0 ? (
-                      <li className="text-[#8e99a8]">No open tasks</li>
+                      <li className="text-theme-text-tertiary">No open tasks</li>
                     ) : null}
 
                     {openTasksToShow.map((t: any, index: number) => (
@@ -1785,7 +1785,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             style={provided.draggableProps.style}
-                            className="group relative bg-white border border-[#dbd6cf] hover:border-[#dbd6cf] rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
+                            className="group relative bg-white border border-theme-neutral-300 hover:border-theme-neutral-300 rounded-xl p-4 transition-all duration-200 hover:shadow-warm cursor-grab active:cursor-grabbing"
                           >
                             <div className="flex items-start gap-3">
                               <label className="flex items-center cursor-pointer">
@@ -1796,8 +1796,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                   className="sr-only"
                                 />
                                 <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${t.completed
-                                    ? 'bg-[#bb9e7b] border-[#bb9e7b]'
-                                    : 'border-[#dbd6cf] hover:border-[#bb9e7b] group-hover:border-[#bb9e7b]'
+                                    ? 'bg-theme-secondary border-theme-secondary'
+                                    : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary'
                                   }`}>
                                   {t.completed && (
                                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1812,7 +1812,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-[#8e99a8]/70' : 'text-[#314158]'
+                                    <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${t.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
                                       }`}>
                                       {t.content}
                                     </p>
@@ -1840,7 +1840,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                       { taskId: t.id.toString(), updates: { bucket: val || undefined } }
                                     ]).catch(err => console.error('Failed to update bucket', err));
                                   }}
-                                  className="absolute right-3 top-3 text-xs rounded-md border border-[#dbd6cf] px-2 py-1 bg-white focus:border-[#bb9e7b] focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                                  className="absolute right-3 top-3 text-xs rounded-md border border-theme-neutral-300 px-2 py-1 bg-white focus:border-theme-secondary focus:outline-none opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                                 >
                                   <option value="">No bucket</option>
                                   {availableBuckets.map((b) => (
@@ -1863,11 +1863,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                 <div className="mt-2 space-y-2">
                   {availableBuckets.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-[#6b7688] font-medium">Bucket:</label>
+                      <label className="text-xs text-theme-text-subtle font-medium">Bucket:</label>
                       <select
                         value={taskBucket}
                         onChange={(e) => setTaskBucket(e.target.value)}
-                        className="flex-1 rounded-md border border-[#dbd6cf] px-3 py-1.5 text-sm focus:border-[#bb9e7b] focus:ring-1 focus:ring-[#bb9e7b] focus:outline-none bg-white"
+                        className="flex-1 rounded-md border border-theme-neutral-300 px-3 py-1.5 text-sm focus:border-theme-secondary focus:ring-1 focus:ring-theme-secondary focus:outline-none bg-white"
                       >
                         {availableBuckets.map(bucket => (
                           <option key={bucket} value={bucket}>{bucket}</option>
@@ -1882,12 +1882,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                       value={newOpenTask}
                       onChange={(e) => setNewOpenTask(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleAddOpenTask(); }}
-                      className="flex-1 rounded border border-[#dbd6cf] px-2 py-1 text-sm focus:border-[#bb9e7b] focus:outline-none"
+                      className="flex-1 rounded border border-theme-neutral-300 px-2 py-1 text-sm focus:border-theme-secondary focus:outline-none"
                     />
                     <button
                       onClick={handleAddOpenTask}
                       disabled={!newOpenTask.trim()}
-                      className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-[#ebe5de] text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
+                      className="px-4 py-2.5 bg-theme-primary hover:bg-theme-primary/90 disabled:bg-theme-skeleton text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:cursor-not-allowed shadow-sm hover:shadow-warm"
                     >
                       Add
                     </button>

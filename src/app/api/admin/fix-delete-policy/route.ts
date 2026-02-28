@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { validateAdminAuth } from '@/lib/admin-auth'
 
 export async function POST(request: NextRequest) {
-  // Block in production unless explicitly enabled
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_ROUTES !== 'true') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  }
-
-  // Require admin secret header
-  const adminSecret = request.headers.get('x-admin-secret')
-  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const authError = await validateAdminAuth(request)
+  if (authError) return authError
 
   try {
     const supabase = supabaseServer()
-
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
 
     // Add the missing DELETE policy
     const { error } = await supabase.rpc('exec_sql', {

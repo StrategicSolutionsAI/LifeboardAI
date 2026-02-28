@@ -53,7 +53,7 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
                 className={`px-2 py-1 rounded text-sm ${
                   rangeDays === days
                     ? 'bg-warm-500 text-white'
-                    : 'bg-[#f5f0eb] text-[#6b7688] hover:bg-[#ebe5de]'
+                    : 'bg-theme-progress-track text-theme-text-subtle hover:bg-theme-skeleton'
                 }`}
               >
                 {label}

@@ -43,9 +43,22 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
     }
   }, [activeBucket]);
 
+  const ALLOWED_MIME_TYPES = new Set([
+    'text/calendar',
+    'application/ics',
+    'text/x-vcalendar',
+    // Some browsers report generic types for .ics files
+    'application/octet-stream',
+    '',
+  ]);
+
   const validateFile = (file: File): string | null => {
     if (!file.name.endsWith('.ics') && !file.name.endsWith('.ical')) {
       return 'Please select a valid calendar file (.ics or .ical)';
+    }
+
+    if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+      return `Unexpected file type "${file.type}". Please upload a valid .ics calendar file.`;
     }
 
     if (file.size > 5 * 1024 * 1024) {
@@ -203,7 +216,8 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-[#f5f0eb] text-[#8e99a8] hover:text-[#4a5568]"
+            aria-label="Close upload dialog"
+            className="p-1 rounded-lg hover:bg-theme-progress-track text-theme-text-tertiary hover:text-theme-text-body"
           >
             <X className="h-5 w-5" />
           </button>
@@ -211,23 +225,23 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-[#4a5568]">
+          <label className="block text-sm font-medium text-theme-text-body">
             Calendar name
             <input
               type="text"
               value={calendarName}
               onChange={(e) => setCalendarName(e.target.value)}
               placeholder="e.g., Family Schedule"
-              className="mt-1 w-full rounded-lg border border-[#dbd6cf] px-3 py-2 text-sm focus:border-warm-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-theme-neutral-300 px-3 py-2 text-sm focus:border-warm-500 focus:outline-none"
             />
           </label>
-          <p className="text-xs text-[#8e99a8]">
+          <p className="text-xs text-theme-text-tertiary">
             Give this calendar a label so you can manage it from the Integrations tab.
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-[#4a5568]">
+          <label className="block text-sm font-medium text-theme-text-body">
             Bucket
             <select
               value={selectedBucket}
@@ -235,7 +249,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
                 userBucketChoiceRef.current = true;
                 setSelectedBucket(e.target.value);
               }}
-              className="mt-1 w-full rounded-lg border border-[#dbd6cf] px-3 py-2 text-sm focus:border-warm-500 focus:outline-none bg-white"
+              className="mt-1 w-full rounded-lg border border-theme-neutral-300 px-3 py-2 text-sm focus:border-warm-500 focus:outline-none bg-white"
             >
               <option value="">Don&apos;t assign a bucket</option>
               {buckets.map((bucket) => (
@@ -245,7 +259,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
               ))}
             </select>
           </label>
-          <p className="text-xs text-[#8e99a8]">
+          <p className="text-xs text-theme-text-tertiary">
             Imported events will be tagged with this bucket so they appear with the right color coding.
           </p>
         </div>
@@ -261,7 +275,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
               ? 'border-warm-400 bg-warm-50'
               : selectedFile
                 ? 'border-green-300 bg-green-50'
-                : 'border-[#dbd6cf] bg-[#faf8f5] hover:border-[#c5beb6]'
+                : 'border-theme-neutral-300 bg-theme-surface-alt hover:border-theme-neutral-400'
             }
           `}
         >
@@ -272,26 +286,26 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
                   <FileText className="h-8 w-8 text-green-600" />
                 </div>
                 <div className="text-center">
-                  <p className="font-medium text-[#314158]">{selectedFile.name}</p>
-                  <p className="text-sm text-[#8e99a8]">{formatFileSize(selectedFile.size)}</p>
+                  <p className="font-medium text-theme-text-primary">{selectedFile.name}</p>
+                  <p className="text-sm text-theme-text-tertiary">{formatFileSize(selectedFile.size)}</p>
                 </div>
                 <button
                   onClick={handleReset}
-                  className="text-sm text-[#6b7688] hover:text-[#314158] underline"
+                  className="text-sm text-theme-text-subtle hover:text-theme-text-primary underline"
                 >
                   Choose different file
                 </button>
               </>
             ) : (
               <>
-                <div className={`p-3 rounded-full ${isDragging ? 'bg-warm-100' : 'bg-[#f5f0eb]'}`}>
-                  <Upload className={`h-8 w-8 ${isDragging ? 'text-warm-600' : 'text-[#8e99a8]'}`} />
+                <div className={`p-3 rounded-full ${isDragging ? 'bg-warm-100' : 'bg-theme-progress-track'}`}>
+                  <Upload className={`h-8 w-8 ${isDragging ? 'text-warm-600' : 'text-theme-text-tertiary'}`} />
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-medium text-[#314158] mb-2">
+                  <p className="text-lg font-medium text-theme-text-primary mb-2">
                     Drop your calendar file here
                   </p>
-                  <p className="text-sm text-[#6b7688] mb-4">
+                  <p className="text-sm text-theme-text-subtle mb-4">
                     or click to browse for .ics or .ical files
                   </p>
                   <button
@@ -351,7 +365,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
                   <p className="text-sm mt-1 text-yellow-700">{uploadResult.warnings}</p>
                 )}
                 {uploadResult.success && uploadResult.bucket && (
-                  <p className="text-sm mt-1 text-[#4a5568]">
+                  <p className="text-sm mt-1 text-theme-text-body">
                     Tagged imported events with the {uploadResult.bucket} bucket.
                   </p>
                 )}
@@ -379,7 +393,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
             </button>
             <button
               onClick={handleReset}
-              className="px-4 py-3 border border-[#dbd6cf] text-[#4a5568] rounded-lg hover:bg-[#faf8f5] transition-colors"
+              className="px-4 py-3 border border-theme-neutral-300 text-theme-text-body rounded-lg hover:bg-theme-surface-alt transition-colors"
             >
               Cancel
             </button>
@@ -387,7 +401,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         )}
 
         {/* Help Text */}
-        <div className="text-sm text-[#6b7688] bg-warm-50 p-4 rounded-lg">
+        <div className="text-sm text-theme-text-subtle bg-warm-50 p-4 rounded-lg">
           <h4 className="font-medium text-warm-900 mb-2">Supported formats:</h4>
           <ul className="space-y-1 list-disc list-inside">
             <li>iCalendar files (.ics, .ical)</li>

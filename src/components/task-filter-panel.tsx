@@ -115,8 +115,8 @@ export function TaskFilterPanel({
                 onClick={() => setStatus(s.id)}
                 className={`px-3 py-1.5 rounded-lg border text-[13px] transition-colors ${
                   active
-                    ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158]"
-                    : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                    ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary"
+                    : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                 }`}
               >
                 {s.label}
@@ -137,8 +137,8 @@ export function TaskFilterPanel({
                 onClick={() => setDateRange(d.id)}
                 className={`px-3 py-1.5 rounded-lg border text-[13px] transition-colors ${
                   active
-                    ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158]"
-                    : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                    ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary"
+                    : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                 }`}
               >
                 {d.label}
@@ -159,10 +159,10 @@ export function TaskFilterPanel({
                 <button
                   key={bucket}
                   onClick={() => toggleBucket(bucket)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[12px] transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition-colors ${
                     active
-                      ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158]"
-                      : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                      ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary"
+                      : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                   }`}
                 >
                   <span
@@ -188,8 +188,8 @@ export function TaskFilterPanel({
                 onClick={() => setSortBy(s.id)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] transition-colors ${
                   active
-                    ? "bg-[rgba(177,145,106,0.12)] border-[rgba(177,145,106,0.35)] text-[#314158]"
-                    : "bg-white border-[#e2e8f0] text-[#596881] hover:border-[#cbd5e1]"
+                    ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary"
+                    : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
                 }`}
               >
                 {s.label}
@@ -208,12 +208,12 @@ export function TaskFilterPanel({
       {/* Footer */}
       {count > 0 && (
         <div className="flex items-center justify-between pt-2 border-t border-[#e2e8f0]">
-          <span className="text-[12px] text-[#8e99a8]">
+          <span className="text-xs text-theme-text-tertiary">
             {count} active {count === 1 ? "filter" : "filters"}
           </span>
           <button
             onClick={clearAll}
-            className="flex items-center gap-1 text-[12px] text-[#B1916A] hover:text-[#96784f] transition-colors"
+            className="flex items-center gap-1 text-xs text-theme-primary hover:text-theme-primary-600 transition-colors"
           >
             <X size={12} />
             Clear all
@@ -233,7 +233,7 @@ function Section({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] tracking-[0.6px] uppercase text-[#8e99a8] font-medium">
+      <span className="text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium">
         {label}
       </span>
       {children}

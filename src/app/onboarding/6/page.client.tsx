@@ -37,7 +37,7 @@ export default function OnboardingStep6Client() {
           </div>
         </div>
         <div className="pt-4">
-          <p className="text-[#6b7688] text-sm">Remember: You can always adjust your settings, theme, and preferences from your dashboard.</p>
+          <p className="text-theme-text-subtle text-sm">Remember: You can always adjust your settings, theme, and preferences from your dashboard.</p>
         </div>
       </div>
     </OnboardingLayout>

@@ -14,7 +14,7 @@ import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, Che
 import { cn } from "@/lib/utils";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
-import { useToast, ToastProvider } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { TaskBoardTabs, type TaskTabId } from "@/components/task-board-tabs";
 import { type TaskFilterState, type TaskSortOption, defaultTaskFilters } from "@/components/task-filter-panel";
 import { prefetchAllTasks } from "@/lib/prefetch-tasks";
@@ -32,8 +32,8 @@ const kanbanChunk = import("@/components/task-kanban-board");
 const TasksBoard = dynamic(() => tasksBoardChunk, {
   ssr: false,
   loading: () => (
-    <div className="h-full rounded-xl border border-[#dbd6cf] bg-white p-4">
-      <div className="h-full animate-pulse rounded-lg bg-[rgba(177,145,106,0.05)]" />
+    <div className="h-full rounded-xl border border-theme-neutral-300 bg-white p-4">
+      <div className="h-full animate-pulse rounded-lg bg-theme-brand-tint-subtle" />
     </div>
   ),
 });
@@ -43,8 +43,8 @@ const TaskListView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-xl border border-[#dbd6cf] bg-white p-4">
-        <div className="h-64 animate-pulse rounded-lg bg-[rgba(177,145,106,0.05)]" />
+      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4">
+        <div className="h-64 animate-pulse rounded-lg bg-theme-brand-tint-subtle" />
       </div>
     ),
   }
@@ -57,8 +57,8 @@ const TaskKanbanBoard = dynamic(
     loading: () => (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-[520px] rounded-xl border border-[#dbd6cf] bg-white p-4">
-            <div className="h-full animate-pulse rounded-lg bg-[rgba(177,145,106,0.05)]" />
+          <div key={i} className="h-[520px] rounded-xl border border-theme-neutral-300 bg-white p-4">
+            <div className="h-full animate-pulse rounded-lg bg-theme-brand-tint-subtle" />
           </div>
         ))}
       </div>
@@ -137,6 +137,7 @@ function TasksBoardShell() {
   const [filters, setFilters] = useState<TaskFilterState>(defaultTaskFilters);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
+  const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -163,7 +164,7 @@ function TasksBoardShell() {
 
   // Apply filters and search
   const filteredTasks = useMemo(() => {
-    let result = [...allTasks];
+    let result = allTasks.filter((t) => !hiddenTasks.has(t.id));
 
     // Search
     if (searchQuery.trim()) {
@@ -223,9 +224,9 @@ function TasksBoardShell() {
     }
 
     return result;
-  }, [allTasks, searchQuery, filters]);
+  }, [allTasks, hiddenTasks, searchQuery, filters]);
 
-  const openTasks = useMemo(() => allTasks.filter((t) => !t.completed), [allTasks]);
+  const openTasks = useMemo(() => allTasks.filter((t) => !t.completed && !hiddenTasks.has(t.id)), [allTasks, hiddenTasks]);
   const completedTasks = useMemo(() => allTasks.filter((t) => t.completed), [allTasks]);
   const totalOpen = openTasks.length;
   const totalCompleted = completedTasks.length;
@@ -338,8 +339,15 @@ function TasksBoardShell() {
   const handleToggleTask = useCallback(
     async (taskId: string) => {
       setLoadingTasks((prev) => new Set(prev).add(taskId));
+      const task = allTasks.find((t) => t.id === taskId);
+      const wasCompleted = task?.completed;
       try {
         await toggleTaskCompletion(taskId);
+        toast({
+          title: wasCompleted ? "Task reopened" : "Task completed",
+          type: "success",
+          duration: 2500,
+        });
       } catch {
         toast({
           title: "Failed to update task",
@@ -354,30 +362,54 @@ function TasksBoardShell() {
         });
       }
     },
-    [toggleTaskCompletion, toast]
+    [allTasks, toggleTaskCompletion, toast]
   );
 
   const handleDeleteTask = useCallback(
-    async (taskId: string) => {
-      setLoadingTasks((prev) => new Set(prev).add(taskId));
-      try {
-        await deleteTask(taskId);
-        toast({ title: "Task deleted" });
-      } catch {
-        toast({
-          title: "Failed to delete task",
-          description: "Please try again.",
-          type: "error",
-        });
-      } finally {
-        setLoadingTasks((prev) => {
-          const next = new Set(prev);
-          next.delete(taskId);
-          return next;
-        });
-      }
+    (taskId: string) => {
+      const taskToDelete = allTasks.find((t) => t.id === taskId);
+      if (!taskToDelete) return;
+
+      // Optimistically hide the task
+      setHiddenTasks((prev) => new Set(prev).add(taskId));
+
+      let undone = false;
+      const timeoutId = setTimeout(async () => {
+        if (undone) return;
+        try {
+          await deleteTask(taskId);
+        } catch {
+          // Restore on failure
+          setHiddenTasks((prev) => {
+            const next = new Set(prev);
+            next.delete(taskId);
+            return next;
+          });
+          toast({
+            title: "Failed to delete task",
+            description: "Please try again.",
+            type: "error",
+          });
+        }
+      }, 5000);
+
+      toast({
+        title: "Task deleted",
+        description: taskToDelete.content,
+        type: "success",
+        undoAction: () => {
+          undone = true;
+          clearTimeout(timeoutId);
+          setHiddenTasks((prev) => {
+            const next = new Set(prev);
+            next.delete(taskId);
+            return next;
+          });
+          toast({ title: "Task restored", type: "success", duration: 2000 });
+        },
+      });
     },
-    [deleteTask, toast]
+    [allTasks, deleteTask, toast]
   );
 
   const handleMoveTask = useCallback(
@@ -574,7 +606,7 @@ function TasksBoardShell() {
   const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.dueDateRange !== null;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 px-4 sm:px-6 md:px-8 py-4 sm:py-5">
+    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5">
       {/* ── Header Row: Progress ring + Title + Stats + Search ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-5">
@@ -589,15 +621,15 @@ function TasksBoardShell() {
                 className="transition-all duration-700 ease-out"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-[#314158]">
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-theme-text-primary">
               {completionPct}%
             </span>
           </div>
 
           {/* Title */}
           <div className="flex flex-col gap-0.5 min-w-0">
-            <h2 className="text-[20px] text-[#314158] font-semibold leading-tight">Tasks</h2>
-            <span className="text-[12px] text-[#8e99a8]">
+            <h2 className="text-[20px] text-theme-text-primary font-semibold leading-tight">Tasks</h2>
+            <span className="text-xs text-theme-text-tertiary">
               {totalOpen} open{totalCompleted > 0 ? ` · ${totalCompleted} done` : ""}
             </span>
           </div>
@@ -606,7 +638,7 @@ function TasksBoardShell() {
           {/* Add Task */}
           <button
             onClick={openNewTaskModal}
-            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-[#B1916A] text-white text-[13px] font-medium hover:bg-[#96784f] transition-colors shadow-[0px_1px_3px_rgba(177,145,106,0.3)]"
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Add Task</span>
@@ -623,8 +655,8 @@ function TasksBoardShell() {
             }}
             className={`shrink-0 p-2 rounded-lg transition-all duration-200 ${
               isSelectMode
-                ? "bg-[rgba(177,145,106,0.12)] text-[#314158] ring-1 ring-[rgba(177,145,106,0.25)]"
-                : "text-[#8e99a8] hover:bg-[rgba(177,145,106,0.06)] hover:text-[#596881]"
+                ? "bg-theme-brand-tint text-theme-text-primary ring-1 ring-theme-focus/25"
+                : "text-theme-text-tertiary hover:bg-theme-brand-tint-subtle hover:text-theme-text-secondary"
             }`}
             aria-label={isSelectMode ? "Exit select mode" : "Select tasks"}
           >
@@ -636,8 +668,8 @@ function TasksBoardShell() {
             onClick={() => setIsSearchOpen(!isSearchOpen)}
             className={`shrink-0 p-2 rounded-lg transition-all duration-200 ${
               isSearchOpen || searchQuery
-                ? "bg-[rgba(177,145,106,0.12)] text-[#314158]"
-                : "text-[#8e99a8] hover:bg-[rgba(177,145,106,0.06)] hover:text-[#596881]"
+                ? "bg-theme-brand-tint text-theme-text-primary"
+                : "text-theme-text-tertiary hover:bg-theme-brand-tint-subtle hover:text-theme-text-secondary"
             }`}
             aria-label="Search tasks"
           >
@@ -648,13 +680,13 @@ function TasksBoardShell() {
         {/* Expandable search bar */}
         {isSearchOpen && (
           <div className="relative flex items-center animate-in fade-in slide-in-from-top-2 duration-200">
-            <Search size={15} className="absolute left-3 text-[#8e99a8]" />
+            <Search size={15} className="absolute left-3 text-theme-text-tertiary" />
             <input
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by task name or bucket..."
-              className="w-full h-9 pl-9 pr-9 rounded-lg border border-[#dbd6cf] bg-white text-[13px] text-[#314158] placeholder:text-[#b5b0a8] focus:outline-none focus:ring-2 focus:ring-[rgba(177,145,106,0.3)] focus:border-[#B1916A] transition-colors"
+              className="w-full h-9 pl-9 pr-9 rounded-lg border border-theme-neutral-300 bg-white text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setSearchQuery("");
@@ -665,7 +697,7 @@ function TasksBoardShell() {
             {searchQuery && (
               <button
                 onClick={() => { setSearchQuery(""); }}
-                className="absolute right-3 text-[#8e99a8] hover:text-[#596881]"
+                className="absolute right-3 text-theme-text-tertiary hover:text-theme-text-secondary"
               >
                 <X size={14} />
               </button>
@@ -681,7 +713,7 @@ function TasksBoardShell() {
               "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
               filters.status === "open" && !filters.dueDateRange
                 ? "border-[rgba(124,110,189,0.4)] ring-1 ring-[rgba(124,110,189,0.15)] shadow-sm"
-                : "border-[#dbd6cf]/80 hover:border-[rgba(124,110,189,0.3)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.06)]"
+                : "border-theme-neutral-300/80 hover:border-[rgba(124,110,189,0.3)] hover:shadow-warm-sm"
             )}
           >
             <div
@@ -691,8 +723,8 @@ function TasksBoardShell() {
               <CheckSquare size={18} style={{ color: "#7C6EBD" }} />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[18px] font-bold text-[#314158] leading-tight">{todoTasks.length}</span>
-              <span className="text-[11px] text-[#8e99a8]">To Do</span>
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{todoTasks.length}</span>
+              <span className="text-[11px] text-theme-text-tertiary">To Do</span>
             </div>
           </button>
 
@@ -702,7 +734,7 @@ function TasksBoardShell() {
               "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
               filters.status === "open" && !filters.dueDateRange
                 ? "border-[rgba(74,173,224,0.4)] ring-1 ring-[rgba(74,173,224,0.15)] shadow-sm"
-                : "border-[#dbd6cf]/80 hover:border-[rgba(74,173,224,0.3)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.06)]"
+                : "border-theme-neutral-300/80 hover:border-[rgba(74,173,224,0.3)] hover:shadow-warm-sm"
             )}
           >
             <div
@@ -712,8 +744,8 @@ function TasksBoardShell() {
               <Activity size={18} style={{ color: "#4AADE0" }} />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[18px] font-bold text-[#314158] leading-tight">{inProgressTasks.length}</span>
-              <span className="text-[11px] text-[#8e99a8]">In Progress</span>
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{inProgressTasks.length}</span>
+              <span className="text-[11px] text-theme-text-tertiary">In Progress</span>
             </div>
           </button>
 
@@ -723,7 +755,7 @@ function TasksBoardShell() {
               "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
               filters.status === "completed"
                 ? "border-[rgba(72,184,130,0.4)] ring-1 ring-[rgba(72,184,130,0.15)] shadow-sm"
-                : "border-[#dbd6cf]/80 hover:border-[rgba(72,184,130,0.3)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.06)]"
+                : "border-theme-neutral-300/80 hover:border-[rgba(72,184,130,0.3)] hover:shadow-warm-sm"
             )}
           >
             <div
@@ -733,8 +765,8 @@ function TasksBoardShell() {
               <CheckCircle2 size={18} style={{ color: "#48B882" }} />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[18px] font-bold text-[#314158] leading-tight">{totalCompleted}</span>
-              <span className="text-[11px] text-[#8e99a8]">Done</span>
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{totalCompleted}</span>
+              <span className="text-[11px] text-theme-text-tertiary">Done</span>
             </div>
           </button>
 
@@ -743,8 +775,8 @@ function TasksBoardShell() {
             className={cn(
               "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
               filters.dueDateRange === "overdue"
-                ? "border-[rgba(177,145,106,0.4)] ring-1 ring-[rgba(177,145,106,0.15)] shadow-sm"
-                : "border-[#dbd6cf]/80 hover:border-[rgba(177,145,106,0.3)] hover:shadow-[0px_2px_8px_rgba(163,133,96,0.06)]"
+                ? "border-theme-primary/40 ring-1 ring-theme-focus/15 shadow-sm"
+                : "border-theme-neutral-300/80 hover:border-theme-primary/30 hover:shadow-warm-sm"
             )}
           >
             <div
@@ -754,8 +786,8 @@ function TasksBoardShell() {
               <AlertTriangle size={18} style={{ color: "#B1916A" }} />
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[18px] font-bold text-[#314158] leading-tight">{overdueTasks.length}</span>
-              <span className="text-[11px] text-[#8e99a8]">Overdue</span>
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{overdueTasks.length}</span>
+              <span className="text-[11px] text-theme-text-tertiary">Overdue</span>
             </div>
           </button>
         </div>
@@ -772,15 +804,15 @@ function TasksBoardShell() {
 
         {/* Active filter indicator */}
         {hasActiveFilters && (
-          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-[rgba(177,145,106,0.06)] border border-[rgba(177,145,106,0.15)] animate-in fade-in slide-in-from-top-1 duration-200">
-            <span className="text-[12px] text-[#596881]">
-              Showing <span className="font-semibold text-[#314158]">{filteredTasks.length}</span> of {allTasks.length} tasks
-              {filters.status !== "all" && <span className="text-[#B1916A]"> ({filters.status})</span>}
-              {filters.dueDateRange && <span className="text-[#B1916A]"> ({filters.dueDateRange})</span>}
+          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-theme-brand-tint-subtle border border-theme-brand-tint-strong animate-in fade-in slide-in-from-top-1 duration-200">
+            <span className="text-xs text-theme-text-secondary">
+              Showing <span className="font-semibold text-theme-text-primary">{filteredTasks.length}</span> of {allTasks.length} tasks
+              {filters.status !== "all" && <span className="text-theme-primary"> ({filters.status})</span>}
+              {filters.dueDateRange && <span className="text-theme-primary"> ({filters.dueDateRange})</span>}
             </span>
             <button
               onClick={() => setFilters(defaultTaskFilters)}
-              className="text-[12px] text-[#B1916A] hover:text-[#96784f] font-medium transition-colors"
+              className="text-xs text-theme-primary hover:text-theme-primary-600 font-medium transition-colors"
             >
               Clear filters
             </button>
@@ -794,25 +826,25 @@ function TasksBoardShell() {
           /* ── Beautiful Empty State ── */
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] animate-in fade-in duration-500">
             <div className="relative mb-6">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[rgba(177,145,106,0.1)] to-[rgba(177,145,106,0.04)] border border-[rgba(219,214,207,0.5)] flex items-center justify-center">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-[#bb9e7b]">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-theme-brand-tint-light to-theme-brand-tint-subtle border border-theme-neutral-300/50 flex items-center justify-center">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-theme-secondary">
                   <path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#48B882] flex items-center justify-center">
+              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-theme-success flex items-center justify-center">
                 <Plus size={12} className="text-white" />
               </div>
             </div>
-            <h3 className="text-[18px] font-semibold text-[#314158] mb-2">
+            <h3 className="text-[18px] font-semibold text-theme-text-primary mb-2">
               Start organizing your tasks
             </h3>
-            <p className="text-[14px] text-[#8e99a8] text-center max-w-[320px] mb-6 leading-relaxed">
-              Add your first task using the button above, or press <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-[#dbd6cf] bg-[rgba(252,250,248,0.8)] text-[11px] font-mono text-[#596881]">n</kbd> to get started.
+            <p className="text-sm text-theme-text-tertiary text-center max-w-[320px] mb-6 leading-relaxed">
+              Add your first task using the button above, or press <kbd className="inline-flex items-center px-1.5 py-0.5 rounded border border-theme-neutral-300 bg-[rgba(252,250,248,0.8)] text-[11px] font-mono text-theme-text-secondary">n</kbd> to get started.
             </p>
             <button
               onClick={openNewTaskModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#B1916A] text-white text-[14px] font-medium hover:bg-[#96784f] transition-colors shadow-[0px_2px_8px_rgba(177,145,106,0.25)]"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-theme-primary text-white text-sm font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
             >
               <Plus size={16} />
               Add your first task
@@ -884,7 +916,7 @@ function TasksBoardShell() {
       {/* ── Floating Bulk Action Bar ── */}
       {isSelectMode && selectedTasks.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#314158] text-white shadow-[0px_8px_30px_rgba(49,65,88,0.35)]">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-theme-text-primary text-white shadow-[0px_8px_30px_rgba(49,65,88,0.35)]">
             <span className="text-[13px] font-medium opacity-90">
               {selectedTasks.size} selected
             </span>
@@ -927,10 +959,8 @@ function TasksBoardShell() {
 
 export default function TasksPageClient() {
   return (
-    <ToastProvider>
-      <TasksProvider selectedDate={new Date()}>
-        <TasksBoardShell />
-      </TasksProvider>
-    </ToastProvider>
+    <TasksProvider selectedDate={new Date()}>
+      <TasksBoardShell />
+    </TasksProvider>
   );
 }

@@ -1,14 +1,10 @@
 import { supabaseServer } from "@/utils/supabase/server";
+import type { UserPreferences } from "@/lib/user-preferences";
 
-export interface UserPreferences {
-  id?: string;
-  user_id: string;
-  life_buckets: string[];
-  widgets_by_bucket: Record<string, any[]>;
-  progress_by_widget?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-}
+// Re-export the canonical UserPreferences type from the client module.
+// Previously this file had its own copy that was missing bucket_colors
+// and hourly_plan, causing subtle type mismatches.
+export type { UserPreferences } from "@/lib/user-preferences";
 
 export async function getUserPreferencesServer() {
   const supabase = supabaseServer();

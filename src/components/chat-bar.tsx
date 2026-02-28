@@ -1,13 +1,123 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { MessageSquare, X, Send, Mic, Volume2, VolumeX, Settings } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { MessageSquare, X, Send, Mic, Volume2, VolumeX, Settings, Copy, Check, RotateCcw, Trash2, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
 
+/** Format a timestamp for display next to a message */
+function formatMessageTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+/** Format a day divider label */
+function formatDayDivider(ts: number): string {
+  const date = new Date(ts)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/** Determine if a day divider should be shown before this message */
+function shouldShowDivider(messages: { timestamp?: number }[], index: number): boolean {
+  const curr = messages[index]?.timestamp
+  if (!curr) return false
+  if (index === 0) return true
+  const prev = messages[index - 1]?.timestamp
+  if (!prev) return true
+  return new Date(curr).toDateString() !== new Date(prev).toDateString()
+}
+
+/** Generate contextual follow-up chips based on the last assistant message */
+function getFollowUpChips(lastAssistantMsg: Message | undefined): string[] {
+  if (!lastAssistantMsg) return []
+  const c = lastAssistantMsg.content.toLowerCase()
+  if (lastAssistantMsg.createdTask) return ['Show my tasks', 'Add another task']
+  if (/calendar|event|schedule|meeting/i.test(c)) return ['Show my calendar', "What's next today?"]
+  if (/task|todo|reminder/i.test(c)) return ['Show my tasks', 'What should I focus on?']
+  return ['Tell me more', 'What else can you help with?']
+}
+
+/** Lightweight inline markdown renderer for chat messages */
+function renderMarkdown(text: string) {
+  // Split into lines for block-level parsing
+  const lines = text.split('\n')
+  const elements: React.ReactNode[] = []
+  let listItems: string[] = []
+  let key = 0
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={key++} className="list-disc list-inside space-y-0.5 my-1">
+          {listItems.map((item, i) => <li key={i}>{renderInline(item)}</li>)}
+        </ul>
+      )
+      listItems = []
+    }
+  }
+
+  for (const line of lines) {
+    const bulletMatch = line.match(/^[\s]*[-*•]\s+(.+)/)
+    const numberedMatch = line.match(/^[\s]*\d+[.)]\s+(.+)/)
+    if (bulletMatch || numberedMatch) {
+      listItems.push((bulletMatch || numberedMatch)![1])
+    } else {
+      flushList()
+      if (line.trim() === '') {
+        elements.push(<br key={key++} />)
+      } else {
+        elements.push(<span key={key++}>{renderInline(line)}{'\n'}</span>)
+      }
+    }
+  }
+  flushList()
+  return elements
+}
+
+/** Render inline formatting: **bold**, *italic*, `code`, [links](url), raw URLs */
+function renderInline(text: string): React.ReactNode[] {
+  // Regex matches: `code`, **bold**, *italic*, [text](url), or raw URLs
+  const pattern = /`([^`]+)`|\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<]+)/g
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    if (match[1]) {
+      parts.push(<code key={match.index} className="bg-black/5 px-1 rounded text-[0.85em]">{match[1]}</code>)
+    } else if (match[2]) {
+      parts.push(<strong key={match.index}>{match[2]}</strong>)
+    } else if (match[3]) {
+      parts.push(<em key={match.index}>{match[3]}</em>)
+    } else if (match[4] && match[5]) {
+      parts.push(<a key={match.index} href={match[5]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[4]}</a>)
+    } else if (match[6]) {
+      parts.push(<a key={match.index} href={match[6]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[6]}</a>)
+    }
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts
+}
+
+let _msgIdCounter = 0
+
 interface Message {
+  id?: string
   role: "user" | "assistant"
   content: string
   audio?: string // Optional audio URL for voice messages
+  isError?: boolean
+  timestamp?: number
   createdTask?: {
     id?: string
     content?: string
@@ -16,15 +126,61 @@ interface Message {
   } | null
 }
 
+/** Generate a stable, unique ID for each chat message. */
+function msgId(): string {
+  return `msg-${++_msgIdCounter}-${Date.now()}`
+}
+
+const CHAT_STORAGE_KEY = 'lifeboard:chat-messages'
+
+function loadStoredMessages(): Message[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    // Strip audio blob URLs (they don't survive page refresh) and keep last 50.
+    // Backfill `id` for messages loaded from storage that pre-date this field.
+    return parsed.slice(-50).map((m: any) => ({
+      id: m.id || msgId(),
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp || undefined,
+      createdTask: m.createdTask || undefined,
+    }))
+  } catch { return [] }
+}
+
+/** Ensure every message has a stable `id` — auto-assigns one if missing. */
+function ensureIds(msgs: Message[]): Message[] {
+  return msgs.map((m) => (m.id ? m : { ...m, id: msgId() }))
+}
+
 export function ChatBar() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, _setMessagesRaw] = useState<Message[]>(loadStoredMessages)
+  /** Wrapper around setState that auto-assigns missing IDs. */
+  const setMessages: typeof _setMessagesRaw = useCallback(
+    (action) =>
+      _setMessagesRaw((prev) => {
+        const next = typeof action === 'function' ? action(prev) : action
+        return ensureIds(next)
+      }),
+    []
+  )
   const [input, setInput] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStage, setProcessingStage] = useState<'transcribing' | 'thinking' | 'speaking' | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [speakReplies, setSpeakReplies] = useState(true)
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  const [silenceProgress, setSilenceProgress] = useState(0)
+  const silenceStartRef = useRef<number>(0)
+  const lastFailedInputRef = useRef<string>('')
   const [showSettings, setShowSettings] = useState(false)
   const [ttsVoice, setTtsVoice] = useState<string>('Chloe')
   const [ttsRate, setTtsRate] = useState<number>(1.0)
@@ -58,6 +214,9 @@ export function ChatBar() {
   // Track recording duration for display
   const [recordingDuration, setRecordingDuration] = useState<number>(0)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Live mic level (0-1) for reactive audio bars
+  const [micLevel, setMicLevel] = useState<number>(0)
+  const micLevelFrameRef = useRef<number>(0)
   // Barge-in monitoring refs (listen while speaking)
   const bargeStreamRef = useRef<MediaStream | null>(null)
   const bargeCtxRef = useRef<AudioContext | null>(null)
@@ -78,7 +237,8 @@ export function ChatBar() {
   const rtLastTranscriptRef = useRef<string>('')
   const rtCreateLockRef = useRef<boolean>(false)
   const rtAudioTranscriptRef = useRef<string>('')
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null)
 
   const notifyTasksUpdated = useCallback((retryDelays?: number[]) => {
     if (typeof window === 'undefined') return
@@ -194,6 +354,25 @@ export function ChatBar() {
     }
   }, [showSettings, hasRequestedDeviceAccess, enumerateAudioDevices])
 
+  // Close settings panel on click-outside or Escape key
+  useEffect(() => {
+    if (!showSettings) return
+    const handleClick = (e: MouseEvent) => {
+      if (settingsPanelRef.current && !settingsPanelRef.current.contains(e.target as Node)) {
+        setShowSettings(false)
+      }
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowSettings(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [showSettings])
+
   useEffect(() => {
     if (isOpen) {
       const id = setTimeout(() => inputRef.current?.focus(), 0)
@@ -201,10 +380,89 @@ export function ChatBar() {
     }
   }, [isOpen])
 
-  // Scroll to bottom whenever messages update
+  // Space key push-to-talk: hold Space to record, release to send (only when voice mode + chat open)
+  useEffect(() => {
+    if (!isOpen || !isVoiceMode || isRealtimeActive) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return
+      // Don't hijack Space when typing in the input
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      e.preventDefault()
+      if (!isRecording && !isProcessing && !isSpeaking) {
+        startRecording()
+      }
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      e.preventDefault()
+      if (isRecording) {
+        stopRecording()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [isOpen, isVoiceMode, isRealtimeActive, isRecording, isProcessing, isSpeaking])
+
+  // Scroll to bottom whenever messages update, processing state changes, or chat opens
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, isProcessing, isSpeaking, isOpen])
+
+  // Persist messages to localStorage (strip audio blob URLs)
+  useEffect(() => {
+    try {
+      const toStore = messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp || undefined,
+        createdTask: m.createdTask || undefined,
+      }))
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toStore.slice(-50)))
+    } catch {}
   }, [messages])
+
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false)
+    const goOffline = () => setIsOffline(true)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  // Focus trap: keep Tab focus within the chat dialog when open
+  const chatPanelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const panel = chatPanelRef.current
+    if (!panel) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const focusable = panel.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus() }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
+    }
+    panel.addEventListener('keydown', onKeyDown)
+    return () => panel.removeEventListener('keydown', onKeyDown)
+  }, [isOpen])
 
   // Schedule a "hello" assistant message every day at 11:55 AM CT (browser local time)
   useEffect(() => {
@@ -221,7 +479,7 @@ export function ChatBar() {
       }
       const msUntil = target.getTime() - now.getTime()
       helloTimeoutRef.current = setTimeout(() => {
-        setMessages(prev => [...prev, { role: "assistant", content: "Hi Dalit, let me know if I can help you with anything" }])
+        setMessages(prev => [...prev, { role: "assistant", content: "Hi Dalit, let me know if I can help you with anything", timestamp: Date.now() }])
         // Reschedule for next day
         scheduleHello()
       }, msUntil)
@@ -247,6 +505,12 @@ export function ChatBar() {
     const rms = Math.sqrt(dataArray.reduce((sum, value) => sum + value * value, 0) / bufferLength)
     const threshold = 10 // Lowered threshold — less sensitive to background noise
 
+    // Update mic level for reactive UI bars (throttled to every 3rd frame)
+    micLevelFrameRef.current++
+    if (micLevelFrameRef.current % 3 === 0) {
+      setMicLevel(Math.min(1, rms / 60))
+    }
+
     // Enforce minimum recording duration of 2 seconds before silence detection
     const elapsed = Date.now() - recordingStartRef.current
     const MIN_RECORDING_MS = 2000
@@ -254,17 +518,24 @@ export function ChatBar() {
     if (elapsed > MIN_RECORDING_MS && rms < threshold) {
       // Start silence timer if not already started — 2.5s of silence before auto-send
       if (!silenceTimeoutRef.current) {
+        silenceStartRef.current = Date.now()
         silenceTimeoutRef.current = setTimeout(() => {
+          setSilenceProgress(0)
           if (isRecordingRef.current) {
             stopRecording()
           }
-        }, 2500) // 2.5 seconds of silence (was 1s — that's why it kept cutting off)
+        }, 2500)
       }
+      // Update visual countdown progress (0→1 over 2.5s)
+      const silenceElapsed = Date.now() - silenceStartRef.current
+      setSilenceProgress(Math.min(1, silenceElapsed / 2500))
     } else {
       // Clear silence timer if sound detected (or still within minimum duration)
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current)
         silenceTimeoutRef.current = null
+        silenceStartRef.current = 0
+        setSilenceProgress(0)
       }
     }
 
@@ -336,14 +607,11 @@ export function ChatBar() {
     bargeHotRef.current = false
   }
 
-  // When AI starts/stops speaking in voice mode, toggle barge monitor (disabled during realtime)
+  // Barge-in monitor disabled — browser echo cancellation is unreliable, so the
+  // AI's own audio leaks into the mic and triggers a false barge-in that cuts off
+  // the response mid-playback. Users can manually tap the mic to interrupt instead.
   useEffect(() => {
-    if (isVoiceMode && isSpeaking && !isRealtimeActive) {
-      startBargeMonitor()
-    } else {
-      stopBargeMonitor()
-    }
-    return () => { /* no-op */ }
+    stopBargeMonitor()
   }, [isVoiceMode, isSpeaking, isRealtimeActive])
 
   // Voice recording functions
@@ -498,6 +766,7 @@ export function ChatBar() {
     }
     setIsRecording(false)
     setRecordingDuration(0)
+    setMicLevel(0)
 
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current)
@@ -524,6 +793,13 @@ export function ChatBar() {
     if (isVoiceMode && isRecording) {
       // Already recording — tap again to stop and send (push-to-talk UX)
       stopRecording()
+      return
+    }
+
+    if (isVoiceMode && isSpeaking) {
+      // AI is speaking — interrupt playback and start recording (manual barge-in)
+      cancelTTS()
+      startRecording()
       return
     }
 
@@ -1075,17 +1351,23 @@ export function ChatBar() {
   }
 
   async function handleVoiceMessage(audioBlob: Blob) {
+    if (isOffline) {
+      setMessages(prev => [...prev, { role: "assistant", content: "You appear to be offline. Please check your connection and try again.", isError: true, timestamp: Date.now() }])
+      return
+    }
+
     try {
-      
+
       // Always send to server for transcription (works across browsers)
       const formData = new FormData()
       formData.append('audio', audioBlob, 'voice-message.webm')
 
-      // Add voice message to chat
-      const newMessages: Message[] = [...messages, { 
-        role: "user", 
-        content: "🎤 Voice message", 
-        audio: URL.createObjectURL(audioBlob) 
+      // Add voice message to chat (will be updated with transcription when it arrives)
+      const newMessages: Message[] = [...messages, {
+        role: "user",
+        content: "🎤 Voice message",
+        audio: URL.createObjectURL(audioBlob),
+        timestamp: Date.now()
       }]
       setMessages(newMessages)
 
@@ -1093,7 +1375,16 @@ export function ChatBar() {
       formData.append('voice', ttsVoice)
       formData.append('speed', String(ttsRate))
 
+      // Send conversation history so the voice AI can follow up on prior exchanges
+      const history = messages
+        .filter(m => m.content && m.content !== '🎤 Voice message')
+        .map(m => ({ role: m.role, content: m.content }))
+      if (history.length > 0) {
+        formData.append('history', JSON.stringify(history))
+      }
+
       // Send to API for processing
+      setProcessingStage('transcribing')
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 90000) // 90s for STT + LLM + TTS pipeline
       const res = await fetch("/api/chat/voice", {
@@ -1111,6 +1402,7 @@ export function ChatBar() {
           // Remove the user message we just added (it was silence)
           setMessages(messages)
           setIsProcessing(false)
+          setProcessingStage(null)
           if (isVoiceMode && !isRecording) {
             setTimeout(() => startRecording(), 300)
           }
@@ -1123,11 +1415,12 @@ export function ChatBar() {
         throw new Error(`Voice chat request failed: ${res.status} ${res.statusText}`)
       }
 
-      // Read streaming NDJSON response — text arrives first, audio follows
+      // Read streaming NDJSON response — transcript → text → audio
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
       let textData: any = null
       let audioData: any = null
+      let updatedUserMessages = newMessages // track messages with transcription update
       let buffer = ''
 
       if (reader) {
@@ -1143,16 +1436,27 @@ export function ChatBar() {
             if (!line.trim()) continue
             try {
               const chunk = JSON.parse(line)
-              if (chunk.type === 'text') {
+              if (chunk.type === 'transcript') {
+                // Replace "Voice message" placeholder with actual transcription
+                setProcessingStage('thinking')
+                updatedUserMessages = updatedUserMessages.map((m, idx) =>
+                  idx === updatedUserMessages.length - 1 && m.role === 'user'
+                    ? { ...m, content: chunk.text }
+                    : m
+                )
+                setMessages(updatedUserMessages)
+              } else if (chunk.type === 'text') {
                 textData = chunk
                 // Show text reply immediately — don't wait for audio
+                setProcessingStage('speaking')
                 const assistantMessage: Message = {
                   role: "assistant" as const,
                   content: chunk.reply,
                   audio: undefined,
+                  timestamp: Date.now(),
                   createdTask: chunk.createdTask || null,
                 }
-                setMessages([...newMessages, assistantMessage])
+                setMessages([...updatedUserMessages, assistantMessage])
                 setIsProcessing(false)
                 // Handle commands
                 if (assistantMessage.createdTask?.id) {
@@ -1178,6 +1482,7 @@ export function ChatBar() {
           role: "assistant" as const,
           content: data.reply,
           audio: data.audioUrl,
+          timestamp: Date.now(),
           createdTask: data.createdTask || null,
         }
         setMessages([...newMessages, assistantMessage])
@@ -1198,6 +1503,7 @@ export function ChatBar() {
         cancelTTS()
 
         setIsSpeaking(true)
+        setProcessingStage(null)
         // NOTE: We intentionally do NOT set m.audio on assistant messages here.
         // The <audio controls> element in JSX is for user recordings only.
         // Playing via new Audio() avoids duplicate playback from both sources.
@@ -1217,9 +1523,11 @@ export function ChatBar() {
           setIsSpeaking(false)
           currentAudioRef.current = null
           if (isVoiceMode) {
+            // 1s delay lets speaker audio fully decay so the mic doesn't
+            // pick up residual sound and trigger an immediate silence-send cycle
             setTimeout(() => {
               if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-            }, 500)
+            }, 1000)
           }
         }
 
@@ -1239,21 +1547,25 @@ export function ChatBar() {
         console.log('[Voice] No audioUrl in response — text only')
         // No server audio — just show the text reply
         setIsProcessing(false)
+        setProcessingStage(null)
         if (isVoiceMode && !isRecording) {
           setTimeout(() => {
             if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-          }, 500)
+          }, 1000)
         }
       }
     } catch (err: any) {
       console.error('Voice message error:', err)
       console.error('Error details:', err.message)
       const errorMessage = err.message || "Sorry, I couldn't process your voice message."
-      setMessages([...messages, { 
-        role: "assistant", 
-        content: errorMessage
+      setMessages([...messages, {
+        role: "assistant",
+        content: errorMessage,
+        isError: true,
+        timestamp: Date.now()
       }])
-      
+      setProcessingStage(null)
+
       // Restart recording even after error if in voice mode
       if (isVoiceMode && !isProcessing) {
         setTimeout(() => {
@@ -1299,7 +1611,12 @@ export function ChatBar() {
   async function handleSend() {
     if (!input.trim()) return
 
-    const newMessages: Message[] = [...messages, { role: "user", content: input }]
+    if (isOffline) {
+      setMessages(prev => [...prev, { role: "assistant", content: "You appear to be offline. Please check your connection and try again.", isError: true, timestamp: Date.now() }])
+      return
+    }
+
+    const newMessages: Message[] = [...messages, { role: "user", content: input, timestamp: Date.now() }]
     setMessages(newMessages)
     setInput("")
     setIsProcessing(true) // Show thinking indicator
@@ -1317,35 +1634,81 @@ export function ChatBar() {
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
       if (!res.ok) throw new Error("Chat request failed")
-      const data = await res.json()
-      // Don't store audioUrl on the message — prevents <audio controls> from also playing it
-      const assistantMessage: Message = { role: "assistant", content: data.reply, createdTask: data.createdTask || null }
-      setMessages([...newMessages, assistantMessage])
-      setIsProcessing(false) // Hide thinking indicator
-      // If a task was created, inject it optimistically into the task list
-      if (assistantMessage.createdTask?.id) {
-        window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
-      }
-      // Broadcast a global refresh if any commands were executed (tasks, calendar, shopping)
-      if (assistantMessage.createdTask || data.commandsExecuted) {
-        notifyTasksUpdated([1000, 3000])
+
+      // Read streaming NDJSON — text arrives immediately, audio follows
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let textData: any = null
+      let audioData: any = null
+      let buffer = ''
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            if (!line.trim()) continue
+            try {
+              const chunk = JSON.parse(line)
+              if (chunk.type === 'text') {
+                textData = chunk
+                const assistantMessage: Message = {
+                  role: "assistant" as const,
+                  content: chunk.reply,
+                  timestamp: Date.now(),
+                  createdTask: chunk.createdTask || null,
+                }
+                setMessages([...newMessages, assistantMessage])
+                setIsProcessing(false)
+                if (assistantMessage.createdTask?.id) {
+                  window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+                }
+                if (assistantMessage.createdTask || chunk.commandsExecuted) {
+                  notifyTasksUpdated([1000, 3000])
+                }
+              } else if (chunk.type === 'audio') {
+                audioData = chunk
+              }
+            } catch { /* ignore partial line parse errors */ }
+          }
+        }
       }
 
-      // Prefer server TTS audio if present
-      if (data.audioUrl) {
+      // Fallback: if no streaming body, try regular JSON parse
+      if (!textData && !reader) {
+        const data = await res.json()
+        textData = data
+        audioData = { audioUrl: data.audioUrl }
+        const assistantMessage: Message = { role: "assistant", content: data.reply, timestamp: Date.now(), createdTask: data.createdTask || null }
+        setMessages([...newMessages, assistantMessage])
+        setIsProcessing(false)
+        if (assistantMessage.createdTask?.id) {
+          window.dispatchEvent(new CustomEvent('lifeboard:task-injected', { detail: { task: assistantMessage.createdTask } }))
+        }
+        if (assistantMessage.createdTask || data.commandsExecuted) {
+          notifyTasksUpdated([1000, 3000])
+        }
+      }
+
+      // Play TTS audio if present
+      const audioUrl = audioData?.audioUrl
+      if (audioUrl) {
         try {
-          cancelTTS() // Stop any existing audio before playing new
+          cancelTTS()
           setIsSpeaking(true)
-          const audio = new Audio(data.audioUrl)
+          const audio = new Audio(audioUrl)
           currentAudioRef.current = audio
           audio.onended = () => {
             setIsSpeaking(false)
             currentAudioRef.current = null
-            // Only auto-resume listening if in voice mode
             if (isVoiceMode && !isProcessing) {
               setTimeout(() => {
                 if (isVoiceMode && !isRecording && !isProcessing) startRecording()
-              }, 500)
+              }, 1000)
             }
           }
           audio.onerror = () => {
@@ -1357,24 +1720,64 @@ export function ChatBar() {
             currentAudioRef.current = null
           })
         } catch {
-          // Server audio playback failed — just show text, no browser TTS fallback
+          // Server audio playback failed — just show text
         }
       }
     } catch (err) {
       console.error(err)
-      setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong." }])
-      setIsProcessing(false) // Hide thinking indicator on error
+      lastFailedInputRef.current = newMessages[newMessages.length - 1]?.content || ''
+      setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong. Tap retry to try again.", isError: true, timestamp: Date.now() }])
+      setIsProcessing(false)
     }
   }
 
+  function handleRetry() {
+    if (!lastFailedInputRef.current) return
+    // Remove the error message and the failed user message
+    const cleaned = messages.filter((_, i) => i < messages.length - 2)
+    setMessages(cleaned)
+    setInput(lastFailedInputRef.current)
+    lastFailedInputRef.current = ''
+    // Auto-send after a tick so the input is set
+    setTimeout(() => handleSend(), 50)
+  }
+
+  function handleCopy(text: string, index: number) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 1500)
+    }).catch(() => {})
+  }
+
+  function handleClearChat() {
+    setMessages([])
+    lastFailedInputRef.current = ''
+    try { localStorage.removeItem(CHAT_STORAGE_KEY) } catch {}
+  }
+
+  const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && !m.isError)
+  const followUpChips = !isProcessing && messages.length > 0 ? getFollowUpChips(lastAssistantMsg) : []
+
   return (
-    <div className="fixed bottom-20 md:bottom-4 right-3 sm:right-4 z-50">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-4 right-3 sm:right-4 z-50">
+      <AnimatePresence>
       {isOpen ? (
-        <div className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[70vh] md:h-96 relative">
+        <motion.div
+          key="chat-panel"
+          ref={chatPanelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chat assistant"
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[min(70vh,480px)] md:h-[420px] relative pb-[env(safe-area-inset-bottom)]"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b">
-            <div className="flex items-center gap-2 font-medium text-sm text-[#4a5568]">
-              <MessageSquare className="w-4 h-4 text-[#bb9e7b]" /> Chat
+            <div className="flex items-center gap-2 font-medium text-sm text-theme-text-body">
+              <MessageSquare className="w-4 h-4 text-theme-secondary" /> Chat
               {isVoiceMode && (
                 <span
                   className={`ml-2 text-[11px] leading-5 inline-flex items-center gap-1 rounded-full px-2 border ${
@@ -1389,22 +1792,36 @@ export function ChatBar() {
                 </span>
               )}
             </div>
-            <button onClick={handleCloseChat} aria-label="Close chat">
-              <X className="w-4 h-4 text-[#8e99a8]" />
-            </button>
+            <div className="flex items-center gap-1">
+              {messages.length > 0 && (
+                <button onClick={handleClearChat} aria-label="Clear chat" title="Clear chat" className="text-[#8e99a8] hover:text-[#4a5568]">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button onClick={handleCloseChat} aria-label="Close chat">
+                <X className="w-4 h-4 text-theme-text-tertiary" />
+              </button>
+            </div>
           </div>
 
+          {/* Offline banner */}
+          {isOffline && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border-b border-amber-200 text-amber-700 text-xs">
+              <WifiOff className="w-3 h-3" /> You are offline
+            </div>
+          )}
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm" aria-live="polite" aria-relevant="additions">
             {messages.length === 0 && (
-              <div className="bg-[#fdf8f6] text-[#314158] rounded-lg p-3 text-xs space-y-2">
-                <div className="font-medium text-[#314158]">Try asking:</div>
+              <div className="bg-theme-primary-50 text-theme-text-primary rounded-lg p-3 text-xs space-y-2">
+                <div className="font-medium text-theme-text-primary">Try asking:</div>
                 <div className="flex flex-wrap gap-2">
                   {quickPrompts.map(prompt => (
                     <button
                       key={prompt}
                       onClick={() => handleQuickPrompt(prompt)}
-                      className="px-2 py-1 rounded-full bg-white text-[#9a7b5a] border border-[#dbd6cf] hover:bg-[#f5ede4] transition"
+                      className="px-2 py-1 rounded-full bg-white text-[#5a4a3a] border border-theme-neutral-300 hover:bg-theme-surface-selected transition"
                     >
                       {prompt}
                     </button>
@@ -1413,72 +1830,137 @@ export function ChatBar() {
               </div>
             )}
             {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
-                <div
-                  className={`inline-block rounded-lg px-3 py-2 whitespace-pre-wrap max-w-[80%] ${
-                    m.role === "user" ? "bg-[#bb9e7b] text-white" : "bg-[rgba(183,148,106,0.08)] text-[#314158]"
-                  }`}
-                >
-                  {m.content}
-                  {m.audio && m.role === 'user' && (
-                    <div className="mt-2">
-                      <audio controls className="w-full max-w-[200px]">
-                        <source src={m.audio} type="audio/webm" />
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
-                  {m.createdTask && m.role === 'assistant' && (
-                    <div className="mt-2 border border-[#dbd6cf] rounded-md bg-white text-[#314158] p-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs">
-                          <div className="font-medium">{m.createdTask.content || 'New task'}</div>
-                          {m.createdTask.due?.date && (
-                            <div className="text-[#8e99a8]">Due {m.createdTask.due.date}</div>
+              <div key={m.id}>
+                {/* Day divider */}
+                {shouldShowDivider(messages, i) && m.timestamp && (
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-1 h-px bg-theme-neutral-200" />
+                    <span className="text-[10px] text-theme-text-tertiary font-medium">{formatDayDivider(m.timestamp)}</span>
+                    <div className="flex-1 h-px bg-theme-neutral-200" />
+                  </div>
+                )}
+                <div className={m.role === "user" ? "text-right" : "text-left group"}>
+                  <div
+                    className={`inline-block rounded-lg px-3 py-2 whitespace-pre-wrap max-w-[80%] ${
+                      m.role === "user"
+                        ? "bg-theme-secondary text-white"
+                        : m.isError
+                          ? "bg-red-50 text-red-700 border border-red-200"
+                          : "bg-theme-brand-tint-light text-theme-text-primary"
+                    }`}
+                  >
+                    {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
+                    {m.audio && m.role === 'user' && (
+                      <div className="mt-2">
+                        <audio controls className="w-full max-w-[200px]">
+                          <source src={m.audio} type="audio/webm" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
+                    {m.createdTask && m.role === 'assistant' && (
+                      <div className="mt-2 border border-theme-neutral-300 rounded-md bg-white text-theme-text-primary p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs">
+                            <div className="font-medium">{m.createdTask.content || 'New task'}</div>
+                            {m.createdTask.due?.date && (
+                              <div className="text-theme-text-tertiary">Due {m.createdTask.due.date}</div>
+                            )}
+                          </div>
+                          {!m.createdTask.completed ? (
+                            <button
+                              onClick={async () => {
+                                const taskId = (m.createdTask as any)?.id
+                                if (!taskId) return
+                                try {
+                                  const res = await fetch('/api/integrations/todoist/tasks/complete', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ taskId: String(taskId) })
+                                  })
+                                  if (res.ok) {
+                                    setMessages(prev => prev.map((msg, idx) => idx === i ? ({
+                                      ...msg,
+                                      createdTask: { ...(msg.createdTask as any), completed: true }
+                                    }) : msg))
+                                  }
+                                } catch {}
+                              }}
+                              className="text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                            >
+                              Mark done
+                            </button>
+                          ) : (
+                            <span className="text-xs text-green-600">Completed</span>
                           )}
                         </div>
-                        {!m.createdTask.completed ? (
-                          <button
-                            onClick={async () => {
-                              const taskId = (m.createdTask as any)?.id
-                              if (!taskId) return
-                              try {
-                                const res = await fetch('/api/integrations/todoist/tasks/complete', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ taskId: String(taskId) })
-                                })
-                                if (res.ok) {
-                                  setMessages(prev => prev.map((msg, idx) => idx === i ? ({
-                                    ...msg,
-                                    createdTask: { ...(msg.createdTask as any), completed: true }
-                                  }) : msg))
-                                }
-                              } catch {}
-                            }}
-                            className="text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700"
-                          >
-                            Mark done
-                          </button>
-                        ) : (
-                          <span className="text-xs text-green-600">Completed</span>
-                        )}
                       </div>
+                    )}
+                  </div>
+                  {/* Timestamp + Copy + Retry for assistant messages */}
+                  {m.role === 'assistant' && (
+                    <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {m.timestamp && (
+                        <span className="text-[10px] text-theme-text-tertiary mr-1">{formatMessageTime(m.timestamp)}</span>
+                      )}
+                      <button
+                        onClick={() => handleCopy(m.content, i)}
+                        className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
+                        title="Copy"
+                        aria-label="Copy message"
+                      >
+                        {copiedIndex === i ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                      {m.isError && (
+                        <button
+                          onClick={handleRetry}
+                          className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
+                          title="Retry"
+                          aria-label="Retry message"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {/* User message timestamp */}
+                  {m.role === 'user' && m.timestamp && (
+                    <div className="text-[10px] text-theme-text-tertiary mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {formatMessageTime(m.timestamp)}
                     </div>
                   )}
                 </div>
               </div>
             ))}
+            {/* Follow-up suggestion chips */}
+            {followUpChips.length > 0 && !isProcessing && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {followUpChips.map(chip => (
+                  <button
+                    key={chip}
+                    onClick={() => handleQuickPrompt(chip)}
+                    className="px-2 py-1 rounded-full text-[11px] bg-theme-primary-50 text-[#5a4a3a] border border-theme-neutral-200 hover:bg-theme-surface-selected transition"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            )}
             {isProcessing && (
               <div className="text-left">
-                <div className="inline-block rounded-lg px-3 py-2 bg-[rgba(183,148,106,0.08)] text-[#314158]">
+                <div className="inline-block rounded-lg px-3 py-2 bg-theme-brand-tint-light text-theme-text-primary">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      <span className="w-2 h-2 bg-theme-secondary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-theme-secondary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-theme-secondary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                     </div>
-                    <span className="text-xs text-[#8e99a8]">Thinking...</span>
+                    <span className="text-xs text-theme-text-tertiary">
+                      {processingStage === 'transcribing' ? 'Transcribing...' :
+                       processingStage === 'thinking' ? 'Thinking...' :
+                       processingStage === 'speaking' ? 'Generating audio...' :
+                       'Thinking...'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1491,43 +1973,60 @@ export function ChatBar() {
             {/* Recording indicator replaces input when actively recording */}
             {isVoiceMode && isRecording ? (
               <div className="flex-1 flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 relative">
+                  {/* Silence countdown ring */}
+                  {silenceProgress > 0 && (
+                    <svg className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)]" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="#fca5a5" strokeWidth="2" strokeDasharray={`${silenceProgress * 62.8} 62.8`} strokeLinecap="round" transform="rotate(-90 12 12)" />
+                    </svg>
+                  )}
                   <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
                   <span className="text-xs font-medium text-red-600">
                     {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
                   </span>
                 </div>
-                <div className="flex-1 flex items-center gap-[3px] px-2">
-                  {/* Audio level bars animation */}
-                  {[0, 1, 2, 3, 4].map(i => (
+                <div className="flex-1 flex items-center justify-center gap-[3px] px-2">
+                  {/* Reactive audio level bars driven by mic RMS */}
+                  {[0.6, 1.0, 0.8, 1.0, 0.6].map((scale, i) => (
                     <div
                       key={i}
-                      className="w-1 bg-red-400 rounded-full animate-pulse"
+                      className="w-1 bg-red-400 rounded-full transition-[height] duration-100"
                       style={{
-                        height: `${8 + Math.random() * 12}px`,
-                        animationDelay: `${i * 100}ms`,
-                        animationDuration: '0.6s',
+                        height: `${4 + micLevel * scale * 16}px`,
                       }}
                     />
                   ))}
                 </div>
-                <span className="text-[11px] text-[#8e99a8]">Tap mic to send</span>
+                <span className="text-[11px] text-theme-text-tertiary">
+                  {silenceProgress > 0 ? 'Sending soon...' : 'Tap mic to send'}
+                </span>
               </div>
             ) : (
-              <input
-                type="text"
-                className="flex-1 text-sm outline-none placeholder-[#8e99a8]"
+              <textarea
+                className="flex-1 text-sm outline-none placeholder-theme-text-tertiary resize-none max-h-20 overflow-y-auto bg-theme-surface-alt/50 rounded-lg px-2.5 py-1.5 focus:bg-theme-surface-alt transition-colors"
+                rows={1}
                 placeholder={
                   isVoiceMode
-                    ? (isSpeaking ? "AI is speaking…" :
+                    ? (isSpeaking ? "AI speaking… tap mic to interrupt" :
+                       processingStage === 'transcribing' ? "Transcribing…" :
+                       processingStage === 'thinking' ? "Thinking…" :
+                       processingStage === 'speaking' ? "Generating audio…" :
                        isProcessing ? "Processing…" :
-                       "Tap mic to speak")
+                       "Tap mic or hold Space to speak")
                     : "Type a message…"
                 }
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  // Auto-resize: reset to 1 row then expand to content
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSend()
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
                 }}
                 ref={inputRef}
               />
@@ -1535,7 +2034,7 @@ export function ChatBar() {
             {/* Settings Toggle */}
             <button
               onClick={() => setShowSettings(s => !s)}
-              className="text-[#8e99a8]/70 hover:text-[#9a7b5a]"
+              className="text-theme-text-tertiary/70 hover:text-theme-primary-600"
               aria-label="TTS settings"
               title="Voice settings"
             >
@@ -1555,7 +2054,7 @@ export function ChatBar() {
                   return next
                 })
               }}
-              className={`transition-colors ${speakReplies ? 'text-[#9a7b5a] bg-[#fdf8f6] rounded-full p-1' : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'}`}
+              className={`transition-colors ${speakReplies ? 'text-theme-primary-600 bg-theme-primary-50 rounded-full p-1' : 'text-theme-text-tertiary/70 hover:text-theme-primary-600'}`}
               aria-label={speakReplies ? 'Mute spoken replies' : 'Enable spoken replies'}
               title={speakReplies ? 'Spoken replies on' : 'Spoken replies off'}
             >
@@ -1568,19 +2067,21 @@ export function ChatBar() {
               className={`transition-all ${
                 isRecording
                   ? 'text-white bg-red-500 rounded-full p-1.5 shadow-md hover:bg-red-600'
-                  : isVoiceMode
-                    ? 'text-green-500 bg-green-50 rounded-full p-1 hover:bg-green-100'
-                    : 'text-[#8e99a8]/70 hover:text-[#9a7b5a]'
+                  : isSpeaking
+                    ? 'text-theme-secondary bg-theme-primary-50 rounded-full p-1 hover:bg-theme-surface-selected ring-2 ring-theme-secondary/30'
+                    : isVoiceMode
+                      ? 'text-green-500 bg-green-50 rounded-full p-1 hover:bg-green-100'
+                      : 'text-theme-text-tertiary/70 hover:text-theme-primary-600'
               }`}
-              aria-label={isRecording ? "Stop recording and send" : isVoiceMode ? "Start recording" : "Start voice conversation"}
-              title={isRecording ? "Tap to send" : isVoiceMode ? "Tap to record" : "Voice mode"}
+              aria-label={isRecording ? "Stop recording and send" : isSpeaking ? "Tap to interrupt" : isVoiceMode ? "Start recording" : "Start voice conversation"}
+              title={isRecording ? "Tap to send" : isSpeaking ? "Tap to interrupt" : isVoiceMode ? "Tap to record" : "Voice mode"}
             >
               {isRecording ? (
                 <Send className="w-4 h-4" />
               ) : isVoiceMode ? (
                 <div className="flex items-center gap-1">
                   {isSpeaking ? (
-                    <div className="w-2 h-2 bg-[#bb9e7b] rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-theme-secondary rounded-full animate-pulse"></div>
                   ) : isProcessing ? (
                     <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                   ) : (
@@ -1593,7 +2094,7 @@ export function ChatBar() {
               )}
             </button>
             {!isRecording && (
-              <button onClick={handleSend} className="text-[#bb9e7b]" aria-label="Send message">
+              <button onClick={handleSend} className="text-theme-secondary" aria-label="Send message">
                 <Send className="w-4 h-4" />
               </button>
             )}
@@ -1604,9 +2105,18 @@ export function ChatBar() {
 
           {/* Settings Panel */}
           {showSettings && (
-            <div className="absolute bottom-14 right-3 bg-white border shadow-warm-lg rounded-md p-3 w-64 z-50">
-              <div className="text-xs font-medium text-[#4a5568] mb-2">Voice Settings</div>
-              <label className="flex items-center justify-between mb-3 text-xs text-[#4a5568]">
+            <div ref={settingsPanelRef} className="absolute bottom-14 right-3 bg-white border shadow-warm-lg rounded-md p-3 w-64 z-50">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-medium text-theme-text-body">Voice Settings</div>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="text-theme-text-tertiary hover:text-theme-text-body p-0.5 rounded transition-colors"
+                  aria-label="Close settings"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <label className="flex items-center justify-between mb-3 text-xs text-theme-text-body">
                 <span>Realtime voice (beta)</span>
                 <input
                   type="checkbox"
@@ -1617,13 +2127,13 @@ export function ChatBar() {
               <div className="mb-3">
                 <button
                   onClick={() => enumerateAudioDevices(true)}
-                  className="text-[11px] text-[#6b7688] hover:text-[#314158] underline"
+                  className="text-[11px] text-theme-text-subtle hover:text-theme-text-primary underline"
                 >
                   {isEnumerating ? 'Detecting devices…' : 'Detect audio devices'}
                 </button>
               </div>
               <label className="block mb-2">
-                <span className="text-xs text-[#8e99a8]">Voice</span>
+                <span className="text-xs text-theme-text-tertiary">Voice</span>
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice(e.target.value)}
@@ -1635,7 +2145,7 @@ export function ChatBar() {
                 </select>
               </label>
               <label className="block mb-2">
-                <span className="text-xs text-[#8e99a8]">Microphone</span>
+                <span className="text-xs text-theme-text-tertiary">Microphone</span>
                 <select
                   value={micDeviceId}
                   onChange={(e) => setMicDeviceId(e.target.value)}
@@ -1651,7 +2161,7 @@ export function ChatBar() {
                 )}
               </label>
               <label className="block mb-3">
-                <span className="text-xs text-[#8e99a8]">Speaker</span>
+                <span className="text-xs text-theme-text-tertiary">Speaker</span>
                 <select
                   value={speakerDeviceId}
                   onChange={(e) => setSpeakerDeviceId(e.target.value)}
@@ -1673,14 +2183,14 @@ export function ChatBar() {
                         await a.play()
                       } catch (e) { console.warn('Test beep failed', e) }
                     }}
-                    className="text-[11px] px-2 py-1 rounded border hover:bg-[#faf8f5]"
+                    className="text-[11px] px-2 py-1 rounded border hover:bg-theme-surface-alt"
                   >
                     Test beep
                   </button>
                 </div>
               </label>
               <label className="block">
-                <div className="flex items-center justify-between text-xs text-[#8e99a8]">
+                <div className="flex items-center justify-between text-xs text-theme-text-tertiary">
                   <span>Speaking rate</span>
                   <span>{ttsRate.toFixed(2)}×</span>
                 </div>
@@ -1694,36 +2204,44 @@ export function ChatBar() {
                   className="w-full"
                 />
               </label>
-              <div className="mt-3 border-t pt-2">
-                <div className="text-[10px] text-[#8e99a8]">Debug</div>
-                <div className="text-[10px] text-[#8e99a8]">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
-                {isRealtimeActive && (
-                  <div className="text-[10px] text-[#8e99a8]">
-                    conn:{rtConnState || '—'} ice:{rtIceState || '—'} gather:{rtGatheringState || '—'}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-3 border-t pt-2">
+                  <div className="text-[10px] text-theme-text-tertiary">Debug</div>
+                  <div className="text-[10px] text-theme-text-tertiary">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
+                  {isRealtimeActive && (
+                    <div className="text-[10px] text-theme-text-tertiary">
+                      conn:{rtConnState || '—'} ice:{rtIceState || '—'} gather:{rtGatheringState || '—'}
+                    </div>
+                  )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      onClick={reconnectRealtime}
+                      className={`text-xs px-2 py-1 rounded border ${rtReconnecting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-theme-surface-alt'}`}
+                      disabled={rtReconnecting}
+                    >
+                      {rtReconnecting ? 'Reconnecting…' : 'Reconnect Realtime'}
+                    </button>
                   </div>
-                )}
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={reconnectRealtime}
-                    className={`text-xs px-2 py-1 rounded border ${rtReconnecting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#faf8f5]'}`}
-                    disabled={rtReconnecting}
-                  >
-                    {rtReconnecting ? 'Reconnecting…' : 'Reconnect Realtime'}
-                  </button>
                 </div>
-              </div>
+              )}
             </div>
           )}
-        </div>
+        </motion.div>
       ) : (
-        <button
+        <motion.button
+          key="chat-fab"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.15 }}
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-2 bg-white shadow-warm rounded-full pl-3 pr-4 py-2 hover:shadow-warm-lg"
         >
-          <MessageSquare className="w-5 h-5 text-[#bb9e7b]" />
-          <span className="text-sm text-[#8e99a8]">Ask me anything</span>
-        </button>
+          <MessageSquare className="w-5 h-5 text-theme-secondary" />
+          <span className="text-sm text-theme-text-tertiary">Ask me anything</span>
+        </motion.button>
       )}
+      </AnimatePresence>
     </div>
   )
 }

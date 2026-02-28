@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { runGemini, runTTS } from '@/lib/replicate/client'
-import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { handleApiError } from '@/lib/api-error-handler'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
+import { buildChatContext } from '@/lib/chat-context'
+import { chatLimiter, getRateLimitKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,6 +20,11 @@ function getOpenAI() {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit before any expensive work (AI calls cost money)
+    const rateLimitKey = getRateLimitKey(req)
+    const rateLimited = chatLimiter.check(rateLimitKey)
+    if (rateLimited) return rateLimited
+
     const body = await req.json() as {
       messages: { role: 'user' | 'assistant'; content: string }[]
       tts?: { voice?: string; speed?: number }
@@ -30,134 +36,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No messages' }, { status: 400 })
     }
 
-    // Fetch comprehensive user context via direct DB queries (not self-calling HTTP)
-    const prefs = await getUserPreferencesServer()
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
-    const today = new Date().toISOString().split('T')[0]
-
-    let systemContext = ''
+    // Fetch comprehensive user context via shared builder (uses Promise.allSettled)
+    const { systemContext, userId } = await buildChatContext(req)
     const supabase = supabaseServer()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (prefs) {
-      const bucketSummary = Object.entries(prefs.widgets_by_bucket).map(([b, w]: [string, any[]]) => `${b}: ${w.map(x => x.name || x.type || 'widget').join(', ')}`).join('; ')
-
-      const contextData: {
-        tasks?: any[]
-        calendar?: any[]
-        shopping?: any[]
-        steps?: number
-      } = {}
-
-      if (user) {
-        const [tasksResult, calendarResult, shoppingResult] = await Promise.all([
-          supabase
-            .from('lifeboard_tasks')
-            .select('id, content, completed, due_date, start_date, hour_slot, bucket, created_at')
-            .eq('user_id', user.id)
-            .eq('completed', false)
-            .order('created_at', { ascending: false })
-            .limit(50),
-          supabase
-            .from('calendar_events')
-            .select('id, title, description, start_date, end_date, hour_slot, all_day, bucket')
-            .eq('user_id', user.id)
-            .gte('start_date', today)
-            .order('start_date', { ascending: true })
-            .limit(20),
-          supabase
-            .from('shopping_list_items')
-            .select('id, name, quantity, bucket, is_purchased')
-            .eq('user_id', user.id)
-            .eq('is_purchased', false)
-            .order('created_at', { ascending: true })
-            .limit(30),
-        ])
-
-        if (tasksResult.data) {
-          contextData.tasks = tasksResult.data.map(row => ({
-            content: row.content,
-            due: row.due_date ? { date: row.due_date } : row.start_date ? { date: row.start_date } : undefined,
-            bucket: row.bucket || undefined,
-          }))
-        }
-        if (calendarResult.data) contextData.calendar = calendarResult.data
-        if (shoppingResult.data) {
-          contextData.shopping = shoppingResult.data.map(row => ({
-            name: row.name,
-            quantity: row.quantity,
-            bucket: row.bucket,
-          }))
-        }
-      }
-
-      // Steps metrics still needs the integration-specific API (has token refresh logic)
-      let stepsDataSource: 'fitbit' | 'googlefit' | null = null
-      for (const widgets of Object.values(prefs.widgets_by_bucket)) {
-        for (const w of widgets as any[]) {
-          if (w.id === 'steps') {
-            const ds = (w as any).dataSource ?? 'fitbit'
-            stepsDataSource = ds === 'googlefit' ? 'googlefit' : 'fitbit'
-            break
-          }
-        }
-        if (stepsDataSource) break
-      }
-
-      if (stepsDataSource) {
-        try {
-          const metricsUrl = `${origin}/api/integrations/${stepsDataSource}/metrics?date=${today}`
-          const metricsRes = await fetch(metricsUrl, {
-            headers: { cookie: req.headers.get('cookie') || '' },
-            cache: 'no-store'
-          })
-          if (metricsRes.ok) {
-            const metricsJson = await metricsRes.json()
-            if (typeof metricsJson.steps === 'number') {
-              contextData.steps = metricsJson.steps
-            }
-          }
-        } catch (err) {
-          console.error(`Failed fetching ${stepsDataSource} metrics for chat context`, err)
-        }
-      }
-
-      // Build comprehensive context string
-      const contextParts = [
-        `Life buckets: ${prefs.life_buckets.join(', ')}`,
-        `Widgets: ${bucketSummary}`
-      ]
-
-      if (contextData.tasks && contextData.tasks.length > 0) {
-        const taskSummary = contextData.tasks
-          .slice(0, 15)
-          .map((t: any) => `- ${t.content}${t.due?.date ? ` (due: ${t.due.date})` : ''}${t.bucket ? ` [${t.bucket}]` : ''}`)
-          .join('\n')
-        contextParts.push(`\n\nCurrent Tasks (${contextData.tasks.length}):\n${taskSummary}${contextData.tasks.length > 15 ? '\n... and more' : ''}`)
-      }
-
-      if (contextData.calendar && contextData.calendar.length > 0) {
-        const calSummary = contextData.calendar
-          .slice(0, 10)
-          .map((e: any) => `- ${e.title}${e.start_date ? ` (${e.start_date})` : ''}${e.bucket ? ` [${e.bucket}]` : ''}`)
-          .join('\n')
-        contextParts.push(`\n\nUpcoming Calendar Events (${contextData.calendar.length}):\n${calSummary}${contextData.calendar.length > 10 ? '\n... and more' : ''}`)
-      }
-
-      if (contextData.shopping && contextData.shopping.length > 0) {
-        const shopSummary = contextData.shopping
-          .slice(0, 10)
-          .map((i: any) => `- ${i.name}${i.quantity ? ` (${i.quantity})` : ''}${i.bucket ? ` [${i.bucket}]` : ''}`)
-          .join('\n')
-        contextParts.push(`\n\nShopping List (${contextData.shopping.length}):\n${shopSummary}${contextData.shopping.length > 10 ? '\n... and more' : ''}`)
-      }
-
-      if (contextData.steps !== undefined) {
-        contextParts.push(`\n\nToday's Steps: ${contextData.steps}`)
-      }
-
-      systemContext = `System: ${contextParts.join('\n')}`
-    }
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
 
     // Build system prompt with all available commands
     const todayIso = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)
@@ -201,10 +83,10 @@ export async function POST(req: NextRequest) {
     // Execute all commands in the reply (create tasks, complete tasks, add events, etc.)
     let createdTask: any | undefined
     let commandsExecuted = false
-    if (user) {
+    if (userId) {
       const cmdResult = await processReplyCommands(reply, {
         supabase,
-        userId: user.id,
+        userId,
         req,
         origin,
       })
@@ -213,33 +95,57 @@ export async function POST(req: NextRequest) {
       commandsExecuted = cmdResult.commandsExecuted
     }
 
-    // Optional server-side TTS via Chatterbox Turbo on Replicate
-    let audioUrl: string | undefined
-    try {
-      const ttsVoice = body.tts?.voice || process.env.TTS_VOICE || 'Chloe'
-      console.log(`[TTS] /api/chat: Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
-      const ttsFileUrl = await runTTS({
-        text: reply,
-        voice: ttsVoice,
-        speed: typeof body.tts?.speed === 'number' && !Number.isNaN(body.tts.speed) ? body.tts.speed : undefined,
-      })
-      console.log(`[TTS] /api/chat: Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
-      const audioRes = await fetch(ttsFileUrl)
-      if (!audioRes.ok) {
-        console.error(`[TTS] /api/chat: Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
-        throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
-      }
-      const buf = Buffer.from(await audioRes.arrayBuffer())
-      console.log(`[TTS] /api/chat: Audio buffer ${buf.length} bytes`)
-      const b64 = buf.toString('base64')
-      audioUrl = `data:audio/wav;base64,${b64}`
-      console.log(`[TTS] /api/chat: Success`)
-    } catch (e) {
-      console.error('[TTS] /api/chat: Server TTS failed:', e instanceof Error ? e.message : String(e))
-      if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
-    }
+    // Stream response: send text immediately, then TTS audio when ready
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Chunk 1: text reply (sent immediately)
+        controller.enqueue(encoder.encode(
+          JSON.stringify({ type: 'text', reply, createdTask, commandsExecuted }) + '\n'
+        ))
 
-    return NextResponse.json({ reply, audioUrl, createdTask, commandsExecuted })
+        // Chunk 2: TTS audio (generated in background)
+        try {
+          const ttsVoice = body.tts?.voice || process.env.TTS_VOICE || 'Chloe'
+          console.log(`[TTS] /api/chat: Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
+          const ttsFileUrl = await runTTS({
+            text: reply,
+            voice: ttsVoice,
+            speed: typeof body.tts?.speed === 'number' && !Number.isNaN(body.tts.speed) ? body.tts.speed : undefined,
+          })
+          console.log(`[TTS] /api/chat: Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
+          const audioRes = await fetch(ttsFileUrl)
+          if (!audioRes.ok) {
+            console.error(`[TTS] /api/chat: Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
+            throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
+          }
+          const buf = Buffer.from(await audioRes.arrayBuffer())
+          console.log(`[TTS] /api/chat: Audio buffer ${buf.length} bytes`)
+          const b64 = buf.toString('base64')
+          const audioUrl = `data:audio/wav;base64,${b64}`
+          console.log(`[TTS] /api/chat: Success`)
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: 'audio', audioUrl }) + '\n'
+          ))
+        } catch (e) {
+          console.error('[TTS] /api/chat: Server TTS failed:', e instanceof Error ? e.message : String(e))
+          if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: 'audio', audioUrl: null }) + '\n'
+          ))
+        }
+
+        controller.close()
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        'Transfer-Encoding': 'chunked',
+      },
+    })
   } catch (err) {
     return handleApiError(err, 'POST /api/chat')
   }

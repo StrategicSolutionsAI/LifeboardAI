@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Plus,
   MoreHorizontal,
@@ -67,7 +67,7 @@ function HighlightText({ text, query }: { text: string; query?: string }) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-[rgba(177,145,106,0.2)] text-[#314158] rounded-sm px-0.5">{text.slice(idx, idx + q.length)}</mark>
+      <mark className="bg-theme-primary/20 text-theme-text-primary rounded-sm px-0.5">{text.slice(idx, idx + q.length)}</mark>
       {text.slice(idx + q.length)}
     </>
   );
@@ -266,8 +266,8 @@ function TaskSection({
       className={cn(
         "rounded-xl border overflow-hidden w-full transition-all",
         !isDone
-          ? "bg-white border-[#dbd6cf] shadow-[0px_1px_3px_rgba(163,133,96,0.04)]"
-          : "bg-[rgba(252,250,248,0.6)] border-[#dbd6cf]/60"
+          ? "bg-white border-theme-neutral-300 shadow-[0px_1px_3px_rgba(163,133,96,0.04)]"
+          : "bg-[rgba(252,250,248,0.6)] border-theme-neutral-300/60"
       )}
     >
       {/* Section Header */}
@@ -281,15 +281,15 @@ function TaskSection({
       >
         <div className="flex items-center gap-2.5">
           {isExpanded ? (
-            <ChevronDown size={14} className="text-[#8e99a8]" />
+            <ChevronDown size={14} className="text-theme-text-tertiary" />
           ) : (
-            <ChevronRight size={14} className="text-[#8e99a8]" />
+            <ChevronRight size={14} className="text-theme-text-tertiary" />
           )}
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
           <span
             className={cn(
               "text-[13px] tracking-[0.5px] uppercase font-medium",
-              !isDone ? "text-[#314158]" : "text-[#8e99a8]"
+              !isDone ? "text-theme-text-primary" : "text-theme-text-tertiary"
             )}
           >
             {config.label}
@@ -309,7 +309,7 @@ function TaskSection({
               setAddingTask(true);
             }}
             aria-label={`Add ${config.label.toLowerCase()} task`}
-            className="p-1 hover:bg-[rgba(177,145,106,0.08)] rounded-lg transition-colors"
+            className="p-1 hover:bg-theme-brand-tint-light rounded-lg transition-colors"
           >
             <Plus size={18} style={{ color: config.color }} />
           </button>
@@ -320,16 +320,16 @@ function TaskSection({
       {!isDone && isExpanded && count === 0 && !addingTask && (
         <div className="flex items-center gap-4 px-5 py-8 border-t border-[rgba(219,214,207,0.4)]">
           <div
-            className="w-10 h-10 rounded-xl border border-[#dbd6cf]/60 flex items-center justify-center shrink-0"
+            className="w-10 h-10 rounded-xl border border-theme-neutral-300/60 flex items-center justify-center shrink-0"
             style={{ backgroundColor: `${config.color}10` }}
           >
             <ClipboardList size={18} style={{ color: config.color }} />
           </div>
           <div>
-            <span className="text-[14px] font-medium text-[#314158] block">
+            <span className="text-sm font-medium text-theme-text-primary block">
               No {config.label.toLowerCase()} tasks
             </span>
-            <span className="text-[12px] text-[#8e99a8]">
+            <span className="text-xs text-theme-text-tertiary">
               {sectionStatus === "todo"
                 ? "Press + or type in the quick-add bar above"
                 : "Drag tasks here or use the status menu"}
@@ -343,7 +343,7 @@ function TaskSection({
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-t border-[rgba(219,214,207,0.5)]">
+              <tr className="border-t border-theme-neutral-300/50">
                 <th className="w-8">
                   {isSelectMode && (
                     <div className="flex items-center justify-center pl-3">
@@ -362,8 +362,8 @@ function TaskSection({
                         className={cn(
                           "w-[16px] h-[16px] rounded-[4px] transition-all flex items-center justify-center",
                           tasks.every((t) => selectedTasks.has(t.id)) && tasks.length > 0
-                            ? "bg-[#B1916A]"
-                            : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]"
+                            ? "bg-theme-primary"
+                            : "bg-white border-[1.5px] border-theme-neutral-300/80 hover:border-theme-secondary"
                         )}
                       >
                         {tasks.every((t) => selectedTasks.has(t.id)) && tasks.length > 0 && (
@@ -382,16 +382,16 @@ function TaskSection({
                   )}
                 </th>
                 <th className="text-left py-2.5 pl-2 pr-4 min-w-[200px]">
-                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Task</span>
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Task</span>
                 </th>
                 <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[110px]">
-                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Status</span>
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Status</span>
                 </th>
                 <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[120px]">
-                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Bucket</span>
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Bucket</span>
                 </th>
                 <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[100px]">
-                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-[#8e99a8]">Due</span>
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Due</span>
                 </th>
                 <th className="w-12 border-l border-[rgba(219,214,207,0.4)]" />
               </tr>
@@ -434,7 +434,7 @@ function TaskSection({
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
             placeholder="Task name..."
-            className="flex-1 border-0 focus-visible:ring-0 h-8 text-sm text-[#314158] placeholder:text-[#b5b0a8]"
+            className="flex-1 border-0 focus-visible:ring-0 h-8 text-sm text-theme-text-primary placeholder:text-theme-neutral-400"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -446,7 +446,7 @@ function TaskSection({
               }
             }}
           />
-          <Button size="sm" onClick={handleSubmitNew} className="h-7 px-3 text-xs bg-[#B1916A] hover:bg-[#96784f]">
+          <Button size="sm" onClick={handleSubmitNew} className="h-7 px-3 text-xs bg-theme-primary hover:bg-theme-primary-600">
             Add
           </Button>
           <Button
@@ -456,7 +456,7 @@ function TaskSection({
               setAddingTask(false);
               setNewTaskTitle("");
             }}
-            className="h-7 px-2 text-xs text-[#8e99a8] hover:text-[#596881]"
+            className="h-7 px-2 text-xs text-theme-text-tertiary hover:text-theme-text-secondary"
           >
             Cancel
           </Button>
@@ -467,10 +467,10 @@ function TaskSection({
       {!isDone && isExpanded && !addingTask && count > 0 && (
         <button
           onClick={() => setAddingTask(true)}
-          className="flex items-center gap-3 pl-[52px] pr-4 h-11 w-full hover:bg-[rgba(177,145,106,0.04)] transition-colors border-t border-[rgba(219,214,207,0.4)]"
+          className="flex items-center gap-3 pl-[52px] pr-4 h-11 w-full hover:bg-theme-brand-tint-subtle transition-colors border-t border-[rgba(219,214,207,0.4)]"
         >
           <Plus size={14} style={{ color: config.color }} />
-          <span className="text-[13px] text-[#8e99a8]">Add task</span>
+          <span className="text-[13px] text-theme-text-tertiary">Add task</span>
         </button>
       )}
     </div>
@@ -514,6 +514,17 @@ function TaskTableRow({
   const bucketColor = task.bucket ? (bucketColors[task.bucket] ?? "#bb9e7b") : "#bb9e7b";
   const isOverdue = dateBadge?.tone === "destructive";
   const currentStatus = getTaskStatus(task);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleToggle = useCallback(() => {
+    if (!task.completed) {
+      setJustCompleted(true);
+      clearTimeout(justCompletedTimer.current);
+      justCompletedTimer.current = setTimeout(() => setJustCompleted(false), 600);
+    }
+    onToggleTask(task.id);
+  }, [task.id, task.completed, onToggleTask]);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -523,9 +534,10 @@ function TaskTableRow({
           {...provided.draggableProps}
           className={cn(
             "group transition-all duration-150",
-            "hover:bg-[rgba(177,145,106,0.04)]",
+            "hover:bg-theme-brand-tint-subtle",
             isOverdue && !isDoneSection && "bg-red-50/40",
-            isSelected && "bg-[rgba(177,145,106,0.08)]",
+            isSelected && "bg-theme-brand-tint-light",
+            justCompleted && "bg-emerald-50/60",
             !isLast && "border-b border-[rgba(219,214,207,0.35)]",
             snapshot.isDragging && "opacity-40 bg-white shadow-warm-lg"
           )}
@@ -542,8 +554,8 @@ function TaskTableRow({
                   className={cn(
                     "w-[18px] h-[18px] rounded-[5px] transition-all flex items-center justify-center",
                     isSelected
-                      ? "bg-[#B1916A]"
-                      : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]"
+                      ? "bg-theme-primary"
+                      : "bg-white border-[1.5px] border-theme-neutral-300/80 hover:border-theme-secondary"
                   )}
                 >
                   {isSelected && (
@@ -564,7 +576,7 @@ function TaskTableRow({
                 {...provided.dragHandleProps}
                 className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-30 transition-opacity"
               >
-                <GripVertical size={14} className="text-[#596881]" />
+                <GripVertical size={14} className="text-theme-text-secondary" />
               </div>
             )}
           </td>
@@ -574,18 +586,19 @@ function TaskTableRow({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => onToggleTask(task.id)}
+                onClick={handleToggle}
                 disabled={isLoading}
                 aria-label={task.completed ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
                 className={cn(
                   "w-[18px] h-[18px] rounded-[5px] shrink-0 transition-all flex items-center justify-center",
                   task.completed
-                    ? "bg-[#48B882] border-[#48B882]"
-                    : "bg-white border-[1.5px] border-[rgba(219,214,207,0.8)] hover:border-[#bb9e7b]",
-                  isLoading && "animate-pulse opacity-50"
+                    ? "bg-theme-success border-[#48B882]"
+                    : "bg-white border-[1.5px] border-theme-neutral-300/80 hover:border-theme-secondary",
+                  isLoading && "animate-pulse opacity-50",
+                  justCompleted && "animate-check-pop"
                 )}
               >
-                {task.completed && (
+                {(task.completed || justCompleted) && (
                   <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                     <path
                       d="M1 4L3.5 6.5L9 1"
@@ -593,6 +606,7 @@ function TaskTableRow({
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      className={justCompleted ? "animate-check-stroke" : ""}
                     />
                   </svg>
                 )}
@@ -600,7 +614,7 @@ function TaskTableRow({
               <button
                 onClick={() => (isSelectMode ? onToggleSelection?.(task.id) : onEditTask(task.id))}
                 className={cn(
-                  "text-[14px] text-[#314158] text-left hover:text-[#B1916A] transition-colors cursor-pointer leading-snug",
+                  "text-sm text-theme-text-primary text-left hover:text-theme-primary transition-colors cursor-pointer leading-snug",
                   isDoneSection && "line-through opacity-50"
                 )}
               >
@@ -619,10 +633,10 @@ function TaskTableRow({
             {task.bucket ? (
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bucketColor }} />
-                <span className="text-[12px] text-[#596881] truncate">{task.bucket}</span>
+                <span className="text-xs text-theme-text-secondary truncate">{task.bucket}</span>
               </div>
             ) : (
-              <span className="text-[11px] text-[#b5b0a8]">--</span>
+              <span className="text-[11px] text-theme-neutral-400">--</span>
             )}
           </td>
 
@@ -633,8 +647,8 @@ function TaskTableRow({
                 className={cn(
                   "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium",
                   dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
-                  dateBadge.tone === "accent" && "bg-[rgba(177,145,106,0.08)] text-[#96784f]",
-                  dateBadge.tone === "default" && "bg-[#f4f6f8] text-[#596881]"
+                  dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
+                  dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
                 )}
               >
                 <CalendarDays size={10} />
@@ -672,9 +686,9 @@ function TaskRowDropdown({
         <button
           type="button"
           aria-label="Task actions"
-          className="p-1 rounded hover:bg-[#f5f0eb] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="p-1 rounded hover:bg-theme-progress-track opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <MoreHorizontal size={16} className="text-[#596881]" />
+          <MoreHorizontal size={16} className="text-theme-text-secondary" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-36">

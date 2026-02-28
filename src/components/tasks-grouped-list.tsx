@@ -162,8 +162,8 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
 
   if (groups.length === 0) {
     return (
-      <div className="py-12 text-center text-[#8e99a8]">
-        <p className="mb-2 text-lg text-[#314158]">All caught up</p>
+      <div className="py-12 text-center text-theme-text-tertiary">
+        <p className="mb-2 text-lg text-theme-text-primary">All caught up</p>
         <p className="text-sm">No open tasks in this section.</p>
       </div>
     );
@@ -189,9 +189,9 @@ export function TasksGroupedList({ tasks, renderTask }: TasksGroupedListProps) {
 // ---------------------------------------------------------------------------
 const TONE_STYLES: Record<TaskGroup["tone"], string> = {
   critical: "border-red-200/70 bg-red-50/60 text-red-700",
-  accent: "border-[#dbd6cf]/70 bg-[#fdf8f6]/60 text-[#9a7b5a]",
+  accent: "border-theme-neutral-300/70 bg-theme-primary-50/60 text-theme-primary-600",
   success: "border-emerald-200/70 bg-emerald-50/60 text-emerald-700",
-  neutral: "border-[#dbd6cf]/70 bg-[rgba(250,248,245,0.4)] text-[#8e99a8]",
+  neutral: "border-theme-neutral-300/70 bg-[rgba(250,248,245,0.4)] text-theme-text-tertiary",
 };
 
 const GroupSection = memo(function GroupSection({
@@ -206,7 +206,7 @@ const GroupSection = memo(function GroupSection({
   renderTask: (task: Task, index: number) => React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-[#dbd6cf]/70">
+    <div className="overflow-hidden rounded-xl border border-theme-neutral-300/70">
       <button
         onClick={() => onToggle(group.key)}
         className={`flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors ${TONE_STYLES[group.tone]}`}
@@ -215,13 +215,13 @@ const GroupSection = memo(function GroupSection({
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           <span>{group.title}</span>
         </div>
-        <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/70 px-2 text-xs font-semibold text-[#314158]">
+        <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/70 px-2 text-xs font-semibold text-theme-text-primary">
           {group.tasks.length}
         </div>
       </button>
 
       {!isCollapsed && (
-        <div className="divide-y divide-[#dbd6cf]/60 bg-white">
+        <div className="divide-y divide-theme-neutral-300/60 bg-white">
           {group.tasks.map((task, index) => (
             <div key={task.id}>{renderTask(task, index)}</div>
           ))}

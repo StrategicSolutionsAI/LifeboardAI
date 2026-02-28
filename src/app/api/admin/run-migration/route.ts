@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { supabaseServer } from '@/utils/supabase/server';
+import { validateAdminAuth } from '@/lib/admin-auth';
 
 /**
  * API endpoint to run the user_preferences columns migration
@@ -10,23 +10,8 @@ import { supabaseServer } from '@/utils/supabase/server';
  * Requires: authenticated admin user + ADMIN_SECRET header
  */
 export async function GET(request: Request) {
-  // Block in production unless explicitly enabled
-  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_ADMIN_ROUTES !== 'true') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  // Require authentication
-  const supabaseAuth = supabaseServer();
-  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  // Require admin secret header
-  const adminSecret = request.headers.get('x-admin-secret');
-  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const authError = await validateAdminAuth(request);
+  if (authError) return authError;
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

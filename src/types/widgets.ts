@@ -99,6 +99,22 @@ export interface WidgetInstance extends WidgetTemplate {
     }>;
     motivationalNote?: string;  // personal motivation/reason for quitting
   };
+  // Habit tracker data
+  habitTrackerData?: {
+    habitName: string;
+    habitDescription?: string;
+    startDate: string;              // ISO YYYY-MM-DD
+    bestStreak: number;
+    totalCompletions: number;
+    completionHistory: string[];    // array of ISO date strings when completed
+    milestones: Array<{
+      days: number;
+      label: string;
+      emoji: string;
+      achieved: boolean;
+      achievedDate?: string;
+    }>;
+  };
   // Weight tracking data
   weightData?: {
     currentWeight?: number;       // current weight value

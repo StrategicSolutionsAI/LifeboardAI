@@ -318,10 +318,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file type
+    // Validate file extension
     if (!file.name.endsWith('.ics') && !file.name.endsWith('.ical')) {
       return NextResponse.json({
         error: 'Invalid file type. Please upload an .ics or .ical file.'
+      }, { status: 400 });
+    }
+
+    // Validate MIME type (browsers may send various types for .ics)
+    const ALLOWED_MIME_TYPES = new Set([
+      'text/calendar', 'application/ics', 'text/x-vcalendar',
+      'application/octet-stream', '',
+    ]);
+    if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+      return NextResponse.json({
+        error: `Unexpected file type "${file.type}". Please upload a valid .ics calendar file.`
       }, { status: 400 });
     }
 
@@ -335,9 +346,10 @@ export async function POST(request: NextRequest) {
     // Read and parse the file
     const fileContent = await file.text();
 
+    // Validate content starts with iCalendar header (content-based check)
     if (!fileContent.includes('BEGIN:VCALENDAR')) {
       return NextResponse.json({
-        error: 'Invalid calendar file format.'
+        error: 'Invalid calendar file format. File does not contain valid iCalendar data.'
       }, { status: 400 });
     }
 

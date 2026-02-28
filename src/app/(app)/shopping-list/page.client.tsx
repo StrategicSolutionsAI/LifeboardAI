@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
+  Archive,
   CalendarPlus,
+  Clock,
   LayoutGrid,
   Loader2,
   Plus,
+  RotateCcw,
   ShoppingCart,
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useToast, ToastProvider } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useBuckets } from "@/hooks/use-buckets";
 import {
   ShoppingListItem,
@@ -31,6 +33,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { WidgetInstance } from "@/types/widgets";
 import { useWidgets } from "@/hooks/use-widgets";
 import { hexToRgba } from "@/lib/dashboard-utils";
+import { card, form, interactive, surface, text } from "@/lib/styles";
 
 const UNSORTED_LABEL = "Unsorted";
 
@@ -73,7 +76,7 @@ const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> 
   violet: "bg-violet-500",
   lime: "bg-lime-500",
   fuchsia: "bg-fuchsia-500",
-  gray: "bg-[#faf8f5]0",
+  gray: "bg-theme-surface-alt0",
   slate: "bg-slate-500",
   stone: "bg-stone-500",
 };
@@ -86,12 +89,15 @@ function ShoppingListLayout() {
   const { buckets } = useBuckets();
   const {
     items,
+    purchasedItems,
     loading: loadingItems,
+    loadingPurchased,
     error,
     createItem,
     deleteItem,
     togglePurchased,
     updateItem,
+    loadPurchasedItems,
   } = useShoppingList();
   const { addWidget, updateWidget, removeWidget, widgetsByBucket } = useWidgets();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
@@ -122,6 +128,11 @@ function ShoppingListLayout() {
   const [itemBucket, setItemBucket] = useState<string>("");
   const [itemNeededBy, setItemNeededBy] = useState("");
   const [isConverting, setIsConverting] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [archiveLoaded, setArchiveLoaded] = useState(false);
+  const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
+  const [justPurchased, setJustPurchased] = useState<Set<string>>(new Set());
+  const [lastCreatedId, setLastCreatedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!newItemBucket) {
@@ -211,11 +222,13 @@ function ShoppingListLayout() {
 
   const sortedItems = useMemo(
     () =>
-      [...items].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      ),
-    [items],
+      items
+        .filter((i) => !hiddenItems.has(i.id))
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        ),
+    [items, hiddenItems],
   );
 
   const filteredItems = useMemo(() => {
@@ -244,11 +257,15 @@ function ShoppingListLayout() {
 
     setIsCreating(true);
     try {
-      await createItem({
+      const created = await createItem({
         name: trimmed,
         bucket: newItemBucket || null,
         quantity: newItemQuantity.trim() || null,
       });
+      if (created?.id) {
+        setLastCreatedId(created.id);
+        setTimeout(() => setLastCreatedId(null), 300);
+      }
       setNewItemName("");
       setNewItemQuantity("");
       toast({
@@ -271,15 +288,32 @@ function ShoppingListLayout() {
   };
 
   const handleTogglePurchased = async (item: ShoppingListItem) => {
+    const wasPurchased = item.isPurchased;
     try {
-      await togglePurchased(item.id, !item.isPurchased);
+      if (!wasPurchased) {
+        setJustPurchased((prev) => new Set(prev).add(item.id));
+        setTimeout(() => {
+          setJustPurchased((prev) => {
+            const next = new Set(prev);
+            next.delete(item.id);
+            return next;
+          });
+        }, 600);
+      }
+      await togglePurchased(item.id, !wasPurchased);
       toast({
-        title: item.isPurchased ? "Item restored" : "Marked as purchased",
+        title: wasPurchased ? "Item restored" : "Marked as purchased",
         description: item.name,
         type: "success",
+        duration: 2500,
       });
     } catch (err) {
       console.error("Failed to toggle purchased state", err);
+      setJustPurchased((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
       toast({
         title: "Unable to update item",
         description: "Please try again in a moment.",
@@ -288,27 +322,76 @@ function ShoppingListLayout() {
     }
   };
 
-  const handleDelete = async (item: ShoppingListItem) => {
-    try {
-      await deleteItem(item.id);
-      toast({
-        title: "Item removed",
-        description: item.name,
-        type: "success",
-      });
-    } catch (err) {
-      console.error("Failed to delete shopping list item", err);
-      toast({
-        title: "Unable to delete item",
-        description: "Please try again in a moment.",
-        type: "error",
-      });
-    }
+  const handleDelete = (item: ShoppingListItem) => {
+    // Optimistically hide the item
+    setHiddenItems((prev) => new Set(prev).add(item.id));
+
+    let undone = false;
+    const timeoutId = setTimeout(async () => {
+      if (undone) return;
+      try {
+        await deleteItem(item.id);
+      } catch {
+        setHiddenItems((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+        toast({
+          title: "Unable to delete item",
+          description: "Please try again in a moment.",
+          type: "error",
+        });
+      }
+    }, 5000);
+
+    toast({
+      title: "Item removed",
+      description: item.name,
+      type: "success",
+      undoAction: () => {
+        undone = true;
+        clearTimeout(timeoutId);
+        setHiddenItems((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+        toast({ title: "Item restored", type: "success", duration: 2000 });
+      },
+    });
   };
 
   const handleOpenConvert = (item: ShoppingListItem) => {
     setConvertItem(item);
     setConvertOpen(true);
+  };
+
+  const handleToggleArchive = () => {
+    const next = !showArchive;
+    setShowArchive(next);
+    if (next && !archiveLoaded) {
+      setArchiveLoaded(true);
+      loadPurchasedItems();
+    }
+  };
+
+  const handleRestore = async (item: ShoppingListItem) => {
+    try {
+      await togglePurchased(item.id, false);
+      toast({
+        title: "Item restored",
+        description: `${item.name} moved back to your active list.`,
+        type: "success",
+      });
+    } catch (err) {
+      console.error("Failed to restore item", err);
+      toast({
+        title: "Unable to restore item",
+        description: "Please try again in a moment.",
+        type: "error",
+      });
+    }
   };
 
   useEffect(() => {
@@ -753,132 +836,176 @@ function ShoppingListLayout() {
 
   return (
     <>
-      <div className="mx-auto flex max-w-4xl flex-col gap-6 pb-12">
-        <header className="flex flex-col gap-2">
-          <p className="text-sm font-medium uppercase text-theme-primary">
-            Shopping
-          </p>
-          <h1 className="text-3xl font-semibold text-[#314158]">
-            Shopping list
-          </h1>
-          <p className="text-base text-[#596881]">
-            One streamlined list for everything you need, tagged with the same
-            life buckets that organize your dashboard.
-          </p>
-        </header>
+      <div className="flex w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5 pb-24">
+        {/* ── Header Row: Title + Stats + Add button ── */}
+        <div className="flex items-center gap-5">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <h2 className="text-[20px] text-theme-text-primary font-semibold leading-tight">Shopping</h2>
+            <span className="text-xs text-theme-text-tertiary">
+              {loadingItems ? "Loading…" : `${totalOpen} item${totalOpen !== 1 ? "s" : ""}`}
+              {purchasedItems.length > 0 ? ` · ${purchasedItems.length} purchased` : ""}
+            </span>
+          </div>
 
-        <Card className="border-none bg-white shadow-sm">
-          <CardHeader className="gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-xl font-semibold text-[#314158]">
-                Quick add
-              </CardTitle>
-              <p className="text-sm text-[#8e99a8]">
-                Capture an item and optionally tag it with a bucket.
-              </p>
+          <button
+            type="button"
+            onClick={() => {
+              const input = document.getElementById("shopping-quick-input");
+              if (input) input.focus();
+            }}
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add Item</span>
+          </button>
+        </div>
+
+        {/* ── Stat Tiles ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-theme-neutral-300/80 bg-white transition-all">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ backgroundColor: "rgba(124,110,189,0.15)" }}
+            >
+              <ShoppingCart size={18} style={{ color: "#7C6EBD" }} />
             </div>
-            <div className="text-sm text-[#8e99a8]">
-              {loadingItems ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-theme-primary" />
-                  Loading items…
-                </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{totalOpen}</span>
+              <span className="text-[11px] text-theme-text-tertiary">To Buy</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggleArchive}
+            className={cn(
+              "flex items-center gap-3 px-3.5 py-3 rounded-xl border bg-white transition-all text-left",
+              showArchive
+                ? "border-[rgba(72,184,130,0.4)] ring-1 ring-[rgba(72,184,130,0.15)] shadow-sm"
+                : "border-theme-neutral-300/80 hover:border-[rgba(72,184,130,0.3)] hover:shadow-warm-sm",
+            )}
+          >
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ backgroundColor: "rgba(72,184,130,0.15)" }}
+            >
+              <Archive size={18} style={{ color: "#48B882" }} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{purchasedItems.length}</span>
+              <span className="text-[11px] text-theme-text-tertiary">Purchased</span>
+            </div>
+          </button>
+
+          <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-theme-neutral-300/80 bg-white transition-all">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ backgroundColor: "rgba(74,173,224,0.15)" }}
+            >
+              <LayoutGrid size={18} style={{ color: "#4AADE0" }} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">{bucketFilters.length}</span>
+              <span className="text-[11px] text-theme-text-tertiary">Buckets</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-theme-neutral-300/80 bg-white transition-all">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
+              style={{ backgroundColor: "rgba(219,171,62,0.15)" }}
+            >
+              <Clock size={18} style={{ color: "#DBA73E" }} />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[18px] font-bold text-theme-text-primary leading-tight">
+                {items.filter((i) => {
+                  if (!i.neededBy) return false;
+                  const diff = new Date(i.neededBy).getTime() - Date.now();
+                  return diff >= 0 && diff <= 7 * 86_400_000;
+                }).length}
+              </span>
+              <span className="text-[11px] text-theme-text-tertiary">Due Soon</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quick Add Row ── */}
+        <form
+          onSubmit={handleCreateItem}
+          className="flex flex-col sm:flex-row gap-2.5"
+        >
+          <Input
+            id="shopping-quick-input"
+            placeholder="What do you need to pick up?"
+            value={newItemName}
+            onChange={(event) => setNewItemName(event.target.value)}
+            disabled={isCreating}
+            className="h-9 flex-1 rounded-lg border border-theme-neutral-300 bg-white px-3 text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
+          />
+          <div className="flex gap-2.5">
+            <select
+              value={newItemBucket ?? ""}
+              onChange={(event) =>
+                setNewItemBucket(
+                  event.target.value === "" ? null : event.target.value,
+                )
+              }
+              className="h-9 rounded-lg border border-theme-neutral-300 bg-white px-2.5 text-[13px] text-theme-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
+              disabled={isCreating}
+            >
+              <option value="">Unsorted</option>
+              {availableWidgetBuckets.map((bucket) => (
+                <option key={bucket} value={bucket}>
+                  {bucket}
+                </option>
+              ))}
+            </select>
+            <Input
+              placeholder="Qty"
+              value={newItemQuantity}
+              onChange={(event) =>
+                setNewItemQuantity(event.target.value)
+              }
+              disabled={isCreating}
+              className="h-9 w-20 rounded-lg border border-theme-neutral-300 bg-white px-2.5 text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <span className="font-medium text-[#314158]">
-                    {totalOpen}
-                  </span>{" "}
-                  items open
+                  <Plus size={15} />
+                  <span className="hidden sm:inline">Add</span>
                 </>
               )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form
-              onSubmit={handleCreateItem}
-              className="grid gap-3 sm:grid-cols-[1.2fr_0.8fr_auto]"
-            >
-              <Input
-                placeholder="What do you need to pick up?"
-                value={newItemName}
-                onChange={(event) => setNewItemName(event.target.value)}
-                disabled={isCreating}
-              />
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
-                    Bucket
-                  </label>
-                  <select
-                    value={newItemBucket ?? ""}
-                    onChange={(event) =>
-                      setNewItemBucket(
-                        event.target.value === "" ? null : event.target.value,
-                      )
-                    }
-                    className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
-                    disabled={isCreating}
-                  >
-                    <option value="">Unsorted</option>
-                    {availableWidgetBuckets.map((bucket) => (
-                      <option key={bucket} value={bucket}>
-                        {bucket}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
-                    Quantity
-                  </label>
-                  <Input
-                    placeholder="2 packs"
-                    value={newItemQuantity}
-                    onChange={(event) =>
-                      setNewItemQuantity(event.target.value)
-                    }
-                    disabled={isCreating}
-                  />
-                </div>
-              </div>
-              <Button
-                type="submit"
-                className="h-10 w-full sm:w-auto"
-                disabled={isCreating}
-              >
-                {isCreating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add item
-                  </>
-                )}
-              </Button>
-            </form>
-            {error && (
-              <p className="mt-2 text-sm text-red-600">
-                We couldn&apos;t load your shopping list. Try refreshing the
-                page.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+            </button>
+          </div>
+          {error && (
+            <p className="text-[13px] text-red-600">
+              Couldn&apos;t load your list. Try refreshing.
+            </p>
+          )}
+        </form>
 
+        {/* ── Bucket Filter Chips ── */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
+          <button
             type="button"
-            variant={selectedBucket === "all" ? "default" : "ghost"}
             onClick={() => setSelectedBucket("all")}
             className={cn(
-              "h-9 rounded-full px-4 text-sm",
+              "h-8 rounded-full px-3.5 text-[13px] font-medium transition-all duration-150",
               selectedBucket === "all"
-                ? "bg-theme-primary text-white hover:bg-theme-primary/90"
-                : "border border-[#dbd6cf] bg-white text-[#4a5568]",
+                ? "bg-theme-primary text-white shadow-warm-sm"
+                : "border border-theme-neutral-300 bg-white text-theme-text-body hover:bg-theme-surface-alt",
             )}
           >
             All items
-          </Button>
+          </button>
           {bucketFilters.map((bucket) => {
             const isUnsorted = bucket === UNASSIGNED_BUCKET_ID;
             const label = isUnsorted ? UNSORTED_LABEL : bucket;
@@ -889,145 +1016,238 @@ function ShoppingListLayout() {
             );
 
             return (
-              <Button
+              <button
                 key={bucket}
                 type="button"
-                variant={isActive ? "default" : "ghost"}
                 onClick={() => setSelectedBucket(bucket)}
                 className={cn(
-                  "h-9 rounded-full px-4 text-sm",
+                  "h-8 rounded-full px-3.5 text-[13px] font-medium transition-all duration-150",
                   isActive
-                    ? "text-white"
-                    : "border border-[#dbd6cf] bg-white text-[#4a5568]",
+                    ? "text-white shadow-warm-sm"
+                    : "border border-theme-neutral-300 bg-white hover:bg-theme-surface-alt",
                 )}
                 style={
                   isActive
                     ? { backgroundColor: color }
-                    : { color, borderColor: `${color}33` }
+                    : { color, borderColor: hexToRgba(color, 0.25) }
                 }
               >
                 {label}
-              </Button>
+              </button>
             );
           })}
         </div>
 
-        <Card className="border border-[#dbd6cf]/60 bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-lg font-semibold text-[#314158]">
-              Items
-            </CardTitle>
-            <span className="text-sm text-[#8e99a8]">
-              {filteredItems.length} shown
-            </span>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {filteredItems.length === 0 ? (
-              <div className="rounded-md border border-dashed border-[#dbd6cf] p-6 text-center text-sm text-[#8e99a8]">
-                {selectedBucket === "all"
-                  ? "Add your first item to get started."
-                  : "No items in this bucket yet."}
-              </div>
-            ) : (
-              filteredItems.map((item) => {
-                const color = getBucketColorSync(
-                  item.bucket ?? UNASSIGNED_BUCKET_ID,
-                  bucketColors,
-                );
-                const conversionComplete =
-                  Boolean(item.calendarEventId) && Boolean(item.widgetInstanceId);
+        {/* ── Items List ── */}
+        {filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-theme-brand-tint-subtle">
+              <ShoppingCart className="h-10 w-10 text-theme-brand-tint-strong" />
+            </div>
+            <h3 className="text-lg font-semibold text-theme-text-primary">
+              {selectedBucket === "all"
+                ? "Start your shopping list"
+                : "No items in this bucket"}
+            </h3>
+            <p className="mt-1 max-w-xs text-sm text-theme-text-tertiary">
+              {selectedBucket === "all"
+                ? "Add your first item using the input above to get started."
+                : "Items tagged with this bucket will appear here."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredItems.map((item) => {
+              const color = getBucketColorSync(
+                item.bucket ?? UNASSIGNED_BUCKET_ID,
+                bucketColors,
+              );
+              const conversionComplete =
+                Boolean(item.calendarEventId) && Boolean(item.widgetInstanceId);
 
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-start justify-between rounded-lg border border-[#dbd6cf]/60 bg-[#faf8f5] p-3 hover:border-[#dbd6cf]"
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={item.isPurchased}
-                        onCheckedChange={() => handleTogglePurchased(item)}
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-[#314158]">
-                            {item.name}
-                          </p>
-                          {renderBucketBadge(item.bucket)}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-[#8e99a8]">
-                          {item.quantity && (
-                            <span className="rounded-full bg-white px-2 py-0.5 shadow-sm">
-                              Qty: {item.quantity}
+              const isPurchaseAnimating = justPurchased.has(item.id);
+              const isNewlyCreated = lastCreatedId === item.id;
+
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "group flex items-start justify-between rounded-xl border p-3.5",
+                    "border-theme-neutral-300/80 bg-white",
+                    interactive.transitionFast,
+                    "hover:shadow-warm-sm hover:border-theme-neutral-300",
+                    isPurchaseAnimating && "bg-emerald-50/60 border-emerald-200",
+                    isNewlyCreated && "animate-row-enter",
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={item.isPurchased}
+                      onCheckedChange={() => handleTogglePurchased(item)}
+                      className="mt-0.5"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className={cn(
+                          "text-[14px] font-medium text-theme-text-primary",
+                          isPurchaseAnimating && "animate-strike",
+                        )}>
+                          {item.name}
+                        </p>
+                        {renderBucketBadge(item.bucket)}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2.5">
+                        {item.quantity && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-surface-alt text-theme-text-secondary border border-theme-neutral-300/50">
+                            Qty: {item.quantity}
+                          </span>
+                        )}
+                        {item.neededBy && (
+                          <span className="text-[11px] text-theme-text-tertiary">
+                            Needed by {item.neededBy}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-theme-text-tertiary">
+                          <span
+                            className="inline-flex h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: color }}
+                          />
+                          Added{" "}
+                          {new Date(item.createdAt).toLocaleDateString(
+                            undefined,
+                            { month: "short", day: "numeric" },
+                          )}
+                        </span>
+                      </div>
+                      {(item.calendarEventId || item.widgetInstanceId) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {item.calendarEventId && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-brand-tint-subtle text-theme-primary-600">
+                              <CalendarPlus className="mr-1 h-3 w-3" />
+                              Event
                             </span>
                           )}
-                          {item.neededBy && (
-                            <span>Needed by {item.neededBy}</span>
-                          )}
-                          <span className="flex items-center gap-1 text-xs text-[#8e99a8]/70">
-                            <span
-                              className="inline-flex h-2 w-2 rounded-full"
-                              style={{ backgroundColor: color }}
-                            />
-                            Added{" "}
-                            {new Date(item.createdAt).toLocaleDateString(
-                              undefined,
-                              {
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {item.calendarEventId && (
-                            <Badge className="flex items-center gap-1 bg-warm-50 text-warm-700">
-                              <CalendarPlus className="h-3 w-3" />
-                              Event linked
-                            </Badge>
-                          )}
                           {item.widgetInstanceId && (
-                            <Badge className="flex items-center gap-1 bg-amber-50 text-amber-700">
-                              <LayoutGrid className="h-3 w-3" />
-                              Widget added
-                            </Badge>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700">
+                              <LayoutGrid className="mr-1 h-3 w-3" />
+                              Widget
+                            </span>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                    <button
+                      type="button"
+                      className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
+                      onClick={() => handleOpenConvert(item)}
+                      aria-label={`Edit ${item.name}`}
+                      title={
+                        conversionComplete
+                          ? "Edit linked event or widget"
+                          : "Convert to calendar event, widget, or both"
+                      }
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
+                      onClick={() => handleDelete(item)}
+                      aria-label={`Delete ${item.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Purchased / Archive section ── */}
+        {showArchive && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[13px] font-semibold text-theme-text-secondary uppercase tracking-wide">
+                Purchased
+              </h3>
+              <button
+                type="button"
+                onClick={handleToggleArchive}
+                className="text-[12px] text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
+              >
+                Hide
+              </button>
+            </div>
+            {loadingPurchased ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
+                <span className="ml-2 text-xs text-theme-text-tertiary">Loading purchased items…</span>
+              </div>
+            ) : purchasedItems.length === 0 ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <Archive className="mb-2 h-6 w-6 text-theme-text-subtle" />
+                <p className="text-sm text-theme-text-tertiary">
+                  No purchased items yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {purchasedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "group flex items-center justify-between rounded-xl border p-3",
+                      "border-theme-neutral-300/40 bg-white/60",
+                      interactive.transitionFast,
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 shrink-0">
+                        <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-medium line-through text-theme-text-tertiary">
+                          {item.name}
+                        </p>
+                        <div className="mt-0.5 flex items-center gap-2">
+                          {item.quantity && (
+                            <span className="text-[10px] font-medium text-theme-text-tertiary">Qty: {item.quantity}</span>
+                          )}
+                          {renderBucketBadge(item.bucket)}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
+                    <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-[#8e99a8]/70 hover:text-theme-primary"
-                        onClick={() => handleOpenConvert(item)}
-                        aria-label={`Edit ${item.name}`}
-                        title={
-                          conversionComplete
-                            ? "Edit linked event or widget"
-                            : "Convert to calendar event, widget, or both"
-                        }
+                        className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
+                        onClick={() => handleRestore(item)}
+                        aria-label={`Restore ${item.name}`}
+                        title="Restore to active list"
                       >
-                        <Sparkles className="h-4 w-4" />
-                      </Button>
-                      <Button
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-[#8e99a8]/70 hover:text-red-500"
+                        className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
                         onClick={() => handleDelete(item)}
                         aria-label={`Delete ${item.name}`}
+                        title="Delete permanently"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </div>
                   </div>
-                );
-              })
+                ))}
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
 
       <Sheet open={convertOpen} onOpenChange={(open) => {
@@ -1047,47 +1267,50 @@ function ShoppingListLayout() {
           </SheetHeader>
           {convertItem && (
             <form onSubmit={handleConvertSubmit} className="mt-6 space-y-6">
-              <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
+              <div className={cn(card.inset, "space-y-3 p-4")}>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                  <label className={cn(form.label, "mb-1 block")}>
                     Item name
                   </label>
                   <Input
                     value={itemName}
                     onChange={(e) => setItemName(e.target.value)}
                     placeholder="Item name"
+                    className={form.input}
                   />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className={cn(form.label, "mb-1 block")}>
                       Quantity
                     </label>
                     <Input
                       value={itemQuantity}
                       onChange={(e) => setItemQuantity(e.target.value)}
                       placeholder="e.g. 3 packs"
+                      className={form.input}
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                    <label className={cn(form.label, "mb-1 block")}>
                       Needed by
                     </label>
                     <Input
                       type="date"
                       value={itemNeededBy}
                       onChange={(e) => setItemNeededBy(e.target.value)}
+                      className={form.input}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                  <label className={cn(form.label, "mb-1 block")}>
                     Bucket
                   </label>
                   <select
                     value={itemBucket}
                     onChange={(event) => setItemBucket(event.target.value)}
-                    className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                    className={form.select}
                   >
                     <option value="">Unsorted</option>
                     {bucketFilters
@@ -1100,14 +1323,14 @@ function ShoppingListLayout() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                  <label className={cn(form.label, "mb-1 block")}>
                     Notes
                   </label>
                   <textarea
                     value={itemNotes}
                     onChange={(e) => setItemNotes(e.target.value)}
                     rows={3}
-                    className="w-full rounded-md border border-[#dbd6cf] px-3 py-2 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                    className={form.textarea}
                     placeholder="Optional details or reminders"
                   />
                 </div>
@@ -1122,26 +1345,26 @@ function ShoppingListLayout() {
                     }
                     disabled={Boolean(convertItem.calendarEventId)}
                   />
-                  <label htmlFor="convert-event" className="text-sm font-medium text-[#314158]">
+                  <label htmlFor="convert-event" className={cn("text-sm font-medium", text.primary)}>
                     Create calendar event
                   </label>
                 </div>
                 {convertItem.calendarEventId && (
-                  <p className="pl-7 text-xs text-[#8e99a8]">
+                  <p className={cn("pl-7", text.size.sm, text.tertiary)}>
                     This item already links to a calendar event.
                   </p>
                 )}
 
                 {(convertItem.calendarEventId || convertCreateEvent) && (
-                  <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
+                  <div className={cn(card.inset, "space-y-3 p-4")}>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-1 block")}>
                         Bucket
                       </label>
                       <select
                         value={eventBucket}
                         onChange={(e) => setEventBucket(e.target.value)}
-                        className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                        className={form.select}
                       >
                         {widgetBucketOptions.map((bucket) => (
                           <option key={bucket} value={bucket}>
@@ -1152,17 +1375,18 @@ function ShoppingListLayout() {
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                        <label className={cn(form.label, "mb-1 block")}>
                           Date
                         </label>
                         <Input
                           type="date"
                           value={eventDate}
                           onChange={(e) => setEventDate(e.target.value)}
+                          className={form.input}
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                        <label className={cn(form.label, "mb-1 block")}>
                           Time
                         </label>
                         <Input
@@ -1175,6 +1399,7 @@ function ShoppingListLayout() {
                             }
                           }}
                           disabled={eventAllDay}
+                          className={form.input}
                         />
                       </div>
                     </div>
@@ -1192,14 +1417,14 @@ function ShoppingListLayout() {
                       />
                       <label
                         htmlFor="event-all-day"
-                        className="text-sm text-[#4a5568]"
+                        className={cn(text.size.md, text.body)}
                       >
                         Treat as all-day event
                       </label>
                     </div>
                     {!eventAllDay && (
                       <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                        <label className={cn(form.label, "mb-1 block")}>
                           Duration (minutes)
                         </label>
                         <Input
@@ -1208,6 +1433,7 @@ function ShoppingListLayout() {
                           step={5}
                           value={eventDuration}
                           onChange={(e) => setEventDuration(e.target.value)}
+                          className={form.input}
                         />
                       </div>
                     )}
@@ -1225,36 +1451,37 @@ function ShoppingListLayout() {
                     }
                     disabled={Boolean(convertItem.widgetInstanceId)}
                   />
-                  <label htmlFor="convert-widget" className="text-sm font-medium text-[#314158]">
+                  <label htmlFor="convert-widget" className={cn("text-sm font-medium", text.primary)}>
                     Create dashboard widget
                   </label>
                 </div>
                 {convertItem.widgetInstanceId && (
-                  <p className="pl-7 text-xs text-[#8e99a8]">
+                  <p className={cn("pl-7", text.size.sm, text.tertiary)}>
                     This item already has a dashboard widget.
                   </p>
                 )}
 
                 {(convertItem.widgetInstanceId || convertCreateWidget) && (
-                  <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
+                  <div className={cn(card.inset, "space-y-3 p-4")}>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-1 block")}>
                         Widget name
                       </label>
                       <Input
                         value={widgetName}
                         onChange={(e) => setWidgetName(e.target.value)}
                         placeholder={`Buy ${convertItem.name}`}
+                        className={form.input}
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-1 block")}>
                         Bucket
                       </label>
                       <select
                         value={widgetBucket}
                         onChange={(event) => setWidgetBucket(event.target.value)}
-                        className="h-10 w-full rounded-md border border-[#dbd6cf] px-3 text-sm shadow-sm focus:border-theme-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30"
+                        className={form.select}
                       >
                         {widgetBucketOptions.length === 0 ? (
                           <option value="">No buckets available</option>
@@ -1268,7 +1495,7 @@ function ShoppingListLayout() {
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-1 block")}>
                         Daily target
                       </label>
                       <div className="flex items-center gap-3">
@@ -1284,8 +1511,8 @@ function ShoppingListLayout() {
                         >
                           -
                         </Button>
-                        <div className="flex items-center gap-2 text-sm text-[#4a5568]">
-                          <span className="min-w-[24px] text-center text-base font-semibold">
+                        <div className={cn("flex items-center gap-2", text.size.md, text.body)}>
+                          <span className={cn("min-w-[24px] text-center", text.heading.sm)}>
                             {widgetTarget}
                           </span>
                           <span>item{widgetTarget !== 1 ? "s" : ""}</span>
@@ -1303,7 +1530,7 @@ function ShoppingListLayout() {
                       </div>
                     </div>
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-2 block")}>
                         Colour
                       </label>
                       <div className="grid grid-cols-6 gap-2">
@@ -1313,17 +1540,19 @@ function ShoppingListLayout() {
                             type="button"
                             aria-label={color}
                             onClick={() => setWidgetColor(color)}
-                            className={`h-8 w-8 rounded-full border-2 transition ${WIDGET_COLOR_CLASS[color]} ${
+                            className={cn(
+                              "h-8 w-8 rounded-full border-2 transition",
+                              WIDGET_COLOR_CLASS[color],
                               widgetColor === color
                                 ? "ring-2 ring-offset-2 ring-warm-500 border-white"
-                                : "border-white"
-                            }`}
+                                : "border-white",
+                            )}
                           />
                         ))}
                       </div>
                     </div>
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8e99a8]">
+                      <label className={cn(form.label, "mb-2 block")}>
                         Schedule
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -1338,11 +1567,13 @@ function ShoppingListLayout() {
                                 ),
                               )
                             }
-                            className={`h-8 w-8 rounded-full border text-xs font-semibold transition ${
+                            className={cn(
+                              "h-8 w-8 rounded-full border text-xs font-semibold",
+                              interactive.transitionFast,
                               widgetSchedule[index]
                                 ? "bg-warm-500 text-white border-warm-500"
-                                : "bg-white text-[#6b7688] border-[#dbd6cf]"
-                            }`}
+                                : cn(surface.raised, "text-theme-text-subtle border-theme-neutral-300"),
+                            )}
                           >
                             {day}
                           </button>
@@ -1353,7 +1584,7 @@ function ShoppingListLayout() {
                 )}
               </div>
 
-              <div className="space-y-3 rounded-lg border border-[#dbd6cf] bg-white p-4">
+              <div className={cn(card.inset, "space-y-3 p-4")}>
                 <div className="flex items-start gap-2">
                   <Checkbox
                     id="convert-task"
@@ -1361,16 +1592,16 @@ function ShoppingListLayout() {
                     onCheckedChange={(checked) => setTaskEnabled(Boolean(checked))}
                   />
                   <div>
-                    <label htmlFor="convert-task" className="text-sm font-medium text-[#314158]">
+                    <label htmlFor="convert-task" className={cn("text-sm font-medium", text.primary)}>
                       Mirror as task
                     </label>
-                    <p className="text-xs text-[#8e99a8]">
+                    <p className={cn(text.size.sm, text.tertiary)}>
                       Adds this item to your Tasks view and keeps it in sync with widget updates.
                     </p>
                   </div>
                 </div>
                 {convertItem.taskId && (
-                  <p className="pl-7 text-xs text-[#8e99a8]">
+                  <p className={cn("pl-7", text.size.sm, text.tertiary)}>
                     Linked task ID:{" "}
                     <span className="font-mono">{convertItem.taskId}</span>
                   </p>
@@ -1406,9 +1637,5 @@ function ShoppingListLayout() {
 }
 
 export default function ShoppingListPageClient() {
-  return (
-    <ToastProvider>
-      <ShoppingListLayout />
-    </ToastProvider>
-  );
+  return <ShoppingListLayout />;
 }

@@ -160,6 +160,18 @@ const config = {
           raised: 'var(--theme-surface-raised)',
           overlay: 'var(--theme-surface-overlay)',
           sunken: 'var(--theme-surface-sunken)',
+          alt: 'var(--theme-surface-alt)',
+          selected: 'var(--theme-surface-selected)',
+        },
+
+        // Additional semantic tokens
+        'theme-skeleton': 'var(--theme-skeleton)',
+        'theme-progress-track': 'var(--theme-progress-track)',
+        'theme-brand-tint': {
+          subtle: 'var(--theme-brand-tint-subtle)',
+          light: 'var(--theme-brand-tint-light)',
+          DEFAULT: 'var(--theme-brand-tint)',
+          strong: 'var(--theme-brand-tint-strong)',
         },
         
         // Interactive states
@@ -189,6 +201,8 @@ const config = {
           tertiary: 'var(--theme-text-tertiary)',
           quaternary: 'var(--theme-text-quaternary)',
           inverse: 'var(--theme-text-inverse)',
+          subtle: 'var(--theme-text-subtle)',
+          body: 'var(--theme-text-body)',
         },
       },
       borderRadius: {

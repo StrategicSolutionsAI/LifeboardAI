@@ -6,6 +6,8 @@ import { Analytics } from '@vercel/analytics/next'
 
 import './globals.css'
 import PerfObserver from '@/components/perf-observer'
+import { GlobalErrorHandler } from '@/components/global-error-handler'
+import { ToastProvider } from '@/components/ui/use-toast'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -21,9 +23,34 @@ const inter = Inter({
   display: 'swap',
 })
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lifeboard.ai'
+
 export const metadata: Metadata = {
-  title: 'Lifeboard.ai - Organize Your Life, Effortlessly With AI',
-  description: 'The first emotion-first life-dashboard that fuses task, habit, and health data into one ruthlessly prioritised command centre.',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Lifeboard.ai - Organize Your Life, Effortlessly With AI',
+    template: '%s | Lifeboard.ai',
+  },
+  description:
+    'The first emotion-first life-dashboard that fuses task, habit, and health data into one ruthlessly prioritised command centre.',
+  openGraph: {
+    type: 'website',
+    siteName: 'Lifeboard.ai',
+    title: 'Lifeboard.ai - Organize Your Life, Effortlessly With AI',
+    description:
+      'The first emotion-first life-dashboard that fuses task, habit, and health data into one ruthlessly prioritised command centre.',
+    url: siteUrl,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Lifeboard.ai - Organize Your Life, Effortlessly With AI',
+    description:
+      'The first emotion-first life-dashboard that fuses task, habit, and health data into one ruthlessly prioritised command centre.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 export const viewport: Viewport = {
@@ -58,8 +85,11 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <ThemeProvider>
-          <PerfObserver />
-          {children}
+          <ToastProvider>
+            <GlobalErrorHandler />
+            <PerfObserver />
+            {children}
+          </ToastProvider>
           <SpeedInsights />
           <Analytics />
         </ThemeProvider>

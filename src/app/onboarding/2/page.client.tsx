@@ -54,11 +54,11 @@ export default function OnboardingStep2Client() {
   const handleBack = () => { router.push("/onboarding/1") }
 
   return (
-    <OnboardingLayout step={3} title="Add Custom Categories" subtitle="Personalize your dashboard further" description="Add any specific areas you want to track that weren't in the previous list." buttonText="CONTINUE" onNext={handleContinue} onBack={handleBack}>
+    <OnboardingLayout step={3} title="Add Custom Categories" subtitle="Personalize your dashboard further" description="Add any specific areas you want to track that weren't in the previous list." buttonText="Continue" onNext={handleContinue} onBack={handleBack}>
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h2 className="text-[18px] font-medium text-[#171A1F]">Add custom life buckets</h2>
-          <p className="text-[14px] text-[#565E6C]">Create your own categories for better organization</p>
+          <p className="text-sm text-[#565E6C]">Create your own categories for better organization</p>
         </div>
         <form onSubmit={handleInputSubmit} className="flex gap-2">
           <Input type="text" placeholder="Enter custom bucket name" value={newBucketInput} onChange={(e: ChangeEvent<HTMLInputElement>) => setNewBucketInput(e.target.value)} onKeyDown={handleKeyDown} className="flex-1 border-[#E5E7EB] focus-visible:ring-theme-primary rounded" />
@@ -74,7 +74,7 @@ export default function OnboardingStep2Client() {
                 </div>
               ))
             ) : (
-              <p className="text-[14px] text-[#6B7280] italic">No buckets selected yet</p>
+              <p className="text-sm text-[#6B7280] italic">No buckets selected yet</p>
             )}
           </div>
         </div>

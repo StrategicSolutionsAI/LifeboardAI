@@ -33,7 +33,7 @@ export default function WidgetSelector({
           const next = event.target.value;
           onWidgetChange(next === 'all' ? 'all' : next);
         }}
-        className="w-full rounded-md border border-[#dbd6cf] bg-white px-3 py-2 text-sm text-[#314158] shadow-sm focus:border-warm-500 focus:outline-none focus:ring-2 focus:ring-warm-500"
+        className="w-full rounded-md border border-theme-neutral-300 bg-white px-3 py-2 text-sm text-theme-text-primary shadow-sm focus:border-warm-500 focus:outline-none focus:ring-2 focus:ring-warm-500"
       >
         {showAllOption && (
           <option value="all">All Widgets</option>

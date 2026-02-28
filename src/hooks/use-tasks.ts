@@ -275,10 +275,18 @@ export function useTasks(selectedDate?: Date) {
 
       const fallbackToSupabaseOrLocal = async (): Promise<Task[]> => {
         const supabaseTasks = await readSupabaseTasks()
+        const localTasks = readLocalTasks()
         if (supabaseTasks) {
+          // Include both Supabase and local tasks (local tasks are pending sync)
+          if (localTasks.length > 0) {
+            const taskMap = new Map<string, Task>()
+            localTasks.forEach(t => taskMap.set(t.id, t))
+            supabaseTasks.forEach(t => taskMap.set(t.id, t))
+            return Array.from(taskMap.values())
+          }
           return supabaseTasks
         }
-        return readLocalTasks()
+        return localTasks
       }
 
       try {
@@ -480,10 +488,29 @@ export function useTasks(selectedDate?: Date) {
       ? allDay
       : !normalizedHourSlot && !normalizedEndHourSlot
 
-    // Helper: create local task and persist to localStorage
+    // Helper: announce task update to other components
+    const announceTaskUpdate = () => {
+      if (typeof window !== 'undefined') {
+        sharedFetchRef.current = null
+        const timestamp = Date.now()
+        localUpdateTimestamps.current.add(timestamp)
+        window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+      }
+    }
+
+    // Helper: add task to optimistic caches
+    const addToOptimisticCaches = (task: Task) => {
+      if (dueDate === dateStr) {
+        updateDailyOptimistically(current => [...(current || []), task as any])
+      }
+      updateAllOptimistically(current => [...(current || []), task as any])
+      announceTaskUpdate()
+    }
+
+    // Helper: create local task and persist to localStorage (last resort)
     const createLocalTask = (): any => {
       try {
-        // Generate a proper UUID for local tasks to be compatible with Supabase
         const generateUUID = () => {
           return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             const r = Math.random() * 16 | 0;
@@ -522,13 +549,81 @@ export function useTasks(selectedDate?: Date) {
       }
     }
 
+    // Supabase request body — used for primary write
+    const supabaseBody = {
+      content: trimmed,
+      start_date: dueDate,
+      end_date: resolvedEndDate,
+      hourSlot: normalizedHourSlot,
+      endHourSlot: normalizedEndHourSlot,
+      bucket,
+      repeat_rule: repeatRule,
+      allDay: resolvedAllDay,
+      duration: options && 'duration' in options ? (options as any).duration : undefined,
+    }
+
+    // ── Step 1: Always write to Supabase first ──
+    try {
+      const supaRes = await fetch('/api/tasks', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supabaseBody),
+      })
+
+      if (supaRes.ok) {
+        const json = await supaRes.json()
+        const task = ensureTaskSource(json.task as Task, 'supabase')
+        addToOptimisticCaches(task)
+
+        // ── Step 2: Also sync to Todoist if connected (best-effort, non-blocking) ──
+        if (todoistConnectedRef.current !== false) {
+          fetch('/api/integrations/todoist/tasks', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: trimmed,
+              due_date: dueDate,
+              start_date: dueDate,
+              end_date: resolvedEndDate,
+              hour_slot: normalizedHourSlot,
+              end_hour_slot: normalizedEndHourSlot,
+              bucket,
+              repeat_rule: repeatRule,
+              all_day: resolvedAllDay,
+            }),
+          }).then(res => {
+            if (!res.ok) {
+              if (res.status === 400 || res.status === 401) {
+                todoistConnectedRef.current = false
+              }
+            } else {
+              todoistConnectedRef.current = true
+            }
+          }).catch(() => {
+            // Todoist sync failed silently — Supabase already has the task
+          })
+        }
+
+        return task
+      }
+
+      // Supabase write failed — log and try Todoist as fallback
+      const supaError = await supaRes.text().catch(() => '')
+      console.warn('Supabase task creation failed:', supaRes.status, supaError)
+    } catch (supaErr) {
+      console.warn('Supabase task creation network error:', supaErr)
+    }
+
+    // ── Step 3: Supabase failed — try Todoist as fallback ──
     try {
       const res = await fetch('/api/integrations/todoist/tasks', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content,
+          content: trimmed,
           due_date: dueDate,
           start_date: dueDate,
           end_date: resolvedEndDate,
@@ -536,190 +631,69 @@ export function useTasks(selectedDate?: Date) {
           end_hour_slot: normalizedEndHourSlot,
           bucket,
           repeat_rule: repeatRule,
-          all_day: resolvedAllDay
+          all_day: resolvedAllDay,
         }),
       })
-      
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => '');
-        console.error('❌ API request failed:', { status: res.status, statusText: res.statusText, errorText });
-        let upstreamStatus: number | null = null
-        if (res.status === 502 && errorText) {
-          try {
-            const parsed = JSON.parse(errorText)
-            const reported = Number(parsed?.upstreamStatus ?? parsed?.status)
-            if (Number.isFinite(reported)) {
-              upstreamStatus = reported
-            }
-          } catch {}
-        }
-        const todoistAuthRevoked = upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410
-        // If Todoist not connected or auth missing, use Supabase fallback
-        if (res.status === 400 || res.status === 401 || todoistAuthRevoked) {
-          todoistConnectedRef.current = false
-          const alt = await fetch('/api/tasks', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              content,
-              start_date: dueDate,
-              end_date: resolvedEndDate,
-              hourSlot: normalizedHourSlot,
-              endHourSlot: normalizedEndHourSlot,
-              bucket,
-              repeat_rule: repeatRule,
-              allDay: resolvedAllDay
-            })
-          })
-          if (alt.ok) {
-            const json = await alt.json()
-            const task = ensureTaskSource(json.task as Task, 'supabase')
-            if (dueDate === dateStr) {
-              updateDailyOptimistically(current => [...(current || []), task as any])
-            }
-            updateAllOptimistically(current => [...(current || []), task as any])
-            // Announce the task update to other components
-            if (typeof window !== 'undefined') {
-              sharedFetchRef.current = null
-              const timestamp = Date.now()
-              localUpdateTimestamps.current.add(timestamp)
-              window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-              window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-            }
-            return task
-          }
-          // As last resort create local
-          const local = createLocalTask()
-          if (local) {
-            if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
-            updateAllOptimistically(current => [...(current || []), local as any])
-            // Announce the task update to other components
-            if (typeof window !== 'undefined') {
-              sharedFetchRef.current = null
-              const timestamp = Date.now()
-              localUpdateTimestamps.current.add(timestamp)
-              window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-              window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-            }
-            return local
-          }
-        }
-        throw new Error(`Failed to create task: ${res.status} ${res.statusText}`);
-      }
-      
-      const responseData = await res.json();
-      const { task } = responseData;
 
-      // Parse and normalize metadata so UI shows bucket/duration immediately
-      let metadata: {
-        duration?: number
-        hourSlot?: string
-        bucket?: string
-        repeatRule?: RepeatRule
-        startDate?: string | null
-        endDate?: string | null
-        endHourSlot?: string | null
-        allDay?: boolean
-      } = {}
-      let cleanContent: string = task.content
+      if (res.ok) {
+        todoistConnectedRef.current = true
+        const responseData = await res.json()
+        const { task } = responseData
 
-      try {
-        if (task.description) {
-          const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
-          if (metaMatch) {
-            metadata = JSON.parse(metaMatch[1])
+        // Parse LIFEBOARD_META from Todoist description
+        let metadata: {
+          duration?: number; hourSlot?: string; bucket?: string; repeatRule?: RepeatRule
+          startDate?: string | null; endDate?: string | null; endHourSlot?: string | null; allDay?: boolean
+        } = {}
+        let cleanContent: string = task.content
+        try {
+          if (task.description) {
+            const metaMatch = task.description.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
+            if (metaMatch) metadata = JSON.parse(metaMatch[1])
           }
-        }
-        if (typeof task.content === 'string') {
-          const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/)
-          if (contentMetaMatch) {
-            cleanContent = contentMetaMatch[1].trim()
-            if (Object.keys(metadata).length === 0) {
-              const metaMatch = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
-              if (metaMatch) {
-                metadata = JSON.parse(metaMatch[1])
+          if (typeof task.content === 'string') {
+            const contentMetaMatch = task.content.match(/^(.*?)\s*\[LIFEBOARD_META\].*?\[\/LIFEBOARD_META\]$/)
+            if (contentMetaMatch) {
+              cleanContent = contentMetaMatch[1].trim()
+              if (Object.keys(metadata).length === 0) {
+                const metaMatch2 = task.content.match(/\[LIFEBOARD_META\](.*?)\[\/LIFEBOARD_META\]/)
+                if (metaMatch2) metadata = JSON.parse(metaMatch2[1])
               }
             }
           }
+        } catch { /* ignore parse errors */ }
+
+        const enhancedTask = {
+          ...task, content: cleanContent,
+          ...(metadata.duration !== undefined ? { duration: metadata.duration } : {}),
+          ...(metadata.hourSlot !== undefined ? { hourSlot: metadata.hourSlot } : {}),
+          ...(metadata.bucket !== undefined ? { bucket: metadata.bucket } : {}),
+          ...(metadata.repeatRule !== undefined ? { repeatRule: metadata.repeatRule } : {}),
+          ...(metadata.startDate !== undefined ? { startDate: metadata.startDate } : {}),
+          ...(metadata.endDate !== undefined ? { endDate: metadata.endDate } : {}),
+          ...(metadata.endHourSlot !== undefined ? { endHourSlot: metadata.endHourSlot } : {}),
+          ...(metadata.allDay !== undefined ? { allDay: metadata.allDay } : {}),
         }
-      } catch {
-        // Ignore parse errors; fall back to raw task fields
+        const todoistTask = ensureTaskSource(enhancedTask as Task, 'todoist')
+        addToOptimisticCaches(todoistTask)
+        return todoistTask
       }
 
-      const enhancedTask = {
-        ...task,
-        content: cleanContent,
-        ...(metadata.duration !== undefined ? { duration: metadata.duration } : {}),
-        ...(metadata.hourSlot !== undefined ? { hourSlot: metadata.hourSlot } : {}),
-        ...(metadata.bucket !== undefined ? { bucket: metadata.bucket } : {}),
-        ...(metadata.repeatRule !== undefined ? { repeatRule: metadata.repeatRule } : {}),
-        ...(metadata.startDate !== undefined ? { startDate: metadata.startDate } : {}),
-        ...(metadata.endDate !== undefined ? { endDate: metadata.endDate } : {}),
-        ...(metadata.endHourSlot !== undefined ? { endHourSlot: metadata.endHourSlot } : {}),
-        ...(metadata.allDay !== undefined ? { allDay: metadata.allDay } : {}),
+      if (res.status === 400 || res.status === 401) {
+        todoistConnectedRef.current = false
       }
-
-      const todoistTask = ensureTaskSource(enhancedTask as Task, 'todoist')
-
-      // Add task to appropriate caches
-      if (dueDate === dateStr) {
-        updateDailyOptimistically(current => [...(current || []), todoistTask as any])
-      }
-      updateAllOptimistically(current => [...(current || []), todoistTask as any])
-      
-      // Announce the task update to other components
-      if (typeof window !== 'undefined') {
-        sharedFetchRef.current = null
-        const timestamp = Date.now()
-        localUpdateTimestamps.current.add(timestamp)
-        window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-      }
-
-      return todoistTask
-    } catch (error) {
-      console.error('💥 createTask error:', error);
-      // Network or other errors – try Supabase, then local
-      try {
-        const alt = await fetch('/api/tasks', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, due_date: dueDate, hour_slot: hourSlot, bucket, repeat_rule: repeatRule })
-        })
-        if (alt.ok) {
-          const json = await alt.json()
-          const task = ensureTaskSource(json.task as Task, 'supabase')
-          if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), task as any])
-          updateAllOptimistically(current => [...(current || []), task as any])
-          // Announce the task update to other components
-          if (typeof window !== 'undefined') {
-            sharedFetchRef.current = null
-            const timestamp = Date.now()
-            localUpdateTimestamps.current.add(timestamp)
-            window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-            window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-          }
-          return task
-        }
-      } catch {}
-      const local = createLocalTask()
-      if (local) {
-        if (dueDate === dateStr) updateDailyOptimistically(current => [...(current || []), local as any])
-        updateAllOptimistically(current => [...(current || []), local as any])
-        // Announce the task update to other components
-        if (typeof window !== 'undefined') {
-          sharedFetchRef.current = null
-          const timestamp = Date.now()
-          localUpdateTimestamps.current.add(timestamp)
-          window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-          window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-        }
-        return local
-      }
-      throw error
+    } catch {
+      // Todoist also failed
     }
+
+    // ── Step 4: Both failed — local storage as last resort ──
+    console.warn('Both Supabase and Todoist failed — creating local task')
+    const local = createLocalTask()
+    if (local) {
+      addToOptimisticCaches(local)
+      return local
+    }
+    throw new Error('Failed to create task: all persistence methods failed')
   }, [dateStr, updateDailyOptimistically, updateAllOptimistically])
 
   // On mount, check if another part of the app recently announced a task update
@@ -735,6 +709,64 @@ export function useTasks(selectedDate?: Date) {
       }
     } catch {}
   }, [scheduleRefetch])
+
+  // On mount, sync any orphaned local tasks to Supabase
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const syncLocalTasks = async () => {
+      try {
+        const raw = window.localStorage.getItem('lifeboard_local_tasks')
+        if (!raw) return
+        const localTasks: Task[] = JSON.parse(raw)
+        if (!Array.isArray(localTasks) || localTasks.length === 0) return
+
+        const synced: string[] = []
+        for (const task of localTasks) {
+          if (task.completed) continue
+          try {
+            const res = await fetch('/api/tasks', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: task.content,
+                start_date: task.startDate ?? task.due?.date,
+                end_date: task.endDate,
+                hourSlot: task.hourSlot,
+                endHourSlot: task.endHourSlot,
+                bucket: task.bucket,
+                repeat_rule: task.repeatRule,
+                allDay: task.allDay,
+                duration: task.duration,
+              }),
+            })
+            if (res.ok) {
+              synced.push(task.id)
+            }
+          } catch {
+            // Individual sync failure — skip this task, try others
+          }
+        }
+
+        if (synced.length > 0) {
+          // Remove synced tasks from local storage
+          const remaining = localTasks.filter(t => !synced.includes(t.id))
+          if (remaining.length === 0) {
+            window.localStorage.removeItem('lifeboard_local_tasks')
+          } else {
+            window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(remaining))
+          }
+          // Refetch to include newly synced tasks
+          sharedFetchRef.current = null
+          try { refetchDaily() } catch {}
+          try { refetchAll() } catch {}
+        }
+      } catch {
+        // Non-critical — will try again next mount
+      }
+    }
+    syncLocalTasks()
+  }, [refetchDaily, refetchAll])
 
   useEffect(() => {
     return () => {
@@ -1076,12 +1108,13 @@ export function useTasks(selectedDate?: Date) {
     updateAllOptimistically(tasks => mergeTasks(tasks, updatesForAll))
 
     // Separate updates by task source (Supabase vs Todoist)
+    // Local tasks are routed to Supabase since that's the primary database
     const supabaseUpdates = updatesForAll.filter(update => {
       const task = resolveTask(update.taskId);
       const source = task?.source || inferSourceFromId(update.taskId);
-      return source === 'supabase';
+      return source === 'supabase' || source === 'local';
     });
-    
+
     const todoistUpdates = updatesForAll.filter(update => {
       const task = resolveTask(update.taskId);
       const source = task?.source || inferSourceFromId(update.taskId);

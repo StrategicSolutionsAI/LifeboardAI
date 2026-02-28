@@ -140,8 +140,8 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
               <Pill className="w-4 h-4 text-fuchsia-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#8e99a8]">MEDICATION</p>
-              <p className="text-sm font-semibold text-[#314158]">{adherencePercentage}% Today</p>
+              <p className="text-xs font-medium text-theme-text-tertiary">MEDICATION</p>
+              <p className="text-sm font-semibold text-theme-text-primary">{adherencePercentage}% Today</p>
             </div>
           </div>
           {refillNeeded.length > 0 && (
@@ -153,11 +153,11 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
         
         {upcomingDoses.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-[#8e99a8]">Next doses:</p>
+            <p className="text-xs text-theme-text-tertiary">Next doses:</p>
             {upcomingDoses.map((dose, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs">
-                <span className="text-[#4a5568]">{dose.medicationName}</span>
-                <span className="text-[#8e99a8]">{dose.time}</span>
+                <span className="text-theme-text-body">{dose.medicationName}</span>
+                <span className="text-theme-text-tertiary">{dose.time}</span>
               </div>
             ))}
           </div>
@@ -203,10 +203,10 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
       <CardContent>
         <div className="w-full">
           <div className="grid w-full grid-cols-4 mb-4">
-            <button className="p-2 text-sm font-medium border-b-2 border-[#bb9e7b]">Today</button>
-            <button className="p-2 text-sm font-medium text-[#8e99a8]">Medications</button>
-            <button className="p-2 text-sm font-medium text-[#8e99a8]">Refills</button>
-            <button className="p-2 text-sm font-medium text-[#8e99a8]">History</button>
+            <button className="p-2 text-sm font-medium border-b-2 border-theme-secondary">Today</button>
+            <button className="p-2 text-sm font-medium text-theme-text-tertiary">Medications</button>
+            <button className="p-2 text-sm font-medium text-theme-text-tertiary">Refills</button>
+            <button className="p-2 text-sm font-medium text-theme-text-tertiary">History</button>
           </div>
 
           <div className="space-y-4">
@@ -214,8 +214,8 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-[#8e99a8]">Today's Adherence</p>
-                    <p className="text-2xl font-bold text-[#314158]">{adherencePercentage}%</p>
+                    <p className="text-sm text-theme-text-tertiary">Today's Adherence</p>
+                    <p className="text-2xl font-bold text-theme-text-primary">{adherencePercentage}%</p>
                   </div>
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     adherencePercentage >= 90 ? 'bg-green-100' : 
@@ -229,9 +229,9 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
                     }
                   </div>
                 </div>
-                <div className="w-full bg-[#ebe5de] rounded-full h-2 mt-2">
+                <div className="w-full bg-theme-skeleton rounded-full h-2 mt-2">
                   <div 
-                    className="bg-[#bb9e7b] h-2 rounded-full transition-all duration-300" 
+                    className="bg-theme-secondary h-2 rounded-full transition-all duration-300" 
                     style={{ width: `${adherencePercentage}%` }}
                   />
                 </div>
@@ -240,13 +240,13 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-[#8e99a8]">Doses Taken</p>
-                    <p className="text-2xl font-bold text-[#314158]">
+                    <p className="text-sm text-theme-text-tertiary">Doses Taken</p>
+                    <p className="text-2xl font-bold text-theme-text-primary">
                       {todaysTakenDoses}/{todaysScheduledDoses.length}
                     </p>
                   </div>
-                  <div className="w-10 h-10 bg-[#f5ede4] rounded-lg flex items-center justify-center">
-                    <Pill className="w-5 h-5 text-[#9a7b5a]" />
+                  <div className="w-10 h-10 bg-theme-surface-selected rounded-lg flex items-center justify-center">
+                    <Pill className="w-5 h-5 text-theme-primary-600" />
                   </div>
                 </div>
               </Card>
@@ -254,8 +254,8 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-[#8e99a8]">Refills Needed</p>
-                    <p className="text-2xl font-bold text-[#314158]">{refillNeeded.length}</p>
+                    <p className="text-sm text-theme-text-tertiary">Refills Needed</p>
+                    <p className="text-2xl font-bold text-theme-text-primary">{refillNeeded.length}</p>
                   </div>
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     refillNeeded.length === 0 ? 'bg-green-100' : 'bg-orange-100'
@@ -269,7 +269,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
             </div>
 
             <div className="space-y-4">
-              <h3 className="font-semibold text-[#314158]">Today's Schedule</h3>
+              <h3 className="font-semibold text-theme-text-primary">Today's Schedule</h3>
               <div className="space-y-2">
                 {todaysScheduledDoses.map((dose, idx) => {
                   const isTaken = doseLogs.some(log => 
@@ -280,14 +280,14 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
                   const medication = medications.find(m => m.id === dose.medicationId)
                   
                   return (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-[#faf8f5] rounded-lg">
+                    <div key={idx} className="flex items-center justify-between p-3 bg-theme-surface-alt rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className={`w-3 h-3 rounded-full ${
-                          isTaken ? 'bg-green-500' : 'bg-[#ebe5de]'
+                          isTaken ? 'bg-green-500' : 'bg-theme-skeleton'
                         }`} />
                         <div>
-                          <p className="font-medium text-[#314158]">{dose.medicationName}</p>
-                          <div className="text-sm text-[#8e99a8]">
+                          <p className="font-medium text-theme-text-primary">{dose.medicationName}</p>
+                          <div className="text-sm text-theme-text-tertiary">
                             <span>{medication?.dosage}</span>
                             <span> at {dose.time}</span>
                           </div>
@@ -379,7 +379,7 @@ function AddMedicationForm({ onSave, onCancel }: {
           id="frequency"
           value={formData.frequency} 
           onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))}
-          className="w-full p-2 border border-[#dbd6cf] rounded-md"
+          className="w-full p-2 border border-theme-neutral-300 rounded-md"
         >
           <option value="Once daily">Once daily</option>
           <option value="Twice daily">Twice daily</option>
@@ -417,7 +417,7 @@ function AddMedicationForm({ onSave, onCancel }: {
           placeholder="e.g., Take with food"
           value={formData.instructions}
           onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-          className="w-full p-2 border border-[#dbd6cf] rounded-md resize-none"
+          className="w-full p-2 border border-theme-neutral-300 rounded-md resize-none"
           rows={3}
         />
       </div>

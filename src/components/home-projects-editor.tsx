@@ -281,7 +281,7 @@ export function HomeProjectsEditor({
                   placeholder="Search projects..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                  className="flex-1 px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                 />
                 {selectedProjects.length > 0 && (
                   <div className="flex gap-1">
@@ -304,7 +304,7 @@ export function HomeProjectsEditor({
                 <select 
                   value={filterStatus} 
                   onChange={(e) => setFilterStatus(e.target.value as ProjectStatus | 'all')}
-                  className="w-32 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                  className="w-32 px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                 >
                   <option value="all">All Status</option>
                   {Object.entries(PROJECT_STATUS).map(([key, config]) => (
@@ -317,7 +317,7 @@ export function HomeProjectsEditor({
                 <select 
                   value={filterPriority} 
                   onChange={(e) => setFilterPriority(e.target.value as ProjectPriority | 'all')}
-                  className="w-32 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                  className="w-32 px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                 >
                   <option value="all">All Priority</option>
                   {Object.entries(PROJECT_PRIORITIES).map(([key, config]) => (
@@ -330,7 +330,7 @@ export function HomeProjectsEditor({
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="w-32 px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                  className="w-32 px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                 >
                   <option value="priority">Priority</option>
                   <option value="dueDate">Due Date</option>
@@ -360,17 +360,17 @@ export function HomeProjectsEditor({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                           {getStatusIcon(project.status)}
-                          <h4 className="font-medium text-[#314158] truncate">{project.title}</h4>
+                          <h4 className="font-medium text-theme-text-primary truncate">{project.title}</h4>
                           <Badge variant="outline" className={`bg-${PROJECT_PRIORITIES[project.priority].color}-50 text-${PROJECT_PRIORITIES[project.priority].color}-700 border-${PROJECT_PRIORITIES[project.priority].color}-200`}>
                             {PROJECT_PRIORITIES[project.priority].label}
                           </Badge>
                         </div>
                         
                         {project.description && (
-                          <p className="text-sm text-[#6b7688] mb-2">{project.description}</p>
+                          <p className="text-sm text-theme-text-subtle mb-2">{project.description}</p>
                         )}
                         
-                        <div className="flex items-center gap-4 text-xs text-[#8e99a8]">
+                        <div className="flex items-center gap-4 text-xs text-theme-text-tertiary">
                           <div className="flex items-center gap-1">
                             {getCategoryIcon(project.category)}
                             <span className="capitalize">{project.category}</span>
@@ -434,7 +434,7 @@ export function HomeProjectsEditor({
               ))}
               
               {filteredProjects.length === 0 && (
-                <div className="text-center py-8 text-[#8e99a8]">
+                <div className="text-center py-8 text-theme-text-tertiary">
                   No projects found. Try adjusting your filters or add a new project.
                 </div>
               )}
@@ -446,7 +446,7 @@ export function HomeProjectsEditor({
               {/* Quick Templates */}
               {!editingProject && (
                 <div className="space-y-3">
-                  <h4 className="font-medium text-[#314158]">Quick Templates</h4>
+                  <h4 className="font-medium text-theme-text-primary">Quick Templates</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(PROJECT_TEMPLATES).slice(0, 6).map(([category, templates]) => 
                       templates.slice(0, 1).map((template, index) => (
@@ -465,18 +465,18 @@ export function HomeProjectsEditor({
                               notes: []
                             })
                           }}
-                          className="p-3 text-left text-sm bg-[#faf8f5] hover:bg-[#f5f0eb] rounded-lg border border-[#dbd6cf] hover:border-[#dbd6cf] transition-colors"
+                          className="p-3 text-left text-sm bg-theme-surface-alt hover:bg-theme-progress-track rounded-lg border border-theme-neutral-300 hover:border-theme-neutral-300 transition-colors"
                         >
                           <div className="flex items-center gap-2 mb-1">
                             {getCategoryIcon(category as ProjectCategory)}
-                            <span className="font-medium text-[#314158] capitalize">{category}</span>
+                            <span className="font-medium text-theme-text-primary capitalize">{category}</span>
                           </div>
-                          <div className="text-[#6b7688] text-xs truncate">{template}</div>
+                          <div className="text-theme-text-subtle text-xs truncate">{template}</div>
                         </button>
                       ))
                     )}
                   </div>
-                  <div className="border-b border-[#dbd6cf]"></div>
+                  <div className="border-b border-theme-neutral-300"></div>
                 </div>
               )}
               
@@ -509,35 +509,35 @@ export function HomeProjectsEditor({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label htmlFor="title" className="block text-sm font-medium text-[#4a5568] mb-1">Project Title</label>
+                  <label htmlFor="title" className="block text-sm font-medium text-theme-text-body mb-1">Project Title</label>
                   <input
                     id="title"
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="e.g., Fix leaky kitchen faucet"
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   />
                 </div>
 
                 <div className="col-span-2">
-                  <label htmlFor="description" className="block text-sm font-medium text-[#4a5568] mb-1">Description</label>
+                  <label htmlFor="description" className="block text-sm font-medium text-theme-text-body mb-1">Description</label>
                   <textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Additional details about the project..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-[#4a5568] mb-1">Category</label>
+                  <label htmlFor="category" className="block text-sm font-medium text-theme-text-body mb-1">Category</label>
                   <select 
                     value={formData.category} 
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as ProjectCategory })}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   >
                     {Object.entries(PROJECT_CATEGORIES).map(([key, config]) => (
                       <option key={key} value={key}>
@@ -548,11 +548,11 @@ export function HomeProjectsEditor({
                 </div>
 
                 <div>
-                  <label htmlFor="priority" className="block text-sm font-medium text-[#4a5568] mb-1">Priority</label>
+                  <label htmlFor="priority" className="block text-sm font-medium text-theme-text-body mb-1">Priority</label>
                   <select 
                     value={formData.priority} 
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value as ProjectPriority })}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   >
                     {Object.entries(PROJECT_PRIORITIES).map(([key, config]) => (
                       <option key={key} value={key}>
@@ -563,11 +563,11 @@ export function HomeProjectsEditor({
                 </div>
 
                 <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-[#4a5568] mb-1">Status</label>
+                  <label htmlFor="status" className="block text-sm font-medium text-theme-text-body mb-1">Status</label>
                   <select 
                     value={formData.status} 
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as ProjectStatus })}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   >
                     {Object.entries(PROJECT_STATUS).map(([key, config]) => (
                       <option key={key} value={key}>
@@ -578,11 +578,11 @@ export function HomeProjectsEditor({
                 </div>
 
                 <div>
-                  <label htmlFor="room" className="block text-sm font-medium text-[#4a5568] mb-1">Room</label>
+                  <label htmlFor="room" className="block text-sm font-medium text-theme-text-body mb-1">Room</label>
                   <select 
                     value={formData.room} 
                     onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   >
                     <option value="">Select room</option>
                     {Object.entries(ROOM_CATEGORIES).map(([key, label]) => (
@@ -594,7 +594,7 @@ export function HomeProjectsEditor({
                 </div>
 
                 <div>
-                  <label htmlFor="hours" className="block text-sm font-medium text-[#4a5568] mb-1">Estimated Hours</label>
+                  <label htmlFor="hours" className="block text-sm font-medium text-theme-text-body mb-1">Estimated Hours</label>
                   <input
                     id="hours"
                     type="number"
@@ -603,18 +603,18 @@ export function HomeProjectsEditor({
                     value={formData.estimatedHours || ''}
                     onChange={(e) => setFormData({ ...formData, estimatedHours: parseFloat(e.target.value) || 0 })}
                     placeholder="0"
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="dueDate" className="block text-sm font-medium text-[#4a5568] mb-1">Due Date</label>
+                  <label htmlFor="dueDate" className="block text-sm font-medium text-theme-text-body mb-1">Due Date</label>
                   <input
                     id="dueDate"
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-[#dbd6cf] rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
+                    className="w-full px-3 py-2 border border-theme-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-warm-500"
                   />
                 </div>
               </div>
@@ -637,12 +637,12 @@ export function HomeProjectsEditor({
 
           <TabsContent value="settings" className="space-y-4">
             <div className="space-y-6">
-              <div className="p-4 bg-[#faf8f5] rounded-lg">
+              <div className="p-4 bg-theme-surface-alt rounded-lg">
                 <h4 className="font-medium mb-4">Widget Appearance</h4>
                 
                 {/* Color Selection */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-[#4a5568]">Color</label>
+                  <label className="block text-sm font-medium text-theme-text-body">Color</label>
                   <div className="grid grid-cols-6 gap-3">
                     {['blue', 'green', 'red', 'orange', 'purple', 'indigo', 'amber', 'teal', 'rose', 'cyan', 'yellow', 'sky'].map((color) => (
                       <button
@@ -654,8 +654,8 @@ export function HomeProjectsEditor({
                         }}
                         className={`w-8 h-8 rounded-full border-2 transition-all ${
                           widget?.color === color 
-                            ? 'border-[#dbd6cf] ring-2 ring-[#dbd6cf]' 
-                            : 'border-[#dbd6cf] hover:border-[#dbd6cf]'
+                            ? 'border-theme-neutral-300 ring-2 ring-theme-neutral-300' 
+                            : 'border-theme-neutral-300 hover:border-theme-neutral-300'
                         } bg-${color}-500`}
                         title={color}
                       />
@@ -665,7 +665,7 @@ export function HomeProjectsEditor({
 
                 {/* Daily Target */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-[#4a5568]">Daily Target</label>
+                  <label className="block text-sm font-medium text-theme-text-body">Daily Target</label>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => {
@@ -673,13 +673,13 @@ export function HomeProjectsEditor({
                           onWidgetUpdate({ ...widget, target: widget.target - 1 })
                         }
                       }}
-                      className="w-8 h-8 rounded-lg border border-[#dbd6cf] flex items-center justify-center text-[#6b7688] hover:bg-[#faf8f5]"
+                      className="w-8 h-8 rounded-lg border border-theme-neutral-300 flex items-center justify-center text-theme-text-subtle hover:bg-theme-surface-alt"
                     >
                       -
                     </button>
                     <div className="flex-1 text-center">
                       <span className="text-2xl font-semibold">{widget?.target || 1}</span>
-                      <span className="text-[#8e99a8] ml-2">projects</span>
+                      <span className="text-theme-text-tertiary ml-2">projects</span>
                     </div>
                     <button
                       onClick={() => {
@@ -687,7 +687,7 @@ export function HomeProjectsEditor({
                           onWidgetUpdate({ ...widget, target: widget.target + 1 })
                         }
                       }}
-                      className="w-8 h-8 rounded-lg border border-[#dbd6cf] flex items-center justify-center text-[#6b7688] hover:bg-[#faf8f5]"
+                      className="w-8 h-8 rounded-lg border border-theme-neutral-300 flex items-center justify-center text-theme-text-subtle hover:bg-theme-surface-alt"
                     >
                       +
                     </button>
@@ -696,7 +696,7 @@ export function HomeProjectsEditor({
 
                 {/* Schedule */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-medium text-[#4a5568]">Schedule</label>
+                  <label className="block text-sm font-medium text-theme-text-body">Schedule</label>
                   <div className="flex gap-2">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
                       <button
@@ -711,7 +711,7 @@ export function HomeProjectsEditor({
                         className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
                           widget?.schedule?.[index] !== false
                             ? `bg-${widget?.color || 'blue'}-500 text-white`
-                            : 'bg-[#f5f0eb] text-[#8e99a8] hover:bg-[#ebe5de]'
+                            : 'bg-theme-progress-track text-theme-text-tertiary hover:bg-theme-skeleton'
                         }`}
                       >
                         {day}

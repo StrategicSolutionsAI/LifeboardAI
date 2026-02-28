@@ -6,7 +6,7 @@ export function FooterCTA() {
       <h2 className="text-[12vw] font-bold leading-none tracking-tighter mb-8">
         START NOW
       </h2>
-      <p className="text-2xl text-[#8e99a8] mb-12 font-light">
+      <p className="text-2xl text-theme-text-tertiary mb-12 font-light">
         Join 50,000+ obsessive organizers.
       </p>
       <Link href="/signup">

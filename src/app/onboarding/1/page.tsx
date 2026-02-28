@@ -50,14 +50,14 @@ export default function OnboardingStep1() {
       title="Choose Your Life Areas"
       subtitle="Select the categories that matter to you"
       description="These will become your personalized dashboard buckets. Don't worry - you can add more later!"
-      buttonText="CONTINUE"
+      buttonText="Continue"
       onNext={handleContinue}
       onBack={handleBack}
     >
       <div className="w-full flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h2 className="text-[18px] font-medium text-[#171A1F]">Popular life categories</h2>
-          <p className="text-[14px] text-[#565E6C]">Choose as many as you'd like - you can customize these next</p>
+          <p className="text-sm text-[#565E6C]">Choose as many as you'd like - you can customize these next</p>
         </div>
         
         <div className="flex flex-wrap gap-1.5">

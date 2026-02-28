@@ -103,7 +103,7 @@ export function WithingsWeightWidget({
     if (error || weightData?.error) return 'text-red-600'
     if (!isConnected) return 'text-yellow-600'
     if (hasData) return 'text-green-600'
-    return 'text-[#6b7688]'
+    return 'text-theme-text-subtle'
   }
 
   const getStatusIcon = () => {
@@ -179,16 +179,16 @@ export function WithingsWeightWidget({
       {goalWeight && hasData && (
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-[#8e99a8]">Current</span>
+            <span className="text-theme-text-tertiary">Current</span>
             <span className="font-semibold">{currentWeight} {unit}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[#8e99a8]">Goal</span>
+            <span className="text-theme-text-tertiary">Goal</span>
             <span className="font-semibold">{goalWeight} {unit}</span>
           </div>
           {progressToGoal && (
             <div className="flex justify-between">
-              <span className="text-[#8e99a8]">To Goal</span>
+              <span className="text-theme-text-tertiary">To Goal</span>
               <span className="font-semibold text-warm-600">{Math.abs(progressToGoal).toFixed(1)} {unit}</span>
             </div>
           )}
@@ -247,7 +247,7 @@ export function WithingsWeightWidget({
           </div>
           
           {lastFetchTime && (
-            <div className="text-xs text-[#8e99a8] text-center">
+            <div className="text-xs text-theme-text-tertiary text-center">
               Last updated: {lastFetchTime.toLocaleTimeString()}
             </div>
           )}

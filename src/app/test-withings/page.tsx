@@ -1,15 +1,12 @@
 "use client"
 
 import { WithingsWeightWidget } from '@/components/withings-weight-widget'
-import { ToastProvider } from '@/components/ui/use-toast'
-
 export default function TestWithingsPage() {
   return (
-    <ToastProvider>
       <div className="container mx-auto p-6 space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-[#314158] mb-2">Withings Weight Tracking Test</h1>
-          <p className="text-[#6b7688]">Test the automatic weight tracking functionality</p>
+          <h1 className="text-3xl font-bold text-theme-text-primary mb-2">Withings Weight Tracking Test</h1>
+          <p className="text-theme-text-subtle">Test the automatic weight tracking functionality</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -59,7 +56,7 @@ export default function TestWithingsPage() {
         </div>
 
         {/* Connection Status */}
-        <div className="bg-[#faf8f5] p-4 rounded-lg">
+        <div className="bg-theme-surface-alt p-4 rounded-lg">
           <h3 className="font-semibold mb-2">Connection Status</h3>
           <div className="space-y-2 text-sm">
             <div>• If you see "Withings connection expired" - you need to reconnect your Withings account</div>
@@ -69,6 +66,5 @@ export default function TestWithingsPage() {
           </div>
         </div>
       </div>
-    </ToastProvider>
   )
 }

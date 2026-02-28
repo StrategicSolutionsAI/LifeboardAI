@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react'
-import * as Sentry from '@sentry/nextjs'
 
 interface PerformanceMetrics {
   operationName: string
@@ -11,6 +10,15 @@ interface PerformanceMetrics {
 }
 
 const SLOW_OPERATION_THRESHOLD_MS = 1000
+
+// Lazy-loaded Sentry reference — avoids pulling ~1000 modules into the main bundle
+let _sentry: Promise<typeof import('@sentry/nextjs')> | null = null
+function getSentry() {
+  if (!_sentry) {
+    _sentry = import('@sentry/nextjs')
+  }
+  return _sentry
+}
 
 export function usePerformanceMonitor(operationName: string, metadata?: Record<string, any>) {
   const metricsRef = useRef<PerformanceMetrics>({
@@ -49,13 +57,15 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
       }
 
       // Track cleanup without completion for visibility
-      Sentry.addBreadcrumb({
-        message: `Performance cleanup: ${operationName}`,
-        level: 'info',
-        data: {
-          duration,
-          ...finalMetadata
-        }
+      getSentry().then(Sentry => {
+        Sentry.addBreadcrumb({
+          message: `Performance cleanup: ${operationName}`,
+          level: 'info',
+          data: {
+            duration,
+            ...finalMetadata
+          }
+        })
       })
     }
   }, [operationName, metadata])
@@ -82,23 +92,27 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
     if (duration > SLOW_OPERATION_THRESHOLD_MS) {
       console.warn(`Slow operation detected: ${operationName} took ${duration.toFixed(2)}ms`)
 
-      Sentry.addBreadcrumb({
-        message: `Slow operation: ${operationName}`,
-        level: 'warning',
-        data: {
-          duration,
-          ...mergedMetadata
-        }
+      getSentry().then(Sentry => {
+        Sentry.addBreadcrumb({
+          message: `Slow operation: ${operationName}`,
+          level: 'warning',
+          data: {
+            duration,
+            ...mergedMetadata
+          }
+        })
       })
 
       return finalMetrics
     }
 
     // Track in Sentry
-    Sentry.addBreadcrumb({
-      message: `Operation completed: ${operationName}`,
-      level: 'info',
-      data: finalMetrics
+    getSentry().then(Sentry => {
+      Sentry.addBreadcrumb({
+        message: `Operation completed: ${operationName}`,
+        level: 'info',
+        data: finalMetrics
+      })
     })
 
     return finalMetrics
@@ -114,7 +128,7 @@ export async function measureAsync<T>(
   metadata?: Record<string, any>
 ): Promise<{ result: T; metrics: PerformanceMetrics }> {
   const startTime = performance.now()
-  
+
   try {
     const result = await operation()
     const endTime = performance.now()
@@ -135,10 +149,12 @@ export async function measureAsync<T>(
     }
 
     // Track in Sentry
-    Sentry.addBreadcrumb({
-      message: `Async operation: ${operationName}`,
-      level: duration > SLOW_OPERATION_THRESHOLD_MS ? 'warning' : 'info',
-      data: { duration, ...(metadata ?? {}) }
+    getSentry().then(Sentry => {
+      Sentry.addBreadcrumb({
+        message: `Async operation: ${operationName}`,
+        level: duration > SLOW_OPERATION_THRESHOLD_MS ? 'warning' : 'info',
+        data: { duration, ...(metadata ?? {}) }
+      })
     })
 
     return { result, metrics }
@@ -147,14 +163,16 @@ export async function measureAsync<T>(
     const duration = endTime - startTime
 
     // Track failed operation
-    Sentry.withScope((scope) => {
-      scope.setTag('operationType', 'async')
-      scope.setContext('performance', {
-        operationName,
-        duration,
-        metadata
+    getSentry().then(Sentry => {
+      Sentry.withScope((scope) => {
+        scope.setTag('operationType', 'async')
+        scope.setContext('performance', {
+          operationName,
+          duration,
+          metadata
+        })
+        Sentry.captureException(error)
       })
-      Sentry.captureException(error)
     })
 
     throw error

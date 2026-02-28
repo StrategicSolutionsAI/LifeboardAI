@@ -124,7 +124,7 @@ export default function OnboardingIntro() {
       title="Welcome to LifeboardAI"
       subtitle="Your AI-powered life management platform"
       description="Get organized, stay focused, and achieve more with personalized insights."
-      buttonText={isSaving ? "SAVING..." : "GET STARTED"}
+      buttonText={isSaving ? "Saving..." : "Get Started"}
       onNext={handleNext}
     >
       <div className="space-y-6 text-center">
@@ -162,7 +162,7 @@ export default function OnboardingIntro() {
           </div>
         </div>
 
-        <div className="pt-4 bg-[#faf8f5] rounded-lg p-4">
+        <div className="pt-4 bg-theme-surface-alt rounded-lg p-4">
           <p className="text-[#565E6C] text-sm">
             ⏱️ Setup takes just 2 minutes
           </p>
