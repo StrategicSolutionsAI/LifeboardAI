@@ -836,16 +836,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
     try {
       const widgetIds = activeWidgets.map((widget) => widget.instanceId);
-      const { data, error } = await supabase
-        .from("widget_progress_history")
-        .select("widget_instance_id,date,value,created_at")
-        .in("widget_instance_id", widgetIds)
-        .order("date", { ascending: false })
-        .limit(200);
-
-      if (error) {
-        throw error;
-      }
+      const res = await fetch(`/api/widgets/progress?widgetIds=${widgetIds.join(',')}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('Failed to load widget logs');
+      const { logs: data } = await res.json();
 
       const historyLogs: WidgetLogEntry[] = (data ?? []).map((row: any) => {
         const widget = activeWidgetMap.get(row.widget_instance_id);
@@ -963,54 +956,47 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
               setProgressByWidget(updatedProgress);
 
-              const {
-                data: { user: currentUser },
-              } = await supabase.auth.getUser();
-              if (currentUser) {
-                const rows = fitbitWidgets.map((w) => ({
-                  user_id: currentUser.id,
-                  widget_instance_id: w.instanceId,
-                  date: todayStr,
-                  value: w.id === "water" ? obj.water : obj.steps,
-                }));
+              const rows = fitbitWidgets.map((w) => ({
+                widget_instance_id: w.instanceId,
+                date: todayStr,
+                value: w.id === "water" ? obj.water : obj.steps,
+              }));
 
-                if (rows.length) {
-                  await supabase
-                    .from("widget_progress_history")
-                    .upsert(rows, {
-                      onConflict: "user_id,widget_instance_id,date",
-                    });
+              if (rows.length) {
+                await fetch('/api/widgets/progress', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ rows }),
+                });
 
-                  // Fire-and-forget: backfill yesterday's data in background
-                  // to avoid blocking the main integration refresh
-                  if (!fetchedYesterdayRef.current) {
-                    fetchedYesterdayRef.current = true;
-                    const uid = currentUser.id;
-                    const fwCopy = [...fitbitWidgets];
-                    void (async () => {
-                      try {
-                        const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
-                        if (resY.ok) {
-                          const dataY = await resY.json();
-                          const rowsY = fwCopy.map((w) => ({
-                            user_id: uid,
-                            widget_instance_id: w.instanceId,
-                            date: yesterdayStrGlobal,
-                            value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
-                          }));
-                          if (rowsY.length) {
-                            await supabase
-                              .from("widget_progress_history")
-                              .upsert(rowsY, {
-                                onConflict: "user_id,widget_instance_id,date",
-                              });
-                          }
+                // Fire-and-forget: backfill yesterday's data in background
+                if (!fetchedYesterdayRef.current) {
+                  fetchedYesterdayRef.current = true;
+                  const fwCopy = [...fitbitWidgets];
+                  void (async () => {
+                    try {
+                      const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
+                      if (resY.ok) {
+                        const dataY = await resY.json();
+                        const rowsY = fwCopy.map((w) => ({
+                          widget_instance_id: w.instanceId,
+                          date: yesterdayStrGlobal,
+                          value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
+                        }));
+                        if (rowsY.length) {
+                          await fetch('/api/widgets/progress', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rows: rowsY }),
+                          });
                         }
-                      } catch (errYesterday) {
-                        console.error("Failed to backfill yesterday Fitbit history", errYesterday);
                       }
-                    })();
-                  }
+                    } catch (errYesterday) {
+                      console.error("Failed to backfill yesterday Fitbit history", errYesterday);
+                    }
+                  })();
                 }
               }
 
@@ -1071,26 +1057,25 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
             // Also upsert today's weight into widget_progress_history for trends
             try {
-              const { data: { user: currentUser } } = await supabase.auth.getUser();
-              if (currentUser) {
-                const withingsWidgets = Object.values(widgetsByBucketRef.current)
-                  .flat()
-                  .filter((w) => w.id === 'weight' && w.dataSource === 'withings');
-                const rows = withingsWidgets.map((w) => {
-                  const wUnit = w.weightData?.unit || w.unit || 'lbs';
-                  const val = wUnit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
-                  return {
-                    user_id: currentUser.id,
-                    widget_instance_id: w.instanceId,
-                    date: todayStrGlobal,
-                    value: val,
-                  };
+              const withingsWidgets = Object.values(widgetsByBucketRef.current)
+                .flat()
+                .filter((w) => w.id === 'weight' && w.dataSource === 'withings');
+              const rows = withingsWidgets.map((w) => {
+                const wUnit = w.weightData?.unit || w.unit || 'lbs';
+                const val = wUnit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
+                return {
+                  widget_instance_id: w.instanceId,
+                  date: todayStrGlobal,
+                  value: val,
+                };
+              });
+              if (rows.length) {
+                await fetch('/api/widgets/progress', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ rows }),
                 });
-                if (rows.length) {
-                  await supabase
-                    .from('widget_progress_history')
-                    .upsert(rows, { onConflict: 'user_id,widget_instance_id,date' });
-                }
               }
             } catch (errProgress) {
               console.error('Failed to upsert Withings weight to progress history', errProgress);
@@ -1153,20 +1138,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
               setProgressByWidget(updatedProgress);
 
-              const { data: { user: currentUser } } = await supabase.auth.getUser();
-              if (currentUser) {
-                const rows = googleFitWidgets.map((w) => ({
-                  user_id: currentUser.id,
-                  widget_instance_id: w.instanceId,
-                  date: todayStr,
-                  value: w.id === "water" ? obj.water : obj.steps,
-                }));
+              const rows = googleFitWidgets.map((w) => ({
+                widget_instance_id: w.instanceId,
+                date: todayStr,
+                value: w.id === "water" ? obj.water : obj.steps,
+              }));
 
-                if (rows.length) {
-                  await supabase.from("widget_progress_history").upsert(rows, {
-                    onConflict: "user_id,widget_instance_id,date",
-                  });
-                }
+              if (rows.length) {
+                await fetch('/api/widgets/progress', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ rows }),
+                });
               }
 
               try {
@@ -1757,17 +1741,20 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       return newProgress;
     });
 
-    // ---------------- Supabase history upsert ----------------
+    // ---------------- Progress history upsert via API ----------------
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        await supabase.from('widget_progress_history').upsert({
-          user_id: currentUser.id,
-          widget_instance_id: w.instanceId,
-          date: todayStrGlobal,
-          value: (progressByWidget[w.instanceId]?.value ?? 0) + 1,
-        }, { onConflict: 'user_id,widget_instance_id,date' });
-      }
+      await fetch('/api/widgets/progress', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rows: [{
+            widget_instance_id: w.instanceId,
+            date: todayStrGlobal,
+            value: (progressByWidget[w.instanceId]?.value ?? 0) + 1,
+          }],
+        }),
+      });
     } catch (err) {
       console.error('Failed to upsert progress history', err);
     }
@@ -2422,25 +2409,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       } catch { /* fall through to direct query */ }
 
       try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('first_name')
-          .eq('id', user.id)
-          .maybeSingle();
+        const res = await fetch('/api/user/profile', { credentials: 'same-origin' });
+        if (isCancelled) return;
 
-        if (isCancelled) {
-          return;
+        if (res.ok) {
+          const { profile } = await res.json();
+          setGreetingName(deriveGreetingName(profile ?? null, user));
+        } else {
+          console.error('Failed to load profile for greeting');
+          setGreetingName(deriveGreetingName(null, user));
         }
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Failed to load profile for greeting', error);
-        }
-
-        setGreetingName(deriveGreetingName(profile ?? null, user));
       } catch (err) {
-        if (isCancelled) {
-          return;
-        }
+        if (isCancelled) return;
         console.error('Failed to resolve greeting name', err);
         setGreetingName(deriveGreetingName(null, user));
       }
@@ -2675,13 +2655,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         const cachedUser = await getCachedUser();
         if (!cachedUser) return;
 
-        const [{ data: profile }, prefs] = await Promise.all([
-          supabase.from('profiles').select('onboarded').eq('id', cachedUser.id).single(),
+        const [profileRes, prefs] = await Promise.all([
+          fetch('/api/user/profile', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null),
           getUserPreferencesClient(),
         ]);
 
+        const profile = profileRes?.profile;
         if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
-          await supabase.from('profiles').update({ onboarded: true }).eq('id', cachedUser.id);
+          await fetch('/api/user/profile', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ onboarded: true }),
+          });
         }
       } catch (err) {
         console.error('Error in ensureUserOnboarded:', err);
@@ -3540,21 +3526,20 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     const archiveNeeded = toArchive.length > 0;
     if (!archiveNeeded) return; // nothing to reset
 
-    // 1️⃣  Archive in Supabase (fire-and-forget)
-    (async () => {
-
+    // 1️⃣  Archive in progress history API (fire-and-forget)
+    void (async () => {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (!currentUser) return;
         const rows = toArchive.map(([instanceId, entry]) => ({
-          user_id: currentUser.id,
           widget_instance_id: instanceId,
           date: entry.date,
           value: entry.value,
         }));
-        await supabase
-          .from('widget_progress_history')
-          .upsert(rows, { onConflict: 'user_id,widget_instance_id,date' });
+        await fetch('/api/widgets/progress', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows }),
+        });
       } catch (err) {
         console.error('Failed to archive progress history', err);
       }
