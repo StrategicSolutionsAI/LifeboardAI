@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMinutes } from "date-fns";
-import { supabaseServer } from "@/utils/supabase/server";
-import { supabaseFromBearer } from "@/utils/supabase/bearer";
-import { handleApiError } from "@/lib/api-error-handler";
-
-function getClientFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    return supabaseFromBearer(authHeader.slice(7));
-  }
-  return supabaseServer();
-}
+import { withAuth } from "@/lib/api-utils";
 
 function formatHourSlot(time?: string | null): string | null {
   if (!time) return null;
@@ -46,162 +36,148 @@ function mapRow(row: Record<string, unknown>) {
   };
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = (await request.json().catch(() => ({}))) as Record<string, any>;
-    const title = (body.title ?? "").toString().trim();
-    const startDate = (body.date ?? "").toString().trim();
+export const POST = withAuth(async (req, { supabase, user }) => {
+  const body = (await req.json().catch(() => ({}))) as Record<string, any>;
+  const title = (body.title ?? "").toString().trim();
+  const startDate = (body.date ?? "").toString().trim();
 
-    if (!title) {
-      return NextResponse.json({ error: "title required" }, { status: 400 });
-    }
+  if (!title) {
+    return NextResponse.json({ error: "title required" }, { status: 400 });
+  }
 
-    if (!startDate) {
-      return NextResponse.json({ error: "date required" }, { status: 400 });
-    }
+  if (!startDate) {
+    return NextResponse.json({ error: "date required" }, { status: 400 });
+  }
 
-    const supabase = getClientFromRequest(request);
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+  const source =
+    typeof body.source === "string" && body.source.trim().length > 0
+      ? body.source.trim()
+      : "manual";
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const source =
-      typeof body.source === "string" && body.source.trim().length > 0
-        ? body.source.trim()
-        : "manual";
-
-    const externalId =
-      typeof body.externalId === "string" && body.externalId.trim().length > 0
-        ? body.externalId.trim()
-        : crypto.randomUUID();
+  const externalId =
+    typeof body.externalId === "string" && body.externalId.trim().length > 0
+      ? body.externalId.trim()
+      : crypto.randomUUID();
 
   const description =
-      typeof body.description === "string" && body.description.trim().length > 0
-        ? body.description.trim()
-        : null;
+    typeof body.description === "string" && body.description.trim().length > 0
+      ? body.description.trim()
+      : null;
 
-    const bucket =
-      typeof body.bucket === "string" && body.bucket.trim().length > 0
-        ? body.bucket.trim()
-        : null;
+  const bucket =
+    typeof body.bucket === "string" && body.bucket.trim().length > 0
+      ? body.bucket.trim()
+      : null;
 
-    const allDay = body.allDay === true;
-    const timeInput =
-      typeof body.time === "string" && body.time.trim().length > 0
-        ? body.time.trim()
-        : null;
+  const allDay = body.allDay === true;
+  const timeInput =
+    typeof body.time === "string" && body.time.trim().length > 0
+      ? body.time.trim()
+      : null;
 
-    const hourSlot = !allDay ? formatHourSlot(timeInput) : null;
+  const hourSlot = !allDay ? formatHourSlot(timeInput) : null;
 
-    const durationMinutesRaw =
-      typeof body.durationMinutes === "number"
-        ? body.durationMinutes
-        : typeof body.durationMinutes === "string" && body.durationMinutes.trim().length > 0
-        ? Number.parseInt(body.durationMinutes, 10)
-        : null;
+  const durationMinutesRaw =
+    typeof body.durationMinutes === "number"
+      ? body.durationMinutes
+      : typeof body.durationMinutes === "string" && body.durationMinutes.trim().length > 0
+      ? Number.parseInt(body.durationMinutes, 10)
+      : null;
 
-    const durationMinutes =
-      !allDay && Number.isFinite(durationMinutesRaw) && (durationMinutesRaw as number) > 0
-        ? (durationMinutesRaw as number)
-        : null;
+  const durationMinutes =
+    !allDay && Number.isFinite(durationMinutesRaw) && (durationMinutesRaw as number) > 0
+      ? (durationMinutesRaw as number)
+      : null;
 
-    let startTimeIso: string | null = null;
-    let endTimeIso: string | null = null;
-    let endDate = startDate;
+  let startTimeIso: string | null = null;
+  let endTimeIso: string | null = null;
+  let endDate = startDate;
 
-    if (!allDay && timeInput) {
-      const [hoursStr, minutesStr = "00"] = timeInput.split(":");
-      startTimeIso = `${startDate}T${hoursStr.padStart(2, "0")}:${minutesStr.padStart(2, "0")}:00Z`;
+  if (!allDay && timeInput) {
+    const [hoursStr, minutesStr = "00"] = timeInput.split(":");
+    startTimeIso = `${startDate}T${hoursStr.padStart(2, "0")}:${minutesStr.padStart(2, "0")}:00Z`;
 
-      if (durationMinutes) {
-        const baseForDuration = `${startDate}T${hoursStr.padStart(2, "0")}:${minutesStr.padStart(2, "0")}:00`;
-        const end = addMinutes(new Date(`${baseForDuration}Z`), durationMinutes);
-        const yyyy = end.getUTCFullYear().toString().padStart(4, "0");
-        const mm = (end.getUTCMonth() + 1).toString().padStart(2, "0");
-        const dd = end.getUTCDate().toString().padStart(2, "0");
-        const hh = end.getUTCHours().toString().padStart(2, "0");
-        const min = end.getUTCMinutes().toString().padStart(2, "0");
-        endDate = `${yyyy}-${mm}-${dd}`;
-        endTimeIso = `${yyyy}-${mm}-${dd}T${hh}:${min}:00Z`;
-      }
+    if (durationMinutes) {
+      const baseForDuration = `${startDate}T${hoursStr.padStart(2, "0")}:${minutesStr.padStart(2, "0")}:00`;
+      const end = addMinutes(new Date(`${baseForDuration}Z`), durationMinutes);
+      const yyyy = end.getUTCFullYear().toString().padStart(4, "0");
+      const mm = (end.getUTCMonth() + 1).toString().padStart(2, "0");
+      const dd = end.getUTCDate().toString().padStart(2, "0");
+      const hh = end.getUTCHours().toString().padStart(2, "0");
+      const min = end.getUTCMinutes().toString().padStart(2, "0");
+      endDate = `${yyyy}-${mm}-${dd}`;
+      endTimeIso = `${yyyy}-${mm}-${dd}T${hh}:${min}:00Z`;
     }
+  }
 
-    const commonFields = {
-      title,
-      description,
-      content: description ?? title,
-      start_date: startDate,
-      end_date: endDate,
-      due_date: startDate,
-      hour_slot: hourSlot,
-      start_time: startTimeIso,
-      end_time: endTimeIso,
-      bucket,
-      duration: durationMinutes,
-      all_day: allDay || !hourSlot,
-      completed: false,
-      position: null,
-      rrule: null,
-      repeat_rule: null,
-      updated_at: new Date().toISOString(),
-      source,
-    };
+  const commonFields = {
+    title,
+    description,
+    content: description ?? title,
+    start_date: startDate,
+    end_date: endDate,
+    due_date: startDate,
+    hour_slot: hourSlot,
+    start_time: startTimeIso,
+    end_time: endTimeIso,
+    bucket,
+    duration: durationMinutes,
+    all_day: allDay || !hourSlot,
+    completed: false,
+    position: null,
+    rrule: null,
+    repeat_rule: null,
+    updated_at: new Date().toISOString(),
+    source,
+  };
 
-    const { data: existing, error: fetchError } = await supabase
+  const { data: existing, error: fetchError } = await supabase
+    .from("calendar_events")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("external_id", externalId)
+    .eq("source", source)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("Failed to lookup calendar event before insert", fetchError);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+
+  let result;
+
+  if (existing?.id) {
+    const { data, error } = await supabase
       .from("calendar_events")
-      .select("id")
+      .update(commonFields)
+      .eq("id", existing.id)
       .eq("user_id", user.id)
-      .eq("external_id", externalId)
-      .eq("source", source)
-      .maybeSingle();
+      .select("*")
+      .single();
 
-    if (fetchError) {
-      console.error("Failed to lookup calendar event before insert", fetchError);
+    if (error) {
+      console.error("Failed to update calendar event", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
+    result = data;
+  } else {
+    const insertPayload = {
+      ...commonFields,
+      user_id: user.id,
+      external_id: externalId,
+    };
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .insert(insertPayload)
+      .select("*")
+      .single();
 
-    let result;
-
-    if (existing?.id) {
-      const { data, error } = await supabase
-        .from("calendar_events")
-        .update(commonFields)
-        .eq("id", existing.id)
-        .eq("user_id", user.id)
-        .select("*")
-        .single();
-
-      if (error) {
-        console.error("Failed to update calendar event", error);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
-      }
-      result = data;
-    } else {
-      const insertPayload = {
-        ...commonFields,
-        user_id: user.id,
-        external_id: externalId,
-      };
-      const { data, error } = await supabase
-        .from("calendar_events")
-        .insert(insertPayload)
-        .select("*")
-        .single();
-
-      if (error) {
-        console.error("Failed to insert calendar event", error);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
-      }
-      result = data;
+    if (error) {
+      console.error("Failed to insert calendar event", error);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
-
-    return NextResponse.json({ event: mapRow(result) }, { status: 201 });
-  } catch (error) {
-    return handleApiError(error, "POST /api/calendar/events");
+    result = data;
   }
-}
+
+  return NextResponse.json({ event: mapRow(result) }, { status: 201 });
+}, "POST /api/calendar/events");

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 
 export interface ApiError extends Error {
@@ -104,10 +104,10 @@ export function handleApiError(error: unknown, context?: string): NextResponse {
 }
 
 export function withErrorHandling(
-  handler: (request: Request, ...args: any[]) => Promise<NextResponse>,
+  handler: (request: NextRequest, ...args: any[]) => Promise<NextResponse>,
   context?: string
 ) {
-  return async (request: Request, ...args: any[]): Promise<NextResponse> => {
+  return async (request: NextRequest, ...args: any[]): Promise<NextResponse> => {
     try {
       return await handler(request, ...args)
     } catch (error) {

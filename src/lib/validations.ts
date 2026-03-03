@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { NextResponse } from 'next/server'
 
 // Reusable date string pattern: YYYY-MM-DD
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format')
@@ -95,7 +96,7 @@ export const deleteShoppingItemSchema = z.object({
 export function parseBody<T extends z.ZodType>(
   schema: T,
   body: unknown
-): { data: z.infer<T>; error?: never; response?: never } | { data?: never; error: z.ZodError; response: Response } {
+): { data: z.infer<T>; error?: never; response?: never } | { data?: never; error: z.ZodError; response: NextResponse } {
   const result = schema.safeParse(body)
   if (result.success) {
     return { data: result.data }
@@ -103,9 +104,9 @@ export function parseBody<T extends z.ZodType>(
   const messages = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
   return {
     error: result.error,
-    response: new Response(
-      JSON.stringify({ error: messages, code: 'VALIDATION_ERROR' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    response: NextResponse.json(
+      { error: messages, code: 'VALIDATION_ERROR' },
+      { status: 400 }
     ),
   }
 }
