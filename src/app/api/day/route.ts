@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
 
+export const dynamic = 'force-dynamic'
+
 // lifeboard_tasks → unified item
 function mapTaskRow(row: Record<string, unknown>) {
   const startDate = (row.start_date ?? row.due_date ?? undefined) as string | undefined
