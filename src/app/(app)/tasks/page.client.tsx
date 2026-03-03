@@ -8,7 +8,7 @@ import type { Bucket as BoardBucket, Task as BoardTask } from "@/components/Task
 import type { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import type { ListTask } from "@/components/task-list-view";
 import type { KanbanTask } from "@/components/task-kanban-board";
-import type { KanbanStatus } from "@/hooks/use-tasks";
+import type { KanbanStatus } from "@/types/tasks";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,9 @@ const TaskKanbanBoard = dynamic(
   }
 );
 
-import TaskEditorModal from "@/components/task-editor-modal";
+const TaskEditorModal = dynamic(() => import("@/components/task-editor-modal"), {
+  ssr: false,
+});
 
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
 

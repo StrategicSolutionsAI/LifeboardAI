@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { KanbanStatus } from "@/hooks/use-tasks";
+import type { KanbanStatus } from "@/types/tasks";
 
 /* ─── Calidora color helpers ─── */
 

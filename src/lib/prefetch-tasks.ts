@@ -1,5 +1,5 @@
 import { prefetchToGlobalCache } from '@/hooks/use-data-cache'
-import type { Task } from '@/hooks/use-tasks'
+import type { Task } from '@/types/tasks'
 
 const CACHE_KEY = 'tasks-all-open'
 const FETCH_TIMEOUT_MS = 4500

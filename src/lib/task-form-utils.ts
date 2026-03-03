@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import type { RepeatOption, Task } from "@/hooks/use-tasks";
+import type { RepeatOption, Task } from "@/types/tasks";
 
 export const UNASSIGNED_BUCKET_LABEL = "Unassigned";
 

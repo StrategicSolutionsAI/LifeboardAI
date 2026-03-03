@@ -26,7 +26,7 @@ import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "l
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption, Task } from "@/hooks/use-tasks";
+import type { RepeatOption, Task } from "@/types/tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";

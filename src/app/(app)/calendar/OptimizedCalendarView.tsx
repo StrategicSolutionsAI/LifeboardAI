@@ -5,7 +5,7 @@ import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption } from "@/hooks/use-tasks";
+import type { RepeatOption } from "@/types/tasks";
 import { CalendarHeaderSkeleton, CalendarMonthSkeleton, CalendarWeekSkeleton, HourlyPlannerSkeleton, TaskListSkeleton } from "@/components/calendar-loading-skeleton";
 import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/components/calendar-performance-monitor";
 import { format, addDays } from "date-fns";

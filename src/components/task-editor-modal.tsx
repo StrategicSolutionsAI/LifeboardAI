@@ -12,7 +12,7 @@ import { format, parseISO } from "date-fns";
 import { X, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption, Task } from "@/hooks/use-tasks";
+import type { RepeatOption, Task } from "@/types/tasks";
 import {
   deriveRepeatOption,
   extractHourLabel,

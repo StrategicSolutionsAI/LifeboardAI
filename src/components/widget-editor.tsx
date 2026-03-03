@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/comp
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption } from "@/hooks/use-tasks";
+import type { RepeatOption } from "@/types/tasks";
 import { format } from "date-fns";
 import { card, form } from "@/lib/styles";
 

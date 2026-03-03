@@ -4,33 +4,7 @@ import { supabaseServer } from '@/utils/supabase/server';
 import { supabaseFromBearer } from '@/utils/supabase/bearer';
 import { handleApiError } from '@/lib/api-error-handler';
 import { createTaskSchema, updateTaskSchema, parseBody } from '@/lib/validations';
-
-const SELECT_COLUMNS =
-  'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, kanban_status, created_at, updated_at';
-
-// DB → client
-function mapRowToTask(row: any) {
-  const startDate: string | undefined = row.start_date ?? row.due_date ?? undefined;
-  const endDate: string | undefined = row.end_date ?? startDate ?? undefined;
-  return {
-    id: row.id,
-    content: row.content,
-    completed: row.completed,
-    due: startDate ? { date: startDate } : undefined,
-    startDate,
-    endDate,
-    hourSlot: row.hour_slot || undefined,
-    endHourSlot: row.end_hour_slot || undefined,
-    bucket: row.bucket || undefined,
-    position: row.position ?? undefined,
-    duration: row.duration ?? undefined,
-    repeatRule: row.repeat_rule && row.repeat_rule !== 'none' ? row.repeat_rule : undefined,
-    allDay: row.all_day ?? (row.hour_slot ? false : true),
-    kanbanStatus: row.kanban_status ?? (row.completed ? 'done' : 'todo'),
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
-}
+import { TASK_SELECT_COLUMNS as SELECT_COLUMNS, mapRowToTask } from '@/repositories/tasks';
 
 // hour_slot normalizer (supports number 0–23 or display strings)
 function normalizeHourSlot(value?: number | string): string | undefined {
@@ -99,7 +73,7 @@ export async function GET(request: NextRequest) {
         const pa = a.position ?? Number.MAX_SAFE_INTEGER;
         const pb = b.position ?? Number.MAX_SAFE_INTEGER;
         if (pa !== pb) return pa - pb;
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
       });
 
     return NextResponse.json({ tasks });

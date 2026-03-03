@@ -12,7 +12,7 @@ import {
   Draggable,
 } from "@hello-pangea/dnd";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
-import type { RepeatOption } from "@/hooks/use-tasks";
+import type { RepeatOption } from "@/types/tasks";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 
 // -----------------------------------------------------------------------------

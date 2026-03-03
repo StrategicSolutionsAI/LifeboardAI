@@ -8,7 +8,7 @@ import { TasksProvider } from "@/contexts/tasks-context";
 import { CalendarTaskList } from "@/components/calendar-task-list";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useTasksContext } from "@/contexts/tasks-context";
-import type { RepeatOption } from "@/hooks/use-tasks";
+import type { RepeatOption } from "@/types/tasks";
 
 // Load calendar grid on client to avoid SSR issues with date-fns
 const FullCalendar = dynamic(() => import("@/components/full-calendar"), { ssr: false });

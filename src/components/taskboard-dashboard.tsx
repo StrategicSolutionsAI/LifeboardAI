@@ -51,7 +51,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
-import type { Task, RepeatOption } from "@/hooks/use-tasks";
+import type { Task, RepeatOption } from "@/types/tasks";
 import dynamic from 'next/dynamic';
 
 // Lazy-load these heavy components — only rendered when user opens a drawer/sheet

@@ -9,7 +9,7 @@ import {
   isToday,
   parseISO,
 } from "date-fns";
-import type { Task } from "@/hooks/use-tasks";
+import type { Task } from "@/types/tasks";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useToast } from "@/components/ui/use-toast";
 import { TasksQuickActions, type TasksQuickActionFilter } from "./tasks-quick-actions";

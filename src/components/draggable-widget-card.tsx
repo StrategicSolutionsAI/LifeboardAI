@@ -10,7 +10,7 @@ import {
   Check,
 } from "lucide-react";
 import type { WidgetInstance } from "@/types/widgets";
-import type { Task } from "@/hooks/use-tasks";
+import type { Task } from "@/types/tasks";
 import {
   getIconComponent,
   getWidgetColorStyles,
