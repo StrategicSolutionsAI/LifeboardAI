@@ -832,10 +832,14 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                             style={{
                               ...(prov.draggableProps.style || {}),
                               height: `${Math.max(32, (taskDuration / 60) * HOUR_HEIGHT)}px`,
-                              position: isDraggingNow ? 'relative' : 'absolute',
-                              top: isDraggingNow ? 'auto' : (taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px'),
-                              left: isDraggingNow ? 'auto' : leftOffset,
-                              width: isDraggingNow ? 'auto' : taskWidth,
+                              // When dragging, let the library control position/top/left/width
+                              // (it uses position:fixed + transform to track the cursor)
+                              ...(!isDraggingNow ? {
+                                position: 'absolute' as const,
+                                top: taskCount > 1 ? `${Math.floor(index / Math.ceil(taskCount / 2)) * 2}px` : '0px',
+                                left: leftOffset,
+                                width: taskWidth,
+                              } : {}),
                               zIndex: isResizing ? 1000 : (isDraggingNow ? 1000 : (frontTaskId === t.id.toString() ? 999 : index + 1)),
                               ...(isResizing ? { transform: 'none', transition: 'none' } : {}),
                             }}

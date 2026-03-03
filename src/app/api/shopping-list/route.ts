@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
 
     const sp = request.nextUrl.searchParams;
     const bucketFilter = sp.get("bucket");
+    const taskIdFilter = sp.get("taskId");
     const includePurchased = sp.get("includePurchased") === "true";
 
     let query = supabase
@@ -79,6 +80,10 @@ export async function GET(request: NextRequest) {
 
     if (bucketFilter) {
       query = query.eq("bucket", bucketFilter);
+    }
+
+    if (taskIdFilter) {
+      query = query.eq("task_id", taskIdFilter);
     }
 
     if (!includePurchased) {

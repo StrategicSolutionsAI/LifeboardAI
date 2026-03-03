@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { Plus, CalendarDays, GripVertical, LayoutGrid, Activity, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -81,19 +81,36 @@ function formatDue(due: string | null, isRecurring: boolean) {
 function KanbanCard({
   task,
   index,
+  columnId,
   bucketColors,
   isLoading,
   onOpen,
+  onStatusChange,
 }: {
   task: KanbanTask;
   index: number;
+  columnId: KanbanStatus;
   bucketColors?: Record<string, string>;
   isLoading?: boolean;
   onOpen?: (id: string) => void;
+  onStatusChange?: (taskId: string, newStatus: KanbanStatus) => void;
 }) {
   const dateBadge = useMemo(() => formatDue(task.dueDate, task.isRecurring), [task.dueDate, task.isRecurring]);
   const bucketColor = task.bucket ? (bucketColors?.[task.bucket] ?? "#bb9e7b") : null;
   const isDone = task.kanbanStatus === "done";
+  const [justCompleted, setJustCompleted] = useState(false);
+  const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleToggle = useCallback(() => {
+    if (columnId === "done") {
+      onStatusChange?.(task.id, "in_progress");
+    } else {
+      setJustCompleted(true);
+      clearTimeout(justCompletedTimer.current);
+      justCompletedTimer.current = setTimeout(() => setJustCompleted(false), 600);
+      onStatusChange?.(task.id, "done");
+    }
+  }, [task.id, columnId, onStatusChange]);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -105,10 +122,38 @@ function KanbanCard({
             "group bg-white rounded-xl border border-theme-neutral-300/80 p-3.5 transition-all cursor-default",
             "hover:border-theme-primary/35 hover:shadow-warm-sm",
             snapshot.isDragging && "opacity-40 shadow-warm-lg border-theme-primary/40",
-            isLoading && "opacity-60 pointer-events-none"
+            isLoading && "opacity-60 pointer-events-none",
+            justCompleted && "bg-emerald-50/60"
           )}
         >
           <div className="flex items-start gap-2.5">
+            {/* Checkbox — In Progress (unchecked) & Done (checked) */}
+            {(columnId === "in_progress" || columnId === "done") && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggle();
+                }}
+                disabled={isLoading}
+                aria-label={isDone ? `Mark "${task.title}" not completed` : `Mark "${task.title}" completed`}
+                className={cn(
+                  "w-[18px] h-[18px] rounded-[5px] shrink-0 mt-0.5 transition-all flex items-center justify-center",
+                  isDone || justCompleted
+                    ? "bg-theme-success"
+                    : "bg-white border-[1.5px] border-theme-neutral-300/80 hover:border-theme-secondary",
+                  isLoading && "animate-pulse opacity-50",
+                  justCompleted && "animate-check-pop"
+                )}
+              >
+                {(isDone || justCompleted) && (
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={justCompleted ? "animate-check-stroke" : ""} />
+                  </svg>
+                )}
+              </button>
+            )}
+
             {/* Drag Handle */}
             <div
               {...provided.dragHandleProps}
@@ -131,7 +176,7 @@ function KanbanCard({
 
               {/* Bucket dot + Date badge */}
               {(bucketColor || dateBadge) && (
-                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
                   {bucketColor && task.bucket && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[rgba(0,0,0,0.03)]">
                       <span
@@ -171,6 +216,7 @@ function KanbanColumn({
   tasks,
   onAddTask,
   onTaskOpen,
+  onStatusChange,
   bucketColors,
   loadingTasks,
   justDroppedId,
@@ -179,6 +225,7 @@ function KanbanColumn({
   tasks: KanbanTask[];
   onAddTask: (title: string, status: KanbanStatus) => void;
   onTaskOpen?: (id: string) => void;
+  onStatusChange?: (taskId: string, newStatus: KanbanStatus) => void;
   bucketColors?: Record<string, string>;
   loadingTasks?: Set<string>;
   justDroppedId?: string | null;
@@ -270,9 +317,11 @@ function KanbanColumn({
                   <KanbanCard
                     task={task}
                     index={index}
+                    columnId={column.id}
                     bucketColors={bucketColors}
                     isLoading={loadingTasks?.has(task.id)}
                     onOpen={onTaskOpen}
+                    onStatusChange={onStatusChange}
                   />
                 </div>
               ))}
@@ -375,6 +424,7 @@ export function TaskKanbanBoard({
             tasks={grouped[col.id]}
             onAddTask={onAddTask}
             onTaskOpen={onTaskOpen}
+            onStatusChange={onStatusChange}
             bucketColors={bucketColors}
             loadingTasks={loadingTasks}
             justDroppedId={justDroppedId}

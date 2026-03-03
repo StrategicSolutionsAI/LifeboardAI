@@ -56,6 +56,15 @@ export interface WidgetInstance extends WidgetTemplate {
     currentMood?: number;        // 1-5 scale (1=very poor, 5=excellent)
     moodNote?: string;           // optional note about mood
     lastUpdated?: string;        // ISO timestamp of last mood entry
+    entries?: Array<{
+      date: string;              // YYYY-MM-DD
+      mood: number;              // 1-5
+      note?: string;
+      loggedAt: string;          // ISO timestamp
+    }>;
+    weeklyAverage?: number;
+    currentStreak?: number;
+    bestStreak?: number;
   };
   // Journal widget specific data
   journalData?: {
@@ -80,6 +89,101 @@ export interface WidgetInstance extends WidgetTemplate {
     isPaused?: boolean;
     elapsedBeforePause?: number;
     completedToday?: boolean;
+    sessionHistory?: Array<{
+      date: string;             // YYYY-MM-DD
+      duration: number;         // minutes completed
+      completedAt: string;      // ISO timestamp
+    }>;
+    preferredDuration?: number; // last used duration in minutes
+    currentStreak?: number;
+    bestStreak?: number;
+  };
+  // Sleep tracker data
+  sleepData?: {
+    entries: Array<{
+      date: string;             // YYYY-MM-DD
+      bedtime: string;          // HH:mm
+      wakeTime: string;         // HH:mm
+      duration: number;         // hours (decimal, e.g. 7.5)
+      quality: number;          // 1-5
+      notes?: string;
+    }>;
+    weeklyAverage: number;
+    currentStreak: number;
+    bestStreak: number;
+    sleepDebt: number;          // accumulated hours deficit vs target
+  };
+  // Breathwork session data
+  breathworkData?: {
+    isActive?: boolean;
+    currentPattern?: string;    // '4-7-8' | '4-4-4-4' | '4-2-6'
+    cyclesCompleted?: number;
+    totalSessions?: number;
+    totalMinutes?: number;
+    lastSessionDate?: string;
+    sessionHistory?: Array<{
+      date: string;             // YYYY-MM-DD
+      pattern: string;
+      cycles: number;
+      duration: number;         // minutes
+    }>;
+    preferredPattern?: string;
+    currentStreak?: number;
+    bestStreak?: number;
+  };
+  // Water intake tracking data
+  waterData?: {
+    entries: Array<{
+      date: string;            // YYYY-MM-DD
+      amount: number;          // in current unit (cups/ml/oz)
+      beverage: string;        // 'water' | 'tea' | 'coffee' | 'juice' | 'sparkling' | 'other'
+      loggedAt: string;        // ISO timestamp
+    }>;
+    weeklyAverage: number;
+    currentStreak: number;
+    bestStreak: number;
+    preferredUnit?: string;    // 'cups' | 'ml' | 'oz'
+  };
+  // Steps tracking data
+  stepsData?: {
+    entries: Array<{
+      date: string;            // YYYY-MM-DD
+      steps: number;           // step count for this entry
+      source: string;          // 'manual' | 'walk' | 'run' | 'hike' | 'other'
+      loggedAt: string;        // ISO timestamp
+    }>;
+    weeklyAverage: number;
+    currentStreak: number;
+    bestStreak: number;
+    totalSteps: number;        // lifetime total
+  };
+  // Heart rate tracking data
+  heartRateData?: {
+    entries: Array<{
+      date: string;            // YYYY-MM-DD
+      bpm: number;             // heart rate in BPM
+      context: string;         // 'resting' | 'post-exercise' | 'morning' | 'evening'
+      loggedAt: string;        // ISO timestamp
+    }>;
+    weeklyAverage: number;
+    currentStreak: number;
+    bestStreak: number;
+    lowestRecorded?: number;
+    highestRecorded?: number;
+  };
+  // Caffeine tracking data
+  caffeineData?: {
+    entries: Array<{
+      date: string;            // YYYY-MM-DD
+      amount: number;          // mg of caffeine
+      beverage: string;        // 'coffee' | 'espresso' | 'tea' | 'energy_drink' | 'soda' | 'other'
+      cups: number;            // number of cups/servings
+      loggedAt: string;        // ISO timestamp
+    }>;
+    weeklyAverage: number;     // avg cups per day
+    currentStreak: number;
+    bestStreak: number;
+    totalCaffeineMg: number;   // lifetime total mg
   };
   // Quit habit tracking data
   quitHabitData?: {

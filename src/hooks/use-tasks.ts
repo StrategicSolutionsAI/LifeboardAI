@@ -1313,7 +1313,8 @@ export function useTasks(selectedDate?: Date) {
         return true
       }
 
-      if (!task.repeatRule) {
+      const rule = task.repeatRule as string | undefined
+      if (!rule || rule === 'none') {
         return dueDateStr === todayStr
       }
 
@@ -1325,7 +1326,7 @@ export function useTasks(selectedDate?: Date) {
       const dueDay = due.getDay()
       const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000))
 
-      switch (task.repeatRule) {
+      switch (rule) {
         case 'daily':
           return true
         case 'weekdays':

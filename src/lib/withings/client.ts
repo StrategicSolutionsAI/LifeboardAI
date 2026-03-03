@@ -146,6 +146,81 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
 
   // Convert from Withings format (value * 10^unit) to kg
   const weightKg = weightMeasure.value * Math.pow(10, weightMeasure.unit)
-  
+
   return weightKg
-} 
+}
+
+// Fetch historical weight measurements from the Withings API
+// Returns an array of { weightKg, weightLbs, measuredAt } sorted by date descending
+export async function fetchWithingsWeightHistory(
+  accessToken: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<Array<{ weightKg: number; weightLbs: number; measuredAt: string }>> {
+  const params: Record<string, string> = {
+    action: 'getmeas',
+    meastype: '1', // weight
+  }
+
+  // Use startdate/enddate if provided, otherwise fetch all
+  if (startDate) {
+    params.startdate = Math.floor(startDate.getTime() / 1000).toString()
+  } else {
+    params.lastupdate = '1' // fetch all since epoch
+  }
+  if (endDate) {
+    params.enddate = Math.floor(endDate.getTime() / 1000).toString()
+  }
+
+  const response = await fetch('https://wbsapi.withings.net/measure', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(params).toString(),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Withings API HTTP error: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (data.status !== 0) {
+    if (data.status === 401) {
+      throw new Error('INVALID_TOKEN')
+    } else if (data.status === 601) {
+      throw new Error('RATE_LIMITED')
+    } else {
+      throw new Error(`Withings API error: ${data.status} - ${data.error || 'Unknown error'}`)
+    }
+  }
+
+  if (!data.body?.measuregrps || data.body.measuregrps.length === 0) {
+    return []
+  }
+
+  const groups = data.body.measuregrps
+
+  // Sort by date descending (most recent first)
+  const sortedGroups = groups.sort((a: any, b: any) => b.date - a.date)
+
+  const measurements: Array<{ weightKg: number; weightLbs: number; measuredAt: string }> = []
+
+  for (const group of sortedGroups) {
+    const weightMeasure = group.measures.find((m: any) => m.type === 1)
+    if (!weightMeasure) continue
+
+    const kg = weightMeasure.value * Math.pow(10, weightMeasure.unit)
+    const lbs = Math.round(kg * 2.20462 * 10) / 10
+
+    measurements.push({
+      weightKg: parseFloat(kg.toFixed(2)),
+      weightLbs: lbs,
+      measuredAt: new Date(group.date * 1000).toISOString(),
+    })
+  }
+
+  return measurements
+}

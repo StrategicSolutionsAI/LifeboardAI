@@ -126,6 +126,33 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
       return;
     }
 
+    // Handle drag from sidebar (or all-day strip) to the hourly planner wrapper
+    if ((isFromSidebar(source.droppableId) || source.droppableId === 'allday-strip') && destination.droppableId === 'hourly-planner-drop') {
+      const dateStr = selectedDateStr;
+      const taskId = source.droppableId === 'allday-strip' ? draggableId.replace('allday::', '') : draggableId;
+      const now = new Date();
+      const currentHour = now.getHours();
+      const nextHour = currentHour < 7 ? 9 : currentHour < 21 ? currentHour + 1 : 9;
+      const displayHour = nextHour % 12 || 12;
+      const period = nextHour < 12 ? 'AM' : 'PM';
+      const dstHour = `hour-${displayHour}${period}`;
+
+      batchUpdateTasks([
+        {
+          taskId,
+          updates: {
+            hourSlot: dstHour,
+            allDay: false,
+            due: { date: dateStr },
+          },
+          occurrenceDate: dateStr,
+        }
+      ]).catch(error => {
+        console.error('Failed to schedule task to hourly planner:', error);
+      });
+      return;
+    }
+
     // Handle drag from sidebar to calendar day (non-hour areas)
     if (isFromSidebar(source.droppableId) && isCalendarDay(destination.droppableId)) {
       const targetDateStr = destination.droppableId.replace('calendar-day-', '');
@@ -522,7 +549,7 @@ function CalendarContentInner({ selectedDate, onDateChange }: CalendarContentInn
             isSidebarCollapsed ? 'lg:w-[64px]' : 'lg:w-[360px]'
           }`}
         >
-          <CalendarTaskList 
+          <CalendarTaskList
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
             availableBuckets={buckets}

@@ -24,7 +24,7 @@ function mapRowToTask(row: any) {
     bucket: row.bucket || undefined,
     position: row.position ?? undefined,
     duration: row.duration ?? undefined,
-    repeatRule: row.repeat_rule || undefined,
+    repeatRule: row.repeat_rule && row.repeat_rule !== 'none' ? row.repeat_rule : undefined,
     allDay: row.all_day ?? (row.hour_slot ? false : true),
     kanbanStatus: row.kanban_status ?? (row.completed ? 'done' : 'todo'),
     created_at: row.created_at,

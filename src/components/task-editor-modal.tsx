@@ -9,7 +9,8 @@ import {
   useState,
 } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, ShoppingCart } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/hooks/use-tasks";
 import {
@@ -19,6 +20,7 @@ import {
   UNASSIGNED_BUCKET_LABEL,
 } from "@/lib/task-form-utils";
 import { cn } from "@/lib/utils";
+import { getBucketColorSync } from "@/lib/bucket-colors";
 
 const START_TIMES = ["7AM","8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM"];
 const END_TIMES = ["8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM","10PM"];
@@ -64,6 +66,7 @@ const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
   ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {} }, ref) => {
     const { allTasks, createTask, batchUpdateTasks, deleteTask, refetch } = useTasksContext();
+    const { toast } = useToast();
 
     const [isOpen, setIsOpen] = useState(false);
     const [formContent, setFormContent] = useState("");
@@ -77,6 +80,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editTaskId, setEditTaskId] = useState<string | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [shoppingItemId, setShoppingItemId] = useState<string | null>(null);
+    const [isShoppingBusy, setIsShoppingBusy] = useState(false);
 
     const resolveDefaultDate = useCallback(() => {
       return getDefaultDate?.() ?? resolveTodayKey();
@@ -99,6 +104,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setIsSubmitting(false);
       setFormBucket(evaluateBucketDefault());
       setShowDeleteConfirm(false);
+      setShoppingItemId(null);
+      setIsShoppingBusy(false);
     }, [evaluateBucketDefault]);
 
     const ensureTaskLookup = useCallback((taskId?: string | null): Task | undefined => {
@@ -159,6 +166,30 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       openNew,
       close: resetState,
     }), [openWithTask, openByTaskId, openNew, resetState]);
+
+    useEffect(() => {
+      if (!isOpen || !editTaskId) {
+        setShoppingItemId(null);
+        return;
+      }
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/shopping-list?taskId=${encodeURIComponent(editTaskId)}&includePurchased=true`,
+            { credentials: "same-origin" },
+          );
+          if (!res.ok || cancelled) return;
+          const json = await res.json();
+          if (!cancelled && json.items?.length > 0) {
+            setShoppingItemId(json.items[0].id);
+          }
+        } catch {
+          // silently ignore — button defaults to "add" mode
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [isOpen, editTaskId]);
 
     useEffect(() => {
       if (!startDate) {
@@ -292,6 +323,60 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         console.error("Failed to delete task", error);
       }
     }, [editTaskId, deleteTask, resetState, refetch]);
+
+    const handleToggleShoppingList = useCallback(async () => {
+      if (!editTaskId || isShoppingBusy) return;
+      setIsShoppingBusy(true);
+      try {
+        if (shoppingItemId) {
+          // Remove from shopping list
+          const res = await fetch("/api/shopping-list", {
+            method: "DELETE",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: shoppingItemId }),
+          });
+          if (!res.ok) throw new Error("Failed to remove shopping item");
+          setShoppingItemId(null);
+          toast({ title: "Removed from shopping list" });
+        } else {
+          // Add to shopping list
+          const createRes = await fetch("/api/shopping-list", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: formContent.trim() || "Untitled",
+              bucket: formBucket || null,
+              neededBy: startDate ?? null,
+            }),
+          });
+          if (!createRes.ok) throw new Error("Failed to create shopping item");
+          const { item } = await createRes.json();
+
+          if (item?.id) {
+            await fetch("/api/shopping-list", {
+              method: "PATCH",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: item.id,
+                taskId: editTaskId,
+                taskCreatedAt: new Date().toISOString(),
+              }),
+            });
+            setShoppingItemId(item.id);
+          }
+
+          toast({ title: "Added to shopping list" });
+        }
+      } catch (err) {
+        console.error("Failed to update shopping list:", err);
+        toast({ title: "Failed to update shopping list", type: "error" });
+      } finally {
+        setIsShoppingBusy(false);
+      }
+    }, [editTaskId, isShoppingBusy, shoppingItemId, formContent, formBucket, startDate, toast]);
 
     // Keyboard shortcuts: Cmd+Enter to save, Escape to close
     useEffect(() => {
@@ -466,7 +551,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                     {UNASSIGNED_BUCKET_LABEL}
                   </button>
                   {availableBuckets.map((bucket) => {
-                    const color = bucketColors[bucket] ?? "#bb9e7b";
+                    const color = getBucketColorSync(bucket, bucketColors);
                     const active = formBucket === bucket;
                     return (
                       <button
@@ -511,7 +596,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           {/* Footer */}
           <div className="px-6 py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex items-center gap-3">
                 {editTaskId && (
                   showDeleteConfirm ? (
                     <div className="flex items-center gap-3">
@@ -530,13 +615,30 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 text-[13px] text-theme-text-tertiary hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="flex items-center gap-1.5 text-[13px] text-theme-text-tertiary hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                      <button
+                        onClick={handleToggleShoppingList}
+                        disabled={isShoppingBusy}
+                        className={cn(
+                          "flex items-center gap-1.5 text-[13px] transition-colors disabled:opacity-50",
+                          shoppingItemId
+                            ? "text-theme-primary hover:text-red-500"
+                            : "text-theme-text-tertiary hover:text-theme-primary"
+                        )}
+                      >
+                        <ShoppingCart size={14} />
+                        {isShoppingBusy
+                          ? (shoppingItemId ? "Removing..." : "Adding...")
+                          : (shoppingItemId ? "On shopping list" : "Shopping list")}
+                      </button>
+                    </>
                   )
                 )}
               </div>

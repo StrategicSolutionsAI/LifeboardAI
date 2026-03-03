@@ -9,11 +9,11 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { access_token, refresh_token, user_id } = await request.json()
+    const { access_token, refresh_token, user_id, expires_in } = await request.json()
 
     if (!access_token || !refresh_token || !user_id) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: access_token, refresh_token, user_id' 
+      return NextResponse.json({
+        error: 'Missing required fields: access_token, refresh_token, user_id'
       }, { status: 400 })
     }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         token_data: {
           access_token,
           refresh_token,
-          expires_in: 3600,
+          expires_in: expires_in ?? 10800, // Withings default is 3 hours
           token_type: 'Bearer'
         },
         updated_at: new Date().toISOString(),

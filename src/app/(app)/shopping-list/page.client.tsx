@@ -134,6 +134,15 @@ function ShoppingListLayout() {
   const [justPurchased, setJustPurchased] = useState<Set<string>>(new Set());
   const [lastCreatedId, setLastCreatedId] = useState<string | null>(null);
 
+  const dueSoonCount = useMemo(() => {
+    const now = Date.now();
+    return items.filter((i) => {
+      if (!i.neededBy) return false;
+      const diff = new Date(i.neededBy).getTime() - now;
+      return diff >= 0 && diff <= 7 * 86_400_000;
+    }).length;
+  }, [items]);
+
   useEffect(() => {
     if (!newItemBucket) {
       if (buckets.length > 0) {
@@ -919,11 +928,7 @@ function ShoppingListLayout() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[18px] font-bold text-theme-text-primary leading-tight">
-                {items.filter((i) => {
-                  if (!i.neededBy) return false;
-                  const diff = new Date(i.neededBy).getTime() - Date.now();
-                  return diff >= 0 && diff <= 7 * 86_400_000;
-                }).length}
+                {dueSoonCount}
               </span>
               <span className="text-[11px] text-theme-text-tertiary">Due Soon</span>
             </div>

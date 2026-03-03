@@ -348,11 +348,13 @@ function EnhancedTaskCard({
                     </div>
                   )}
 
-                  {/* Expand/Collapse Indicator */}
-                  <div className={`w-6 h-6 rounded-lg bg-theme-brand-tint-light/80 flex items-center justify-center transition-all duration-200 ${isExpanded ? 'bg-theme-surface-selected rotate-90' : 'group-hover:bg-theme-skeleton/80'
-                    }`}>
-                    <ChevronRight size={12} className={`transition-colors duration-200 ${isExpanded ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-text-body'
-                      }`} />
+                  <div className="flex items-center gap-1.5">
+                    {/* Expand/Collapse Indicator */}
+                    <div className={`w-6 h-6 rounded-lg bg-theme-brand-tint-light/80 flex items-center justify-center transition-all duration-200 ${isExpanded ? 'bg-theme-surface-selected rotate-90' : 'group-hover:bg-theme-skeleton/80'
+                      }`}>
+                      <ChevronRight size={12} className={`transition-colors duration-200 ${isExpanded ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-text-body'
+                        }`} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -389,6 +391,7 @@ function EnhancedTaskCard({
                     />
                     Reschedule
                   </button>
+
 
                   {availableBuckets?.length > 0 && (
                     <select
@@ -526,9 +529,21 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange, onTaskClick }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange, onTaskClick }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
+
+  // Auto-expand collapsed daily section when dragging from hourly planner
+  const wasCollapsedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (isDragging && isDailyCollapsed) {
+      wasCollapsedRef.current = true;
+      setIsDailyCollapsed(false);
+    }
+    if (!isDragging && wasCollapsedRef.current) {
+      wasCollapsedRef.current = false;
+    }
+  }, [isDragging, isDailyCollapsed]);
   const [isOpenCollapsed, setIsOpenCollapsed] = useState(false);
   const [taskView, setTaskView] = useState<'Today' | 'Upcoming' | 'Master List'>('Today');
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
@@ -1201,7 +1216,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
             <button
               key={tab}
               onClick={() => setTaskView(tab)}
-              className={`relative z-10 flex-1 h-8 px-4 text-sm font-medium rounded-lg transition-all duration-300 ease-out ${taskView === tab
+              className={`relative z-10 flex-1 h-8 px-4 text-sm font-medium rounded-lg transition-all duration-300 ease-out whitespace-nowrap ${taskView === tab
                   ? 'text-white'
                   : 'text-theme-text-subtle hover:text-theme-text-primary'
                 }`}
@@ -1234,11 +1249,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
           <div className="space-y-6">
             {/* Daily tasks */}
             <Droppable droppableId="dailyTasks">
-              {(provided: any) => (
+              {(provided: any, snapshot: any) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="space-y-4"
+                  className={`space-y-4 rounded-xl transition-all duration-200 ${snapshot.isDraggingOver ? 'ring-2 ring-theme-secondary/40 bg-theme-brand-tint-subtle/20' : ''}`}
                 >
                   <div
                     className="flex items-center justify-between group cursor-pointer select-none py-2"
@@ -1269,12 +1284,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                           ))}
                         </div>
                       ) : !loading && todayTasks.length === 0 ? (
-                        <div className="text-center py-8">
+                        <div className={`text-center py-8 rounded-xl transition-all duration-200 ${isDragging ? 'border-2 border-dashed border-theme-secondary/40 bg-theme-brand-tint-subtle/10 min-h-[80px]' : ''}`}>
                           <div className="w-12 h-12 rounded-xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-3">
                             <Clock size={20} className="text-theme-primary-600" />
                           </div>
-                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks for today</h5>
-                          <p className="text-xs text-theme-text-tertiary">Add a task to get started</p>
+                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">{isDragging ? 'Drop here to unschedule' : 'No tasks for today'}</h5>
+                          <p className="text-xs text-theme-text-tertiary">{isDragging ? 'Task will keep its date but lose its time' : 'Add a task to get started'}</p>
                         </div>
                       ) : (
                         todayTasksOrdered.map((t: any, index: number) => (
@@ -1492,11 +1507,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                   >
                     <div className="px-4 pb-4">
                       <Droppable droppableId={`upcoming-${groupKey}`}>
-                        {(provided) => (
+                        {(provided, snapshot) => (
                           <div
                             ref={provided.innerRef}
                             {...provided.droppableProps}
-                            className="space-y-3"
+                            className={`space-y-3 rounded-xl transition-all duration-200 ${snapshot.isDraggingOver ? 'ring-2 ring-theme-secondary/40 bg-theme-brand-tint-subtle/20' : ''}`}
                           >
                             {tasks.map((task: any, index: number) => (
                               <EnhancedTaskCard
@@ -1622,11 +1637,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
           <div className="space-y-6">
             {/* Today's Tasks Section in Master List */}
             <Droppable droppableId="masterTodayTasks">
-              {(provided: any) => (
+              {(provided: any, snapshot: any) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="space-y-4"
+                  className={`space-y-4 rounded-xl transition-all duration-200 ${snapshot.isDraggingOver ? 'ring-2 ring-theme-secondary/40 bg-theme-brand-tint-subtle/20' : ''}`}
                 >
                   <div
                     className="flex items-center justify-between group cursor-pointer select-none py-2"
@@ -1759,11 +1774,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               </div>
 
               <Droppable droppableId="openTasks">
-                {(provided: any) => (
+                {(provided: any, snapshot: any) => (
                   <ul
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="space-y-2 text-sm text-theme-text-body pr-1 transition-[max-height] duration-200"
+                    className={`space-y-2 text-sm text-theme-text-body pr-1 transition-[max-height] duration-200 rounded-xl ${snapshot.isDraggingOver ? 'ring-2 ring-theme-secondary/40 bg-theme-brand-tint-subtle/20' : ''}`}
                     style={{
                       maxHeight: isOpenCollapsed ? 0 : '60vh',
                       overflowY: isOpenCollapsed ? 'hidden' : 'auto'

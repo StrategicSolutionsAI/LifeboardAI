@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Popover,
@@ -897,11 +898,12 @@ function TaskRowDropdown({
           <MoreHorizontal size={16} className="text-theme-text-secondary" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-36">
+      <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onClick={() => onEdit(taskId)}>
           <Pencil size={14} />
           Edit
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => onDelete(taskId)}>
           <Trash2 size={14} />
           Delete

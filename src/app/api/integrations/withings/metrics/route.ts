@@ -121,12 +121,11 @@ async function handler(request: Request) {
       })
     })
     
-    // Update the timestamp to show when we last successfully fetched data
-    await supabase
-      .from('user_integrations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', integration.id)
-    
+    // NOTE: We intentionally do NOT update `updated_at` here.
+    // `updated_at` tracks when the *token* was last refreshed, which is used
+    // to calculate token expiry.  Bumping it on every data fetch would mask
+    // the real token age and delay preemptive refresh.
+
     requestLogger.info('Successfully fetched Withings metrics', {
       integrationId: integration.id,
       weightKg
@@ -153,12 +152,6 @@ async function handler(request: Request) {
           const weightKg = await requestLogger.timeOperation('fetch-withings-weight-retry', async () => {
             return await fetchWithingsLatestWeight(refreshResult.newTokens!.access_token)
           })
-          
-          // Update success timestamp
-          await supabase
-            .from('user_integrations')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', integration.id)
           
           requestLogger.info('Successfully fetched Withings metrics after token refresh', {
             integrationId: integration.id,

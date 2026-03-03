@@ -45,15 +45,15 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
           </div>
           
           {/* Range picker */}
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-5 flex flex-wrap gap-2">
             {ranges.map(({ label, days }) => (
               <button
                 key={days}
                 onClick={() => setRangeDays(days)}
-                className={`px-2 py-1 rounded text-sm ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
                   rangeDays === days
-                    ? 'bg-warm-500 text-white'
-                    : 'bg-theme-progress-track text-theme-text-subtle hover:bg-theme-skeleton'
+                    ? 'bg-warm-500 text-white border-warm-500 shadow-warm-sm'
+                    : 'bg-theme-surface-raised text-theme-text-secondary border-theme-neutral-300 hover:border-warm-300 hover:text-theme-text-primary'
                 }`}
               >
                 {label}
@@ -63,12 +63,16 @@ export default function TrendsPanel({ widgets, bucketName }: TrendsPanelProps) {
 
           {/* Charts */}
           <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {(selectedWidget === 'all' ? widgets : widgets.filter(w => w.instanceId === selectedWidget)).map((w) => (
+            {(selectedWidget === 'all' ? widgets : widgets.filter(w => w.instanceId === selectedWidget)).map((w, i) => (
               <WidgetTrendChart
                 key={w.instanceId}
                 instanceId={w.instanceId}
                 name={w.name}
                 rangeDays={rangeDays}
+                dataSource={w.dataSource}
+                widgetType={w.id}
+                unit={w.weightData?.unit || w.unit}
+                index={i}
               />
             ))}
           </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { CSSProperties } from "react";
 import dynamic from "next/dynamic";
-import { createPortal } from "react-dom";
 import {
   addMonths,
   subMonths,
@@ -23,8 +22,7 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Upload, Sparkles, Heart, Coffee, Sun, BookOpen, Dumbbell, Sticker, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
@@ -34,6 +32,13 @@ import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/hooks/use-calendar-stickers";
 import { sanitizeBucketName, isoToHourLabel } from "@/lib/task-form-utils";
+import {
+  StickerChips,
+  StickerAddButtonCompact,
+  StickerPalette,
+  StickerRow,
+  computeStickerPalettePosition as computeStickerPos,
+} from "@/components/calendar-stickers";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -49,73 +54,6 @@ const getRepeatLabel = (value?: RepeatOption | null) => {
   return REPEAT_LABELS[value];
 };
 
-interface StickerOption {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  backgroundClass: string;
-  textClass: string;
-  ringClass: string;
-}
-
-const STICKER_OPTIONS: StickerOption[] = [
-  {
-    id: 'celebrate',
-    label: 'Celebrate',
-    icon: Sparkles,
-    backgroundClass: 'bg-pink-50',
-    textClass: 'text-pink-500',
-    ringClass: 'ring-pink-200/70',
-  },
-  {
-    id: 'self-care',
-    label: 'Self-care',
-    icon: Heart,
-    backgroundClass: 'bg-rose-50',
-    textClass: 'text-rose-500',
-    ringClass: 'ring-rose-200/70',
-  },
-  {
-    id: 'coffee-break',
-    label: 'Coffee',
-    icon: Coffee,
-    backgroundClass: 'bg-amber-50',
-    textClass: 'text-amber-600',
-    ringClass: 'ring-amber-200/70',
-  },
-  {
-    id: 'sunshine',
-    label: 'Sunshine',
-    icon: Sun,
-    backgroundClass: 'bg-yellow-50',
-    textClass: 'text-yellow-500',
-    ringClass: 'ring-yellow-200/70',
-  },
-  {
-    id: 'focus',
-    label: 'Focus',
-    icon: BookOpen,
-    backgroundClass: 'bg-theme-primary-50',
-    textClass: 'text-theme-secondary',
-    ringClass: 'ring-theme-neutral-300/70',
-  },
-  {
-    id: 'movement',
-    label: 'Movement',
-    icon: Dumbbell,
-    backgroundClass: 'bg-emerald-50',
-    textClass: 'text-emerald-600',
-    ringClass: 'ring-emerald-200/70',
-  },
-];
-
-const STICKER_LOOKUP: Record<string, StickerOption> = STICKER_OPTIONS.reduce((acc, option) => {
-  acc[option.id] = option;
-  return acc;
-}, {} as Record<string, StickerOption>);
-
-const STICKER_PALETTE_WIDTH = 208;
-const STICKER_PALETTE_HEIGHT = 236;
 
 const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
   if (!value) return undefined;
@@ -369,30 +307,14 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const { stickersByDate, addStickerToDate, removeStickerFromDate, clearStickersForDate } = useCalendarStickers();
   const [activeStickerDay, setActiveStickerDay] = useState<string | null>(null);
-  const [selectedStickerDate, setSelectedStickerDate] = useState<string | null>(null); // For date selection in header sticker mode
-  const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
+const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
   const stickerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [stickerPalettePosition, setStickerPalettePosition] = useState<{ top: number; left: number } | null>(null);
 
-  const computeStickerPalettePosition = useCallback((target: HTMLElement) => {
-    const rect = target.getBoundingClientRect();
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : STICKER_PALETTE_WIDTH;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : STICKER_PALETTE_HEIGHT;
-
-    const preferredLeft = rect.left + rect.width / 2 - STICKER_PALETTE_WIDTH / 2;
-    const clampedLeft = Math.min(
-      Math.max(preferredLeft, 12),
-      viewportWidth - STICKER_PALETTE_WIDTH - 12
-    );
-
-    const preferredTop = rect.bottom + 8;
-    const clampedTop = Math.min(
-      Math.max(preferredTop, 12),
-      viewportHeight - STICKER_PALETTE_HEIGHT - 12
-    );
-
-    return { top: clampedTop, left: clampedLeft };
-  }, []);
+  const computeStickerPalettePosition = useCallback(
+    (target: HTMLElement) => computeStickerPos(target),
+    [],
+  );
 
   const repositionStickerPalette = useCallback(() => {
     const trigger = stickerTriggerRef.current;
@@ -501,318 +423,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     };
   }, [activeStickerDay, repositionStickerPalette]);
 
-  // Component to display stickers on a date (without add button)
-  const StickerDisplay = ({ dayStr, className }: { dayStr: string; className?: string }) => {
-    const dayStickers = stickersByDate[dayStr] ?? [];
-    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15';
-
-    if (dayStickers.length === 0) return null;
-
-    return (
-      <div className={className ?? ''}>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          {dayStickers.map((stickerId) => {
-            const option = STICKER_LOOKUP[stickerId];
-            if (!option) return null;
-            const Icon = option.icon;
-            return (
-              <button
-                key={`${dayStr}-${stickerId}`}
-                type="button"
-                title={`Remove ${option.label} sticker`}
-                aria-label={`Remove ${option.label} sticker`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  removeStickerFromDate(dayStr, stickerId);
-                }}
-                className={`${stickerButtonCommon} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // Component for add sticker button only (no sticker display) - for headers
-  const StickerAddButton = ({ dayStr, className, showDatePicker = false }: { dayStr: string; className?: string; showDatePicker?: boolean }) => {
-    const targetDate = showDatePicker && selectedStickerDate ? selectedStickerDate : dayStr;
-    const dayStickers = stickersByDate[targetDate] ?? [];
-    const isOpen = activeStickerDay === dayStr;
-    const reachedLimit = dayStickers.length >= MAX_STICKERS_PER_DAY;
-
-    return (
-      <div className={className ?? ''}>
-        <button
-          type="button"
-          ref={dayStr === activeStickerDay ? stickerTriggerRef : undefined}
-          onClick={(event) => {
-            event.stopPropagation();
-            const target = event.currentTarget as HTMLButtonElement;
-
-            if (activeStickerDay === dayStr) {
-              setActiveStickerDay(null);
-              setSelectedStickerDate(null);
-              return;
-            }
-
-            stickerTriggerRef.current = target;
-            setStickerPalettePosition(computeStickerPalettePosition(target));
-            setActiveStickerDay(dayStr);
-            if (showDatePicker) {
-              setSelectedStickerDate(dayStr);
-            }
-          }}
-          className={[
-            'inline-flex items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-theme-text-subtle shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15',
-            reachedLimit
-              ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
-              : 'border-theme-neutral-300 hover:border-theme-secondary hover:text-theme-primary-600'
-          ].join(' ')}
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-          aria-label={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
-          title={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
-        >
-          <Sticker className="h-3.5 w-3.5" />
-          <span className="ml-1">Sticker</span>
-        </button>
-
-        {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
-          <div
-            ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
-            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-theme-neutral-300 bg-white/95 p-2 shadow-xl ring-1 ring-theme-neutral-300 backdrop-blur-sm"
-            style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
-              <span>Choose sticker</span>
-              <button
-                type="button"
-                className="text-theme-text-tertiary/70 transition hover:text-theme-text-subtle focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setActiveStickerDay(null);
-                  setSelectedStickerDate(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
-
-            {showDatePicker && (
-              <div className="mb-3">
-                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
-                  Select Date
-                </label>
-                <input
-                  type="date"
-                  value={selectedStickerDate || dayStr}
-                  onChange={(e) => setSelectedStickerDate(e.target.value)}
-                  className="w-full rounded-lg border border-theme-neutral-300 px-2 py-1.5 text-xs focus:border-theme-secondary focus:outline-none focus:ring-1 focus:ring-theme-secondary"
-                  onClick={(event) => event.stopPropagation()}
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 gap-2">
-              {STICKER_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const isSelected = dayStickers.includes(option.id);
-                const disabled = !isSelected && reachedLimit;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-theme-surface-alt text-theme-text-tertiary transition hover:bg-theme-brand-tint-light focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 ${
-                      isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
-                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (isSelected) {
-                        removeStickerFromDate(targetDate, option.id);
-                      } else if (!disabled) {
-                        addStickerToDate(targetDate, option.id);
-                      }
-                    }}
-                    aria-pressed={isSelected}
-                    aria-label={isSelected ? `Remove ${option.label}` : `Add ${option.label}`}
-                    disabled={disabled && !isSelected}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-[10px] font-medium">{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-2 space-y-1 text-[10px] text-theme-text-tertiary/70">
-              <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
-              <p>Tap a sticker again to remove it.</p>
-            </div>
-
-            {dayStickers.length > 0 && (
-              <button
-                type="button"
-                className="mt-2 w-full rounded-lg border border-theme-neutral-300 px-2 py-1 text-[11px] font-medium text-theme-text-tertiary transition hover:bg-theme-surface-alt focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  clearStickersForDate(targetDate);
-                  setActiveStickerDay(null);
-                  setSelectedStickerDate(null);
-                }}
-              >
-                Clear stickers
-              </button>
-            )}
-          </div>,
-          document.body
-        )}
-      </div>
-    );
-  };
-
-  const StickerRow = ({ dayStr, className }: { dayStr: string; className?: string }) => {
-    const dayStickers = stickersByDate[dayStr] ?? [];
-    const isOpen = activeStickerDay === dayStr;
-    const reachedLimit = dayStickers.length >= MAX_STICKERS_PER_DAY;
-
-    const stickerButtonCommon = 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15';
-
-    return (
-      <div className={className ?? ''}>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <button
-            type="button"
-            ref={dayStr === activeStickerDay ? stickerTriggerRef : undefined}
-            onClick={(event) => {
-              event.stopPropagation();
-              const target = event.currentTarget as HTMLButtonElement;
-
-              if (activeStickerDay === dayStr) {
-                setActiveStickerDay(null);
-                return;
-              }
-
-              stickerTriggerRef.current = target;
-              setStickerPalettePosition(computeStickerPalettePosition(target));
-              setActiveStickerDay(dayStr);
-            }}
-            className={[
-              'order-first inline-flex w-full items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-theme-text-subtle shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 sm:order-none sm:w-auto sm:px-3',
-              reachedLimit
-                ? 'border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600'
-                : 'border-theme-neutral-300 hover:border-theme-secondary hover:text-theme-primary-600'
-            ].join(' ')}
-            aria-haspopup="dialog"
-            aria-expanded={isOpen}
-            aria-label={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
-            title={reachedLimit ? `Sticker limit reached (${MAX_STICKERS_PER_DAY})` : 'Add sticker'}
-          >
-            <Sticker className="h-3.5 w-3.5" />
-            <span className="ml-1">Sticker</span>
-          </button>
-
-          {dayStickers.map((stickerId) => {
-            const option = STICKER_LOOKUP[stickerId];
-            if (!option) return null;
-            const Icon = option.icon;
-            return (
-              <button
-                key={`${dayStr}-${stickerId}`}
-                type="button"
-                title={`Remove ${option.label} sticker`}
-                aria-label={`Remove ${option.label} sticker`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  removeStickerFromDate(dayStr, stickerId);
-                }}
-                className={`${stickerButtonCommon} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            );
-          })}
-        </div>
-
-        {isOpen && stickerPalettePosition && typeof window !== 'undefined' && createPortal(
-          <div
-            ref={dayStr === activeStickerDay ? stickerPaletteRef : undefined}
-            className="fixed z-[1200] max-h-[80vh] w-[208px] overflow-hidden rounded-xl border border-theme-neutral-300 bg-white/95 p-2 shadow-xl ring-1 ring-theme-neutral-300 backdrop-blur-sm"
-            style={{ top: stickerPalettePosition.top, left: stickerPalettePosition.left }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
-              <span>Choose sticker</span>
-              <button
-                type="button"
-                className="text-theme-text-tertiary/70 transition hover:text-theme-text-subtle focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setActiveStickerDay(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {STICKER_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const isSelected = dayStickers.includes(option.id);
-                const disabled = !isSelected && reachedLimit;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`flex h-14 flex-col items-center justify-center gap-1 rounded-lg border border-transparent bg-theme-surface-alt text-theme-text-tertiary transition hover:bg-theme-brand-tint-light focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 ${
-                      isSelected ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm` : ''
-                    } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (isSelected) {
-                        removeStickerFromDate(dayStr, option.id);
-                      } else if (!disabled) {
-                        addStickerToDate(dayStr, option.id);
-                      }
-                    }}
-                    aria-pressed={isSelected}
-                    aria-label={isSelected ? `Remove ${option.label}` : `Add ${option.label}`}
-                    disabled={disabled && !isSelected}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-[10px] font-medium">{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-2 space-y-1 text-[10px] text-theme-text-tertiary/70">
-              <p>{`Up to ${MAX_STICKERS_PER_DAY} stickers per day.`}</p>
-              <p>Tap a sticker again to remove it.</p>
-            </div>
-
-            {dayStickers.length > 0 && (
-              <button
-                type="button"
-                className="mt-2 w-full rounded-lg border border-theme-neutral-300 px-2 py-1 text-[11px] font-medium text-theme-text-tertiary transition hover:bg-theme-surface-alt focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  clearStickersForDate(dayStr);
-                  setActiveStickerDay(null);
-                }}
-              >
-                Clear stickers
-              </button>
-            )}
-          </div>,
-          document.body
-        )}
-      </div>
-    );
-  };
 
   // Initialize current date from localStorage or prop or default to today
   const [currentDate, setCurrentDate] = useState(() => {
@@ -994,7 +604,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       if (!startRaw) return;
       const endRaw = normalizeDateString(task.endDate) ?? startRaw;
 
-      if (!task.repeatRule) {
+      const rule = task.repeatRule as string | undefined;
+      if (!rule || rule === 'none') {
         // Non-repeating: clamp [startRaw, endRaw] to visible range and iterate
         const clampedStart = startRaw < format(rangeStart, 'yyyy-MM-dd') ? format(rangeStart, 'yyyy-MM-dd') : startRaw;
         const clampedEnd = endRaw > format(rangeEnd, 'yyyy-MM-dd') ? format(rangeEnd, 'yyyy-MM-dd') : endRaw;
@@ -1382,7 +993,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       if (event.key === 'Escape') {
         if (activeStickerDay) {
           setActiveStickerDay(null);
-          setSelectedStickerDate(null);
           return;
         }
         if (isFilterDropdownOpen) {
@@ -2188,7 +1798,17 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     <h2 className="text-xl font-semibold text-theme-text-primary tracking-tight">
                       {format(currentDate, "MMMM d, yyyy")}
                     </h2>
-                    <StickerRow dayStr={currentDateKey} className="flex" />
+                    <StickerRow
+                      dayStr={currentDateKey}
+                      className="flex"
+                      stickersByDate={stickersByDate}
+                      maxStickersPerDay={MAX_STICKERS_PER_DAY}
+                      activeStickerDay={activeStickerDay}
+                      setActiveStickerDay={setActiveStickerDay}
+                      setStickerPalettePosition={setStickerPalettePosition}
+                      stickerTriggerRef={stickerTriggerRef}
+                      removeStickerFromDate={removeStickerFromDate}
+                    />
                   </div>
 
                   {/* Day Summary Stats */}
@@ -2347,19 +1967,33 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 </div>
               )}
 
-              <HourlyPlanner
-                ref={hourlyPlannerRef}
-                className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
-                showTimeIndicator={true}
-                allowResize={true}
-                availableBuckets={availableBuckets}
-                selectedBucket={selectedBucket}
-                isDragging={isDragging}
-                wrapWithContext={false}
-                plannerDate={format(currentDate, 'yyyy-MM-dd')}
-                onTaskOpen={openTaskEditorById}
-                bucketColors={bucketColors}
-              />
+              {/* Large Droppable wrapper so sidebar→calendar drops always land */}
+              <Droppable droppableId="hourly-planner-drop">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`relative flex-1 rounded-xl transition-colors duration-150 ${
+                      snapshot.isDraggingOver ? 'ring-2 ring-theme-primary-300/50' : ''
+                    }`}
+                  >
+                    <HourlyPlanner
+                      ref={hourlyPlannerRef}
+                      className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
+                      showTimeIndicator={true}
+                      allowResize={true}
+                      availableBuckets={availableBuckets}
+                      selectedBucket={selectedBucket}
+                      isDragging={isDragging}
+                      wrapWithContext={false}
+                      plannerDate={format(currentDate, 'yyyy-MM-dd')}
+                      onTaskOpen={openTaskEditorById}
+                      bucketColors={bucketColors}
+                    />
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
           </div>
         </div>
@@ -2405,7 +2039,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           <div
                             onClick={(e) => {
                               const target = e.target as HTMLElement;
-                              if (target.closest('.lb-day-add')) return;
+                              if (target.closest('.lb-day-add') || target.closest('.lb-sticker-add')) return;
                               if (dayEvents.length) setSelectedModalDate(dayStr);
                             }}
                             className={cellClasses}
@@ -2423,21 +2057,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             >
                               {format(day, "d")}
                             </button>
-                            <button
-                              type="button"
-                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedModalDate(null);
-                                taskEditorRef.current?.openNew(dayStr);
-                              }}
-                              title={`Add task on ${formattedDayLabel}`}
-                              aria-label={`Add task on ${formattedDayLabel}`}
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="flex items-center gap-0.5">
+                              <StickerAddButtonCompact
+                                dayStr={dayStr}
+                                stickersByDate={stickersByDate}
+                                maxStickersPerDay={MAX_STICKERS_PER_DAY}
+                                activeStickerDay={activeStickerDay}
+                                setActiveStickerDay={setActiveStickerDay}
+                                setStickerPalettePosition={setStickerPalettePosition}
+                                stickerTriggerRef={stickerTriggerRef}
+                              />
+                              <button
+                                type="button"
+                                className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedModalDate(null);
+                                  taskEditorRef.current?.openNew(dayStr);
+                                }}
+                                title={`Add task on ${formattedDayLabel}`}
+                                aria-label={`Add task on ${formattedDayLabel}`}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
-                          
+
+                          {/* Sticker chips */}
+                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} size="md" />
+
                           {/* Calidora-style compact event pills */}
                           <div className="flex flex-col gap-1.5">
                             {filteredEvents.map((ev: DayEvent, filteredIndex: number) => {
@@ -2545,7 +2193,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           <div
                             onClick={(e) => {
                               const target = e.target as HTMLElement;
-                              if (target.closest('.lb-day-add')) return;
+                              if (target.closest('.lb-day-add') || target.closest('.lb-sticker-add')) return;
                               if (dayEvents.length) setSelectedModalDate(dayStr);
                             }}
                             className={cellClasses}
@@ -2563,21 +2211,35 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             >
                               <span className="text-xs">{format(day, "d")}</span>
                             </button>
-                            <button
-                              type="button"
-                              className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedModalDate(null);
-                                taskEditorRef.current?.openNew(dayStr);
-                              }}
-                              title={`Add task on ${formattedDayLabel}`}
-                              aria-label={`Add task on ${formattedDayLabel}`}
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                            <div className="flex items-center gap-0.5">
+                              <StickerAddButtonCompact
+                                dayStr={dayStr}
+                                stickersByDate={stickersByDate}
+                                maxStickersPerDay={MAX_STICKERS_PER_DAY}
+                                activeStickerDay={activeStickerDay}
+                                setActiveStickerDay={setActiveStickerDay}
+                                setStickerPalettePosition={setStickerPalettePosition}
+                                stickerTriggerRef={stickerTriggerRef}
+                              />
+                              <button
+                                type="button"
+                                className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedModalDate(null);
+                                  taskEditorRef.current?.openNew(dayStr);
+                                }}
+                                title={`Add task on ${formattedDayLabel}`}
+                                aria-label={`Add task on ${formattedDayLabel}`}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
-                          
+
+                          {/* Sticker chips */}
+                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} size="sm" />
+
                           {/* Calidora-style compact event pills */}
                           <div className="flex flex-col gap-1">
                             {filteredEvents.slice(0, 3).map((ev: DayEvent, filteredIndex: number) => {
@@ -2756,6 +2418,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         availableBuckets={availableBuckets}
         selectedBucket={selectedBucket}
         getDefaultDate={taskEditorDefaultDate}
+        bucketColors={bucketColors}
       />
 
       {/* Delete Confirmation Modal */}
@@ -2836,6 +2499,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shared sticker palette — single instance for all views */}
+      {activeStickerDay && stickerPalettePosition && (
+        <StickerPalette
+          dayStr={activeStickerDay}
+          dayStickers={stickersByDate[activeStickerDay] ?? []}
+          maxStickersPerDay={MAX_STICKERS_PER_DAY}
+          position={stickerPalettePosition}
+          paletteRef={stickerPaletteRef}
+          onAdd={(id) => addStickerToDate(activeStickerDay, id)}
+          onRemove={(id) => removeStickerFromDate(activeStickerDay, id)}
+          onClear={() => { clearStickersForDate(activeStickerDay); setActiveStickerDay(null); }}
+          onClose={() => setActiveStickerDay(null)}
+        />
       )}
 
       {/* Upload Calendar Modal */}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { CustomApiError, createApiError } from './api-error-handler'
 import { logger, LogContext, ScopedLogger } from './logger'
+import { withRefreshLock } from './token-refresh-lock'
 
 export interface IntegrationError extends CustomApiError {
   provider: string
@@ -197,7 +198,9 @@ export class IntegrationErrorHandler {
     })
   }
 
-  // Helper method to handle token refresh operations
+  // Helper method to handle token refresh operations.
+  // Uses an in-memory lock to prevent concurrent refreshes for the same
+  // integration from racing (important because Withings rotates refresh tokens).
   async handleTokenRefresh<T>(
     refreshTokenFn: (refreshToken: string) => Promise<T>,
     refreshToken: string,
@@ -215,53 +218,98 @@ export class IntegrationErrorHandler {
       }
     }
 
-    try {
-      this.logger.info('Attempting token refresh', { integrationId })
-      
-      const newTokens = await refreshTokenFn(refreshToken)
-      
-      // Update tokens in database
-      const supabase = supabaseServer()
-      const { error: updateError } = await supabase
-        .from('user_integrations')
-        .update({
-          access_token: (newTokens as any).access_token,
-          refresh_token: (newTokens as any).refresh_token || refreshToken,
-          token_data: newTokens,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', integrationId)
+    return withRefreshLock(integrationId, async () => {
+      try {
+        // Re-read the integration row inside the lock — another request may
+        // have already refreshed while we were waiting.
+        const supabase = supabaseServer()
+        const { data: freshRow } = await supabase
+          .from('user_integrations')
+          .select('access_token, refresh_token, token_data, updated_at')
+          .eq('id', integrationId)
+          .maybeSingle()
 
-      if (updateError) {
-        this.logger.error('Failed to update tokens in database', {}, updateError)
-        throw updateError
-      }
+        if (freshRow?.updated_at) {
+          const updatedMs = new Date(freshRow.updated_at).getTime()
+          const tokenData = (freshRow.token_data || {}) as { expires_in?: number }
+          const expiresIn = (tokenData.expires_in ?? 3600) * 1000
+          const isStillFresh = Date.now() < updatedMs + expiresIn - 60_000
 
-      this.logger.info('Token refresh successful', { integrationId })
-      
-      return {
-        success: true,
-        newTokens: {
-          access_token: (newTokens as any).access_token,
-          refresh_token: (newTokens as any).refresh_token,
-          token_data: newTokens
+          if (isStillFresh && freshRow.access_token) {
+            this.logger.info('Token already refreshed by another request', { integrationId })
+            return {
+              success: true,
+              newTokens: {
+                access_token: freshRow.access_token,
+                refresh_token: freshRow.refresh_token ?? undefined,
+                token_data: freshRow.token_data
+              }
+            }
+          }
+        }
+
+        // Use the latest refresh token from the DB (may have been rotated).
+        const latestRefreshToken = freshRow?.refresh_token || refreshToken
+
+        this.logger.info('Attempting token refresh', { integrationId })
+        const newTokens = await refreshTokenFn(latestRefreshToken)
+
+        const { error: updateError } = await supabase
+          .from('user_integrations')
+          .update({
+            access_token: (newTokens as any).access_token,
+            refresh_token: (newTokens as any).refresh_token || latestRefreshToken,
+            token_data: newTokens,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', integrationId)
+
+        if (updateError) {
+          this.logger.error('Failed to update tokens in database', {}, updateError)
+          throw updateError
+        }
+
+        this.logger.info('Token refresh successful', { integrationId })
+
+        return {
+          success: true,
+          newTokens: {
+            access_token: (newTokens as any).access_token,
+            refresh_token: (newTokens as any).refresh_token,
+            token_data: newTokens
+          }
+        }
+      } catch (error) {
+        this.logger.error('Token refresh failed', { integrationId }, error as Error)
+
+        const integrationError = this.categorizeError(error as Error)
+
+        // Only clear tokens if the refresh token itself is permanently invalid.
+        // Re-check the DB first — another request may have refreshed successfully.
+        if (integrationError.code === 'TOKEN_EXPIRED') {
+          const supabase = supabaseServer()
+          const { data: currentRow } = await supabase
+            .from('user_integrations')
+            .select('updated_at')
+            .eq('id', integrationId)
+            .maybeSingle()
+
+          const recentlyUpdated = currentRow?.updated_at &&
+            (Date.now() - new Date(currentRow.updated_at).getTime()) < 30_000
+
+          if (!recentlyUpdated) {
+            await this.clearInvalidTokens(integrationId)
+          } else {
+            this.logger.info('Skipping token clear — row was recently updated by another request', { integrationId })
+          }
+        }
+
+        return {
+          success: false,
+          error: integrationError
         }
       }
-    } catch (error) {
-      this.logger.error('Token refresh failed', { integrationId }, error as Error)
-      
-      const integrationError = this.categorizeError(error as Error)
-      
-      // If refresh failed due to expired/invalid refresh token, clear tokens
-      if (integrationError.code === 'TOKEN_EXPIRED') {
-        await this.clearInvalidTokens(integrationId)
-      }
-      
-      return {
-        success: false,
-        error: integrationError
-      }
-    }
+    })
   }
 
   // Clear invalid tokens from database

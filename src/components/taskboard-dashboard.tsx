@@ -68,7 +68,6 @@ import { Button } from "@/components/ui/button";
 import type { DropResult } from "@hello-pangea/dnd";
 const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
-const Draggable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Draggable), { ssr: false });
 import WidgetSelector from "./widget-selector";
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,6 +109,38 @@ const HabitTrackerWidget = dynamic(
   () => import("./habit-tracker-widget").then(m => m.HabitTrackerWidget),
   { ssr: false }
 );
+const SleepTrackerWidget = dynamic(
+  () => import("./sleep-tracker-widget").then(m => m.SleepTrackerWidget),
+  { ssr: false }
+);
+const MeditationTimerWidget = dynamic(
+  () => import("./meditation-timer-widget").then(m => m.MeditationTimerWidget),
+  { ssr: false }
+);
+const BreathworkWidget = dynamic(
+  () => import("./breathwork-widget").then(m => m.BreathworkWidget),
+  { ssr: false }
+);
+const WaterIntakeWidget = dynamic(
+  () => import("./water-intake-widget").then(m => m.WaterIntakeWidget),
+  { ssr: false }
+);
+const MoodTrackerWidget = dynamic(
+  () => import("./mood-tracker-widget").then(m => m.MoodTrackerWidget),
+  { ssr: false }
+);
+const StepsTrackerWidget = dynamic(
+  () => import("./steps-tracker-widget").then(m => m.StepsTrackerWidget),
+  { ssr: false }
+);
+const HeartRateWidget = dynamic(
+  () => import("./heart-rate-widget").then(m => m.HeartRateWidget),
+  { ssr: false }
+);
+const CaffeineTrackerWidget = dynamic(
+  () => import("./caffeine-tracker-widget").then(m => m.CaffeineTrackerWidget),
+  { ssr: false }
+);
 const TrendsPanel = dynamic(
   () => import("./trends-panel"),
   { loading: () => <Skeleton className="h-48 w-full" /> }
@@ -118,13 +149,20 @@ const ChatBarLazy = dynamic(
   () => import("./chat-bar").then(m => m.ChatBar),
   { ssr: false, loading: () => null }
 );
+const DraggableWidgetCard = dynamic(
+  () => import("./draggable-widget-card").then(m => m.DraggableWidgetCard),
+  { ssr: false }
+);
+const WidgetCardSkeleton = dynamic(
+  () => import("./draggable-widget-card").then(m => m.WidgetCardSkeleton),
+  { ssr: false }
+);
 
 
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
   // Access tasks context for all task operations
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask, allTasks, toggleTaskCompletion: toggleTaskCompletionContext } = useTasksContext();
-
   // State for task management
   const [newOpenTask, setNewOpenTask] = useState('');
   const [isLoadingAllTasks, setIsLoadingAllTasks] = useState(false);
@@ -334,6 +372,30 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [shouldLoadExerciseWidget, setShouldLoadExerciseWidget] = useState(false);
   const [shouldLoadHomeProjectsWidget, setShouldLoadHomeProjectsWidget] = useState(false);
   const [shouldLoadHabitTrackerWidget, setShouldLoadHabitTrackerWidget] = useState(false);
+  const [sleepWidgetOpen, setSleepWidgetOpen] = useState(false);
+  const [shouldLoadSleepWidget, setShouldLoadSleepWidget] = useState(false);
+  const [activeSleepWidget, setActiveSleepWidget] = useState<WidgetInstance | null>(null);
+  const [meditationWidgetOpen, setMeditationWidgetOpen] = useState(false);
+  const [shouldLoadMeditationWidget, setShouldLoadMeditationWidget] = useState(false);
+  const [activeMeditationWidget, setActiveMeditationWidget] = useState<WidgetInstance | null>(null);
+  const [breathworkWidgetOpen, setBreathworkWidgetOpen] = useState(false);
+  const [shouldLoadBreathworkWidget, setShouldLoadBreathworkWidget] = useState(false);
+  const [activeBreathworkWidget, setActiveBreathworkWidget] = useState<WidgetInstance | null>(null);
+  const [waterWidgetOpen, setWaterWidgetOpen] = useState(false);
+  const [shouldLoadWaterWidget, setShouldLoadWaterWidget] = useState(false);
+  const [activeWaterWidget, setActiveWaterWidget] = useState<WidgetInstance | null>(null);
+  const [moodWidgetOpen, setMoodWidgetOpen] = useState(false);
+  const [shouldLoadMoodWidget, setShouldLoadMoodWidget] = useState(false);
+  const [activeMoodWidget, setActiveMoodWidget] = useState<WidgetInstance | null>(null);
+  const [stepsWidgetOpen, setStepsWidgetOpen] = useState(false);
+  const [shouldLoadStepsWidget, setShouldLoadStepsWidget] = useState(false);
+  const [activeStepsWidget, setActiveStepsWidget] = useState<WidgetInstance | null>(null);
+  const [heartRateWidgetOpen, setHeartRateWidgetOpen] = useState(false);
+  const [shouldLoadHeartRateWidget, setShouldLoadHeartRateWidget] = useState(false);
+  const [activeHeartRateWidget, setActiveHeartRateWidget] = useState<WidgetInstance | null>(null);
+  const [caffeineWidgetOpen, setCaffeineWidgetOpen] = useState(false);
+  const [shouldLoadCaffeineWidget, setShouldLoadCaffeineWidget] = useState(false);
+  const [activeCaffeineWidget, setActiveCaffeineWidget] = useState<WidgetInstance | null>(null);
   const [chatBarReady, setChatBarReady] = useState(false);
   const [confirmState, setConfirmState] = useState<DestructiveConfirmState | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
@@ -401,6 +463,46 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!habitTrackerWidgetOpen) return;
     setShouldLoadHabitTrackerWidget(true);
   }, [habitTrackerWidgetOpen]);
+
+  useEffect(() => {
+    if (!sleepWidgetOpen) return;
+    setShouldLoadSleepWidget(true);
+  }, [sleepWidgetOpen]);
+
+  useEffect(() => {
+    if (!meditationWidgetOpen) return;
+    setShouldLoadMeditationWidget(true);
+  }, [meditationWidgetOpen]);
+
+  useEffect(() => {
+    if (!breathworkWidgetOpen) return;
+    setShouldLoadBreathworkWidget(true);
+  }, [breathworkWidgetOpen]);
+
+  useEffect(() => {
+    if (!waterWidgetOpen) return;
+    setShouldLoadWaterWidget(true);
+  }, [waterWidgetOpen]);
+
+  useEffect(() => {
+    if (!moodWidgetOpen) return;
+    setShouldLoadMoodWidget(true);
+  }, [moodWidgetOpen]);
+
+  useEffect(() => {
+    if (!stepsWidgetOpen) return;
+    setShouldLoadStepsWidget(true);
+  }, [stepsWidgetOpen]);
+
+  useEffect(() => {
+    if (!heartRateWidgetOpen) return;
+    setShouldLoadHeartRateWidget(true);
+  }, [heartRateWidgetOpen]);
+
+  useEffect(() => {
+    if (!caffeineWidgetOpen) return;
+    setShouldLoadCaffeineWidget(true);
+  }, [caffeineWidgetOpen]);
 
   useEffect(() => {
     if (chatBarReady || typeof window === 'undefined') return;
@@ -966,6 +1068,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               });
               return updated;
             });
+
+            // Also upsert today's weight into widget_progress_history for trends
+            try {
+              const { data: { user: currentUser } } = await supabase.auth.getUser();
+              if (currentUser) {
+                const withingsWidgets = Object.values(widgetsByBucketRef.current)
+                  .flat()
+                  .filter((w) => w.id === 'weight' && w.dataSource === 'withings');
+                const rows = withingsWidgets.map((w) => {
+                  const wUnit = w.weightData?.unit || w.unit || 'lbs';
+                  const val = wUnit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
+                  return {
+                    user_id: currentUser.id,
+                    widget_instance_id: w.instanceId,
+                    date: todayStrGlobal,
+                    value: val,
+                  };
+                });
+                if (rows.length) {
+                  await supabase
+                    .from('widget_progress_history')
+                    .upsert(rows, { onConflict: 'user_id,widget_instance_id,date' });
+                }
+              }
+            } catch (errProgress) {
+              console.error('Failed to upsert Withings weight to progress history', errProgress);
+            }
           } catch (errW) {
             console.error('Error fetching Withings metrics', errW);
           }
@@ -1689,6 +1818,82 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       saveWidgets(latestWidgets, latestProgress);
     }, 2000)
   ).current;
+
+  // Handle widget drag-and-drop reorder within a bucket
+  const handleWidgetDragEnd = useCallback((result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.index === destination.index) return;
+
+    setWidgetsByBucket((prev) => {
+      const bucketWidgets = [...(prev[activeBucket] || [])];
+      // Work on display widgets only (exclude debug widgets)
+      const displayWidgets = bucketWidgets.filter(w => !w.instanceId?.startsWith('debug-'));
+      const debugWidgets = bucketWidgets.filter(w => w.instanceId?.startsWith('debug-'));
+      const [moved] = displayWidgets.splice(source.index, 1);
+      displayWidgets.splice(destination.index, 0, moved);
+      const updated = { ...prev, [activeBucket]: [...displayWidgets, ...debugWidgets] };
+      widgetsByBucketRef.current = updated;
+      return updated;
+    });
+    debouncedSaveToSupabase();
+  }, [activeBucket, debouncedSaveToSupabase]);
+
+  // Handle habit tracker inline toggle (log / undo today)
+  const handleHabitToggle = useCallback((widget: WidgetInstance, isCompletedToday: boolean) => {
+    const habitData = widget.habitTrackerData;
+    if (!habitData) return;
+
+    const history = [...(habitData.completionHistory || [])];
+    let total = habitData.totalCompletions || 0;
+    const todayKey = new Date().toISOString().split('T')[0];
+
+    // Calculate current streak for bestStreak update
+    const sorted = Array.from(new Set(habitData.completionHistory || [])).sort().reverse();
+    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    let streak = 0;
+    if (sorted.length && (sorted[0] === todayKey || sorted[0] === yesterdayKey)) {
+      let expected = sorted[0];
+      for (const date of sorted) {
+        if (date === expected) {
+          streak++;
+          const d = new Date(expected + 'T12:00:00');
+          d.setDate(d.getDate() - 1);
+          expected = d.toISOString().split('T')[0];
+        } else break;
+      }
+    }
+
+    if (isCompletedToday) {
+      const idx = history.lastIndexOf(todayKey);
+      if (idx !== -1) history.splice(idx, 1);
+      total = Math.max(0, total - 1);
+    } else {
+      history.push(todayKey);
+      total++;
+      incrementProgress(widget);
+    }
+
+    const updatedData = {
+      habitTrackerData: {
+        ...habitData,
+        completionHistory: history,
+        totalCompletions: total,
+        bestStreak: Math.max(habitData.bestStreak || 0, streak + (isCompletedToday ? 0 : 1)),
+      },
+    };
+
+    setWidgetsByBucket(prev => {
+      const next = { ...prev };
+      next[activeBucket] = (next[activeBucket] ?? []).map(ww =>
+        ww.instanceId === widget.instanceId ? { ...ww, ...updatedData } : ww
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+      }
+      return next;
+    });
+  }, [activeBucket, incrementProgress]);
 
   const handleSignOut = async () => {
     if (isSigningOut) return; // Prevent double-clicks
@@ -3595,22 +3800,35 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             {/* Content container: white widget box with subtle shadow */}
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-white shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center gap-3 sm:gap-5 border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-4 text-sm font-semibold overflow-x-auto no-scrollbar">
-                {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => setActiveSubTab(item)}
-                    className={`relative shrink-0 pb-3  text-xs tracking-[0.88px] uppercase transition-colors ${item === activeSubTab
-                      ? 'text-theme-text-primary'
-                      : 'text-theme-text-secondary hover:text-theme-text-primary'
-                      }`}
-                  >
-                    {item}
-                    {item === activeSubTab && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-primary rounded-full" />
-                    )}
-                  </button>
-                ))}
+              <nav className="flex items-center border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-4 text-sm font-semibold overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-3 sm:gap-5">
+                  {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setActiveSubTab(item)}
+                      className={`relative shrink-0 pb-3  text-xs tracking-[0.88px] uppercase transition-colors ${item === activeSubTab
+                        ? 'text-theme-text-primary'
+                        : 'text-theme-text-secondary hover:text-theme-text-primary'
+                        }`}
+                    >
+                      {item}
+                      {item === activeSubTab && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-primary rounded-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={isRefreshing ? undefined : fetchIntegrationsData}
+                  className="ml-auto shrink-0 flex items-center gap-1.5 pb-3 text-xs tracking-[0.88px] uppercase text-theme-text-secondary hover:text-theme-text-primary transition-colors cursor-pointer"
+                >
+                  {isRefreshing ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-theme-primary" />
+                  ) : (
+                    <RotateCw className="h-4 w-4" />
+                  )}
+                  Refresh
+                </button>
               </nav>
 
               {/* Content area */}
@@ -3651,873 +3869,100 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                     </div>
                   )}
 
-                  {/* Widget grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 auto-rows-fr">
-                  {/* Refresh card */}
-                  {activeWidgets.length > 0 && (
-                    <div
-                      onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                      className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm hover:shadow-warm relative cursor-pointer transition-shadow"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-brand-tint-strong">
-                          {isRefreshing ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-theme-primary" />
-                          ) : (
-                            <RotateCw className="h-5 w-5 text-theme-primary" />
-                          )}
-                        </div>
-                        <span className="text-sm font-medium truncate">Refresh</span>
-                      </div>
-                      <p className="mt-2 text-xs text-theme-text-tertiary truncate">Sync integrations</p>
-                      {/* Invisible progress bar placeholder to equalize height */}
-                      <div className="mt-3 h-1 bg-transparent" />
+                  {/* Widget grid — flex-wrap for drag-and-drop reorder */}
+                  {!isWidgetLoadComplete && activeWidgets.length === 0 ? (
+                    <div className="flex flex-wrap gap-3 sm:gap-4">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <WidgetCardSkeleton key={i} index={i} />
+                      ))}
                     </div>
-                  )}
+                  ) : (
+                  <DragDropContext onDragEnd={handleWidgetDragEnd}>
+                  <Droppable droppableId={`widget-grid-${activeBucket}`} direction="horizontal">
+                  {(droppableProvided) => (
+                  <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps} className="flex flex-wrap gap-3 sm:gap-4">
 
-                  {/* Widget cards */}
-                  {activeWidgets.map((w) => {
-                    const isLinkedTask = Boolean(w.linkedTaskId);
-                    const linkedTask = isLinkedTask
-                      ? allTasks.find((task) => task.id?.toString?.() === w.linkedTaskId)
-                      : undefined;
-                    const linkedTaskCompleted = Boolean(linkedTask?.completed);
-                    const linkedTaskContent = linkedTask?.content ?? w.linkedTaskTitle ?? w.name;
-                    const linkedTaskDueRaw = linkedTask?.due?.date ?? linkedTask?.due?.datetime ?? null;
-                    const linkedTaskDueDisplay = (() => {
-                      if (!linkedTaskDueRaw) return null;
-                      try {
-                        const parsed =
-                          linkedTaskDueRaw.length === 10
-                            ? parseISO(`${linkedTaskDueRaw}T00:00:00`)
-                            : parseISO(linkedTaskDueRaw);
-                        return format(parsed, "MMM d");
-                      } catch {
-                        return null;
-                      }
-                    })();
-                    // Determine today's progress value and percentage towards target
-                    let todayVal = 0;
-                    let isFitbitData = false;
-                    let isGoogleFitData = false;
-
-                    if (isLinkedTask) {
-                      todayVal = linkedTaskCompleted ? (w.target || 1) : 0;
-                    } else if (w.id === 'water' && w.dataSource === 'fitbit' && fitbitData.water !== undefined) {
-                      todayVal = fitbitData.water;
-                      isFitbitData = true;
-                    } else if (w.id === 'steps' && w.dataSource === 'fitbit' && fitbitData.steps !== undefined) {
-                      todayVal = fitbitData.steps;
-                      isFitbitData = true;
-                    } else if (w.id === 'water' && w.dataSource === 'googlefit' && googleFitData.water !== undefined) {
-                      todayVal = googleFitData.water;
-                      isGoogleFitData = true;
-                    } else if (w.id === 'steps' && w.dataSource === 'googlefit' && googleFitData.steps !== undefined) {
-                      todayVal = googleFitData.steps;
-                      isGoogleFitData = true;
-                    } else {
-                      // Use manual progress tracking
-                      const prog = progressByWidget[w.instanceId];
-                      todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                    }
-
-                    const normalizedTarget = w.target && w.target > 0 ? w.target : 1;
-                    const pct = isLinkedTask
-                      ? (linkedTaskCompleted ? 100 : 0)
-                      : Math.min(100, Math.round((todayVal / normalizedTarget) * 100));
-                    const goalMet = isLinkedTask ? linkedTaskCompleted : pct >= 100;
-
-                    // All widgets inherit the active bucket's color
-                    const bucketHex = getBucketColor(activeBucket);
-                    const wStyles = getWidgetColorStyles(bucketHex);
-
-                    return (
-                      <div key={w.instanceId} className={`rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm hover:shadow-warm relative group cursor-pointer transition-shadow min-w-0`} style={goalMet ? { backgroundColor: wStyles.tint } : undefined} onClick={() => {
-                        if (w.id === 'nutrition') {
-                          // For nutrition widget, show a modal with the full FatSecret widget
+                  {/* Widget cards — draggable */}
+                  {activeWidgets.map((w, widgetIndex) => (
+                    <DraggableWidgetCard
+                      key={w.instanceId}
+                      widget={w}
+                      index={widgetIndex}
+                      activeBucket={activeBucket}
+                      bucketHex={getBucketColor(activeBucket)}
+                      progressByWidget={progressByWidget}
+                      allTasks={allTasks}
+                      fitbitData={fitbitData}
+                      googleFitData={googleFitData}
+                      onCardClick={(widget) => {
+                        if (widget.id === 'nutrition') {
                           setNutritionWidgetOpen(true);
-                        } else if (w.id === 'medication') {
-                          // For medication widget, show a modal with the full medication tracker
+                        } else if (widget.id === 'medication') {
                           setMedicationWidgetOpen(true);
-                        } else if (w.id === 'exercise') {
-                          // For exercise widget, show a modal with the enhanced exercise tracker
+                        } else if (widget.id === 'exercise') {
                           setExerciseWidgetOpen(true);
-                        } else if (w.id === 'home_projects') {
-                          // For home projects widget, show a modal with the comprehensive project manager
+                        } else if (widget.id === 'home_projects') {
                           setHomeProjectsWidgetOpen(true);
-                        } else if (w.id === 'habit_tracker') {
-                          setActiveHabitWidget(w);
+                        } else if (widget.id === 'habit_tracker') {
+                          setActiveHabitWidget(widget);
                           setHabitTrackerWidgetOpen(true);
+                        } else if (widget.id === 'sleep') {
+                          setActiveSleepWidget(widget);
+                          setSleepWidgetOpen(true);
+                        } else if (widget.id === 'meditation') {
+                          setActiveMeditationWidget(widget);
+                          setMeditationWidgetOpen(true);
+                        } else if (widget.id === 'breathwork') {
+                          setActiveBreathworkWidget(widget);
+                          setBreathworkWidgetOpen(true);
+                        } else if (widget.id === 'water' && (!widget.dataSource || widget.dataSource === 'manual')) {
+                          setActiveWaterWidget(widget);
+                          setWaterWidgetOpen(true);
+                        } else if (widget.id === 'mood') {
+                          setActiveMoodWidget(widget);
+                          setMoodWidgetOpen(true);
+                        } else if (widget.id === 'steps' && (!widget.dataSource || widget.dataSource === 'manual')) {
+                          setActiveStepsWidget(widget);
+                          setStepsWidgetOpen(true);
+                        } else if (widget.id === 'heartrate' && (!widget.dataSource || widget.dataSource === 'manual')) {
+                          setActiveHeartRateWidget(widget);
+                          setHeartRateWidgetOpen(true);
+                        } else if (widget.id === 'caffeine') {
+                          setActiveCaffeineWidget(widget);
+                          setCaffeineWidgetOpen(true);
                         } else {
-                          setEditingWidget(w); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
+                          setEditingWidget(widget);
+                          setEditingBucket(activeBucket);
+                          setNewlyCreatedWidgetId(null);
                         }
-                      }}>
-                        <div className="flex absolute top-1 right-1 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* Edit button for nutrition widget */}
-                          {w.id === 'nutrition' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingWidget(w);
-                                setEditingBucket(activeBucket);
-                                setNewlyCreatedWidgetId(null);
-                              }}
-                              className="rounded-full bg-green-100 hover:bg-green-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition"
-                              aria-label="Edit widget settings"
-                              title="Edit settings"
-                            >
-                              <SettingsIcon className="h-3 w-3 text-green-600" />
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              convertWidgetToTask(w, activeBucket);
-                            }}
-                            className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary/40 transition ${w.linkedTaskId
-                              ? "bg-theme-primary hover:bg-theme-primary-600"
-                              : "bg-theme-brand-tint hover:bg-theme-primary/20"
-                              }`}
-                            aria-label={w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"}
-                            title={w.linkedTaskId ? "Remove from Tasks tab" : "Show in Tasks tab"}
-                          >
-                            <ListChecks
-                              className={`h-3 w-3 ${w.linkedTaskId ? "text-white" : "text-theme-primary"
-                                }`}
-                            />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              requestRemoveWidget(w);
-                            }}
-                            className="rounded-full bg-red-100 hover:bg-red-200 p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 transition"
-                            aria-label="Delete widget"
-                            title="Delete widget"
-                          >
-                            <X className="h-3 w-3 text-red-600" />
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            let IconComponent: any = null;
-                            // If icon is stored as a string (its name), resolve via map
-                            if (typeof w.icon === 'string') {
-                              const key = w.icon.replace(/^Lucide/, '');
-                              IconComponent = getIconComponent(key) || getIconComponent(w.icon);
-                            }
-                            // If icon is a function (React component), use directly
-                            else if (typeof w.icon === 'function') {
-                              IconComponent = w.icon;
-                            }
-
-                            // Handle cases where icon became a plain object `{}` after JSON serialization
-                            if (!IconComponent || typeof IconComponent !== 'function') {
-                              IconComponent = getIconComponent(w.id);
-                            }
-                            if (!IconComponent) return <div className="h-5 w-5 bg-theme-neutral-300 rounded" />;
-
-                            return (
-                              <div
-                                className="w-9 h-9 rounded-lg flex items-center justify-center"
-                                style={{ backgroundColor: wStyles.iconTint }}
-                              >
-                                <IconComponent className="h-5 w-5" style={{ color: wStyles.text }} />
-                              </div>
-                            );
-                          })()}
-                          {w.id === 'birthdays' && w.birthdayData && w.birthdayData.friendName ? (
-                            <span className="text-sm font-medium truncate">{w.birthdayData.friendName}</span>
-                          ) : w.id === 'social_events' && w.eventData ? (
-                            <span className="text-sm font-medium truncate">{w.eventData.eventName}</span>
-                          ) : w.id === 'holidays' && w.holidayData && w.holidayData.holidayName ? (
-                            <span className="text-sm font-medium truncate">{w.holidayData.holidayName}</span>
-                          ) : w.id === 'quit_habit' && w.quitHabitData && w.quitHabitData.habitName ? (
-                            <span className="text-sm font-medium truncate">{w.quitHabitData.habitName}</span>
-                          ) : (
-                            <span className="text-sm font-medium truncate">{w.name}</span>
-                          )}
-                        </div>
-                        {isLinkedTask && (
-                          <div className="mt-3 space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 text-sm text-theme-text-body">
-                                <ListChecks className="h-4 w-4 text-theme-primary" />
-                                <span className="truncate">{linkedTaskContent}</span>
-                              </div>
-                              <button
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  if (!linkedTask) return;
-                                  void toggleTaskCompletionContext(linkedTask.id.toString());
-                                }}
-                                disabled={!linkedTask}
-                                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${linkedTaskCompleted
-                                  ? ""
-                                  : "border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-brand-tint-light"
-                                  } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
-                                style={linkedTaskCompleted ? { borderColor: wStyles.solid, color: wStyles.text, backgroundColor: wStyles.tint } : undefined}
-                              >
-                                {linkedTaskCompleted ? "Undo" : "Mark done"}
-                              </button>
-                            </div>
-                            {linkedTaskDueDisplay ? (
-                              <p className="text-xs text-theme-text-tertiary">Due {linkedTaskDueDisplay}</p>
-                            ) : null}
-                          </div>
-                        )}
-
-                        {(() => {
-                          // Special handling for birthday widgets
-                          if (w.id === 'birthdays') {
-                            if (w.birthdayData && w.birthdayData.birthDate) {
-                              const birthDate = new Date(w.birthdayData.birthDate);
-                              const today = new Date();
-                              const currentYear = today.getFullYear();
-
-                              // Create this year's birthday
-                              const thisYearBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
-
-                              // If birthday already passed this year, show next year's
-                              const nextBirthday = thisYearBirthday < today
-                                ? new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate())
-                                : thisYearBirthday;
-
-                              // Calculate days until birthday
-                              const daysUntil = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-                              return (
-                                <div className="mt-2">
-                                  <div className="text-xs text-theme-text-tertiary">
-                                    {birthDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                                  </div>
-                                  <div className="text-xs text-theme-text-subtle mt-1">
-                                    {daysUntil === 0 ? '🎉 Today!' :
-                                      daysUntil === 1 ? '🎂 Tomorrow' :
-                                        `🗓️ ${daysUntil} days`}
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-2 text-xs text-theme-text-tertiary">
-                                  Click to add birthday details
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for events widgets
-                          if (w.id === 'social_events') {
-                            if (w.eventData && w.eventData.eventDate) {
-                              const eventDate = new Date(w.eventData.eventDate);
-                              const today = new Date();
-                              const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-                              return (
-                                <div className="mt-2">
-                                  {w.eventData.description && (
-                                    <div className="text-xs text-theme-text-subtle">
-                                      {w.eventData.description}
-                                    </div>
-                                  )}
-                                  <div className="text-xs text-theme-text-tertiary">
-                                    {eventDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                  </div>
-                                  <div className="text-xs text-theme-text-subtle mt-1">
-                                    {daysUntil === 0 ? '🎉 Today!' :
-                                      daysUntil === 1 ? '📅 Tomorrow' :
-                                        daysUntil < 0 ? '✅ Past event' :
-                                          `📆 ${daysUntil} days`}
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-2 text-xs text-theme-text-tertiary">
-                                  Click to add event details
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for holidays widgets  
-                          if (w.id === 'holidays') {
-                            if (w.holidayData && w.holidayData.holidayDate) {
-                              const holidayDate = new Date(w.holidayData.holidayDate);
-                              const today = new Date();
-                              const currentYear = today.getFullYear();
-
-                              // Create this year's holiday
-                              const thisYearHoliday = new Date(currentYear, holidayDate.getMonth(), holidayDate.getDate());
-
-                              // If holiday already passed this year, show next year's
-                              const nextHoliday = thisYearHoliday < today
-                                ? new Date(currentYear + 1, holidayDate.getMonth(), holidayDate.getDate())
-                                : thisYearHoliday;
-
-                              const daysUntil = Math.ceil((nextHoliday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-                              return (
-                                <div className="mt-2">
-                                  <div className="text-xs text-theme-text-tertiary">
-                                    {holidayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                                  </div>
-                                  <div className="text-xs text-theme-text-subtle mt-1">
-                                    {daysUntil === 0 ? '🎄 Today!' :
-                                      daysUntil === 1 ? '🎁 Tomorrow' :
-                                        `🗓️ ${daysUntil} days`}
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-2 text-xs text-theme-text-tertiary">
-                                  Click to add holiday details
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for mood tracker widget
-                          if (w.id === 'mood') {
-                            const moodEmojis = ['😢', '😕', '😐', '😊', '😁'];
-                            const moodLabels = ['Very Poor', 'Poor', 'Neutral', 'Good', 'Excellent'];
-
-                            if (w.moodData?.currentMood) {
-                              const moodIndex = w.moodData.currentMood - 1;
-                              const emoji = moodEmojis[moodIndex];
-                              const label = moodLabels[moodIndex];
-
-                              return (
-                                <div className="mt-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-2xl">{emoji}</span>
-                                    <div>
-                                      <div className="text-sm font-medium text-theme-text-primary">{label}</div>
-                                      <div className="text-xs text-theme-text-tertiary">Today's mood</div>
-                                    </div>
-                                  </div>
-                                  {w.moodData.moodNote && (
-                                    <div className="text-xs text-theme-text-subtle mt-2 italic">
-                                      "{w.moodData.moodNote}"
-                                    </div>
-                                  )}
-                                  <div className="flex gap-1 mt-2">
-                                    {moodEmojis.map((emoji, index) => (
-                                      <span
-                                        key={index}
-                                        className={`text-xs ${index === moodIndex ? 'opacity-100' : 'opacity-30'}`}
-                                      >
-                                        {emoji}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-3">
-                                  <div className="text-center">
-                                    <div className="text-2xl mb-2">😐</div>
-                                    <div className="text-xs text-theme-text-tertiary">Tap to log mood</div>
-                                  </div>
-                                  <div className="flex gap-1 mt-2 justify-center">
-                                    {moodEmojis.map((emoji, index) => (
-                                      <span key={index} className="text-xs opacity-50">{emoji}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for journal widget
-                          if (w.id === 'journal') {
-                            const today = new Date().toISOString().split('T')[0];
-                            const hasEntryToday = w.journalData?.lastEntryDate === today;
-                            const entryPreview = w.journalData?.todaysEntry ?
-                              w.journalData.todaysEntry.substring(0, 100) + (w.journalData.todaysEntry.length > 100 ? '...' : '') : '';
-
-                            if (hasEntryToday && w.journalData?.todaysEntry) {
-                              const wordCount = w.journalData.todaysEntry.split(' ').filter(word => word.length > 0).length;
-
-                              return (
-                                <div className="mt-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">📖</span>
-                                    <div>
-                                      <div className="text-sm font-medium text-theme-text-primary">Today's Entry</div>
-                                      <div className="text-xs text-theme-text-tertiary">{wordCount} words</div>
-                                    </div>
-                                  </div>
-                                  <div className="text-xs text-theme-text-body italic bg-theme-surface-alt p-2 rounded">
-                                    "{entryPreview}"
-                                  </div>
-                                  {w.journalData.entryCount && w.journalData.entryCount > 1 && (
-                                    <div className="text-xs text-theme-text-tertiary mt-2">
-                                      📚 {w.journalData.entryCount} total entries
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            } else {
-                              const prompts = [
-                                "What are you grateful for today?",
-                                "How are you feeling right now?",
-                                "What did you learn today?",
-                                "What's on your mind?",
-                                "Describe your day in three words."
-                              ];
-                              const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-
-                              return (
-                                <div className="mt-3">
-                                  <div className="text-center">
-                                    <div className="text-2xl mb-2">📝</div>
-                                    <div className="text-xs text-theme-text-tertiary mb-2">No entry today</div>
-                                    <div className="text-xs text-theme-text-subtle italic px-2">
-                                      "{randomPrompt}"
-                                    </div>
-                                    {w.journalData?.entryCount && (
-                                      <div className="text-xs text-theme-text-tertiary mt-2">
-                                        📚 {w.journalData.entryCount} total entries
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for quit habit tracker widget
-                          if (w.id === 'quit_habit') {
-                            if (w.quitHabitData && w.quitHabitData.habitName && w.quitHabitData.quitDate) {
-                              const quitDate = new Date(w.quitHabitData.quitDate);
-                              const today = new Date();
-                              const daysSince = Math.floor((today.getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
-
-                              const milestones = [
-                                { days: 1, emoji: '🌟', label: 'First Day!' },
-                                { days: 3, emoji: '💪', label: '3 Days!' },
-                                { days: 7, emoji: '🎉', label: 'One Week!' },
-                                { days: 14, emoji: '⭐', label: 'Two Weeks!' },
-                                { days: 30, emoji: '🏆', label: 'One Month!' },
-                                { days: 90, emoji: '🎊', label: '3 Months!' },
-                                { days: 365, emoji: '👑', label: 'One Year!' }
-                              ];
-                              const achieved = milestones.filter(m => daysSince >= m.days);
-                              const latestMilestone = achieved.length ? achieved[achieved.length - 1] : null;
-
-                              return (
-                                <div className="mt-3 space-y-2">
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-sm">🚫</span>
-                                    <span className="font-medium text-theme-text-body">
-                                      Quitting {w.quitHabitData.habitName}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-theme-text-subtle">
-                                    <span className="text-sm">📅</span>
-                                    <span>Since {quitDate.toLocaleDateString()}</span>
-                                  </div>
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="text-2xl font-bold" style={{ color: wStyles.text }}>{daysSince}</span>
-                                    <span className="text-sm font-medium" style={{ color: wStyles.text }}>days clean</span>
-                                  </div>
-                                  {w.quitHabitData.costPerDay && w.quitHabitData.costPerDay > 0 && (
-                                    <div className="flex items-center gap-2 text-xs text-theme-text-subtle">
-                                      <span className="text-sm">💰</span>
-                                      <span>
-                                        Daily savings: {w.quitHabitData.currency || '$'}{w.quitHabitData.costPerDay.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {latestMilestone && (
-                                    <div className="flex items-center gap-2 text-xs">
-                                      <span className="text-sm">{latestMilestone.emoji}</span>
-                                      <span className="font-medium" style={{ color: wStyles.text }}>{latestMilestone.label}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-3 text-xs text-theme-text-tertiary text-center">
-                                  Click to set up habit tracking
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for habit tracker widget
-                          if (w.id === 'habit_tracker') {
-                            const habitData = w.habitTrackerData;
-                            if (habitData && habitData.habitName) {
-                              const completionSet = new Set(habitData.completionHistory || []);
-                              const todayKey = new Date().toISOString().split('T')[0];
-                              const isCompletedToday = completionSet.has(todayKey);
-
-                              // Calculate streak
-                              const sorted = Array.from(new Set(habitData.completionHistory || [])).sort().reverse();
-                              const yesterdayKey = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-                              let streak = 0;
-                              if (sorted.length && (sorted[0] === todayKey || sorted[0] === yesterdayKey)) {
-                                let expected = sorted[0];
-                                for (const date of sorted) {
-                                  if (date === expected) {
-                                    streak++;
-                                    const d = new Date(expected + 'T12:00:00');
-                                    d.setDate(d.getDate() - 1);
-                                    expected = d.toISOString().split('T')[0];
-                                  } else break;
-                                }
-                              }
-
-                              // Last 7 day dots
-                              const last7 = Array.from({ length: 7 }, (_, i) => {
-                                const d = new Date(Date.now() - (6 - i) * 86400000);
-                                return completionSet.has(d.toISOString().split('T')[0]);
-                              });
-
-                              // Next milestone
-                              const milestones = habitData.milestones || [];
-                              const nextMilestone = milestones.find(m => !m.achieved && streak < m.days);
-
-                              return (
-                                <div className="mt-3 space-y-2">
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-sm">{"\uD83C\uDFAF"}</span>
-                                    <span className="font-medium text-theme-text-body">{habitData.habitName}</span>
-                                  </div>
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="text-2xl font-bold" style={{ color: wStyles.text }}>{streak}</span>
-                                    <span className="text-sm font-medium" style={{ color: wStyles.text }}>day streak</span>
-                                    {streak > 0 && <span className="text-sm">{"\uD83D\uDD25"}</span>}
-                                  </div>
-                                  <div className="flex gap-1">
-                                    {last7.map((done, i) => (
-                                      <div
-                                        key={i}
-                                        className={`h-2.5 w-2.5 rounded-full ${done ? 'bg-green-500' : 'bg-[#e8e3dc]'}`}
-                                      />
-                                    ))}
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    {nextMilestone && (
-                                      <div className="text-[10px] text-theme-text-tertiary">
-                                        {nextMilestone.emoji} {nextMilestone.label} in {nextMilestone.days - streak} days
-                                      </div>
-                                    )}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const history = [...(habitData.completionHistory || [])];
-                                        let total = habitData.totalCompletions || 0;
-                                        if (isCompletedToday) {
-                                          const idx = history.lastIndexOf(todayKey);
-                                          if (idx !== -1) history.splice(idx, 1);
-                                          total = Math.max(0, total - 1);
-                                        } else {
-                                          history.push(todayKey);
-                                          total++;
-                                          incrementProgress(w);
-                                        }
-                                        const updatedData = {
-                                          habitTrackerData: {
-                                            ...habitData,
-                                            completionHistory: history,
-                                            totalCompletions: total,
-                                            bestStreak: Math.max(habitData.bestStreak || 0, streak + (isCompletedToday ? 0 : 1)),
-                                          },
-                                        };
-                                        setWidgetsByBucket(prev => {
-                                          const next = { ...prev };
-                                          next[activeBucket] = (next[activeBucket] ?? []).map(ww =>
-                                            ww.instanceId === w.instanceId ? { ...ww, ...updatedData } : ww
-                                          );
-                                          if (typeof window !== 'undefined') {
-                                            localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                                          }
-                                          return next;
-                                        });
-                                      }}
-                                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors ${
-                                        isCompletedToday
-                                          ? 'bg-green-100 text-green-700'
-                                          : 'bg-theme-neutral-100 text-theme-text-subtle hover:bg-green-50 hover:text-green-700'
-                                      }`}
-                                    >
-                                      {isCompletedToday ? '\u2714' : '\u25CB'} {isCompletedToday ? 'Done' : 'Log'}
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-3 text-xs text-theme-text-tertiary text-center">
-                                  Click to set up habit tracking
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for gratitude journal widget
-                          if (w.id === 'gratitude') {
-                            const today = new Date().toISOString().split('T')[0];
-                            const hasEntryToday = w.gratitudeData?.lastEntryDate === today;
-
-                            if (hasEntryToday && w.gratitudeData?.gratitudeItems?.length) {
-                              return (
-                                <div className="mt-3">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">✨</span>
-                                    <div>
-                                      <div className="text-sm font-medium text-theme-text-primary">Today's Gratitude</div>
-                                      <div className="text-xs text-theme-text-tertiary">{w.gratitudeData.gratitudeItems.length} items</div>
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {w.gratitudeData.gratitudeItems.slice(0, 2).map((item, index) => (
-                                      <div key={index} className="text-xs text-theme-text-body flex items-start gap-1">
-                                        <span className="text-yellow-500 mt-0.5">•</span>
-                                        <span className="italic">"{item}"</span>
-                                      </div>
-                                    ))}
-                                    {w.gratitudeData.gratitudeItems.length > 2 && (
-                                      <div className="text-xs text-theme-text-tertiary">
-                                        +{w.gratitudeData.gratitudeItems.length - 2} more...
-                                      </div>
-                                    )}
-                                  </div>
-                                  {w.gratitudeData.entryCount && w.gratitudeData.entryCount > 1 && (
-                                    <div className="text-xs text-theme-text-tertiary mt-2">
-                                      🙏 {w.gratitudeData.entryCount} grateful days
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="mt-3">
-                                  <div className="text-center">
-                                    <div className="text-2xl mb-2">🙏</div>
-                                    <div className="text-xs text-theme-text-tertiary mb-2">What are you grateful for?</div>
-                                    <div className="text-xs text-theme-text-subtle italic">
-                                      Tap to add today's gratitude
-                                    </div>
-                                    {w.gratitudeData?.entryCount && (
-                                      <div className="text-xs text-theme-text-tertiary mt-2">
-                                        🙏 {w.gratitudeData.entryCount} grateful days
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            }
-                          }
-
-                          // Special handling for weight tracking widget
-                          if (w.id === 'weight') {
-                            if (w.weightData && w.weightData.currentWeight !== undefined) {
-                              return (
-                                <div className="mt-3 space-y-1">
-                                  {/* Current weight */}
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs">⚖️</span>
-                                    <p className="text-xs font-medium text-theme-text-body">Current Weight</p>
-                                  </div>
-                                  <p className="text-lg font-bold" style={{ color: wStyles.text }}>
-                                    {w.weightData.currentWeight} {w.weightData.unit || w.unit || 'lbs'}
-                                  </p>
-
-                                  {/* Change from starting weight */}
-                                  {w.weightData.startingWeight !== undefined && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs">📈</span>
-                                      <p
-                                        className="text-xs"
-                                        style={{ color: wStyles.text }}
-                                      >
-                                        {w.weightData.currentWeight < w.weightData.startingWeight ? 'Lost' : w.weightData.currentWeight > w.weightData.startingWeight ? 'Gained' : 'No change'}: {Math.abs(w.weightData.currentWeight - w.weightData.startingWeight).toFixed(1)} {w.weightData.unit || w.unit || 'lbs'}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Goal weight */}
-                                  {w.weightData.goalWeight !== undefined && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs">🎯</span>
-                                      <p className="text-xs text-theme-primary">
-                                        Goal: {w.weightData.goalWeight} {w.weightData.unit || w.unit || 'lbs'}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }
-                            return (
-                              <div className="mt-3 text-xs text-theme-text-tertiary text-center">
-                                Click to set up weight tracking
-                              </div>
-                            );
-                          }
-
-                          // Special handling for nutrition widget
-                          if (w.id === 'nutrition') {
-                            return (
-                              <div className="mt-3">
-                                <NutritionSummaryWidget
-                                  variant="embedded"
-                                  className="p-0"
-                                  bucketColor={wStyles.solid}
-                                />
-                              </div>
-                            );
-                          }
-
-                          // Special handling for exercise widget
-                          if (w.id === 'exercise') {
-                            return (
-                              <div className="mt-3 text-center">
-                                <div className="text-2xl mb-2">💪</div>
-                                <div className="text-xs text-theme-text-subtle mb-1">Exercise Tracker</div>
-                                <div className="text-xs text-theme-text-tertiary">
-                                  Track workouts & goals
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Special handling for home projects widget
-                          if (w.id === 'home_projects') {
-                            const projects = w.homeProjectsData?.projects || [];
-                            const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
-                            const urgentProjects = projects.filter(p =>
-                              (p.priority === 'critical' || p.priority === 'high') &&
-                              p.status !== 'completed'
-                            );
-                            const completedProjects = projects.filter(p => p.status === 'completed');
-                            const completionRate = projects.length > 0 ? Math.round((completedProjects.length / projects.length) * 100) : 0;
-
-                            if (projects.length === 0) {
-                              return (
-                                <div className="mt-3 text-center">
-                                  <div className="text-2xl mb-2">🔨</div>
-                                  <div className="text-xs text-theme-text-subtle mb-1">Home Projects</div>
-                                  <div className="text-xs text-theme-text-tertiary">
-                                    Track household tasks & improvements
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            // Find next priority project
-                            const sortedActive = activeProjects.sort((a, b) => {
-                              const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-                              return priorityOrder[a.priority] - priorityOrder[b.priority];
-                            });
-                            const nextProject = sortedActive[0];
-
-                            return (
-                              <div className="mt-3 space-y-2">
-                                {/* Stats */}
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                  <div>
-                                    <div className="text-sm font-semibold text-theme-text-primary">{activeProjects.length}</div>
-                                    <div className="text-xs text-theme-text-tertiary">Active</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{urgentProjects.length}</div>
-                                    <div className="text-xs text-theme-text-tertiary">Urgent</div>
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold" style={{ color: wStyles.text }}>{completionRate}%</div>
-                                    <div className="text-xs text-theme-text-tertiary">Done</div>
-                                  </div>
-                                </div>
-
-                                {/* Next priority project */}
-                                {nextProject && (
-                                  <div className="border-t border-theme-neutral-300/60 pt-2">
-                                    <div className="text-xs text-theme-text-subtle mb-1">Next Priority:</div>
-                                    <div className="flex items-center gap-1">
-                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: wStyles.solid }}></span>
-                                      <span className="text-xs font-medium text-theme-text-primary truncate">{nextProject.title}</span>
-                                    </div>
-                                    {nextProject.room && (
-                                      <div className="text-xs text-theme-text-tertiary capitalize mt-1">📍 {nextProject.room}</div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }
-
-                          // Regular progress bar for other widgets
-                          const displayPct = pct;
-                          const prog = progressByWidget[w.instanceId];
-
-                          return (
-                            <div className="mt-2 mb-1">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg font-bold text-theme-text-primary">
-                                    {todayVal}
-                                  </span>
-                                  <span className="text-sm text-theme-text-tertiary">
-                                    / {w.target}
-                                  </span>
-                                </div>
-                                {prog?.streak >= 2 && (
-                                  <span
-                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                                    style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
-                                  >
-                                    🔥 {prog.streak}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="w-full bg-theme-brand-tint-light rounded-full h-1 mt-2">
-                                <div className="h-1 rounded-full transition-all duration-300" style={{ width: `${displayPct}%`, backgroundColor: wStyles.solid }} />
-                              </div>
-                              {(w.dataSource === 'fitbit' || w.dataSource === 'googlefit') && (
-                                <div className="text-right mt-1 mb-1">
-                                  {w.dataSource === 'fitbit' && <span className="text-xs" style={{ color: wStyles.text }}>Fitbit</span>}
-                                  {w.dataSource === 'googlefit' && <span className="text-xs" style={{ color: wStyles.text }}>Google Fit</span>}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-
-                        {!(['water', 'steps'].includes(w.id) && (w.dataSource === 'fitbit' || w.dataSource === 'googlefit')) && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'weight', 'exercise', 'nutrition', 'medication', 'habit_tracker'].includes(w.id) && !isLinkedTask && (
-                          <button
-                            aria-label="Add one"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              incrementProgress(w);
-                            }}
-                            className="absolute bottom-2 right-2 text-xl font-bold leading-none hover:scale-110 transition-transform"
-                            style={{ color: wStyles.text }}
-                          >
-                            +
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-
+                      }}
+                      onEditSettings={(widget) => {
+                        setEditingWidget(widget);
+                        setEditingBucket(activeBucket);
+                        setNewlyCreatedWidgetId(null);
+                      }}
+                      onConvertToTask={convertWidgetToTask}
+                      onRemove={requestRemoveWidget}
+                      onIncrementProgress={incrementProgress}
+                      onToggleTaskCompletion={(taskId) => void toggleTaskCompletionContext(taskId)}
+                      onHabitToggle={handleHabitToggle}
+                    />
+                  ))}
+                  {/* DnD placeholder */}
+                  {droppableProvided.placeholder}
                   {/* Add Widget card */}
-                  <button className="rounded-xl border border-dashed border-theme-neutral-300 bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
+                  <button className="widget-card-size rounded-xl border border-dashed border-theme-neutral-300 bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-theme-neutral-300 bg-theme-brand-tint-subtle">
                       <Plus className="h-5 w-5 text-theme-primary" />
                     </div>
                     <p className=" text-[13px] font-medium text-theme-text-primary">Add Widget</p>
                     <p className=" text-[11px] text-theme-text-tertiary">Track your stats</p>
                   </button>
-                  </div>{/* close widget grid */}
+                  </div>
+                  )}
+                  </Droppable>
+                  </DragDropContext>
+                  )}
                 </div>{/* close overview tab */}
 
                 {activeSubTab === 'Trends' && (
@@ -5183,6 +4628,350 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       return { value: p.value, streak: p.streak, isToday: true };
                     })()}
                     onComplete={() => incrementProgress(activeHabitWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Sleep Tracker Widget Modal */}
+        <Sheet open={sleepWidgetOpen} onOpenChange={(open) => {
+          setSleepWidgetOpen(open);
+          if (open) setShouldLoadSleepWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Sleep Tracker</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(sleepWidgetOpen || shouldLoadSleepWidget) && activeSleepWidget && (
+                shouldLoadSleepWidget ? (
+                  <SleepTrackerWidget
+                    widget={activeSleepWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeSleepWidget, ...updates };
+                      setActiveSleepWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeSleepWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeSleepWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeSleepWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Meditation Timer Widget Modal */}
+        <Sheet open={meditationWidgetOpen} onOpenChange={(open) => {
+          setMeditationWidgetOpen(open);
+          if (open) setShouldLoadMeditationWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Meditation</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(meditationWidgetOpen || shouldLoadMeditationWidget) && activeMeditationWidget && (
+                shouldLoadMeditationWidget ? (
+                  <MeditationTimerWidget
+                    widget={activeMeditationWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeMeditationWidget, ...updates };
+                      setActiveMeditationWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeMeditationWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeMeditationWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeMeditationWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Breathwork Widget Modal */}
+        <Sheet open={breathworkWidgetOpen} onOpenChange={(open) => {
+          setBreathworkWidgetOpen(open);
+          if (open) setShouldLoadBreathworkWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Breathwork</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(breathworkWidgetOpen || shouldLoadBreathworkWidget) && activeBreathworkWidget && (
+                shouldLoadBreathworkWidget ? (
+                  <BreathworkWidget
+                    widget={activeBreathworkWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeBreathworkWidget, ...updates };
+                      setActiveBreathworkWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeBreathworkWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeBreathworkWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeBreathworkWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Water Intake Widget Modal */}
+        <Sheet open={waterWidgetOpen} onOpenChange={(open) => {
+          setWaterWidgetOpen(open);
+          if (open) setShouldLoadWaterWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Water Intake</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(waterWidgetOpen || shouldLoadWaterWidget) && activeWaterWidget && (
+                shouldLoadWaterWidget ? (
+                  <WaterIntakeWidget
+                    widget={activeWaterWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeWaterWidget, ...updates };
+                      setActiveWaterWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeWaterWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeWaterWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeWaterWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Mood Tracker Widget Modal */}
+        <Sheet open={moodWidgetOpen} onOpenChange={(open) => {
+          setMoodWidgetOpen(open);
+          if (open) setShouldLoadMoodWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Mood Tracker</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(moodWidgetOpen || shouldLoadMoodWidget) && activeMoodWidget && (
+                shouldLoadMoodWidget ? (
+                  <MoodTrackerWidget
+                    widget={activeMoodWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeMoodWidget, ...updates };
+                      setActiveMoodWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeMoodWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeMoodWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeMoodWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Steps Tracker Widget Modal */}
+        <Sheet open={stepsWidgetOpen} onOpenChange={(open) => {
+          setStepsWidgetOpen(open);
+          if (open) setShouldLoadStepsWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Daily Steps</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(stepsWidgetOpen || shouldLoadStepsWidget) && activeStepsWidget && (
+                shouldLoadStepsWidget ? (
+                  <StepsTrackerWidget
+                    widget={activeStepsWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeStepsWidget, ...updates };
+                      setActiveStepsWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeStepsWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeStepsWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeStepsWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Heart Rate Widget Modal */}
+        <Sheet open={heartRateWidgetOpen} onOpenChange={(open) => {
+          setHeartRateWidgetOpen(open);
+          if (open) setShouldLoadHeartRateWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Heart Rate</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(heartRateWidgetOpen || shouldLoadHeartRateWidget) && activeHeartRateWidget && (
+                shouldLoadHeartRateWidget ? (
+                  <HeartRateWidget
+                    widget={activeHeartRateWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeHeartRateWidget, ...updates };
+                      setActiveHeartRateWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeHeartRateWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeHeartRateWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeHeartRateWidget)}
+                  />
+                ) : <Skeleton className="h-24 w-full" />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Caffeine Tracker Widget Modal */}
+        <Sheet open={caffeineWidgetOpen} onOpenChange={(open) => {
+          setCaffeineWidgetOpen(open);
+          if (open) setShouldLoadCaffeineWidget(true);
+        }}>
+          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-theme-text-primary">Caffeine Intake</SheetTitle>
+            </SheetHeader>
+            <div className="mt-2">
+              {(caffeineWidgetOpen || shouldLoadCaffeineWidget) && activeCaffeineWidget && (
+                shouldLoadCaffeineWidget ? (
+                  <CaffeineTrackerWidget
+                    widget={activeCaffeineWidget}
+                    onUpdate={(updates) => {
+                      const merged = { ...activeCaffeineWidget, ...updates };
+                      setActiveCaffeineWidget(merged);
+                      setWidgetsByBucket(prev => {
+                        const next = { ...prev };
+                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+                          w.instanceId === activeCaffeineWidget.instanceId ? { ...w, ...updates } : w
+                        );
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+                        }
+                        return next;
+                      });
+                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+                    }}
+                    progress={(() => {
+                      const p = progressByWidget[activeCaffeineWidget.instanceId];
+                      const today = todayStrGlobal;
+                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
+                      return { value: p.value, streak: p.streak, isToday: true };
+                    })()}
+                    onComplete={() => incrementProgress(activeCaffeineWidget)}
                   />
                 ) : <Skeleton className="h-24 w-full" />
               )}

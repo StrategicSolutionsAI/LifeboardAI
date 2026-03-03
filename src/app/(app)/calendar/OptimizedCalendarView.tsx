@@ -63,7 +63,6 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
   // Unified drag and drop handler for sidebar to calendar
   const handleDragEnd = (result: DropResult) => {
-    
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       setIsDragging(false);
@@ -116,16 +115,19 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     // Handle drag from sidebar to calendar hour slots
     if (isFromSidebar(source.droppableId) && isHour(destination.droppableId)) {
       const dstHour = destination.droppableId; // Keep full 'hour-<time>' format
-      
+
       // Set hourSlot and due date for the selected date
       const dateStr = selectedDateStr;
-      
+
       batchUpdateTasks([
-        { 
-          taskId: draggableId, 
-          updates: { 
+        {
+          taskId: draggableId,
+          updates: {
             hourSlot: dstHour,
-            due: { date: dateStr }
+            allDay: false,
+            due: { date: dateStr },
+            startDate: dateStr,
+            endDate: dateStr,
           },
           occurrenceDate: dateStr,
         }
@@ -135,16 +137,50 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       return;
     }
 
+    // Handle drag from sidebar (or all-day strip) to the hourly planner wrapper
+    // This catches drops that miss individual hour-slot Droppables (scroll-container issue)
+    if ((isFromSidebar(source.droppableId) || source.droppableId === 'allday-strip') && destination.droppableId === 'hourly-planner-drop') {
+      const dateStr = selectedDateStr;
+      const taskId = source.droppableId === 'allday-strip' ? draggableId.replace('allday::', '') : draggableId;
+      // Pick the nearest upcoming hour, or default to 9 AM
+      const now = new Date();
+      const currentHour = now.getHours();
+      const nextHour = currentHour < 7 ? 9 : currentHour < 21 ? currentHour + 1 : 9;
+      const displayHour = nextHour % 12 || 12;
+      const period = nextHour < 12 ? 'AM' : 'PM';
+      const dstHour = `hour-${displayHour}${period}`;
+
+      batchUpdateTasks([
+        {
+          taskId,
+          updates: {
+            hourSlot: dstHour,
+            allDay: false,
+            due: { date: dateStr },
+            startDate: dateStr,
+            endDate: dateStr,
+          },
+          occurrenceDate: dateStr,
+        }
+      ]).catch(error => {
+        console.error('Failed to schedule task to hourly planner:', error);
+      });
+      return;
+    }
+
     // Handle drag from sidebar to calendar day (non-hour areas)
     if (isFromSidebar(source.droppableId) && isCalendarDay(destination.droppableId)) {
       const targetDateStr = destination.droppableId.replace('calendar-day-', '');
-      
+
       batchUpdateTasks([
-        { 
-          taskId: draggableId, 
-          updates: { 
+        {
+          taskId: draggableId,
+          updates: {
             due: { date: targetDateStr },
-            hourSlot: null as any // Remove hour slot when dropping on day area
+            startDate: targetDateStr,
+            endDate: targetDateStr,
+            hourSlot: null as any, // Remove hour slot when dropping on day area
+            allDay: true,
           },
           occurrenceDate: targetDateStr,
         }
@@ -390,7 +426,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     <DragDropContext 
       onDragStart={(initial) => {
         setIsDragging(true);
-      }} 
+      }}
       onDragEnd={handleDragEnd}
     >
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full">

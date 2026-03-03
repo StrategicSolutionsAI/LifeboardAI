@@ -1,9 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
+import { VALID_STICKER_IDS } from "@/components/calendar-stickers";
 
 export type CalendarStickerMap = Record<string, string[]>;
 
 const STORAGE_KEY = "lifeboard-calendar-stickers";
-export const MAX_STICKERS_PER_DAY = 3;
+export const MAX_STICKERS_PER_DAY = 5;
+
+/** Map old sticker IDs (v1) → new life-event IDs (v2). */
+const STICKER_MIGRATION: Record<string, string> = {
+  celebrate: "celebration",
+  "self-care": "self-care",
+  "coffee-break": "rest-day",
+  sunshine: "holiday",
+  focus: "deadline",
+  movement: "self-care",
+};
+
+const migrateStickerId = (id: string): string | null => {
+  if (VALID_STICKER_IDS.has(id)) return id;
+  const mapped = STICKER_MIGRATION[id];
+  return mapped && VALID_STICKER_IDS.has(mapped) ? mapped : null;
+};
 
 const sanitizeStickerMap = (input: unknown): CalendarStickerMap => {
   if (!input || typeof input !== "object") return {};
@@ -11,9 +28,18 @@ const sanitizeStickerMap = (input: unknown): CalendarStickerMap => {
   const next: CalendarStickerMap = {};
   for (const [dateKey, value] of Object.entries(input)) {
     if (!Array.isArray(value)) continue;
-    const sanitized = value
-      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-      .slice(0, MAX_STICKERS_PER_DAY);
+
+    const seen = new Set<string>();
+    const sanitized: string[] = [];
+
+    for (const item of value) {
+      if (typeof item !== "string" || item.trim().length === 0) continue;
+      const migrated = migrateStickerId(item);
+      if (!migrated || seen.has(migrated)) continue;
+      seen.add(migrated);
+      sanitized.push(migrated);
+      if (sanitized.length >= MAX_STICKERS_PER_DAY) break;
+    }
 
     if (sanitized.length > 0) {
       next[dateKey] = sanitized;

@@ -375,6 +375,14 @@
   background-size: 200% 100%;
   animation: shimmer 1s ease-in-out;
 }
+.animate-shimmer-loading {
+  background: linear-gradient(90deg, var(--theme-skeleton) 0%, var(--shimmer-highlight, rgba(255,255,255,0.5)) 50%, var(--theme-skeleton) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+:is(.dark) .animate-shimmer-loading {
+  --shimmer-highlight: rgba(255, 255, 255, 0.08);
+}
 
 /* Drag-drop snap feedback */
 @keyframes drop-snap {
@@ -407,5 +415,37 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Widget card sizing for flex-wrap grid (replaces CSS grid cols) */
+.widget-card-size {
+  width: calc(50% - 0.375rem); /* 2 cols, gap-3 */
+}
+@media (min-width: 640px) {
+  .widget-card-size {
+    width: calc(50% - 0.5rem); /* 2 cols, gap-4 */
+  }
+}
+@media (min-width: 1024px) {
+  .widget-card-size {
+    width: calc(33.333% - 0.667rem); /* 3 cols */
+  }
+}
+@media (min-width: 1280px) {
+  .widget-card-size {
+    width: calc(25% - 0.75rem); /* 4 cols */
+  }
+}
+@media (min-width: 1536px) {
+  .widget-card-size {
+    width: calc(20% - 0.8rem); /* 5 cols */
+  }
+}
+
+/* Show drag handle on touch devices (no hover capability) */
+@media (hover: none) {
+  .drag-handle-touch {
+    opacity: 0.3;
   }
 }
