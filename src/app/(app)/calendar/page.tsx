@@ -1,7 +1,7 @@
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { CalendarHeaderSkeleton, CalendarMonthSkeleton, TaskListSkeleton } from "@/components/calendar-loading-skeleton";
+import { CalendarHeaderSkeleton, CalendarMonthSkeleton, TaskListSkeleton } from "@/features/calendar/components/calendar-loading-skeleton";
 
 export const metadata: Metadata = {
   title: "Calendar | LifeboardAI",

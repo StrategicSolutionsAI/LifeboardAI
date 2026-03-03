@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
       if (patch.startDate !== undefined) updateData.start_date = patch.startDate ?? null
       if (patch.endDate !== undefined) updateData.end_date = patch.endDate ?? null
-      if (patch.due) updateData.due_date = patch.due?.date ?? null
+      if (patch.due !== undefined) updateData.due_date = patch.due?.date ?? null
       else if (patch.startDate !== undefined) updateData.due_date = patch.startDate ?? null
 
       if (patch.hourSlot !== undefined) updateData.hour_slot = normalizeHourSlot(patch.hourSlot) 

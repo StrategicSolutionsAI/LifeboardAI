@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences";
 
 // Types
 type MoodKey = "great" | "good" | "okay" | "meh" | "bad";
@@ -105,18 +106,43 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
   const selectedKey = getDateKey(selectedDate);
   const selectedEntry = entries[selectedKey];
 
-  // Load stored data
+  const hasSyncedRef = useRef(false);
+
+  // Sync to Supabase (fire-and-forget)
+  const syncToSupabase = useCallback((updated: Record<string, MoodEntry>) => {
+    void updateUserPreferenceFields({ mood_entries: updated });
+  }, []);
+
+  // Load stored data + merge from Supabase on mount
   useEffect(() => {
+    let localData: Record<string, MoodEntry> = {};
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<string, MoodEntry>;
-        setEntries(parsed);
-      }
-    } catch (e) {
+      if (raw) localData = JSON.parse(raw) as Record<string, MoodEntry>;
+    } catch {
       // ignore
     }
-  }, []);
+    setEntries(localData);
+
+    // Fetch from Supabase and merge (DB wins per date key)
+    if (!hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      void getUserPreferencesClient().then((prefs) => {
+        if (!prefs) return;
+        const dbEntries = (prefs.mood_entries ?? {}) as Record<string, MoodEntry>;
+        if (Object.keys(dbEntries).length === 0 && Object.keys(localData).length === 0) return;
+
+        const merged = { ...localData, ...dbEntries };
+        setEntries(merged);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+
+        // Push merged result back so localStorage-only entries reach the DB
+        if (Object.keys(localData).length > 0) {
+          void updateUserPreferenceFields({ mood_entries: merged });
+        }
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when selected date changes
   useEffect(() => {
@@ -129,7 +155,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, [entries]);
@@ -148,7 +174,9 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
         note,
         tags: selectedTags,
       };
-      return { ...prev, [selectedKey]: updated };
+      const next = { ...prev, [selectedKey]: updated };
+      syncToSupabase(next);
+      return next;
     });
   }
 
@@ -162,7 +190,9 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
         tags: [],
       };
       const updated: MoodEntry = { ...current, note: value, tags: selectedTags };
-      return { ...prev, [selectedKey]: updated };
+      const next = { ...prev, [selectedKey]: updated };
+      syncToSupabase(next);
+      return next;
     });
   }
 
@@ -178,7 +208,9 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
           tags: [],
         };
         const updated: MoodEntry = { ...current, note, tags: next };
-        return { ...prevEntries, [selectedKey]: updated };
+        const nextEntries = { ...prevEntries, [selectedKey]: updated };
+        syncToSupabase(nextEntries);
+        return nextEntries;
       });
       return next;
     });
@@ -199,6 +231,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
     setEntries((prev) => {
       const next = { ...prev };
       delete next[selectedKey];
+      syncToSupabase(next);
       return next;
     });
   }

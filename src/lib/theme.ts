@@ -174,13 +174,18 @@ export function createCustomTheme(name: string, primary: string, secondary: stri
 
 export function saveCustomTheme(theme: ThemeColor) {
   if (typeof window === 'undefined') return
-  
+
   try {
     const existingCustomThemes = getCustomThemes()
     const updatedThemes = [...existingCustomThemes, theme]
     localStorage.setItem('custom_themes', JSON.stringify(updatedThemes))
     localStorage.setItem('theme_colors', JSON.stringify(theme))
     localStorage.setItem('user_theme', theme.id)
+
+    // Sync to Supabase for cross-device persistence
+    void import('@/lib/user-preferences').then(({ updateUserPreferenceFields }) =>
+      updateUserPreferenceFields({ custom_themes: updatedThemes })
+    )
   } catch (error) {
     console.error('Error saving custom theme:', error)
   }
@@ -204,32 +209,37 @@ export function getAllThemes(): ThemeColor[] {
 
 export function updateCustomTheme(themeId: string, updatedTheme: Partial<Pick<ThemeColor, 'name' | 'primary' | 'secondary' | 'accent' | 'description'>>) {
   if (typeof window === 'undefined') return null
-  
+
   try {
     const existingCustomThemes = getCustomThemes()
     const themeIndex = existingCustomThemes.findIndex(theme => theme.id === themeId)
-    
+
     if (themeIndex === -1) {
       console.error('Custom theme not found:', themeId)
       return null
     }
-    
+
     // Update the theme
     const updatedThemeData = {
       ...existingCustomThemes[themeIndex],
       ...updatedTheme
     }
-    
+
     existingCustomThemes[themeIndex] = updatedThemeData
     localStorage.setItem('custom_themes', JSON.stringify(existingCustomThemes))
-    
+
     // If this is the currently active theme, update it
     const currentTheme = localStorage.getItem('user_theme')
     if (currentTheme === themeId) {
       localStorage.setItem('theme_colors', JSON.stringify(updatedThemeData))
       applyTheme(updatedThemeData)
     }
-    
+
+    // Sync to Supabase for cross-device persistence
+    void import('@/lib/user-preferences').then(({ updateUserPreferenceFields }) =>
+      updateUserPreferenceFields({ custom_themes: existingCustomThemes })
+    )
+
     return updatedThemeData
   } catch (error) {
     console.error('Error updating custom theme:', error)
@@ -239,12 +249,12 @@ export function updateCustomTheme(themeId: string, updatedTheme: Partial<Pick<Th
 
 export function deleteCustomTheme(themeId: string) {
   if (typeof window === 'undefined') return
-  
+
   try {
     const existingCustomThemes = getCustomThemes()
     const updatedThemes = existingCustomThemes.filter(theme => theme.id !== themeId)
     localStorage.setItem('custom_themes', JSON.stringify(updatedThemes))
-    
+
     // If the deleted theme was active, switch to default
     const currentTheme = localStorage.getItem('user_theme')
     if (currentTheme === themeId) {
@@ -253,6 +263,11 @@ export function deleteCustomTheme(themeId: string) {
       localStorage.setItem('theme_colors', JSON.stringify(defaultTheme))
       applyTheme(defaultTheme)
     }
+
+    // Sync to Supabase for cross-device persistence
+    void import('@/lib/user-preferences').then(({ updateUserPreferenceFields }) =>
+      updateUserPreferenceFields({ custom_themes: updatedThemes })
+    )
   } catch (error) {
     console.error('Error deleting custom theme:', error)
   }

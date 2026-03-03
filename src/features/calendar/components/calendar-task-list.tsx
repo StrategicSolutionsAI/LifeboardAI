@@ -1021,7 +1021,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
       // Daily task → Open: Remove due date
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: undefined } }
+        { taskId: draggableId, updates: { due: null } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });
@@ -1042,7 +1042,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
       // Master List Today → Open: Remove due date
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: undefined } }
+        { taskId: draggableId, updates: { due: null } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });

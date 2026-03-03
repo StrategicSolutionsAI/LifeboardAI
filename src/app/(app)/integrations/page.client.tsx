@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock, Upload, Trash2 } from 'lucide-react'
 import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-data-cache'
 import SectionLoadTimer from '@/components/section-load-timer'
-import { CalendarFileUpload, type UploadResult } from '@/components/calendar-file-upload'
+import { CalendarFileUpload, type UploadResult } from '@/features/calendar/components/calendar-file-upload'
 import { useBuckets } from '@/hooks/use-buckets'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }

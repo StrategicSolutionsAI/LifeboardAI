@@ -6,19 +6,20 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/utils/supabase/client";
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
 import { invalidateTaskCaches } from "@/hooks/use-data-cache";
+import { useWeather } from "@/features/dashboard/hooks/use-weather";
 import { getPrefetchedGreetingName } from "@/lib/prefetch-user-prefs";
+import { WidgetModalsContainer } from "./WidgetModalsContainer";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { UndoToast } from "./UndoToast";
+import { WidgetLogsTab } from "./WidgetLogsTab";
+import { WidgetSettingsTab } from "./WidgetSettingsTab";
+import { ManageTabsSheet } from "./ManageTabsSheet";
 import {
   type ProfileNameRow,
   type WidgetLogEntry,
   type DestructiveConfirmState,
   type UndoState,
-  iconMap,
-  LOG_KIND_DOT_CLASS,
-  extractFirstWord,
   deriveGreetingName,
-  getIconComponent,
-  hexToRgb,
-  getWidgetColorStyles,
   dateStr,
   todayStrGlobal,
   yesterdayStrGlobal,
@@ -26,7 +27,7 @@ import {
   debounce,
   migrateWidgetsToTemplates,
 } from "@/lib/dashboard-utils";
-import { format, addDays, isSameDay, parseISO, formatDistanceToNow } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
@@ -36,19 +37,9 @@ import {
   Check,
   Loader2,
   RotateCw,
-  ClipboardList,
-  Cloud,
-  CloudSun,
-  CloudRain,
-  CloudSnow,
-  CloudLightning,
-  Sun,
   LayoutDashboard,
   Settings as SettingsIcon,
-  Settings2,
   ListChecks,
-  Pencil,
-  GripVertical,
 } from "lucide-react";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task, RepeatOption } from "@/types/tasks";
@@ -56,11 +47,11 @@ import dynamic from 'next/dynamic';
 
 // Lazy-load these heavy components — only rendered when user opens a drawer/sheet
 const WidgetEditorSheet = dynamic(
-  () => import("@/components/widget-editor"),
+  () => import("@/features/widgets/components/widget-editor"),
   { ssr: false, loading: () => null }
 );
 const WidgetLibrary = dynamic(
-  () => import("@/components/widget-library").then(m => m.WidgetLibrary),
+  () => import("@/features/widgets/components/widget-library").then(m => m.WidgetLibrary),
   { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
 );
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -68,93 +59,40 @@ import { Button } from "@/components/ui/button";
 import type { DropResult } from "@hello-pangea/dnd";
 const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
-import WidgetSelector from "./widget-selector";
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
-import { TasksQuickActions } from "@/components/tasks-quick-actions";
-import { TasksGroupedList } from "@/components/tasks-grouped-list";
-import { TasksDailyProgress } from "@/components/tasks-daily-progress";
-import TaskEditorModal, { type TaskEditorModalHandle } from "@/components/task-editor-modal";
+import { TasksQuickActions } from "@/features/tasks/components/tasks-quick-actions";
+import { TasksGroupedList } from "@/features/tasks/components/tasks-grouped-list";
+import { TasksDailyProgress } from "@/features/tasks/components/tasks-daily-progress";
+import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 const EnhancedTasksView = dynamic(
-  () => import("@/components/enhanced-tasks-view").then(m => m.EnhancedTasksView),
+  () => import("@/features/tasks/components/enhanced-tasks-view").then(m => m.EnhancedTasksView),
   { ssr: false, loading: () => <Skeleton className="h-64 w-full" /> }
 );
 
 // Dynamic, on-demand heavy widgets and panels
-const NutritionMealTracker = dynamic(
-  () => import("./nutrition-meal-tracker").then(m => m.NutritionMealTracker),
-  { loading: () => <Skeleton className="h-32 w-full" /> }
-);
 const NutritionSummaryWidget = dynamic(
-  () => withRetry(() => import("./nutrition-summary-widget").then(m => m.NutritionSummaryWidget))(),
+  () => withRetry(() => import("@/features/widgets/components/nutrition-summary-widget").then(m => m.NutritionSummaryWidget))(),
   { loading: () => <Skeleton className="h-24 w-full" /> }
 );
 const CalendarTaskList = dynamic(
-  () => import("./calendar-task-list").then(m => m.CalendarTaskList),
+  () => import("@/features/calendar/components/calendar-task-list").then(m => m.CalendarTaskList),
   { loading: () => <Skeleton className="h-40 w-full" /> }
 );
-const MedicationTrackerWidget = dynamic(
-  () => import("./medication-tracker-simple").then(m => m.MedicationTrackerWidget),
-  { loading: () => <Skeleton className="h-24 w-full" /> }
-);
-const ExerciseWidget = dynamic(
-  () => import("./exercise-widget-simple").then(m => m.ExerciseWidget),
-  { loading: () => <Skeleton className="h-24 w-full" /> }
-);
-const HomeProjectsWidget = dynamic(
-  () => import("./home-projects-widget").then(m => m.HomeProjectsWidget),
-  { loading: () => <Skeleton className="h-24 w-full" /> }
-);
-const HabitTrackerWidget = dynamic(
-  () => import("./habit-tracker-widget").then(m => m.HabitTrackerWidget),
-  { ssr: false }
-);
-const SleepTrackerWidget = dynamic(
-  () => import("./sleep-tracker-widget").then(m => m.SleepTrackerWidget),
-  { ssr: false }
-);
-const MeditationTimerWidget = dynamic(
-  () => import("./meditation-timer-widget").then(m => m.MeditationTimerWidget),
-  { ssr: false }
-);
-const BreathworkWidget = dynamic(
-  () => import("./breathwork-widget").then(m => m.BreathworkWidget),
-  { ssr: false }
-);
-const WaterIntakeWidget = dynamic(
-  () => import("./water-intake-widget").then(m => m.WaterIntakeWidget),
-  { ssr: false }
-);
-const MoodTrackerWidget = dynamic(
-  () => import("./mood-tracker-widget").then(m => m.MoodTrackerWidget),
-  { ssr: false }
-);
-const StepsTrackerWidget = dynamic(
-  () => import("./steps-tracker-widget").then(m => m.StepsTrackerWidget),
-  { ssr: false }
-);
-const HeartRateWidget = dynamic(
-  () => import("./heart-rate-widget").then(m => m.HeartRateWidget),
-  { ssr: false }
-);
-const CaffeineTrackerWidget = dynamic(
-  () => import("./caffeine-tracker-widget").then(m => m.CaffeineTrackerWidget),
-  { ssr: false }
-);
 const TrendsPanel = dynamic(
-  () => import("./trends-panel"),
+  () => import("@/features/widgets/components/trends-panel"),
   { loading: () => <Skeleton className="h-48 w-full" /> }
 );
 const ChatBarLazy = dynamic(
-  () => import("./chat-bar").then(m => m.ChatBar),
+  () => import("@/components/chat-bar").then(m => m.ChatBar),
   { ssr: false, loading: () => null }
 );
 const DraggableWidgetCard = dynamic(
-  () => import("./draggable-widget-card").then(m => m.DraggableWidgetCard),
+  () => import("@/features/widgets/components/draggable-widget-card").then(m => m.DraggableWidgetCard),
   { ssr: false }
 );
 const WidgetCardSkeleton = dynamic(
-  () => import("./draggable-widget-card").then(m => m.WidgetCardSkeleton),
+  () => import("@/features/widgets/components/draggable-widget-card").then(m => m.WidgetCardSkeleton),
   { ssr: false }
 );
 
@@ -232,7 +170,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const dragIndexRef = useRef<number | null>(null);
   const manageDragIndexRef = useRef<number | null>(null);
   const fetchedYesterdayRef = useRef(false);
-  const [weather, setWeather] = useState<{ icon: LucideIcon; temp: number } | null>(null);
+  const weather = useWeather();
 
   const [isWidgetLoadComplete, setIsWidgetLoadComplete] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -361,41 +299,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
   const [newlyCreatedWidgetId, setNewlyCreatedWidgetId] = useState<string | null>(null);
-  const [nutritionWidgetOpen, setNutritionWidgetOpen] = useState(false);
-  const [medicationWidgetOpen, setMedicationWidgetOpen] = useState(false);
-  const [exerciseWidgetOpen, setExerciseWidgetOpen] = useState(false);
-  const [homeProjectsWidgetOpen, setHomeProjectsWidgetOpen] = useState(false);
-  const [habitTrackerWidgetOpen, setHabitTrackerWidgetOpen] = useState(false);
-  const [activeHabitWidget, setActiveHabitWidget] = useState<WidgetInstance | null>(null);
-  const [shouldLoadNutritionWidget, setShouldLoadNutritionWidget] = useState(false);
-  const [shouldLoadMedicationWidget, setShouldLoadMedicationWidget] = useState(false);
-  const [shouldLoadExerciseWidget, setShouldLoadExerciseWidget] = useState(false);
-  const [shouldLoadHomeProjectsWidget, setShouldLoadHomeProjectsWidget] = useState(false);
-  const [shouldLoadHabitTrackerWidget, setShouldLoadHabitTrackerWidget] = useState(false);
-  const [sleepWidgetOpen, setSleepWidgetOpen] = useState(false);
-  const [shouldLoadSleepWidget, setShouldLoadSleepWidget] = useState(false);
-  const [activeSleepWidget, setActiveSleepWidget] = useState<WidgetInstance | null>(null);
-  const [meditationWidgetOpen, setMeditationWidgetOpen] = useState(false);
-  const [shouldLoadMeditationWidget, setShouldLoadMeditationWidget] = useState(false);
-  const [activeMeditationWidget, setActiveMeditationWidget] = useState<WidgetInstance | null>(null);
-  const [breathworkWidgetOpen, setBreathworkWidgetOpen] = useState(false);
-  const [shouldLoadBreathworkWidget, setShouldLoadBreathworkWidget] = useState(false);
-  const [activeBreathworkWidget, setActiveBreathworkWidget] = useState<WidgetInstance | null>(null);
-  const [waterWidgetOpen, setWaterWidgetOpen] = useState(false);
-  const [shouldLoadWaterWidget, setShouldLoadWaterWidget] = useState(false);
-  const [activeWaterWidget, setActiveWaterWidget] = useState<WidgetInstance | null>(null);
-  const [moodWidgetOpen, setMoodWidgetOpen] = useState(false);
-  const [shouldLoadMoodWidget, setShouldLoadMoodWidget] = useState(false);
-  const [activeMoodWidget, setActiveMoodWidget] = useState<WidgetInstance | null>(null);
-  const [stepsWidgetOpen, setStepsWidgetOpen] = useState(false);
-  const [shouldLoadStepsWidget, setShouldLoadStepsWidget] = useState(false);
-  const [activeStepsWidget, setActiveStepsWidget] = useState<WidgetInstance | null>(null);
-  const [heartRateWidgetOpen, setHeartRateWidgetOpen] = useState(false);
-  const [shouldLoadHeartRateWidget, setShouldLoadHeartRateWidget] = useState(false);
-  const [activeHeartRateWidget, setActiveHeartRateWidget] = useState<WidgetInstance | null>(null);
-  const [caffeineWidgetOpen, setCaffeineWidgetOpen] = useState(false);
-  const [shouldLoadCaffeineWidget, setShouldLoadCaffeineWidget] = useState(false);
-  const [activeCaffeineWidget, setActiveCaffeineWidget] = useState<WidgetInstance | null>(null);
+  // Widget modals — consolidated state (individual modals live in WidgetModalsContainer)
+  const [openWidgetModal, setOpenWidgetModal] = useState<string | null>(null);
+  const [activeModalWidget, setActiveModalWidget] = useState<WidgetInstance | null>(null);
   const [chatBarReady, setChatBarReady] = useState(false);
   const [confirmState, setConfirmState] = useState<DestructiveConfirmState | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
@@ -438,71 +344,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     window.addEventListener('resize', updateMobileView);
     return () => window.removeEventListener('resize', updateMobileView);
   }, []);
-
-  useEffect(() => {
-    if (!nutritionWidgetOpen) return;
-    setShouldLoadNutritionWidget(true);
-  }, [nutritionWidgetOpen]);
-
-  useEffect(() => {
-    if (!medicationWidgetOpen) return;
-    setShouldLoadMedicationWidget(true);
-  }, [medicationWidgetOpen]);
-
-  useEffect(() => {
-    if (!exerciseWidgetOpen) return;
-    setShouldLoadExerciseWidget(true);
-  }, [exerciseWidgetOpen]);
-
-  useEffect(() => {
-    if (!homeProjectsWidgetOpen) return;
-    setShouldLoadHomeProjectsWidget(true);
-  }, [homeProjectsWidgetOpen]);
-
-  useEffect(() => {
-    if (!habitTrackerWidgetOpen) return;
-    setShouldLoadHabitTrackerWidget(true);
-  }, [habitTrackerWidgetOpen]);
-
-  useEffect(() => {
-    if (!sleepWidgetOpen) return;
-    setShouldLoadSleepWidget(true);
-  }, [sleepWidgetOpen]);
-
-  useEffect(() => {
-    if (!meditationWidgetOpen) return;
-    setShouldLoadMeditationWidget(true);
-  }, [meditationWidgetOpen]);
-
-  useEffect(() => {
-    if (!breathworkWidgetOpen) return;
-    setShouldLoadBreathworkWidget(true);
-  }, [breathworkWidgetOpen]);
-
-  useEffect(() => {
-    if (!waterWidgetOpen) return;
-    setShouldLoadWaterWidget(true);
-  }, [waterWidgetOpen]);
-
-  useEffect(() => {
-    if (!moodWidgetOpen) return;
-    setShouldLoadMoodWidget(true);
-  }, [moodWidgetOpen]);
-
-  useEffect(() => {
-    if (!stepsWidgetOpen) return;
-    setShouldLoadStepsWidget(true);
-  }, [stepsWidgetOpen]);
-
-  useEffect(() => {
-    if (!heartRateWidgetOpen) return;
-    setShouldLoadHeartRateWidget(true);
-  }, [heartRateWidgetOpen]);
-
-  useEffect(() => {
-    if (!caffeineWidgetOpen) return;
-    setShouldLoadCaffeineWidget(true);
-  }, [caffeineWidgetOpen]);
 
   useEffect(() => {
     if (chatBarReady || typeof window === 'undefined') return;
@@ -784,11 +625,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return activeWidgets.filter((widget) => widget.instanceId === selectedSettingsWidget);
   }, [activeWidgets, selectedSettingsWidget]);
 
-  const formatLogTimestamp = (timestamp: string) => {
-    const parsed = Date.parse(timestamp);
-    if (Number.isNaN(parsed)) return "Unknown";
-    return formatDistanceToNow(parsed, { addSuffix: true });
-  };
 
   // ---------------------------------------------------------------------------
   // Bucket sync helpers: track whether local changes have been synced to
@@ -1826,6 +1662,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     debouncedSaveToSupabase();
   }, [activeBucket, debouncedSaveToSupabase]);
 
+  // Handle widget modal updates (shared callback for WidgetModalsContainer)
+  const handleWidgetModalUpdate = useCallback((widget: WidgetInstance, updates: Partial<WidgetInstance>) => {
+    setWidgetsByBucket(prev => {
+      const next = { ...prev };
+      next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+        w.instanceId === widget.instanceId ? { ...w, ...updates } : w
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
+      }
+      return next;
+    });
+    saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
+  }, [activeBucket, saveWidgets, widgetsByBucketRef, progressByWidgetRef]);
+
   // Handle habit tracker inline toggle (log / undo today)
   const handleHabitToggle = useCallback((widget: WidgetInstance, isCompletedToday: boolean) => {
     const habitData = widget.habitTrackerData;
@@ -2739,26 +2590,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return widgets.filter((w) => !w.instanceId?.startsWith('debug-'));
   }
 
-  const resolveWidgetIcon = (widget: WidgetInstance): LucideIcon | null => {
-    if (typeof widget.icon === "string") {
-      const key = widget.icon.replace(/^Lucide/, "");
-      return getIconComponent(key) || getIconComponent(widget.icon);
-    }
-    if (typeof widget.icon === "function") {
-      return widget.icon;
-    }
-    return getIconComponent(widget.id);
-  };
-
-  const getDataSourceOptions = (widget: WidgetInstance): string[] => {
-    if (widget.id === "water" || widget.id === "steps") {
-      return ["manual", "fitbit", "googlefit"];
-    }
-    if (widget.id === "weight") {
-      return ["manual", "withings"];
-    }
-    return ["manual"];
-  };
 
   const patchWidgetInActiveBucket = (widgetId: string, updates: Partial<WidgetInstance>) => {
     setWidgetsByBucket((prev) => {
@@ -2941,71 +2772,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     }
   };
 
-  // Fetch current weather using browser geolocation and open-meteo API (no key required).
-  // Deferred via requestIdleCallback so it doesn't compete with critical rendering.
-  useEffect(() => {
-    if (typeof navigator === 'undefined') return;
-    const fetchWeather = async (lat: number, lon: number) => {
-      try {
-        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
-        const data = await resp.json();
-        if (data && data.current_weather) {
-          const code = data.current_weather.weathercode as number;
-          const tempC = data.current_weather.temperature as number;
-          const temp = tempC * 9 / 5 + 32; // convert to °F
-
-          // Map WMO weather codes to icons
-          const iconMap: Record<string, LucideIcon> = {
-            clear: Sun,
-            partly: CloudSun,
-            cloud: Cloud,
-            drizzle: CloudRain,
-            rain: CloudRain,
-            snow: CloudSnow,
-            thunder: CloudLightning,
-          };
-
-          const getIconForCode = (c: number): LucideIcon => {
-            if (c === 0) return iconMap.clear;
-            if ([1, 2].includes(c)) return iconMap.partly;
-            if (c === 3) return iconMap.cloud;
-            if (c >= 45 && c <= 48) return iconMap.cloud;
-            if (c >= 51 && c <= 57) return iconMap.drizzle;
-            if (c >= 61 && c <= 67) return iconMap.rain;
-            if (c >= 71 && c <= 77) return iconMap.snow;
-            if (c >= 95) return iconMap.thunder;
-            return iconMap.cloud;
-          };
-
-          setWeather({ icon: getIconForCode(code), temp });
-        }
-      } catch (err) {
-        console.error('Failed to fetch weather', err);
-      }
-    };
-
-    const startWeatherFetch = () => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          fetchWeather(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          // fallback: New York City
-          fetchWeather(40.7128, -74.006);
-        }
-      );
-    };
-
-    // Defer geolocation + weather API call so it doesn't compete with
-    // critical rendering. Weather is decorative and low-priority.
-    if (typeof requestIdleCallback !== 'undefined') {
-      const id = requestIdleCallback(startWeatherFetch, { timeout: 3000 });
-      return () => cancelIdleCallback(id);
-    }
-    // Fallback for browsers without requestIdleCallback (e.g. Safari)
-    const timeout = setTimeout(startWeatherFetch, 2000);
-    return () => clearTimeout(timeout);
-  }, []);
+  // Weather is now handled by useWeather() hook
 
   // ----------------------------------------------------------------------
   // Tab row scroll fade state
@@ -3880,41 +3647,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       fitbitData={fitbitData}
                       googleFitData={googleFitData}
                       onCardClick={(widget) => {
-                        if (widget.id === 'nutrition') {
-                          setNutritionWidgetOpen(true);
-                        } else if (widget.id === 'medication') {
-                          setMedicationWidgetOpen(true);
-                        } else if (widget.id === 'exercise') {
-                          setExerciseWidgetOpen(true);
-                        } else if (widget.id === 'home_projects') {
-                          setHomeProjectsWidgetOpen(true);
-                        } else if (widget.id === 'habit_tracker') {
-                          setActiveHabitWidget(widget);
-                          setHabitTrackerWidgetOpen(true);
-                        } else if (widget.id === 'sleep') {
-                          setActiveSleepWidget(widget);
-                          setSleepWidgetOpen(true);
-                        } else if (widget.id === 'meditation') {
-                          setActiveMeditationWidget(widget);
-                          setMeditationWidgetOpen(true);
-                        } else if (widget.id === 'breathwork') {
-                          setActiveBreathworkWidget(widget);
-                          setBreathworkWidgetOpen(true);
-                        } else if (widget.id === 'water' && (!widget.dataSource || widget.dataSource === 'manual')) {
-                          setActiveWaterWidget(widget);
-                          setWaterWidgetOpen(true);
-                        } else if (widget.id === 'mood') {
-                          setActiveMoodWidget(widget);
-                          setMoodWidgetOpen(true);
-                        } else if (widget.id === 'steps' && (!widget.dataSource || widget.dataSource === 'manual')) {
-                          setActiveStepsWidget(widget);
-                          setStepsWidgetOpen(true);
-                        } else if (widget.id === 'heartrate' && (!widget.dataSource || widget.dataSource === 'manual')) {
-                          setActiveHeartRateWidget(widget);
-                          setHeartRateWidgetOpen(true);
-                        } else if (widget.id === 'caffeine') {
-                          setActiveCaffeineWidget(widget);
-                          setCaffeineWidgetOpen(true);
+                        const MODAL_WIDGET_IDS = ['nutrition', 'medication', 'exercise', 'home_projects', 'habit_tracker', 'sleep', 'meditation', 'breathwork', 'water', 'mood', 'steps', 'heartrate', 'caffeine'];
+                        // Some widgets only open modals when using manual data source
+                        if (['water', 'steps', 'heartrate'].includes(widget.id) && widget.dataSource && widget.dataSource !== 'manual') {
+                          setEditingWidget(widget); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
+                          return;
+                        }
+                        if (MODAL_WIDGET_IDS.includes(widget.id)) {
+                          setActiveModalWidget(widget);
+                          setOpenWidgetModal(widget.id);
                         } else {
                           setEditingWidget(widget);
                           setEditingBucket(activeBucket);
@@ -3990,235 +3731,37 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 )}
 
                 {activeSubTab === 'Logs' && (
-                  <div>
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h2 className="section-label-sm">Widget Logs</h2>
-                        <p className=" text-[13px] text-theme-text-tertiary mt-1">
-                          Recent syncs, entries, and progress updates for this bucket.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => void loadWidgetHistoryLogs()}
-                          disabled={isWidgetLogsLoading || activeWidgets.length === 0}
-                          className="inline-flex h-9 items-center justify-center rounded-md border border-theme-neutral-300 px-3 text-sm text-theme-text-subtle transition hover:bg-theme-surface-alt disabled:cursor-not-allowed disabled:opacity-60"
-                          title="Refresh widget logs"
-                          aria-label="Refresh widget logs"
-                        >
-                          <RotateCw className={`h-4 w-4 ${isWidgetLogsLoading ? "animate-spin" : ""}`} />
-                        </button>
-                        <WidgetSelector
-                          widgets={activeWidgets}
-                          selectedWidget={selectedLogsWidget}
-                          onWidgetChange={setSelectedLogsWidget}
-                          showAllOption={true}
-                          className="w-56"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      {widgetLogsError ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                          Unable to load full history. Showing local activity only.
-                        </div>
-                      ) : null}
-                      {activeWidgets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-theme-brand-tint-light mb-3">
-                            <ClipboardList className="h-6 w-6 text-theme-primary" />
-                          </div>
-                          <p className=" text-sm font-medium text-theme-text-primary">No activity yet</p>
-                          <p className=" text-xs text-theme-text-tertiary mt-1 max-w-xs">Add widgets to this bucket to start tracking activity and see your logs here.</p>
-                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-theme-neutral-300 bg-white px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-                            <Plus className="h-3.5 w-3.5 text-theme-primary" />
-                            Add Widget
-                          </button>
-                        </div>
-                      ) : filteredWidgetLogs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-theme-brand-tint-light mb-3">
-                            <ClipboardList className="h-5 w-5 text-theme-primary" />
-                          </div>
-                          <p className=" text-[13px] font-medium text-theme-text-primary">No activity yet</p>
-                          <p className=" text-xs text-theme-text-tertiary mt-1">Track progress or update a widget to start building logs.</p>
-                        </div>
-                      ) : (
-                        <div className="bg-white rounded-xl border border-theme-neutral-300 shadow-warm-sm overflow-hidden">
-                          <div className="flex items-center gap-2 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-                            <ClipboardList className="h-4 w-4 text-theme-primary" />
-                            <h3 className=" text-sm tracking-[0.6px] uppercase text-theme-secondary">
-                              {selectedLogsWidget === 'all' ? 'All Widget Activity' :
-                                `${activeWidgets.find(w => w.instanceId === selectedLogsWidget)?.name || 'Widget'} Activity`}
-                            </h3>
-                            <span className=" text-[11px] text-theme-text-tertiary">
-                              ({filteredWidgetLogs.length})
-                            </span>
-                          </div>
-                          <div className="max-h-[480px] overflow-y-auto">
-                            {filteredWidgetLogs.slice(0, 80).map((entry) => (
-                              <div key={entry.id} className="flex items-start gap-4 px-5 py-3 border-b border-theme-neutral-300/50 last:border-b-0 hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-                                <div className={`mt-1.5 h-2 w-2 rounded-full ${LOG_KIND_DOT_CLASS[entry.kind]}`} />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-theme-text-primary">{entry.message}</p>
-                                  <p className="truncate text-xs text-theme-text-tertiary">
-                                    {entry.widgetName}
-                                    {entry.details ? ` • ${entry.details}` : ""}
-                                  </p>
-                                </div>
-                                <p className="whitespace-nowrap text-xs text-theme-text-tertiary/70">
-                                  {formatLogTimestamp(entry.occurredAt)}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <WidgetLogsTab
+                    activeWidgets={activeWidgets}
+                    filteredWidgetLogs={filteredWidgetLogs}
+                    isLoading={isWidgetLogsLoading}
+                    error={widgetLogsError}
+                    selectedWidget={selectedLogsWidget}
+                    onSelectedWidgetChange={setSelectedLogsWidget}
+                    onRefresh={() => void loadWidgetHistoryLogs()}
+                    onAddWidget={() => setIsWidgetSheetOpen(true)}
+                  />
                 )}
 
                 {activeSubTab === 'Settings' && (
-                  <div>
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <h2 className="section-label-sm">Widget Settings</h2>
-                      <WidgetSelector
-                        widgets={activeWidgets}
-                        selectedWidget={selectedSettingsWidget}
-                        onWidgetChange={setSelectedSettingsWidget}
-                        showAllOption={true}
-                        className="w-56"
-                      />
-                    </div>
-
-                    <div className="space-y-6">
-                      {activeWidgets.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-dashed border-theme-neutral-300 bg-white">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-theme-brand-tint-light mb-3">
-                            <Settings2 className="h-6 w-6 text-theme-primary" />
-                          </div>
-                          <p className=" text-sm font-medium text-theme-text-primary">No widgets to configure</p>
-                          <p className=" text-xs text-theme-text-tertiary mt-1 max-w-xs">Add widgets to this bucket to customize their targets, colors, and data sources.</p>
-                          <button onClick={() => setIsWidgetSheetOpen(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-theme-neutral-300 bg-white px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors">
-                            <Plus className="h-3.5 w-3.5 text-theme-primary" />
-                            Add Widget
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="grid gap-6">
-                          {selectedSettingsWidgets.map((widget) => {
-                            const IconComponent = resolveWidgetIcon(widget);
-                            const sourceOptions = getDataSourceOptions(widget);
-                            const activeDataSource = widget.dataSource || "manual";
-                            const selectedDataSource = sourceOptions.includes(activeDataSource)
-                              ? activeDataSource
-                              : sourceOptions[0];
-
-                            return (
-                              <div key={widget.instanceId} className="bg-white rounded-xl border border-theme-neutral-300 shadow-warm-sm overflow-hidden">
-                                <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(219,214,207,0.7)]">
-                                  {(() => {
-                                    const settingsBucketHex = getBucketColor(activeBucket);
-                                    const sStyles = getWidgetColorStyles(settingsBucketHex);
-                                    return (
-                                      <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ backgroundColor: sStyles.iconTint }}>
-                                        {IconComponent ? (
-                                          <IconComponent className="h-5 w-5" style={{ color: sStyles.text }} />
-                                        ) : (
-                                          <LayoutDashboard className="h-5 w-5" style={{ color: sStyles.text }} />
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                  <div>
-                                    <h3 className=" text-sm tracking-[0.6px] uppercase text-theme-secondary">{widget.name}</h3>
-                                    <p className=" text-[11px] text-theme-text-tertiary">{widget.id}</p>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
-                                  <div>
-                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Daily target</label>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      step={1}
-                                      value={widget.target || 1}
-                                      onChange={(event) => {
-                                        const parsed = Number.parseInt(event.target.value, 10);
-                                        if (Number.isNaN(parsed)) return;
-                                        patchWidgetInActiveBucket(widget.instanceId, {
-                                          target: Math.max(1, parsed),
-                                        });
-                                      }}
-                                      className="w-full px-3 py-2 border border-theme-neutral-300 rounded-lg bg-white  text-[13px] text-theme-text-primary focus:outline-none focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary transition-colors"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Data source</label>
-                                    <select
-                                      value={selectedDataSource}
-                                      onChange={(event) => {
-                                        patchWidgetInActiveBucket(widget.instanceId, {
-                                          dataSource: event.target.value,
-                                        });
-                                        void fetchIntegrationsData();
-                                      }}
-                                      className="w-full rounded-lg border border-theme-neutral-300 bg-white px-3 py-2  text-[13px] text-theme-text-primary capitalize focus:outline-none focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary transition-colors"
-                                    >
-                                      {sourceOptions.map((option) => (
-                                        <option key={option} value={option}>
-                                          {option}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block  text-xs font-medium text-theme-text-tertiary uppercase tracking-wide mb-2">Created</label>
-                                    <span className="text-sm text-theme-text-subtle">
-                                      {widget.createdAt
-                                        ? new Date(widget.createdAt).toLocaleDateString()
-                                        : "Unknown"}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2 border-t border-[rgba(219,214,207,0.7)] px-5 py-4">
-                                  <button
-                                    onClick={() => {
-                                      setEditingBucket(activeBucket);
-                                      setEditingWidget(widget);
-                                      setNewlyCreatedWidgetId(null);
-                                    }}
-                                    className="rounded-lg bg-theme-primary px-4 py-2  text-[13px] font-medium text-white shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-theme-primary-600 transition-colors"
-                                  >
-                                    Open Editor
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      void resetWidgetProgress(widget);
-                                    }}
-                                    className="rounded-lg border border-theme-neutral-300 px-4 py-2  text-[13px] font-medium text-theme-text-primary shadow-[0px_1px_1.5px_0.1px_rgba(22,25,36,0.05)] hover:bg-[rgba(252,250,248,0.5)] transition-colors"
-                                  >
-                                    Reset Today
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      requestRemoveWidget(widget);
-                                    }}
-                                    className="rounded-lg border border-red-200 px-4 py-2  text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors ml-auto"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <WidgetSettingsTab
+                    activeWidgets={activeWidgets}
+                    selectedSettingsWidget={selectedSettingsWidget}
+                    onSelectedSettingsWidgetChange={setSelectedSettingsWidget}
+                    selectedSettingsWidgets={selectedSettingsWidgets}
+                    activeBucket={activeBucket}
+                    getBucketColor={getBucketColor}
+                    onPatchWidget={patchWidgetInActiveBucket}
+                    onRefreshIntegrations={() => void fetchIntegrationsData()}
+                    onOpenEditor={(widget) => {
+                      setEditingBucket(activeBucket);
+                      setEditingWidget(widget);
+                      setNewlyCreatedWidgetId(null);
+                    }}
+                    onResetProgress={(widget) => void resetWidgetProgress(widget)}
+                    onRemoveWidget={requestRemoveWidget}
+                    onAddWidget={() => setIsWidgetSheetOpen(true)}
+                  />
                 )}
               </div>
             </div>
@@ -4326,713 +3869,74 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         </Sheet>
         )}
 
-        {/* Bucket editor: add/remove tabs */}
-        <Sheet open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-          <SheetContent side="right" className="w-full sm:w-[520px] md:w-[560px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Manage Tabs</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-theme-text-body mb-1">Add a new tab</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Tab name (e.g., Side Projects)"
-                    value={newBucket}
-                    onChange={(e) => setNewBucket(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddBucket()}
-                    className="flex-1 rounded-lg border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-primary focus:ring-1 focus:ring-theme-primary/30 focus:outline-none transition-colors"
-                  />
-                  <button
-                    onClick={handleAddBucket}
-                    disabled={!newBucket.trim() || buckets.includes(newBucket.trim())}
-                    className="px-3 py-2 text-sm rounded-lg bg-theme-primary text-white hover:bg-theme-primary-600 disabled:opacity-50 transition-colors"
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
+        <ManageTabsSheet
+          isOpen={isEditorOpen}
+          onOpenChange={setIsEditorOpen}
+          newBucket={newBucket}
+          onNewBucketChange={setNewBucket}
+          onAddBucket={handleAddBucket}
+          buckets={buckets}
+          suggestedToShow={suggestedToShow}
+          onAddBucketQuick={handleAddBucketQuick}
+          activeBucket={activeBucket}
+          editingBucketName={editingBucketName}
+          editingBucketNewName={editingBucketNewName}
+          onEditingBucketNewNameChange={setEditingBucketNewName}
+          onSaveEditBucket={handleSaveEditBucket}
+          onCancelEditBucket={handleCancelEditBucket}
+          onStartEditBucket={handleStartEditBucket}
+          onRemoveBucket={requestRemoveBucket}
+          onBucketColorChange={handleBucketColorChange}
+          bucketColors={bucketColors}
+          getSuggestedColorForBucket={getSuggestedColorForBucket}
+          getBucketColor={getBucketColor}
+          draggedBucketIndex={draggedBucketIndex}
+          onBucketDragStart={handleBucketDragStart}
+          onBucketDragOver={handleBucketDragOver}
+          onBucketDragEnd={handleBucketDragEnd}
+        />
 
-              <div>
-                <div className="text-sm font-medium text-theme-text-body mb-2">Suggested tabs</div>
-                <div className="flex flex-wrap gap-2">
-                  {suggestedToShow.length > 0 ? (
-                    suggestedToShow.map((name) => (
-                      <button
-                        key={name}
-                        onClick={() => handleAddBucketQuick(name)}
-                        className="px-3 py-1.5 rounded-full border border-theme-neutral-300 text-sm hover:bg-theme-surface-alt active:bg-theme-brand-tint-light"
-                        aria-label={`Add ${name} tab`}
-                      >
-                        {name}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-xs text-theme-text-tertiary">All suggested tabs are already added</div>
-                  )}
-                </div>
-              </div>
+        {/* Widget modals (nutrition, medication, exercise, etc.) */}
+        <WidgetModalsContainer
+          openModalId={openWidgetModal}
+          onClose={() => setOpenWidgetModal(null)}
+          activeWidget={activeModalWidget}
+          setActiveWidget={setActiveModalWidget}
+          onWidgetUpdate={handleWidgetModalUpdate}
+          progressByWidget={progressByWidget}
+          onIncrementProgress={incrementProgress}
+        />
 
-              <div>
-                <div className="text-sm font-medium text-theme-text-body mb-2">Existing tabs</div>
-                <ul className="divide-y divide-theme-neutral-300 rounded-md border border-theme-neutral-300 overflow-hidden">
-                  {buckets.map((b, index) => (
-                    <li
-                      key={b}
-                      className={`px-3 py-3 bg-white ${draggedBucketIndex === index ? 'opacity-50' : ''}`}
-                      draggable={editingBucketName !== b}
-                      onDragStart={() => handleBucketDragStart(index)}
-                      onDragOver={(e) => handleBucketDragOver(e, index)}
-                      onDragEnd={handleBucketDragEnd}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {editingBucketName !== b && (
-                            <GripVertical className="w-4 h-4 text-theme-text-tertiary/70 cursor-grab active:cursor-grabbing" />
-                          )}
-                          <span
-                            className="inline-block w-4 h-4 rounded-full border border-theme-neutral-300 flex-shrink-0"
-                            style={{ backgroundColor: getBucketColor(b) }}
-                            aria-hidden
-                          />
-                          {editingBucketName === b ? (
-                            <input
-                              type="text"
-                              value={editingBucketNewName}
-                              onChange={(e) => setEditingBucketNewName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEditBucket();
-                                if (e.key === 'Escape') handleCancelEditBucket();
-                              }}
-                              className="flex-1 text-sm border border-theme-primary rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-theme-primary/30"
-                              autoFocus
-                            />
-                          ) : (
-                            <span className={`truncate text-sm ${b === activeBucket ? 'font-semibold text-theme-primary' : 'text-theme-text-body'}`}>{b}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {editingBucketName === b ? (
-                            <>
-                              <button
-                                onClick={handleSaveEditBucket}
-                                className="text-xs p-1.5 rounded-md border border-green-200 text-green-600 hover:bg-green-50"
-                                title="Save"
-                                aria-label="Save bucket name"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={handleCancelEditBucket}
-                                className="text-xs p-1.5 rounded-md border border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-surface-alt"
-                                title="Cancel"
-                                aria-label="Cancel bucket rename"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => handleStartEditBucket(b)}
-                                className="text-xs p-1.5 rounded-lg border border-theme-neutral-300 text-theme-primary hover:bg-theme-brand-tint-subtle"
-                                title="Edit name"
-                                aria-label="Edit bucket name"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => requestRemoveBucket(b)}
-                                className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                              >
-                                Remove
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {/* Custom color picker only (auto-assigned initially) */}
-                      <div className="mt-3 flex items-center justify-end gap-3">
-                        <label className="flex items-center gap-2 text-xs text-theme-text-tertiary">
-                          <span>Custom</span>
-                          <input
-                            type="color"
-                            value={(bucketColors[b] || getSuggestedColorForBucket(b)) as string}
-                            onChange={(e) => handleBucketColorChange(b, e.target.value)}
-                            className="h-6 w-6 p-0 border rounded cursor-pointer"
-                            aria-label={`Choose custom color for ${b}`}
-                          />
-                        </label>
-                      </div>
-                    </li>
-                  ))}
-                  {buckets.length === 0 && (
-                    <li className="px-3 py-6 text-sm text-theme-text-tertiary text-center">No tabs yet</li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Nutrition Widget Modal */}
-        <Sheet open={nutritionWidgetOpen} onOpenChange={(open) => {
-          setNutritionWidgetOpen(open)
-          if (open) {
-            setShouldLoadNutritionWidget(true)
-          } else {
-            // Force refresh nutrition widgets when panel closes
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('nutritionDataUpdated'))
-            }, 100)
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Daily Nutrition Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              {(nutritionWidgetOpen || shouldLoadNutritionWidget) && (
-                shouldLoadNutritionWidget ? <NutritionMealTracker /> : <Skeleton className="h-32 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Medication Widget Modal */}
-        <Sheet open={medicationWidgetOpen} onOpenChange={(open) => {
-          setMedicationWidgetOpen(open)
-          if (open) {
-            setShouldLoadMedicationWidget(true)
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Medication Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              {(medicationWidgetOpen || shouldLoadMedicationWidget) && (
-                shouldLoadMedicationWidget ? <MedicationTrackerWidget /> : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Exercise Widget Modal */}
-        <Sheet open={exerciseWidgetOpen} onOpenChange={(open) => {
-          setExerciseWidgetOpen(open)
-          if (open) {
-            setShouldLoadExerciseWidget(true)
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-warm-950">Exercise Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              {(exerciseWidgetOpen || shouldLoadExerciseWidget) && (
-                shouldLoadExerciseWidget ? <ExerciseWidget onClose={() => setExerciseWidgetOpen(false)} /> : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Home Projects Widget Modal */}
-        <Sheet open={homeProjectsWidgetOpen} onOpenChange={(open) => {
-          setHomeProjectsWidgetOpen(open)
-          if (open) {
-            setShouldLoadHomeProjectsWidget(true)
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-warm-950">Home Projects</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              {(homeProjectsWidgetOpen || shouldLoadHomeProjectsWidget) && (
-                shouldLoadHomeProjectsWidget ? (
-                  <HomeProjectsWidget
-                    widget={{
-                      id: 'home-projects-modal',
-                      instanceId: 'home-projects-modal',
-                      name: 'Home Projects',
-                      description: 'Track and manage home improvement projects',
-                      icon: 'Hammer',
-                      category: 'productivity',
-                      unit: 'projects',
-                      defaultTarget: 5,
-                      color: 'blue',
-                      target: 0,
-                      schedule: [true, true, true, true, true, true, true],
-                      createdAt: new Date().toISOString()
-                    }}
-                    onUpdate={() => { }}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Habit Tracker Widget Modal */}
-        <Sheet open={habitTrackerWidgetOpen} onOpenChange={(open) => {
-          setHabitTrackerWidgetOpen(open);
-          if (open) {
-            setShouldLoadHabitTrackerWidget(true);
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Habit Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(habitTrackerWidgetOpen || shouldLoadHabitTrackerWidget) && activeHabitWidget && (
-                shouldLoadHabitTrackerWidget ? (
-                  <HabitTrackerWidget
-                    widget={activeHabitWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeHabitWidget, ...updates };
-                      setActiveHabitWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeHabitWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeHabitWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeHabitWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Sleep Tracker Widget Modal */}
-        <Sheet open={sleepWidgetOpen} onOpenChange={(open) => {
-          setSleepWidgetOpen(open);
-          if (open) setShouldLoadSleepWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Sleep Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(sleepWidgetOpen || shouldLoadSleepWidget) && activeSleepWidget && (
-                shouldLoadSleepWidget ? (
-                  <SleepTrackerWidget
-                    widget={activeSleepWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeSleepWidget, ...updates };
-                      setActiveSleepWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeSleepWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeSleepWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeSleepWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Meditation Timer Widget Modal */}
-        <Sheet open={meditationWidgetOpen} onOpenChange={(open) => {
-          setMeditationWidgetOpen(open);
-          if (open) setShouldLoadMeditationWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Meditation</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(meditationWidgetOpen || shouldLoadMeditationWidget) && activeMeditationWidget && (
-                shouldLoadMeditationWidget ? (
-                  <MeditationTimerWidget
-                    widget={activeMeditationWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeMeditationWidget, ...updates };
-                      setActiveMeditationWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeMeditationWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeMeditationWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeMeditationWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Breathwork Widget Modal */}
-        <Sheet open={breathworkWidgetOpen} onOpenChange={(open) => {
-          setBreathworkWidgetOpen(open);
-          if (open) setShouldLoadBreathworkWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Breathwork</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(breathworkWidgetOpen || shouldLoadBreathworkWidget) && activeBreathworkWidget && (
-                shouldLoadBreathworkWidget ? (
-                  <BreathworkWidget
-                    widget={activeBreathworkWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeBreathworkWidget, ...updates };
-                      setActiveBreathworkWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeBreathworkWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeBreathworkWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeBreathworkWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Water Intake Widget Modal */}
-        <Sheet open={waterWidgetOpen} onOpenChange={(open) => {
-          setWaterWidgetOpen(open);
-          if (open) setShouldLoadWaterWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Water Intake</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(waterWidgetOpen || shouldLoadWaterWidget) && activeWaterWidget && (
-                shouldLoadWaterWidget ? (
-                  <WaterIntakeWidget
-                    widget={activeWaterWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeWaterWidget, ...updates };
-                      setActiveWaterWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeWaterWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeWaterWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeWaterWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Mood Tracker Widget Modal */}
-        <Sheet open={moodWidgetOpen} onOpenChange={(open) => {
-          setMoodWidgetOpen(open);
-          if (open) setShouldLoadMoodWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Mood Tracker</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(moodWidgetOpen || shouldLoadMoodWidget) && activeMoodWidget && (
-                shouldLoadMoodWidget ? (
-                  <MoodTrackerWidget
-                    widget={activeMoodWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeMoodWidget, ...updates };
-                      setActiveMoodWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeMoodWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeMoodWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeMoodWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Steps Tracker Widget Modal */}
-        <Sheet open={stepsWidgetOpen} onOpenChange={(open) => {
-          setStepsWidgetOpen(open);
-          if (open) setShouldLoadStepsWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Daily Steps</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(stepsWidgetOpen || shouldLoadStepsWidget) && activeStepsWidget && (
-                shouldLoadStepsWidget ? (
-                  <StepsTrackerWidget
-                    widget={activeStepsWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeStepsWidget, ...updates };
-                      setActiveStepsWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeStepsWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeStepsWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeStepsWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Heart Rate Widget Modal */}
-        <Sheet open={heartRateWidgetOpen} onOpenChange={(open) => {
-          setHeartRateWidgetOpen(open);
-          if (open) setShouldLoadHeartRateWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Heart Rate</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(heartRateWidgetOpen || shouldLoadHeartRateWidget) && activeHeartRateWidget && (
-                shouldLoadHeartRateWidget ? (
-                  <HeartRateWidget
-                    widget={activeHeartRateWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeHeartRateWidget, ...updates };
-                      setActiveHeartRateWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeHeartRateWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeHeartRateWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeHeartRateWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Caffeine Tracker Widget Modal */}
-        <Sheet open={caffeineWidgetOpen} onOpenChange={(open) => {
-          setCaffeineWidgetOpen(open);
-          if (open) setShouldLoadCaffeineWidget(true);
-        }}>
-          <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="text-theme-text-primary">Caffeine Intake</SheetTitle>
-            </SheetHeader>
-            <div className="mt-2">
-              {(caffeineWidgetOpen || shouldLoadCaffeineWidget) && activeCaffeineWidget && (
-                shouldLoadCaffeineWidget ? (
-                  <CaffeineTrackerWidget
-                    widget={activeCaffeineWidget}
-                    onUpdate={(updates) => {
-                      const merged = { ...activeCaffeineWidget, ...updates };
-                      setActiveCaffeineWidget(merged);
-                      setWidgetsByBucket(prev => {
-                        const next = { ...prev };
-                        next[activeBucket] = (next[activeBucket] ?? []).map(w =>
-                          w.instanceId === activeCaffeineWidget.instanceId ? { ...w, ...updates } : w
-                        );
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-                        }
-                        return next;
-                      });
-                      saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-                    }}
-                    progress={(() => {
-                      const p = progressByWidget[activeCaffeineWidget.instanceId];
-                      const today = todayStrGlobal;
-                      if (!p || p.date !== today) return { value: 0, streak: p?.streak || 0, isToday: false };
-                      return { value: p.value, streak: p.streak, isToday: true };
-                    })()}
-                    onComplete={() => incrementProgress(activeCaffeineWidget)}
-                  />
-                ) : <Skeleton className="h-24 w-full" />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
       {/* Confirm dialog & undo toast rendered outside the z-10 stacking context
           so they always appear above the sidebar / mobile bottom nav. */}
       {confirmState && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={confirmState.title}
-            className="w-full max-w-md rounded-xl border border-theme-neutral-300 bg-white p-5 shadow-xl"
-          >
-            <h3 className="text-base font-semibold text-theme-text-primary">{confirmState.title}</h3>
-            <p className="mt-2 text-sm text-theme-text-subtle">{confirmState.description}</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmState(null)}
-                className="rounded-md border border-theme-neutral-300 px-3 py-2 text-sm text-theme-text-body hover:bg-theme-surface-alt"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pending = confirmState;
-                  setConfirmState(null);
-                  void Promise.resolve(pending.onConfirm());
-                }}
-                className="rounded-md bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
-              >
-                {confirmState.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          state={confirmState}
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => {
+            const pending = confirmState;
+            setConfirmState(null);
+            void Promise.resolve(pending.onConfirm());
+          }}
+        />
       )}
 
       {undoState && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-24 right-4 z-[110] w-[min(92vw,360px)] rounded-lg border border-theme-neutral-300 bg-white p-3 shadow-warm-lg"
-        >
-          <p className="text-sm text-theme-text-primary">{undoState.message}</p>
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                clearUndoTimer();
-                setUndoState(null);
-              }}
-              className="rounded-md border border-theme-neutral-300 px-2 py-1 text-xs text-theme-text-subtle hover:bg-theme-surface-alt"
-            >
-              Dismiss
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const pending = undoState;
-                clearUndoTimer();
-                setUndoState(null);
-                void Promise.resolve(pending.onUndo());
-              }}
-              className="rounded-lg bg-theme-primary px-2 py-1 text-xs text-white hover:bg-theme-primary-600 transition-colors"
-            >
-              Undo
-            </button>
-          </div>
-        </div>
+        <UndoToast
+          state={undoState}
+          onDismiss={() => {
+            clearUndoTimer();
+            setUndoState(null);
+          }}
+          onUndo={() => {
+            const pending = undoState;
+            clearUndoTimer();
+            setUndoState(null);
+            void Promise.resolve(pending.onUndo());
+          }}
+        />
       )}
 
       {chatBarReady && <ChatBarLazy />}

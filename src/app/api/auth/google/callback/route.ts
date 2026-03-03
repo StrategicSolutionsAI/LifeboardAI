@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
           .from('user_integrations')
           .select('refresh_token')
           .eq('user_id', user.id)
-          .eq('provider', 'google_calendar')
+          .eq('provider', 'google')
           .maybeSingle();
 
         if (existingRow?.refresh_token) {
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         .from('user_integrations')
         .upsert({
           user_id: user.id,
-          provider: 'google_calendar',
+          provider: 'google',
           access_token: tokens.access_token,
           refresh_token: refreshTokenToStore,
           token_data: tokenDataToStore,

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import WidgetTrendChart from './widget-trend-chart';
-import MoodCalendar from './mood-calendar';
+import MoodCalendar from '@/features/calendar/components/mood-calendar';
 import WidgetSelector from './widget-selector';
 import { WidgetInstance } from '@/types/widgets';
 

@@ -7,23 +7,11 @@ import { supabase } from '@/utils/supabase/client';
 import SectionLoadTimer from '@/components/section-load-timer';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Scale, Activity, Target, Calendar } from "lucide-react";
-import { motion } from "framer-motion";
-
 interface Point { date: string; value: number; isReal?: boolean }
 type TimeRange = '7d' | '30d' | '90d'
 interface TrendAnalysis { totalValue: number; dailyAverage: number; trend: 'up' | 'down' | 'stable'; trendPercentage: number; bestDay: { date: string; value: number } | null }
 
 const RANGE_DAYS: Record<TimeRange, number> = { '7d': 7, '30d': 30, '90d': 90 } as const;
-
-/* ── Stagger animation helpers ── */
-const containerVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const } },
-};
 
 /* ── Custom Tooltip ── */
 function FullTooltip({ active, payload, isWeight, unit }: any) {
@@ -48,9 +36,9 @@ function StatCard({ icon: Icon, iconBg, label, value, subtitle, delay = 0 }: {
   icon: any; iconBg: string; label: string; value: React.ReactNode; subtitle: string; delay?: number;
 }) {
   return (
-    <motion.div
-      variants={itemVariants}
-      className="rounded-xl border border-theme-neutral-300 bg-theme-surface-raised p-4 shadow-warm-sm hover:shadow-warm transition-shadow duration-200"
+    <div
+      className="rounded-xl border border-theme-neutral-300 bg-theme-surface-raised p-4 shadow-warm-sm hover:shadow-warm transition-shadow duration-200 animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
     >
       <div className="flex items-center gap-2 mb-3">
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${iconBg}`}>
@@ -60,7 +48,7 @@ function StatCard({ icon: Icon, iconBg, label, value, subtitle, delay = 0 }: {
       </div>
       <div className="text-2xl font-black leading-none tracking-tight text-theme-text-primary">{value}</div>
       <p className="text-[10px] font-medium text-theme-text-tertiary mt-1.5">{subtitle}</p>
-    </motion.div>
+    </div>
   );
 }
 
@@ -244,12 +232,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
       <SectionLoadTimer name="/trends/[instanceId]" />
       <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
         {/* ── Header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
-        >
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 animate-fade-in-up">
           <div>
             <h1 className="text-2xl font-semibold leading-tight text-theme-text-primary">
               {isWithingsWeight ? 'Weight Trends' : 'Widget Trends'}
@@ -267,15 +250,10 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-        </motion.div>
+        </div>
 
         {/* ── Time Range Pills ── */}
-        <motion.div
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.35, delay: 0.1 }}
-          className="flex gap-2"
-        >
+        <div className="flex gap-2 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           {(Object.keys(RANGE_DAYS) as TimeRange[]).map((range) => (
             <button
               key={range}
@@ -290,15 +268,10 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               {range.toUpperCase()}
             </button>
           ))}
-        </motion.div>
+        </div>
 
         {/* ── Stat Cards ── */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={Scale}
             iconBg="bg-theme-primary-50 text-warm-600"
@@ -310,6 +283,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               </span>
             }
             subtitle={`Last ${RANGE_DAYS[timeRange]} days`}
+            delay={0}
           />
           <StatCard
             icon={Activity}
@@ -322,6 +296,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               </span>
             }
             subtitle="Per day average"
+            delay={80}
           />
           <StatCard
             icon={TrendIcon}
@@ -336,6 +311,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               </span>
             }
             subtitle="Period comparison"
+            delay={160}
           />
           <StatCard
             icon={Target}
@@ -348,16 +324,12 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               </span>
             }
             subtitle={analysis.bestDay ? new Date(analysis.bestDay.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+            delay={240}
           />
-        </motion.div>
+        </div>
 
         {/* ── Main Chart ── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-          className="rounded-xl border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-sm overflow-hidden"
-        >
+        <div className="rounded-xl border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-sm overflow-hidden animate-fade-in-up" style={{ animationDelay: '250ms' }}>
           <div className="px-5 pt-5 pb-2">
             <div className="flex items-center gap-2 mb-1">
               <BarChart3 className="h-4 w-4 text-warm-500" />
@@ -452,7 +424,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </motion.div>
+        </div>
       </div>
     </>
   );

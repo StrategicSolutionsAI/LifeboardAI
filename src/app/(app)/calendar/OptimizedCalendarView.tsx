@@ -6,19 +6,19 @@ import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/types/tasks";
-import { CalendarHeaderSkeleton, CalendarMonthSkeleton, CalendarWeekSkeleton, HourlyPlannerSkeleton, TaskListSkeleton } from "@/components/calendar-loading-skeleton";
-import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/components/calendar-performance-monitor";
+import { CalendarHeaderSkeleton, CalendarMonthSkeleton, CalendarWeekSkeleton, HourlyPlannerSkeleton, TaskListSkeleton } from "@/features/calendar/components/calendar-loading-skeleton";
+import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/features/calendar/components/calendar-performance-monitor";
 import { format, addDays } from "date-fns";
 
 // Lazy load heavy components with proper chunk names
 const FullCalendar = lazy(() => 
-  import("@/components/full-calendar").then(module => ({
+  import("@/features/calendar/components/full-calendar").then(module => ({
     default: module.default
   }))
 );
 
 const CalendarTaskList = lazy(() => 
-  import("@/components/calendar-task-list").then(module => ({
+  import("@/features/calendar/components/calendar-task-list").then(module => ({
     default: module.CalendarTaskList
   }))
 );
@@ -63,6 +63,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
   // Unified drag and drop handler for sidebar to calendar
   const handleDragEnd = (result: DropResult) => {
+    console.log('[DnD] handleDragEnd', { source: result.source?.droppableId, destination: result.destination?.droppableId, draggableId: result.draggableId });
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       setIsDragging(false);
@@ -70,6 +71,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     }
     setIsDragging(false);
     if (!result.destination) {
+      console.log('[DnD] No destination - drop cancelled');
       return;
     }
 
@@ -80,6 +82,12 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     const isCalendarDay = (id: string) => id.startsWith('calendar-day-');
     const hourKey = (id: string) => id.replace('hour-', '');
 
+    // Extract real task ID from potentially prefixed draggable IDs
+    const extractTaskId = (id: string) => {
+      if (id.startsWith('allday::')) return id.replace('allday::', '');
+      if (id.startsWith('lifeboard::')) return id.split('::')[1] ?? id;
+      return id;
+    };
 
     // Helper to check if source is from sidebar
     const isFromSidebar = (sourceId: string) => {
@@ -109,6 +117,64 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       ]).catch(error => {
         console.error('Failed to schedule all-day task to hour slot:', error);
       });
+      return;
+    }
+
+    // Handle drag from all-day strip to sidebar lists (unschedule)
+    if (source.droppableId === 'allday-strip' && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
+      const taskId = draggableId.replace('allday::', '');
+      let updates: any = { hourSlot: null, endHourSlot: null };
+
+      if (destination.droppableId === 'dailyTasks') {
+        updates.due = { date: selectedDateStr };
+        updates.startDate = selectedDateStr;
+        updates.endDate = selectedDateStr;
+        updates.allDay = true;
+      } else if (destination.droppableId === 'masterTodayTasks') {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        updates.due = { date: todayStr };
+        updates.startDate = todayStr;
+        updates.endDate = todayStr;
+        updates.allDay = true;
+      } else if (destination.droppableId === 'openTasks') {
+        updates.due = null;
+        updates.startDate = null;
+        updates.endDate = null;
+        updates.allDay = true;
+      }
+
+      batchUpdateTasks([
+        { taskId, updates, occurrenceDate: selectedDateStr }
+      ]).catch(error => {
+        console.error('Failed to move all-day task to sidebar:', error);
+      });
+      return;
+    }
+
+    // Handle drag from all-day strip to upcoming sections
+    if (source.droppableId === 'allday-strip' && destination.droppableId.startsWith('upcoming-')) {
+      const taskId = draggableId.replace('allday::', '');
+      const groupKey = destination.droppableId.replace('upcoming-', '');
+      let targetDate: string | undefined;
+      const today = new Date();
+
+      switch (groupKey) {
+        case 'today': targetDate = format(today, 'yyyy-MM-dd'); break;
+        case 'tomorrow': targetDate = format(addDays(today, 1), 'yyyy-MM-dd'); break;
+        case 'thisWeek': targetDate = format(addDays(today, 3), 'yyyy-MM-dd'); break;
+        case 'nextWeek': targetDate = format(addDays(today, 7), 'yyyy-MM-dd'); break;
+        case 'later': targetDate = format(addDays(today, 14), 'yyyy-MM-dd'); break;
+        case 'overdue': return;
+        default: return;
+      }
+
+      if (targetDate) {
+        batchUpdateTasks([
+          { taskId, updates: { hourSlot: null as any, endHourSlot: null as any, due: { date: targetDate }, startDate: targetDate, endDate: targetDate, allDay: true }, occurrenceDate: targetDate }
+        ]).catch(error => {
+          console.error('Failed to move all-day task to upcoming:', error);
+        });
+      }
       return;
     }
 
@@ -334,9 +400,77 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       return;
     }
 
+    // Handle drag from calendar day cells to sidebar lists (unschedule)
+    if (isCalendarDay(source.droppableId) && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
+      console.log('[DnD] calendar-day → sidebar handler entered');
+      if (!draggableId.startsWith('lifeboard::')) { console.log('[DnD] skipped: not lifeboard:: prefix'); return; }
+      const taskId = draggableId.split('::')[1];
+      if (!taskId) { console.log('[DnD] skipped: no taskId extracted'); return; }
+
+      let updates: any = { hourSlot: null, endHourSlot: null };
+
+      if (destination.droppableId === 'dailyTasks') {
+        updates.due = { date: selectedDateStr };
+        updates.startDate = selectedDateStr;
+        updates.endDate = selectedDateStr;
+        updates.allDay = true;
+      } else if (destination.droppableId === 'masterTodayTasks') {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        updates.due = { date: todayStr };
+        updates.startDate = todayStr;
+        updates.endDate = todayStr;
+        updates.allDay = true;
+      } else if (destination.droppableId === 'openTasks') {
+        updates.due = null;
+        updates.startDate = null;
+        updates.endDate = null;
+        updates.allDay = true;
+      }
+
+      console.log('[DnD] calling batchUpdateTasks', { taskId, updates, selectedDateStr });
+      batchUpdateTasks([
+        { taskId, updates, occurrenceDate: selectedDateStr }
+      ]).then(() => {
+        console.log('[DnD] batchUpdateTasks succeeded');
+      }).catch(error => {
+        console.error('[DnD] batchUpdateTasks failed:', error);
+      });
+      return;
+    }
+
+    // Handle drag from calendar day cells to upcoming sections
+    if (isCalendarDay(source.droppableId) && destination.droppableId.startsWith('upcoming-')) {
+      if (!draggableId.startsWith('lifeboard::')) return;
+      const taskId = draggableId.split('::')[1];
+      if (!taskId) return;
+
+      const groupKey = destination.droppableId.replace('upcoming-', '');
+      let targetDate: string | undefined;
+      const today = new Date();
+
+      switch (groupKey) {
+        case 'today': targetDate = format(today, 'yyyy-MM-dd'); break;
+        case 'tomorrow': targetDate = format(addDays(today, 1), 'yyyy-MM-dd'); break;
+        case 'thisWeek': targetDate = format(addDays(today, 3), 'yyyy-MM-dd'); break;
+        case 'nextWeek': targetDate = format(addDays(today, 7), 'yyyy-MM-dd'); break;
+        case 'later': targetDate = format(addDays(today, 14), 'yyyy-MM-dd'); break;
+        case 'overdue': return;
+        default: return;
+      }
+
+      if (targetDate) {
+        batchUpdateTasks([
+          { taskId, updates: { hourSlot: null as any, endHourSlot: null as any, due: { date: targetDate }, startDate: targetDate, endDate: targetDate, allDay: true }, occurrenceDate: targetDate }
+        ]).catch(error => {
+          console.error('Failed to move calendar task to upcoming:', error);
+        });
+      }
+      return;
+    }
+
     // Handle reordering within the same list
     if (source.droppableId === destination.droppableId && source.index !== destination.index) {
-      
+
       // Dispatch custom events for list reordering
       const eventMap: Record<string, string> = {
         'openTasks': 'reorderOpenTasks',
@@ -394,7 +528,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
     if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
       batchUpdateTasks([
-        { taskId: draggableId, updates: { due: undefined } }
+        { taskId: draggableId, updates: { due: null } }
       ]).catch(error => {
         console.error('Failed to remove task due date:', error);
       });

@@ -39,7 +39,7 @@ export async function prefetchCalendarExperience() {
 
   await Promise.allSettled([
     import("@/app/(app)/calendar/OptimizedCalendarView"),
-    import("@/components/full-calendar"),
-    import("@/components/calendar-task-list"),
+    import("@/features/calendar/components/full-calendar"),
+    import("@/features/calendar/components/calendar-task-list"),
   ]);
 }

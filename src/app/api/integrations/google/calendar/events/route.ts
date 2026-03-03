@@ -29,7 +29,7 @@ async function handler(request: Request) {
     .from('user_integrations')
     .select('token_data')
     .eq('user_id', user.id)
-    .eq('provider', 'google_calendar')
+    .eq('provider', 'google')
     .maybeSingle();
 
   if (error || !integration?.token_data) {

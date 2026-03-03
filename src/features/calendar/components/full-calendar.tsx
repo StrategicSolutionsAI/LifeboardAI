@@ -23,14 +23,14 @@ import {
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
-import HourlyPlanner, { HourlyPlannerHandle } from "@/components/hourly-planner";
-import TaskEditorModal, { TaskEditorModalHandle } from "@/components/task-editor-modal";
+import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
+import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
-import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/hooks/use-calendar-stickers";
+import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/features/calendar/hooks/use-calendar-stickers";
 import { sanitizeBucketName, isoToHourLabel } from "@/lib/task-form-utils";
 import {
   StickerChips,
@@ -38,7 +38,7 @@ import {
   StickerPalette,
   StickerRow,
   computeStickerPalettePosition as computeStickerPos,
-} from "@/components/calendar-stickers";
+} from "@/features/calendar/components/calendar-stickers";
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -65,7 +65,7 @@ const normalizeRepeatOption = (value: unknown): RepeatOption | undefined => {
 };
 
 const CalendarFileUpload = dynamic(
-  () => import("@/components/calendar-file-upload").then((module) => module.CalendarFileUpload),
+  () => import("@/features/calendar/components/calendar-file-upload").then((module) => module.CalendarFileUpload),
   {
     ssr: false,
     loading: () => (
@@ -2084,7 +2084,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                           </div>
 
                           {/* Sticker chips */}
-                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} size="md" />
+                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} onRemove={removeStickerFromDate} size="md" />
 
                           {/* Calidora-style compact event pills */}
                           <div className="flex flex-col gap-1.5">
@@ -2238,7 +2238,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                           </div>
 
                           {/* Sticker chips */}
-                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} size="sm" />
+                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} onRemove={removeStickerFromDate} size="sm" />
 
                           {/* Calidora-style compact event pills */}
                           <div className="flex flex-col gap-1">

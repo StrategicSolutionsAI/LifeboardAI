@@ -4,10 +4,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
-import type { Bucket as BoardBucket, Task as BoardTask } from "@/components/TasksBoard";
-import type { TaskEditorModalHandle } from "@/components/task-editor-modal";
-import type { ListTask } from "@/components/task-list-view";
-import type { KanbanTask } from "@/components/task-kanban-board";
+import type { Bucket as BoardBucket, Task as BoardTask } from "@/features/tasks/components/TasksBoard";
+import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import type { ListTask } from "@/features/tasks/components/task-list-view";
+import type { KanbanTask } from "@/features/tasks/components/task-kanban-board";
 import type { KanbanStatus } from "@/types/tasks";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
 import { useToast } from "@/components/ui/use-toast";
-import { TaskBoardTabs, type TaskTabId } from "@/components/task-board-tabs";
-import { type TaskFilterState, type TaskSortOption, defaultTaskFilters } from "@/components/task-filter-panel";
+import { TaskBoardTabs, type TaskTabId } from "@/features/tasks/components/task-board-tabs";
+import { type TaskFilterState, type TaskSortOption, defaultTaskFilters } from "@/features/tasks/components/task-filter-panel";
 import { prefetchAllTasks } from "@/lib/prefetch-tasks";
 
 // Start fetching task data immediately at module evaluation time so it's
@@ -25,9 +25,9 @@ prefetchAllTasks();
 
 // Eagerly start downloading chunks at module evaluation time.
 // TaskListView is the default tab, so preload it first.
-const taskListChunk = import("@/components/task-list-view");
-const tasksBoardChunk = import("@/components/TasksBoard");
-const kanbanChunk = import("@/components/task-kanban-board");
+const taskListChunk = import("@/features/tasks/components/task-list-view");
+const tasksBoardChunk = import("@/features/tasks/components/TasksBoard");
+const kanbanChunk = import("@/features/tasks/components/task-kanban-board");
 
 const TasksBoard = dynamic(() => tasksBoardChunk, {
   ssr: false,
@@ -66,7 +66,7 @@ const TaskKanbanBoard = dynamic(
   }
 );
 
-const TaskEditorModal = dynamic(() => import("@/components/task-editor-modal"), {
+const TaskEditorModal = dynamic(() => import("@/features/tasks/components/task-editor-modal"), {
   ssr: false,
 });
 

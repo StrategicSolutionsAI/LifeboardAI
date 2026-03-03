@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MedicationTrackerWidget } from '../medication-tracker-widget'
+import { MedicationTrackerWidget } from '@/features/widgets/components/medication-tracker-widget'
 
 // Mock Supabase client
 jest.mock('@/utils/supabase/client', () => ({

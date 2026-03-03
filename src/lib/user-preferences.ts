@@ -9,6 +9,10 @@ export interface UserPreferences {
   widgets_by_bucket: Record<string, any[]>;
   progress_by_widget?: Record<string, any>;
   hourly_plan?: Record<string, any[]>;
+  selected_theme?: Record<string, any> | null;
+  custom_themes?: Record<string, any>[];
+  mood_entries?: Record<string, any>;
+  calendar_stickers?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }
@@ -151,7 +155,7 @@ async function _fetchPreferencesClient() {
  * upserts overwrite each other's changes.
  */
 export async function updateUserPreferenceFields(
-  fields: Partial<Pick<UserPreferences, 'life_buckets' | 'bucket_colors' | 'widgets_by_bucket' | 'progress_by_widget' | 'hourly_plan'>>
+  fields: Partial<Pick<UserPreferences, 'life_buckets' | 'bucket_colors' | 'widgets_by_bucket' | 'progress_by_widget' | 'hourly_plan' | 'selected_theme' | 'custom_themes' | 'mood_entries' | 'calendar_stickers'>>
 ): Promise<boolean> {
   invalidatePreferencesCache()
   try {
@@ -208,7 +212,7 @@ export async function saveUserPreferences(preferences: UserPreferences) {
   try {
     // Only include fields that exist in the database schema
     // Exclude id, created_at, updated_at as they are auto-managed
-    const safePreferences = {
+    const safePreferences: Record<string, any> = {
       user_id: preferences.user_id,
       life_buckets: preferences.life_buckets || [],
       bucket_colors: preferences.bucket_colors || {},
@@ -216,7 +220,19 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       progress_by_widget: preferences.progress_by_widget || {},
       hourly_plan: preferences.hourly_plan || {},
     };
-    
+    if (preferences.selected_theme !== undefined) {
+      safePreferences.selected_theme = preferences.selected_theme;
+    }
+    if (preferences.custom_themes !== undefined) {
+      safePreferences.custom_themes = preferences.custom_themes;
+    }
+    if (preferences.mood_entries !== undefined) {
+      safePreferences.mood_entries = preferences.mood_entries;
+    }
+    if (preferences.calendar_stickers !== undefined) {
+      safePreferences.calendar_stickers = preferences.calendar_stickers;
+    }
+
     // Verify data is properly structured before saving
     if (!safePreferences.user_id) {
       console.error('Cannot save preferences - user_id is missing');

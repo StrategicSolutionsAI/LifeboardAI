@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { VALID_STICKER_IDS } from "@/components/calendar-stickers";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { VALID_STICKER_IDS } from "@/features/calendar/components/calendar-stickers";
+import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences";
 
 export type CalendarStickerMap = Record<string, string[]>;
 
@@ -63,11 +64,41 @@ const readInitialState = (): CalendarStickerMap => {
 
 export function useCalendarStickers() {
   const [stickersByDate, setStickersByDate] = useState<CalendarStickerMap>(() => readInitialState());
+  const hasSyncedRef = useRef(false);
 
+  // Sync to Supabase (fire-and-forget)
+  const syncToSupabase = useCallback((updated: CalendarStickerMap) => {
+    void updateUserPreferenceFields({ calendar_stickers: updated });
+  }, []);
+
+  // Persist to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stickersByDate));
   }, [stickersByDate]);
+
+  // Fetch from Supabase on mount and merge (DB wins per date key)
+  useEffect(() => {
+    if (hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+
+    const localData = readInitialState();
+
+    void getUserPreferencesClient().then((prefs) => {
+      if (!prefs) return;
+      const dbStickers = sanitizeStickerMap(prefs.calendar_stickers ?? {});
+      if (Object.keys(dbStickers).length === 0 && Object.keys(localData).length === 0) return;
+
+      const merged = { ...localData, ...dbStickers };
+      setStickersByDate(merged);
+      try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+
+      // Push merged result back so localStorage-only entries reach the DB
+      if (Object.keys(localData).length > 0) {
+        void updateUserPreferenceFields({ calendar_stickers: merged });
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addStickerToDate = useCallback((dateStr: string, stickerId: string) => {
     if (!dateStr || !stickerId) return;
@@ -77,12 +108,14 @@ export function useCalendarStickers() {
       if (existing.includes(stickerId)) return prev;
       if (existing.length >= MAX_STICKERS_PER_DAY) return prev;
 
-      return {
+      const next = {
         ...prev,
         [dateStr]: [...existing, stickerId],
       };
+      syncToSupabase(next);
+      return next;
     });
-  }, []);
+  }, [syncToSupabase]);
 
   const removeStickerFromDate = useCallback((dateStr: string, stickerId: string) => {
     if (!dateStr || !stickerId) return;
@@ -92,17 +125,17 @@ export function useCalendarStickers() {
       if (!existing) return prev;
 
       const updated = existing.filter((id) => id !== stickerId);
+      let next: CalendarStickerMap;
       if (updated.length === 0) {
         const { [dateStr]: _removed, ...rest } = prev;
-        return rest;
+        next = rest;
+      } else {
+        next = { ...prev, [dateStr]: updated };
       }
-
-      return {
-        ...prev,
-        [dateStr]: updated,
-      };
+      syncToSupabase(next);
+      return next;
     });
-  }, []);
+  }, [syncToSupabase]);
 
   const clearStickersForDate = useCallback((dateStr: string) => {
     if (!dateStr) return;
@@ -110,9 +143,10 @@ export function useCalendarStickers() {
     setStickersByDate((prev) => {
       if (!(dateStr in prev)) return prev;
       const { [dateStr]: _removed, ...rest } = prev;
+      syncToSupabase(rest);
       return rest;
     });
-  }, []);
+  }, [syncToSupabase]);
 
   return {
     stickersByDate,

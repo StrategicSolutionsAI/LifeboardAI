@@ -17,7 +17,7 @@ export interface Task {
   startDate?: string | null
   endDate?: string | null
   duration?: number
-  hourSlot?: string
+  hourSlot?: string | null
   endHourSlot?: string | null
   bucket?: string
   position?: number

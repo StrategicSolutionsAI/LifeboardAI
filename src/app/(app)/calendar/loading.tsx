@@ -1,4 +1,4 @@
-import { CalendarHeaderSkeleton, CalendarMonthSkeleton, TaskListSkeleton } from "@/components/calendar-loading-skeleton"
+import { CalendarHeaderSkeleton, CalendarMonthSkeleton, TaskListSkeleton } from "@/features/calendar/components/calendar-loading-skeleton"
 
 export default function LoadingCalendar() {
   return (

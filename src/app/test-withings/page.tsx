@@ -1,8 +1,11 @@
 "use client"
 
-import { WithingsWeightWidget } from '@/components/withings-weight-widget'
+import { WithingsWeightWidget } from '@/features/widgets/components/withings-weight-widget'
+import { QueryProvider } from '@/providers/query-provider'
+
 export default function TestWithingsPage() {
   return (
+    <QueryProvider>
       <div className="container mx-auto p-6 space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-theme-text-primary mb-2">Withings Weight Tracking Test</h1>
@@ -66,5 +69,6 @@ export default function TestWithingsPage() {
           </div>
         </div>
       </div>
+    </QueryProvider>
   )
 }

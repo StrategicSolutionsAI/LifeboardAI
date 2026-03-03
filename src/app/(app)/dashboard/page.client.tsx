@@ -9,7 +9,7 @@ import { prefetchUserPreferences, prefetchGreetingName } from '@/lib/prefetch-us
 
 // Start downloading the 214KB taskboard chunk immediately at module evaluation
 // time, instead of waiting for React to render the dynamic component.
-const taskboardChunk = import('@/components/taskboard-dashboard')
+const taskboardChunk = import('@/features/dashboard/components/taskboard-dashboard')
 
 // Also start fetching task data in parallel — runs alongside the chunk download
 // so when the component finally mounts, data is already cached.

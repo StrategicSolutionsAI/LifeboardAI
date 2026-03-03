@@ -1,490 +1,135 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-
-interface CacheEntry<T> {
-  data: T
-  timestamp: number
-  expiresAt: number
-  version?: number // Request version when this entry was written
-}
-
-interface CacheOptions {
-  ttl?: number // Time to live in milliseconds (default: 5 minutes)
-  prefetch?: boolean // Whether to prefetch data on mount
-  optimisticUpdate?: boolean // Whether to update cache optimistically
-}
+import { useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getQueryClient } from '@/lib/query-client'
 
 const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
-const CACHE_UPDATE_EVENT = 'lifeboard:data-cache-update'
 
-// Global cache for sharing between components
-const globalCache = new Map<string, CacheEntry<any>>()
-const globalPendingRequests = new Map<string, Promise<any>>()
-
-function emitCacheUpdate(key: string) {
-  if (typeof window === 'undefined') return
-  window.dispatchEvent(new CustomEvent(CACHE_UPDATE_EVENT, { detail: { key } }))
+interface CacheOptions {
+  ttl?: number
+  prefetch?: boolean
+  optimisticUpdate?: boolean
 }
 
-// Global cache invalidation functions that can be called from anywhere
+// ── Global invalidation (callable outside React) ────────────────────────
+
 export function invalidateTaskCaches() {
-  // Find and delete all task-related cache entries
-  const keysToDelete: string[] = []
-  globalCache.forEach((_, key) => {
-    if (key.startsWith('tasks-')) {
-      keysToDelete.push(key)
-    }
+  const qc = getQueryClient()
+  qc.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0]
+      return typeof key === 'string' && key.startsWith('tasks-')
+    },
   })
-  keysToDelete.forEach(key => globalCache.delete(key))
-  keysToDelete.forEach(key => globalPendingRequests.delete(key))
-  keysToDelete.forEach(key => emitCacheUpdate(key))
 }
 
-// Invalidate all integration-related caches
 export function invalidateIntegrationCaches(integrationId?: string) {
-  const keysToDelete: string[] = []
-  globalCache.forEach((_, key) => {
-    // If specific integration ID provided, only clear that integration's cache
-    if (integrationId) {
-      if (key.includes(integrationId) ||
+  const qc = getQueryClient()
+  qc.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0]
+      if (typeof key !== 'string') return false
+      if (integrationId) {
+        return (
+          key.includes(integrationId) ||
           key.startsWith(`${integrationId}-`) ||
           key.endsWith(`-${integrationId}`) ||
-          key.includes(`/${integrationId}/`)) {
-        keysToDelete.push(key)
+          key.includes(`/${integrationId}/`)
+        )
       }
-    } else {
-      // Clear all integration-related caches
-      if (key.includes('todoist') ||
-          key.includes('withings') ||
-          key.includes('fitbit') ||
-          key.includes('google') ||
-          key.includes('nutrition') ||
-          key.includes('weight') ||
-          key.includes('metrics') ||
-          key.includes('calendar') ||
-          key.includes('events')) {
-        keysToDelete.push(key)
-      }
-    }
+      return [
+        'todoist', 'withings', 'fitbit', 'google',
+        'nutrition', 'weight', 'metrics', 'calendar', 'events',
+      ].some((k) => key.includes(k))
+    },
   })
-  keysToDelete.forEach(key => globalCache.delete(key))
-  keysToDelete.forEach(key => globalPendingRequests.delete(key))
-  keysToDelete.forEach(key => emitCacheUpdate(key))
 }
 
-// Invalidate all caches (nuclear option)
 export function invalidateAllCaches() {
-  globalCache.clear()
-  globalPendingRequests.clear()
-  emitCacheUpdate('*')
+  const qc = getQueryClient()
+  qc.invalidateQueries()
 }
 
 /**
- * Seed the global cache from outside of React (e.g. at module evaluation time).
- * When a `useDataCache` hook later mounts with the same key, it will find either
- * the resolved data or the in-flight promise and skip issuing a duplicate fetch.
+ * Seed the React Query cache before React mounts (e.g. at module evaluation time).
+ * When a useDataCache hook later mounts with the same key, React Query finds
+ * either resolved data or an in-flight promise and skips its own fetch.
  */
 export function prefetchToGlobalCache<T>(
   key: string,
   fetcher: () => Promise<T>,
-  ttl: number = DEFAULT_TTL
+  ttl: number = DEFAULT_TTL,
 ): void {
-  // Already cached and valid → nothing to do
-  const existing = globalCache.get(key)
-  if (existing && Date.now() < existing.expiresAt) return
-
-  // Already in-flight → don't duplicate
-  if (globalPendingRequests.has(key)) return
-
-  const promise = (async () => {
-    try {
-      const result = await fetcher()
-      const now = Date.now()
-      globalCache.set(key, {
-        data: result,
-        timestamp: now,
-        expiresAt: now + ttl,
-      })
-      emitCacheUpdate(key)
-      return result
-    } finally {
-      globalPendingRequests.delete(key)
-    }
-  })()
-
-  globalPendingRequests.set(key, promise)
+  if (typeof window === 'undefined') return
+  const qc = getQueryClient()
+  qc.prefetchQuery({
+    queryKey: [key],
+    queryFn: fetcher,
+    staleTime: ttl,
+  })
 }
+
+// ── React hooks (drop-in replacements backed by React Query) ────────────
 
 export function useDataCache<T>(
   key: string,
   fetcher: () => Promise<T>,
-  options: CacheOptions = {}
+  options: CacheOptions = {},
 ) {
-  const { ttl = DEFAULT_TTL, prefetch = false, optimisticUpdate = true } = options
+  const { ttl = DEFAULT_TTL } = options
+  const queryClient = useQueryClient()
 
-  const cacheRef = useRef<Map<string, CacheEntry<T>>>(new Map())
-  const pendingRef = useRef<Map<string, Promise<T>>>(new Map())
-  const requestVersionRef = useRef(0)
-  // Track latest data in a ref so optimistic updates always read the freshest state,
-  // even when two updates fire before React re-renders.
-  const dataRef = useRef<T | null>(null)
-
-  const [data, setData] = useState<T | null>(() => {
-    const cached = globalCache.get(key) as CacheEntry<T> | undefined
-    if (cached && Date.now() < cached.expiresAt) {
-      cacheRef.current.set(key, cached)
-      dataRef.current = cached.data as T
-      return cached.data as T
-    }
-    return null
+  const { data, isLoading, error, refetch } = useQuery<T>({
+    queryKey: [key],
+    queryFn: fetcher,
+    staleTime: ttl,
+    gcTime: ttl * 2,
   })
 
-  // Keep dataRef in sync with React state every render
-  dataRef.current = data
-
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
-  const getLatestRequestVersion = useCallback(() => requestVersionRef.current, [])
-  const advanceRequestVersion = useCallback(() => {
-    requestVersionRef.current += 1
-    return requestVersionRef.current
-  }, [])
-  const isLatestRequest = useCallback(
-    (version: number) => version === getLatestRequestVersion(),
-    [getLatestRequestVersion]
-  )
-  const setDataIfLatest = useCallback(
-    (version: number, nextData: T) => {
-      if (isLatestRequest(version)) {
-        dataRef.current = nextData
-        setData(nextData)
-      }
+  const updateOptimistically = useCallback(
+    (updater: (current: T | null) => T) => {
+      queryClient.setQueryData<T>([key], (old) => updater(old ?? null))
     },
-    [isLatestRequest]
-  )
-  const setErrorIfLatest = useCallback(
-    (version: number, nextError: Error | null) => {
-      if (isLatestRequest(version)) {
-        setError(nextError)
-      }
-    },
-    [isLatestRequest]
-  )
-  const setLoadingIfLatest = useCallback(
-    (version: number, nextLoading: boolean) => {
-      if (isLatestRequest(version)) {
-        setLoading(nextLoading)
-      }
-    },
-    [isLatestRequest]
+    [queryClient, key],
   )
 
-  // Check if cache entry is still valid
-  const isValidCache = useCallback((entry: CacheEntry<T>) => {
-    return Date.now() < entry.expiresAt
-  }, [])
-
-  // Get from cache or fetch
-  const fetchWithCache = useCallback(async () => {
-    const requestVersion = advanceRequestVersion()
-
-    const localCached = cacheRef.current.get(key)
-    if (localCached && isValidCache(localCached)) {
-      setDataIfLatest(requestVersion, localCached.data)
-      return localCached.data
-    }
-
-    const globalCached = globalCache.get(key) as CacheEntry<T> | undefined
-    if (globalCached && isValidCache(globalCached)) {
-      cacheRef.current.set(key, globalCached)
-      setDataIfLatest(requestVersion, globalCached.data)
-      return globalCached.data
-    }
-
-    const localPending = pendingRef.current.get(key)
-    if (localPending) {
-      setLoadingIfLatest(requestVersion, true)
-      try {
-        const result = await localPending
-        setDataIfLatest(requestVersion, result)
-        return result
-      } catch (err) {
-        setErrorIfLatest(requestVersion, err as Error)
-        throw err
-      } finally {
-        setLoadingIfLatest(requestVersion, false)
-      }
-    }
-
-    const globalPending = globalPendingRequests.get(key) as Promise<T> | undefined
-    if (globalPending) {
-      pendingRef.current.set(key, globalPending)
-      setLoadingIfLatest(requestVersion, true)
-      try {
-        const result = await globalPending
-        setDataIfLatest(requestVersion, result)
-        return result
-      } catch (err) {
-        setErrorIfLatest(requestVersion, err as Error)
-        throw err
-      } finally {
-        setLoadingIfLatest(requestVersion, false)
-      }
-    }
-
-    // Fetch new data
-    setLoadingIfLatest(requestVersion, true)
-    setErrorIfLatest(requestVersion, null)
-
-    const loadPromise = (async () => {
-      const result = await fetcher()
-      const now = Date.now()
-      const entry: CacheEntry<T> = {
-        data: result,
-        timestamp: now,
-        expiresAt: now + ttl,
-        version: requestVersion
-      }
-      // Only write to cache if no newer data exists (e.g. from an optimistic update
-      // that happened while this fetch was in-flight).
-      const existingLocal = cacheRef.current.get(key)
-      if (!existingLocal || (existingLocal.version ?? -1) <= requestVersion) {
-        cacheRef.current.set(key, entry)
-      }
-      const existingGlobal = globalCache.get(key) as CacheEntry<T> | undefined
-      if (!existingGlobal || (existingGlobal.version ?? -1) <= requestVersion) {
-        globalCache.set(key, entry)
-        emitCacheUpdate(key)
-      }
-      return result
-    })()
-
-    pendingRef.current.set(key, loadPromise)
-    globalPendingRequests.set(key, loadPromise)
-
-    try {
-      const result = await loadPromise
-      setDataIfLatest(requestVersion, result)
-      return result
-    } catch (err) {
-      setErrorIfLatest(requestVersion, err as Error)
-      throw err
-    } finally {
-      setLoadingIfLatest(requestVersion, false)
-      pendingRef.current.delete(key)
-      globalPendingRequests.delete(key)
-    }
-  }, [
-    key,
-    fetcher,
-    ttl,
-    isValidCache,
-    advanceRequestVersion,
-    setDataIfLatest,
-    setErrorIfLatest,
-    setLoadingIfLatest
-  ])
-
-  // Optimistic update function — reads from dataRef to avoid stale closure issues
-  const updateOptimistically = useCallback((updater: (current: T | null) => T) => {
-    if (!optimisticUpdate) return
-    const version = advanceRequestVersion()
-
-    const newData = updater(dataRef.current)
-    dataRef.current = newData
-    setData(newData)
-
-    // Update cache immediately
-    const now = Date.now()
-    const entry: CacheEntry<T> = {
-      data: newData,
-      timestamp: now,
-      expiresAt: now + ttl,
-      version
-    }
-    cacheRef.current.set(key, entry)
-    globalCache.set(key, entry)
-    emitCacheUpdate(key)
-  }, [key, ttl, optimisticUpdate, advanceRequestVersion])
-
-  // Invalidate cache entry
   const invalidate = useCallback(() => {
-    advanceRequestVersion()
-    cacheRef.current.delete(key)
-    globalCache.delete(key)
-    pendingRef.current.delete(key)
-    globalPendingRequests.delete(key)
-    emitCacheUpdate(key)
-  }, [key, advanceRequestVersion])
-
-  // Refetch data (bypassing cache)
-  const refetch = useCallback(async () => {
-    invalidate()
-    return fetchWithCache()
-  }, [invalidate, fetchWithCache])
-
-  // Initial fetch
-  useEffect(() => {
-    if (prefetch || data === null) {
-      void fetchWithCache().catch(() => {
-        // Error state is already handled inside fetchWithCache; avoid unhandled promise rejections.
-      })
-    }
-  }, [prefetch, data, fetchWithCache])
-
-  // Listen for cache updates from other sources (e.g. invalidateTaskCaches).
-  // Respects version tracking so stale fetches can't overwrite optimistic state.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const onCacheUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ key?: string }>
-      const changedKey = customEvent.detail?.key
-      if (changedKey !== key && changedKey !== '*') return
-
-      const cached = globalCache.get(key) as CacheEntry<T> | undefined
-      if (cached && Date.now() < cached.expiresAt) {
-        // Don't overwrite state with data from an older request version
-        if (typeof cached.version === 'number' && cached.version < requestVersionRef.current) {
-          return
-        }
-        cacheRef.current.set(key, cached)
-        dataRef.current = cached.data
-        setData(cached.data)
-      }
-    }
-
-    window.addEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
-    return () => {
-      window.removeEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
-    }
-  }, [key])
+    queryClient.invalidateQueries({ queryKey: [key] })
+  }, [queryClient, key])
 
   return {
-    data,
-    loading,
-    error,
+    data: data ?? null,
+    loading: isLoading,
+    error: error ?? null,
     refetch,
     updateOptimistically,
-    invalidate
+    invalidate,
   }
 }
 
-// Hook for using global cache
 export function useGlobalCache<T>(
   key: string,
   fetcher: () => Promise<T>,
-  options: CacheOptions = {}
+  options: CacheOptions = {},
 ) {
   const { ttl = DEFAULT_TTL } = options
+  const queryClient = useQueryClient()
 
-  const [data, setData] = useState<T | null>(() => {
-    const cached = globalCache.get(key)
-    if (cached && Date.now() < cached.expiresAt) {
-      return cached.data
-    }
-    return null
+  const { data, isLoading, error, refetch } = useQuery<T>({
+    queryKey: [key],
+    queryFn: fetcher,
+    staleTime: ttl,
+    gcTime: ttl * 2,
   })
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
-  const fetchData = useCallback(async (bypassCache = false) => {
-    // Check cache unless bypassing
-    if (!bypassCache) {
-      const cached = globalCache.get(key)
-      if (cached && Date.now() < cached.expiresAt) {
-        setData(cached.data)
-        return cached.data
-      }
-    }
-
-    const pending = globalPendingRequests.get(key) as Promise<T> | undefined
-    if (pending) {
-      setLoading(true)
-      try {
-        const result = await pending
-        setData(result)
-        return result
-      } catch (err) {
-        setError(err as Error)
-        throw err
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const loadPromise = (async () => {
-      const result = await fetcher()
-      globalCache.set(key, {
-        data: result,
-        timestamp: Date.now(),
-        expiresAt: Date.now() + ttl
-      })
-      emitCacheUpdate(key)
-      return result
-    })()
-    globalPendingRequests.set(key, loadPromise)
-
-    try {
-      const result = await loadPromise
-      setData(result)
-      return result
-    } catch (err) {
-      setError(err as Error)
-      throw err
-    } finally {
-      globalPendingRequests.delete(key)
-      setLoading(false)
-    }
-  }, [key, fetcher, ttl])
-
   const invalidate = useCallback(() => {
-    globalCache.delete(key)
-    globalPendingRequests.delete(key)
-    emitCacheUpdate(key)
-  }, [key])
-
-  const refetch = useCallback(() => {
-    return fetchData(true)
-  }, [fetchData])
-
-  // Subscribe to cache updates from other components
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const onCacheUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ key?: string }>
-      const changedKey = customEvent.detail?.key
-      if (changedKey !== key && changedKey !== '*') return
-
-      const cached = globalCache.get(key)
-      if (cached && Date.now() < cached.expiresAt) {
-        setData(cached.data)
-      }
-    }
-
-    window.addEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
-    return () => {
-      window.removeEventListener(CACHE_UPDATE_EVENT, onCacheUpdate as EventListener)
-    }
-  }, [key])
-
-  // Initial fetch if no cached data
-  useEffect(() => {
-    if (data === null) {
-      fetchData()
-    }
-  }, [data, fetchData])
+    queryClient.invalidateQueries({ queryKey: [key] })
+  }, [queryClient, key])
 
   return {
-    data,
-    loading,
-    error,
+    data: data ?? null,
+    loading: isLoading,
+    error: error ?? null,
     refetch,
-    invalidate
+    invalidate,
   }
 }

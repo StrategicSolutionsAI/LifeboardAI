@@ -2,7 +2,7 @@
 
 import { List, LayoutGrid, Columns3, Filter } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { TaskFilterPanel, type TaskFilterState, activeFilterCount } from "@/components/task-filter-panel";
+import { TaskFilterPanel, type TaskFilterState, activeFilterCount } from "@/features/tasks/components/task-filter-panel";
 
 export type TaskTabId = "lists" | "board" | "kanban";
 

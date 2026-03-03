@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -17,7 +18,7 @@ import {
   Users,
   Sticker,
 } from "lucide-react";
-import type { CalendarStickerMap } from "@/hooks/use-calendar-stickers";
+import type { CalendarStickerMap } from "@/features/calendar/hooks/use-calendar-stickers";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -27,24 +28,27 @@ export interface StickerOption {
   id: string;
   label: string;
   icon: LucideIcon;
-  backgroundClass: string;
-  textClass: string;
-  ringClass: string;
+  /** Saturated fill color for the sticker body */
+  color: string;
+  /** Slightly darker shade for bottom edge / shadow tint */
+  colorDark: string;
+  /** Light tint for unselected/preview state */
+  colorLight: string;
 }
 
 export const STICKER_OPTIONS: StickerOption[] = [
-  { id: "holiday",     label: "Holiday",     icon: TreePine,      backgroundClass: "bg-emerald-50",  textClass: "text-emerald-600",  ringClass: "ring-emerald-200/70" },
-  { id: "birthday",    label: "Birthday",    icon: Cake,          backgroundClass: "bg-pink-50",     textClass: "text-pink-500",     ringClass: "ring-pink-200/70" },
-  { id: "travel",      label: "Travel",      icon: Plane,         backgroundClass: "bg-sky-50",      textClass: "text-sky-500",      ringClass: "ring-sky-200/70" },
-  { id: "date-night",  label: "Date Night",  icon: Heart,         backgroundClass: "bg-rose-50",     textClass: "text-rose-500",     ringClass: "ring-rose-200/70" },
-  { id: "payday",      label: "Payday",      icon: Wallet,        backgroundClass: "bg-lime-50",     textClass: "text-lime-600",     ringClass: "ring-lime-200/70" },
-  { id: "doctor",      label: "Doctor",      icon: Stethoscope,   backgroundClass: "bg-teal-50",     textClass: "text-teal-600",     ringClass: "ring-teal-200/70" },
-  { id: "school",      label: "School",      icon: GraduationCap, backgroundClass: "bg-indigo-50",   textClass: "text-indigo-500",   ringClass: "ring-indigo-200/70" },
-  { id: "deadline",    label: "Deadline",    icon: AlarmClock,    backgroundClass: "bg-orange-50",   textClass: "text-orange-500",   ringClass: "ring-orange-200/70" },
-  { id: "self-care",   label: "Self-care",   icon: Sparkles,      backgroundClass: "bg-violet-50",   textClass: "text-violet-500",   ringClass: "ring-violet-200/70" },
-  { id: "celebration", label: "Celebration", icon: PartyPopper,   backgroundClass: "bg-amber-50",    textClass: "text-amber-600",    ringClass: "ring-amber-200/70" },
-  { id: "rest-day",    label: "Rest Day",    icon: Moon,          backgroundClass: "bg-slate-50",    textClass: "text-slate-500",    ringClass: "ring-slate-200/70" },
-  { id: "family",      label: "Family",      icon: Users,         backgroundClass: "bg-cyan-50",     textClass: "text-cyan-600",     ringClass: "ring-cyan-200/70" },
+  { id: "holiday",     label: "Holiday",     icon: TreePine,      color: "#34d399", colorDark: "#059669", colorLight: "#d1fae5" },
+  { id: "birthday",    label: "Birthday",    icon: Cake,          color: "#f472b6", colorDark: "#db2777", colorLight: "#fce7f3" },
+  { id: "travel",      label: "Travel",      icon: Plane,         color: "#38bdf8", colorDark: "#0284c7", colorLight: "#e0f2fe" },
+  { id: "date-night",  label: "Date Night",  icon: Heart,         color: "#fb7185", colorDark: "#e11d48", colorLight: "#fff1f2" },
+  { id: "payday",      label: "Payday",      icon: Wallet,        color: "#a3e635", colorDark: "#65a30d", colorLight: "#ecfccb" },
+  { id: "doctor",      label: "Doctor",      icon: Stethoscope,   color: "#2dd4bf", colorDark: "#0d9488", colorLight: "#ccfbf1" },
+  { id: "school",      label: "School",      icon: GraduationCap, color: "#818cf8", colorDark: "#4f46e5", colorLight: "#e0e7ff" },
+  { id: "deadline",    label: "Deadline",    icon: AlarmClock,    color: "#fb923c", colorDark: "#ea580c", colorLight: "#fff7ed" },
+  { id: "self-care",   label: "Self-care",   icon: Sparkles,      color: "#a78bfa", colorDark: "#7c3aed", colorLight: "#f5f3ff" },
+  { id: "celebration", label: "Celebration", icon: PartyPopper,   color: "#fbbf24", colorDark: "#d97706", colorLight: "#fffbeb" },
+  { id: "rest-day",    label: "Rest Day",    icon: Moon,          color: "#94a3b8", colorDark: "#475569", colorLight: "#f1f5f9" },
+  { id: "family",      label: "Family",      icon: Users,         color: "#22d3ee", colorDark: "#0891b2", colorLight: "#ecfeff" },
 ];
 
 export const STICKER_LOOKUP: Record<string, StickerOption> = Object.fromEntries(
@@ -53,8 +57,30 @@ export const STICKER_LOOKUP: Record<string, StickerOption> = Object.fromEntries(
 
 export const VALID_STICKER_IDS = new Set(STICKER_OPTIONS.map((o) => o.id));
 
-export const STICKER_PALETTE_WIDTH = 280;
-export const STICKER_PALETTE_HEIGHT = 360;
+export const STICKER_PALETTE_WIDTH = 300;
+export const STICKER_PALETTE_HEIGHT = 420;
+
+// ---------------------------------------------------------------------------
+// Shared sticker style builders
+// ---------------------------------------------------------------------------
+
+/** The glossy gradient overlay that gives the "vinyl sticker" sheen */
+const glossOverlay = "linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0) 60%)";
+
+/** Builds the inline style for a sticker body */
+const stickerStyle = (
+  option: StickerOption,
+  size: "sm" | "md" | "lg" = "md",
+): React.CSSProperties => ({
+  background: `${glossOverlay}, ${option.color}`,
+  border: size === "sm" ? "2px solid white" : "2.5px solid white",
+  borderRadius: size === "sm" ? 6 : 10,
+  boxShadow: [
+    `0 ${size === "sm" ? 1 : 2}px ${size === "sm" ? 3 : 6}px rgba(0,0,0,0.12)`,
+    `0 ${size === "sm" ? 1 : 2}px ${size === "sm" ? 6 : 12}px ${option.colorDark}22`,
+    `inset 0 -${size === "sm" ? 1 : 1.5}px 0 ${option.colorDark}33`,
+  ].join(", "),
+});
 
 // ---------------------------------------------------------------------------
 // Positioning helper
@@ -82,14 +108,16 @@ interface StickerChipsProps {
   dayStr: string;
   stickersByDate: CalendarStickerMap;
   size?: "sm" | "md";
+  onRemove?: (dateStr: string, stickerId: string) => void;
 }
 
-export const StickerChips = ({ dayStr, stickersByDate, size = "sm" }: StickerChipsProps) => {
+export const StickerChips = ({ dayStr, stickersByDate, size = "sm", onRemove }: StickerChipsProps) => {
   const dayStickers = stickersByDate[dayStr] ?? [];
   if (dayStickers.length === 0) return null;
 
-  const chipSize = size === "sm" ? "w-[18px] h-[18px]" : "w-[22px] h-[22px]";
-  const iconPx = size === "sm" ? 10 : 12;
+  const dim = size === "sm" ? 20 : 24;
+  const iconPx = size === "sm" ? 11 : 13;
+  const Tag = onRemove ? "button" : "span";
 
   return (
     <div className="flex items-center gap-0.5 flex-wrap mb-0.5">
@@ -98,13 +126,21 @@ export const StickerChips = ({ dayStr, stickersByDate, size = "sm" }: StickerChi
         if (!option) return null;
         const Icon = option.icon;
         return (
-          <span
+          <Tag
             key={`${dayStr}-chip-${stickerId}`}
-            className={`inline-flex items-center justify-center rounded-full ${chipSize} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
-            title={option.label}
+            type={onRemove ? "button" : undefined}
+            className={`inline-flex items-center justify-center select-none ${onRemove ? "transition-all duration-150 hover:scale-110 hover:brightness-110 active:scale-90 cursor-pointer" : ""}`}
+            style={{
+              width: dim,
+              height: dim,
+              ...stickerStyle(option, "sm"),
+            }}
+            title={onRemove ? `Remove ${option.label}` : option.label}
+            aria-label={onRemove ? `Remove ${option.label} sticker` : undefined}
+            onClick={onRemove ? (e: React.MouseEvent) => { e.stopPropagation(); onRemove(dayStr, stickerId); } : undefined}
           >
-            <Icon size={iconPx} strokeWidth={2} />
-          </span>
+            <Icon size={iconPx} strokeWidth={2.5} color="white" />
+          </Tag>
         );
       })}
     </div>
@@ -141,7 +177,7 @@ export const StickerAddButtonCompact = ({
     <button
       type="button"
       ref={dayStr === activeStickerDay ? stickerTriggerRef : undefined}
-      className={`lb-sticker-add opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all ${
+      className={`lb-sticker-add opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-0.5 rounded transition-all ${
         reachedLimit
           ? "text-rose-400 hover:bg-rose-50"
           : "text-theme-text-tertiary hover:bg-theme-brand-tint-strong hover:text-theme-text-secondary"
@@ -170,7 +206,7 @@ export const StickerAddButtonCompact = ({
 };
 
 // ---------------------------------------------------------------------------
-// StickerPalette — single shared portal palette
+// StickerPalette — sticker sheet picker
 // ---------------------------------------------------------------------------
 
 interface StickerPaletteProps {
@@ -203,30 +239,40 @@ export const StickerPalette = ({
   return createPortal(
     <div
       ref={paletteRef}
-      className="fixed z-[1200] max-h-[80vh] w-[280px] overflow-hidden rounded-xl border border-theme-neutral-300 bg-white/95 p-3 shadow-xl ring-1 ring-theme-neutral-300 backdrop-blur-sm"
-      style={{ top: position.top, left: position.left }}
+      className="fixed z-[1200] max-h-[80vh] w-[300px] overflow-hidden rounded-2xl p-4"
+      style={{
+        top: position.top,
+        left: position.left,
+        // Sticker sheet backing paper texture
+        background: "linear-gradient(180deg, #fafafa 0%, #f5f5f4 100%)",
+        border: "1px solid #e7e5e4",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)",
+      }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="mb-2.5 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-theme-text-tertiary/70">
-          Add sticker
-        </span>
-        <button
-          type="button"
-          className="text-[11px] text-theme-text-tertiary/70 transition hover:text-theme-text-subtle focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)] rounded px-1"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-        >
-          Close
-        </button>
+      <div className="mb-3 flex items-center gap-1.5">
+        <Sticker size={13} className="text-stone-400" />
+        <div className="flex flex-col">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">
+            Sticker Sheet
+          </span>
+          <span className="text-[10px] font-medium text-stone-500">
+            {new Date(dayStr + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+          </span>
+        </div>
       </div>
 
-      {/* Sticker grid — 4 columns */}
-      <div className="grid grid-cols-4 gap-1.5">
-        {STICKER_OPTIONS.map((option) => {
+      {/* Sticker grid — 3 columns */}
+      <div
+        className="grid grid-cols-3 gap-2.5 rounded-xl p-3"
+        style={{
+          // Subtle grid backing — like the peel-off backing sheet
+          background: "repeating-linear-gradient(0deg, transparent, transparent 31px, #e7e5e433 31px, #e7e5e433 32px), repeating-linear-gradient(90deg, transparent, transparent 31px, #e7e5e433 31px, #e7e5e433 32px)",
+          border: "1px dashed #d6d3d1",
+        }}
+      >
+        {STICKER_OPTIONS.map((option, idx) => {
           const Icon = option.icon;
           const isSelected = dayStickers.includes(option.id);
           const disabled = !isSelected && reachedLimit;
@@ -234,13 +280,11 @@ export const StickerPalette = ({
             <button
               key={option.id}
               type="button"
-              className={[
-                "flex h-[52px] flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent text-theme-text-tertiary transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15",
-                isSelected
-                  ? `${option.backgroundClass} ${option.textClass} ring-2 ${option.ringClass} shadow-sm`
-                  : "bg-theme-surface-alt hover:bg-theme-brand-tint-light",
-                disabled ? "cursor-not-allowed opacity-40" : "",
-              ].join(" ")}
+              className="group/sticker relative flex flex-col items-center justify-center gap-1 py-2 transition-all duration-200 focus:outline-none"
+              style={{
+                opacity: disabled ? 0.3 : 1,
+                cursor: disabled && !isSelected ? "not-allowed" : "pointer",
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (isSelected) {
@@ -253,30 +297,58 @@ export const StickerPalette = ({
               aria-label={isSelected ? `Remove ${option.label}` : `Add ${option.label}`}
               disabled={disabled && !isSelected}
             >
-              <Icon className="h-4 w-4" />
-              <span className="text-[9px] font-medium leading-tight">{option.label}</span>
+              {/* The sticker itself */}
+              <span
+                className="inline-flex items-center justify-center transition-transform duration-200 group-hover/sticker:scale-110 group-active/sticker:scale-95"
+                style={{
+                  width: 42,
+                  height: 42,
+                  ...stickerStyle(option, "lg"),
+                  ...(!isSelected
+                    ? {
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.06), inset 0 -1px 0 rgba(0,0,0,0.05)",
+                      }
+                    : {}),
+                }}
+              >
+                <Icon size={20} strokeWidth={2.2} color="white" />
+              </span>
+              <span className="text-[9px] font-semibold text-stone-500 leading-tight mt-0.5">
+                {option.label}
+              </span>
+              {/* "Peeled off" checkmark */}
+              {isSelected && (
+                <span
+                  className="absolute -right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  style={{
+                    background: option.colorDark,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  &#x2713;
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
       {/* Footer */}
-      <div className="mt-2 text-[10px] text-theme-text-tertiary/60">
-        <p>{dayStickers.length}/{maxStickersPerDay} stickers · tap to toggle</p>
-      </div>
-
-      {dayStickers.length > 0 && (
+      <div className="mt-3 flex flex-col gap-2">
+        <span className="text-[10px] font-medium text-stone-400 text-center">
+          {dayStickers.length}/{maxStickersPerDay} placed
+        </span>
         <button
           type="button"
-          className="mt-1.5 w-full rounded-lg border border-theme-neutral-300 px-2 py-1 text-[11px] font-medium text-theme-text-tertiary transition hover:bg-theme-surface-alt focus:outline-none focus:ring-1 focus:ring-[rgba(163,133,96,0.4)]"
+          className="w-full rounded-lg bg-theme-primary px-3 py-2 text-xs font-semibold text-white shadow-warm-sm transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-theme-focus/40"
           onClick={(e) => {
             e.stopPropagation();
-            onClear();
+            onClose();
           }}
         >
-          Clear stickers
+          Done
         </button>
-      )}
+      </div>
     </div>,
     document.body,
   );
@@ -311,12 +383,10 @@ export const StickerRow = ({
 }: StickerRowProps) => {
   const dayStickers = stickersByDate[dayStr] ?? [];
   const reachedLimit = dayStickers.length >= maxStickersPerDay;
-  const stickerButtonCommon =
-    "inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent shadow-sm transition hover:shadow-warm focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15";
 
   return (
     <div className={className ?? ""}>
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {/* Add sticker trigger */}
         <button
           type="button"
@@ -335,10 +405,10 @@ export const StickerRow = ({
             setActiveStickerDay(dayStr);
           }}
           className={[
-            "order-first inline-flex w-full items-center justify-center gap-1 rounded-full border border-dashed bg-white px-2.5 py-1.5 text-[11px] font-semibold text-theme-text-subtle shadow-sm transition focus:outline-none focus:ring-[3px] focus:ring-theme-focus/15 sm:order-none sm:w-auto sm:px-3",
+            "order-first inline-flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-3 py-1.5 text-[11px] font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-stone-300 sm:order-none sm:w-auto sm:px-3.5",
             reachedLimit
-              ? "border-rose-200 text-rose-500 hover:border-rose-300 hover:text-rose-600"
-              : "border-theme-neutral-300 hover:border-theme-secondary hover:text-theme-primary-600",
+              ? "border-rose-300 bg-rose-50/50 text-rose-400 hover:border-rose-400"
+              : "border-stone-300 bg-white/80 text-stone-400 hover:border-stone-400 hover:bg-stone-50 hover:text-stone-500",
           ].join(" ")}
           aria-haspopup="dialog"
           aria-expanded={activeStickerDay === dayStr}
@@ -346,11 +416,11 @@ export const StickerRow = ({
           title={reachedLimit ? `Sticker limit reached (${maxStickersPerDay})` : "Add sticker"}
         >
           <Sticker className="h-3.5 w-3.5" />
-          <span className="ml-1">Sticker</span>
+          <span>Add Sticker</span>
         </button>
 
-        {/* Existing stickers */}
-        {dayStickers.map((stickerId) => {
+        {/* Existing stickers — physical planner sticker style */}
+        {dayStickers.map((stickerId, idx) => {
           const option = STICKER_LOOKUP[stickerId];
           if (!option) return null;
           const Icon = option.icon;
@@ -364,9 +434,16 @@ export const StickerRow = ({
                 e.stopPropagation();
                 removeStickerFromDate(dayStr, stickerId);
               }}
-              className={`${stickerButtonCommon} ${option.backgroundClass} ${option.textClass} ring-1 ${option.ringClass}`}
+              className="group/sticker inline-flex items-center gap-1.5 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-stone-300 focus:ring-offset-1 active:scale-95"
+              style={{
+                ...stickerStyle(option, "md"),
+                padding: "5px 10px 5px 8px",
+              }}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon size={14} strokeWidth={2.5} color="white" />
+              <span className="text-[10px] font-bold text-white/90 drop-shadow-sm">
+                {option.label}
+              </span>
             </button>
           );
         })}
