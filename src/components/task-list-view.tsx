@@ -11,6 +11,7 @@ import {
   GripVertical,
   ChevronDown,
   ChevronRight,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,10 +19,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { differenceInCalendarDays, parseISO, isValid, format } from "date-fns";
+import { differenceInCalendarDays, parseISO, isValid, format, addDays, nextMonday } from "date-fns";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 type TaskStatus = "todo" | "in_progress" | "done";
@@ -44,6 +50,9 @@ interface TaskListViewProps {
   onEditTask: (id: string) => void;
   onAddTask: (title: string, bucket?: string) => void;
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
+  onBucketChange?: (taskId: string, newBucket: string | null) => void;
+  onDueDateChange?: (taskId: string, newDate: string | null) => void;
+  availableBuckets?: string[];
   loadingTasks?: Set<string>;
   bucketColors?: Record<string, string>;
   searchQuery?: string;
@@ -145,6 +154,191 @@ function StatusBadge({
   );
 }
 
+/* ─── BucketBadge ─── */
+
+function BucketBadge({
+  taskId,
+  bucket,
+  bucketColor,
+  availableBuckets,
+  bucketColors,
+  onBucketChange,
+}: {
+  taskId: string;
+  bucket: string | null | undefined;
+  bucketColor: string;
+  availableBuckets: string[];
+  bucketColors: Record<string, string>;
+  onBucketChange?: (taskId: string, newBucket: string | null) => void;
+}) {
+  if (!onBucketChange) {
+    return bucket ? (
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bucketColor }} />
+        <span className="text-xs text-theme-text-secondary truncate">{bucket}</span>
+      </div>
+    ) : (
+      <span className="text-[11px] text-theme-neutral-400">--</span>
+    );
+  }
+
+  const otherBuckets = availableBuckets.filter((b) => b !== bucket);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md text-xs transition-opacity hover:opacity-80 cursor-pointer"
+        >
+          {bucket ? (
+            <>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bucketColor }} />
+              <span className="text-theme-text-secondary truncate">{bucket}</span>
+            </>
+          ) : (
+            <span className="text-[11px] text-theme-neutral-400">--</span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44 max-h-60 overflow-y-auto">
+        {otherBuckets.map((b) => {
+          const color = bucketColors[b] ?? "#bb9e7b";
+          return (
+            <DropdownMenuItem key={b} onClick={() => onBucketChange(taskId, b)}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+              {b}
+            </DropdownMenuItem>
+          );
+        })}
+        {bucket && (
+          <DropdownMenuItem
+            onClick={() => onBucketChange(taskId, null)}
+            className="text-theme-text-tertiary"
+          >
+            <X size={12} className="shrink-0" />
+            Remove bucket
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/* ─── DueDateBadge ─── */
+
+function DueDateBadge({
+  taskId,
+  dueDate,
+  isRecurring,
+  onDueDateChange,
+}: {
+  taskId: string;
+  dueDate: string | null | undefined;
+  isRecurring?: boolean;
+  onDueDateChange?: (taskId: string, newDate: string | null) => void;
+}) {
+  const dateBadge = formatDue(dueDate, isRecurring);
+  const [open, setOpen] = useState(false);
+
+  if (!onDueDateChange) {
+    return dateBadge ? (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium",
+          dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
+          dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
+          dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
+        )}
+      >
+        <CalendarDays size={10} />
+        {dateBadge.label}
+      </span>
+    ) : (
+      <span className="text-[11px] text-[#c5c0b8]">--</span>
+    );
+  }
+
+  const today = new Date();
+  const quickOptions = [
+    { label: "Today", date: format(today, "yyyy-MM-dd") },
+    { label: "Tomorrow", date: format(addDays(today, 1), "yyyy-MM-dd") },
+    { label: "Next Monday", date: format(nextMonday(today), "yyyy-MM-dd") },
+    { label: "Next week", date: format(addDays(today, 7), "yyyy-MM-dd") },
+  ];
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center cursor-pointer transition-opacity hover:opacity-80">
+          {dateBadge ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium",
+                dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
+                dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
+                dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
+              )}
+            >
+              <CalendarDays size={10} />
+              {dateBadge.label}
+            </span>
+          ) : (
+            <span className="text-[11px] text-[#c5c0b8]">--</span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-48 p-1.5">
+        <div className="flex flex-col gap-0.5">
+          {quickOptions.map((opt) => (
+            <button
+              key={opt.label}
+              onClick={() => {
+                onDueDateChange(taskId, opt.date);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] text-theme-text-secondary hover:bg-theme-brand-tint-subtle transition-colors text-left",
+                dueDate === opt.date && "bg-theme-brand-tint-light text-theme-primary-600 font-medium"
+              )}
+            >
+              <CalendarDays size={12} className="shrink-0" />
+              {opt.label}
+            </button>
+          ))}
+          <div className="border-t border-theme-neutral-300/50 my-1" />
+          <div className="px-2.5 py-1.5">
+            <input
+              type="date"
+              value={dueDate ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                onDueDateChange(taskId, val || null);
+                setOpen(false);
+              }}
+              className="w-full text-[12px] text-theme-text-secondary bg-transparent border border-theme-neutral-300/60 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-theme-primary/40 cursor-pointer"
+            />
+          </div>
+          {dueDate && (
+            <>
+              <div className="border-t border-theme-neutral-300/50 my-1" />
+              <button
+                onClick={() => {
+                  onDueDateChange(taskId, null);
+                  setOpen(false);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] text-red-500 hover:bg-red-50 transition-colors text-left"
+              >
+                <X size={12} className="shrink-0" />
+                Remove date
+              </button>
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /* ─── Main TaskListView ─── */
 
 export function TaskListView({
@@ -154,6 +348,9 @@ export function TaskListView({
   onEditTask,
   onAddTask,
   onStatusChange,
+  onBucketChange,
+  onDueDateChange,
+  availableBuckets = [],
   loadingTasks = new Set(),
   bucketColors = {},
   searchQuery,
@@ -194,6 +391,9 @@ export function TaskListView({
     onEditTask,
     onAddTask,
     onStatusChange,
+    onBucketChange,
+    onDueDateChange,
+    availableBuckets,
     loadingTasks,
     bucketColors,
     searchQuery,
@@ -223,6 +423,9 @@ interface TaskSectionProps {
   onEditTask: (id: string) => void;
   onAddTask: (title: string, bucket?: string) => void;
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
+  onBucketChange?: (taskId: string, newBucket: string | null) => void;
+  onDueDateChange?: (taskId: string, newDate: string | null) => void;
+  availableBuckets?: string[];
   loadingTasks: Set<string>;
   bucketColors: Record<string, string>;
   searchQuery?: string;
@@ -239,6 +442,9 @@ function TaskSection({
   onEditTask,
   onAddTask,
   onStatusChange,
+  onBucketChange,
+  onDueDateChange,
+  availableBuckets = [],
   loadingTasks,
   bucketColors,
   searchQuery,
@@ -410,6 +616,9 @@ function TaskSection({
                       onDeleteTask={onDeleteTask}
                       onEditTask={onEditTask}
                       onStatusChange={onStatusChange}
+                      onBucketChange={onBucketChange}
+                      onDueDateChange={onDueDateChange}
+                      availableBuckets={availableBuckets}
                       isLoading={loadingTasks.has(task.id)}
                       bucketColors={bucketColors}
                       searchQuery={searchQuery}
@@ -488,6 +697,9 @@ function TaskTableRow({
   onDeleteTask,
   onEditTask,
   onStatusChange,
+  onBucketChange,
+  onDueDateChange,
+  availableBuckets = [],
   isLoading,
   bucketColors,
   searchQuery,
@@ -503,6 +715,9 @@ function TaskTableRow({
   onDeleteTask: (id: string) => void;
   onEditTask: (id: string) => void;
   onStatusChange?: (taskId: string, newStatus: TaskStatus) => void;
+  onBucketChange?: (taskId: string, newBucket: string | null) => void;
+  onDueDateChange?: (taskId: string, newDate: string | null) => void;
+  availableBuckets?: string[];
   isLoading: boolean;
   bucketColors: Record<string, string>;
   searchQuery?: string;
@@ -630,33 +845,24 @@ function TaskTableRow({
 
           {/* Bucket */}
           <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
-            {task.bucket ? (
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: bucketColor }} />
-                <span className="text-xs text-theme-text-secondary truncate">{task.bucket}</span>
-              </div>
-            ) : (
-              <span className="text-[11px] text-theme-neutral-400">--</span>
-            )}
+            <BucketBadge
+              taskId={task.id}
+              bucket={task.bucket}
+              bucketColor={bucketColor}
+              availableBuckets={availableBuckets}
+              bucketColors={bucketColors}
+              onBucketChange={onBucketChange}
+            />
           </td>
 
           {/* Due */}
           <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
-            {dateBadge ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium",
-                  dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
-                  dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
-                  dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
-                )}
-              >
-                <CalendarDays size={10} />
-                {dateBadge.label}
-              </span>
-            ) : (
-              <span className="text-[11px] text-[#c5c0b8]">--</span>
-            )}
+            <DueDateBadge
+              taskId={task.id}
+              dueDate={task.dueDate ?? null}
+              isRecurring={task.isRecurring}
+              onDueDateChange={onDueDateChange}
+            />
           </td>
 
           {/* Actions */}

@@ -439,6 +439,53 @@ function TasksBoardShell() {
     [batchUpdateTasks, toast]
   );
 
+  const handleBucketChange = useCallback(
+    async (taskId: string, newBucket: string | null) => {
+      setLoadingTasks((prev) => new Set(prev).add(taskId));
+      try {
+        // API route checks `patch.bucket !== undefined` and sets to `patch.bucket ?? null`
+        await batchUpdateTasks([{ taskId, updates: { bucket: newBucket as string | undefined } }]);
+      } catch {
+        toast({
+          title: "Failed to update bucket",
+          description: "Please try again.",
+          type: "error",
+        });
+      } finally {
+        setLoadingTasks((prev) => {
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }
+    },
+    [batchUpdateTasks, toast]
+  );
+
+  const handleDueDateChange = useCallback(
+    async (taskId: string, newDate: string | null) => {
+      setLoadingTasks((prev) => new Set(prev).add(taskId));
+      try {
+        // API route checks `patch.due` and uses `patch.due?.date ?? null`
+        const due = newDate ? { date: newDate } : { date: undefined };
+        await batchUpdateTasks([{ taskId, updates: { due } }]);
+      } catch {
+        toast({
+          title: "Failed to update due date",
+          description: "Please try again.",
+          type: "error",
+        });
+      } finally {
+        setLoadingTasks((prev) => {
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }
+    },
+    [batchUpdateTasks, toast]
+  );
+
   const handleEditTask = useCallback(
     (taskId: string) => {
       taskEditorRef.current?.openByTaskId(taskId);
@@ -861,6 +908,9 @@ function TasksBoardShell() {
                 onEditTask={handleEditTask}
                 onAddTask={handleAddTaskFromList}
                 onStatusChange={handleKanbanStatusChange}
+                onBucketChange={handleBucketChange}
+                onDueDateChange={handleDueDateChange}
+                availableBuckets={buckets}
                 loadingTasks={loadingTasks}
                 bucketColors={bucketColors}
                 searchQuery={searchQuery}
