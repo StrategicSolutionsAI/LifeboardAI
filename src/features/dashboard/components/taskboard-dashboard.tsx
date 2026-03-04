@@ -859,7 +859,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           try {
             const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`, { credentials: 'include' });
             if (!resW.ok) {
-              console.error('Failed to fetch Withings metrics');
+              if (resW.status !== 400) console.error('Failed to fetch Withings metrics');
               return;
             }
             const dataW = await resW.json();

@@ -170,7 +170,7 @@ export async function updateUserPreferenceFields(
       .from('user_preferences')
       .update(fields)
       .eq('user_id', user.id)
-      .select('user_id');
+      .select();
 
     if (error) {
       console.error('Error in updateUserPreferenceFields:', error);

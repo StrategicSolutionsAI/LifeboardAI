@@ -284,9 +284,16 @@ export class IntegrationErrorHandler {
 
         const integrationError = this.categorizeError(error as Error)
 
-        // Only clear tokens if the refresh token itself is permanently invalid.
-        // Re-check the DB first — another request may have refreshed successfully.
-        if (integrationError.code === 'TOKEN_EXPIRED') {
+        // Only clear tokens when the refresh token is *permanently* invalid
+        // (e.g., revoked by user or expired after prolonged inactivity).
+        // Transient failures (network errors, temporary Withings issues) should
+        // NOT wipe tokens — the refresh token is likely still valid and will
+        // succeed on the next attempt.
+        const permanentFailure =
+          (error as Error).message === 'REFRESH_TOKEN_EXPIRED' ||
+          (error as Error).message === 'INVALID_REFRESH_TOKEN'
+
+        if (permanentFailure) {
           const supabase = supabaseServer()
           const { data: currentRow } = await supabase
             .from('user_integrations')
@@ -302,6 +309,8 @@ export class IntegrationErrorHandler {
           } else {
             this.logger.info('Skipping token clear — row was recently updated by another request', { integrationId })
           }
+        } else {
+          this.logger.info('Transient refresh failure — keeping tokens for retry', { integrationId })
         }
 
         return {
