@@ -378,6 +378,21 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
         updates.hourSlot = null;
       }
 
+      // Shift startDate/endDate to match the new due date so the task
+      // immediately moves in the calendar (buildAllLifeboardEvents uses
+      // startDate ?? due.date to place tasks on days).
+      if (task?.startDate && task?.endDate && task.startDate !== task.endDate) {
+        // Multi-day task: preserve the span by shifting both dates
+        const srcMs = new Date(srcDate + 'T00:00:00').getTime();
+        const dstMs = new Date(destDate + 'T00:00:00').getTime();
+        const deltaMs = dstMs - srcMs;
+        updates.startDate = format(new Date(new Date(task.startDate + 'T00:00:00').getTime() + deltaMs), 'yyyy-MM-dd');
+        updates.endDate = format(new Date(new Date(task.endDate + 'T00:00:00').getTime() + deltaMs), 'yyyy-MM-dd');
+      } else {
+        // Single-day task: set both to destination date
+        updates.startDate = destDate;
+        updates.endDate = destDate;
+      }
 
       batchUpdateTasks([
         { taskId, updates, occurrenceDate: destDate }

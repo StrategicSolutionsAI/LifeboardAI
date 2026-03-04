@@ -1,6 +1,6 @@
 {
   "hooks": {
-    "preToolUse": [
+    "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
@@ -11,7 +11,7 @@
         ]
       }
     ],
-    "postToolUse": [
+    "PostToolUse": [
       {
         "matcher": "Edit|Write",
         "hooks": [

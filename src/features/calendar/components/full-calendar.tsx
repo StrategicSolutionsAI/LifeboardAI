@@ -1614,9 +1614,14 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       : 'min-w-[600px]';
 
   const weekdayHeader = (
-    <div className="grid grid-cols-7 border-b border-[rgba(219,214,207,0.7)]">
-      {weekDayLabels.map((label) => (
-        <div key={label} className="py-2.5 text-center text-[11px] tracking-[0.5px] uppercase text-theme-text-tertiary">
+    <div className="grid grid-cols-7 border-b border-theme-neutral-300/60">
+      {weekDayLabels.map((label, i) => (
+        <div
+          key={label}
+          className={`py-2 text-center text-[10px] font-medium tracking-[0.8px] uppercase text-theme-text-tertiary ${
+            i < 6 ? 'border-r border-theme-neutral-300/40' : ''
+          }`}
+        >
           {label}
         </div>
       ))}
@@ -1657,9 +1662,9 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
   const showFilterControls = filterableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0;
 
   return (
-    <div className="w-full max-w-none mx-0 sm:mx-4 bg-white border border-theme-neutral-300 rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
+    <div className="w-full max-w-none bg-white border border-theme-neutral-300/80 rounded-xl shadow-warm-sm overflow-hidden h-full flex flex-col">
       {/* Calidora-style Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-[rgba(219,214,207,0.7)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 border-b border-theme-neutral-300/60">
         <h3 className="section-label-sm">
           {headerTitle}
         </h3>
@@ -2005,27 +2010,24 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                 // Week view: Calidora-style columns
                 <div className="flex-1 flex flex-col">
                   {weekdayHeader}
-                  <div className="grid grid-cols-7 flex-1 min-h-[350px]">
+                  <div className="grid grid-cols-7 flex-1 min-h-[520px]">
                     {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = toDayKey(day);
                 const dayEvents = eventsByDate[dayStr] ?? [];
-                const isCurrentMonth = true; // Always show as current month in week view
                 const isToday = isSameDay(day, today);
                 const formattedDayLabel = format(day, 'MMMM d, yyyy');
-                const weekdayLabel = format(day, 'EEE');
-                
+                const dayOfWeek = day.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
                 return (
                   <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
                     {(provided, snapshot) => {
-                      const dayOfWeek = day.getDay();
-                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                       const cellClasses = [
-                        'p-2 transition-colors relative group',
-                        idx < 6 ? 'border-r border-theme-neutral-300/50' : '',
+                        'px-2 pt-2 pb-3 transition-colors relative group h-full',
                         snapshot.isDraggingOver
                           ? 'bg-theme-brand-tint-light'
-                          : isToday
-                          ? 'bg-theme-brand-tint-subtle'
+                          : isWeekend
+                          ? 'bg-[rgba(250,249,247,0.6)]'
                           : 'bg-white',
                       ].filter(Boolean).join(' ');
                       const visibleEvents = getEventsForDisplay(dayEvents);
@@ -2034,7 +2036,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className="h-full"
+                          className={`h-full ${idx < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
                         >
                           <div
                             onClick={(e) => {
@@ -2044,12 +2046,12 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                             }}
                             className={cellClasses}
                           >
-                          {/* Calidora-style Day Number */}
-                          <div className="flex items-center justify-between mb-1">
+                          {/* Day Number */}
+                          <div className="flex items-center justify-between mb-2">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); handleDateChange(day); handleViewChange('day'); }}
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full mt-1 text-[16px] hover:bg-theme-brand-tint-strong transition-colors ${
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium hover:bg-theme-brand-tint-strong transition-colors ${
                                 isToday
                                   ? 'bg-theme-primary text-white hover:bg-[#a8896a]'
                                   : 'text-theme-text-primary'
@@ -2086,8 +2088,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                           {/* Sticker chips */}
                           <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} onRemove={removeStickerFromDate} size="md" />
 
-                          {/* Calidora-style compact event pills */}
-                          <div className="flex flex-col gap-1.5">
+                          {/* Compact event pills */}
+                          <div className="flex flex-col gap-1">
                             {filteredEvents.map((ev: DayEvent, filteredIndex: number) => {
                                 const styles = resolveEventStyles(ev.source, ev);
                                 const hasTask = Boolean(ev.taskId);
@@ -2115,8 +2117,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                                           event.stopPropagation();
                                           await openCalendarEvent(ev, dayStr);
                                         }}
-                                        className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-colors hover:bg-[rgba(252,250,248,0.8)] cursor-grab active:cursor-grabbing ${
-                                          dragSnapshot.isDragging ? 'opacity-40' : ''
+                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-left transition-all hover:bg-theme-surface-alt/80 cursor-grab active:cursor-grabbing ${
+                                          dragSnapshot.isDragging ? 'opacity-40 shadow-sm' : ''
                                         }`}
                                         style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
                                         title={ev.title}
@@ -2126,7 +2128,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
                                           style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
                                         />
-                                        <span className="text-[11px] text-theme-text-primary truncate">
+                                        <span className="text-[11px] leading-tight text-theme-text-primary truncate">
                                           {ev.title}
                                         </span>
                                       </div>
@@ -2134,9 +2136,6 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                                   </Draggable>
                                 );
                               })}
-                            {filteredEvents.length === 0 && (
-                              <div className="flex items-center justify-center h-20 text-[#c5c9d0] text-[11px]" />
-                            )}
                           </div>
                           {provided.placeholder}
                           </div>

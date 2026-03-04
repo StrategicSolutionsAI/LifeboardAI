@@ -55,12 +55,6 @@ const HOURS = Array.from({ length: 15 }, (_, i) => {
 const RESIZE_INCREMENT = 15; // minutes
 const MIN_DURATION = 15; // minutes
 
-// Period labels for visual grouping
-const PERIOD_LABELS: Record<string, string> = {
-  '7AM': 'Morning',
-  '12PM': 'Afternoon',
-  '5PM': 'Evening',
-};
 
 const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
   { value: 'none', label: 'Do not repeat' },
@@ -720,7 +714,6 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           const isMainHour = timeSlot.indexOf(':') === -1;
           const hasTask = hourlyPlan[timeSlot].length > 0;
           const isCurrentSlot = currentSlot === timeSlot;
-          const periodLabel = PERIOD_LABELS[timeSlot];
           // Determine if this slot is in the past (before current time)
           const slotMinutes = parseTimeSlot(timeSlot);
           const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -728,16 +721,6 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
 
           return (
           <React.Fragment key={timeSlot}>
-            {/* Period section divider */}
-            {periodLabel && (
-              <div className="flex items-center gap-3 px-3 pt-4 pb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[1.5px] text-theme-primary-500/70">
-                  {periodLabel}
-                </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-theme-primary-300/30 to-transparent" />
-              </div>
-            )}
-
             <Droppable droppableId={`hour-${timeSlot}`}>
               {(provided, snapshot) => (
                 <div
@@ -745,7 +728,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                     isMainHour
                       ? 'border-t border-theme-neutral-300/30 h-[18px]'
                       : hasTask ? 'h-[17px]' : 'h-[17px]'
-                  } ${index === 0 && !periodLabel ? 'border-t-0' : ''} ${
+                  } ${index === 0 ? 'border-t-0' : ''} ${
                     snapshot.isDraggingOver
                       ? 'bg-theme-primary-50/80'
                       : isPast && !hasTask
@@ -756,10 +739,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   onMouseEnter={() => handleSlotHover(timeSlot, true)}
                   onMouseLeave={() => handleSlotHover(timeSlot, false)}
                 >
-                  {/* Time label - only for main hours, hidden when now line is active */}
-                  <div className="w-[56px] shrink-0 flex flex-col items-end text-right -mt-[1px] pr-1">
+                  {/* Time label - only for main hours, positioned above the dividing line */}
+                  <div className="w-[56px] shrink-0 flex flex-col items-end text-right pr-1">
                     {isMainHour && !(showTimeIndicator && isCurrentSlot) ? (
-                      <span className={`text-[11px] font-semibold leading-none tabular-nums ${
+                      <span className={`text-[11px] font-semibold leading-none tabular-nums -translate-y-full -mt-[3px] ${
                         isPast ? 'text-theme-text-quaternary/60' : 'text-theme-text-tertiary'
                       }`}>
                         {timeSlot}

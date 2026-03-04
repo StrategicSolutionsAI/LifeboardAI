@@ -8,6 +8,7 @@ import {
   Calendar,
   UserCircle2,
   ListChecks,
+  FolderOpen,
   History,
   Settings,
   Zap,
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
+  { href: "/folders", icon: FolderOpen, label: "Folders" },
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
@@ -64,6 +66,11 @@ const routeContext = [
     match: (path: string) => path.startsWith("/tasks"),
     title: "Tasks",
     description: "Organize work into buckets and ship high-impact items first.",
+  },
+  {
+    match: (path: string) => path.startsWith("/folders"),
+    title: "Folders",
+    description: "Organize and browse your files and documents.",
   },
   {
     match: (path: string) => path.startsWith("/integrations"),
@@ -284,8 +291,11 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
         {/* Main content area */}
         <main
           id="main-content"
-          className="flex-1 w-full px-4 pb-24 pt-4 sm:pt-6 md:h-full md:overflow-y-auto md:px-2 md:pb-4 md:pt-0"
+          className="flex-1 w-full px-6 sm:px-8 md:px-10 pb-24 pt-4 sm:pt-6 md:h-full md:overflow-y-auto md:pb-4 md:pt-8"
         >
+          <h1 className="text-2xl font-semibold text-theme-text-primary mb-6">
+            {currentRoute.title}
+          </h1>
           {children}
         </main>
       </div>

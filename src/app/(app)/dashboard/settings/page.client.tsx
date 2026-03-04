@@ -245,14 +245,10 @@ export default function SettingsPageClient() {
   if (!mounted) return null
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto min-h-screen">
+    <div className="max-w-4xl min-h-screen">
         {/* ── Page header ─────────────────────────────────── */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-theme-text-tertiary" />
-            <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
-          </div>
-          <p className="text-sm text-theme-text-tertiary mt-1 ml-9">Manage your preferences and account settings</p>
+        <div className="mb-6">
+          <p className="text-sm text-theme-text-tertiary">Manage your preferences and account settings</p>
         </div>
 
         <div className="space-y-8">

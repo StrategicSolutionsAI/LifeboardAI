@@ -655,7 +655,7 @@ function TasksBoardShell() {
   const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.dueDateRange !== null;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5">
+    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 pb-3 sm:pb-5">
       {/* ── Header Row: Progress ring + Title + Stats + Search ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-5">
@@ -675,9 +675,8 @@ function TasksBoardShell() {
             </span>
           </div>
 
-          {/* Title */}
+          {/* Stats */}
           <div className="flex flex-col gap-0.5 min-w-0">
-            <h2 className="text-[20px] text-theme-text-primary font-semibold leading-tight">Tasks</h2>
             <span className="text-xs text-theme-text-tertiary">
               {totalOpen} open{totalCompleted > 0 ? ` · ${totalCompleted} done` : ""}
             </span>

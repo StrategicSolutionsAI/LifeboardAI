@@ -346,9 +346,8 @@ export default function IntegrationsPageClient() {
     return (
       <>
         <SectionLoadTimer name="/integrations" />
-        <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Integrations</h1>
+        <div className="max-w-4xl">
+          <div className="mb-6">
             <p className="text-muted-foreground">Connect your favorite apps and services to LifeboardAI</p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
@@ -364,10 +363,9 @@ export default function IntegrationsPageClient() {
   return (
     <>
       <SectionLoadTimer name="/integrations" />
-      <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
-        <div className="mb-8">
+      <div className="max-w-4xl">
+        <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-            <h1 className="text-2xl sm:text-3xl font-bold">Integrations</h1>
             <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-warm hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} aria-hidden="true" />
               <span className="relative z-10">{loading ? 'Refreshing...' : 'Refresh All'}</span>

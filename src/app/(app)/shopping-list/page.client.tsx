@@ -845,11 +845,10 @@ function ShoppingListLayout() {
 
   return (
     <>
-      <div className="flex w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5 pb-24">
+      <div className="flex w-full flex-col gap-3 sm:gap-4 pb-24">
         {/* ── Header Row: Title + Stats + Add button ── */}
         <div className="flex items-center gap-5">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <h2 className="text-[20px] text-theme-text-primary font-semibold leading-tight">Shopping</h2>
             <span className="text-xs text-theme-text-tertiary">
               {loadingItems ? "Loading…" : `${totalOpen} item${totalOpen !== 1 ? "s" : ""}`}
               {purchasedItems.length > 0 ? ` · ${purchasedItems.length} purchased` : ""}
