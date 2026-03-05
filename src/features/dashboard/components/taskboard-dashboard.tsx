@@ -438,26 +438,6 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </h1>
             <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>
-          {/* Completion ring card — uses memoized widgetProgressStats */}
-          <div className="hidden md:flex items-center gap-3 bg-white border border-theme-neutral-300 rounded-2xl px-5 py-3 shadow-warm-sm">
-            <div className="relative w-12 h-12">
-              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
-                <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(219,214,207,0.4)" strokeWidth="3" />
-                <circle cx="24" cy="24" r="20" fill="none" stroke="#48B882" strokeWidth="3" strokeLinecap="round"
-                  strokeDasharray={`${Math.round((widgetProgressStats.pct / 100) * 125.6)} 125.6`}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center  text-[11px] font-medium text-theme-text-primary">
-                {widgetProgressStats.pct}%
-              </span>
-            </div>
-            <div>
-              <p className=" text-[13px] font-medium text-theme-text-primary">Today's Progress</p>
-              <p className=" text-[11px] text-theme-text-tertiary">
-                {widgetProgressStats.completed} of {widgetProgressStats.total} goals met
-              </p>
-            </div>
-          </div>
         </section>
         {/* Bucket tabs row (scrollable) */}
         <div
@@ -581,7 +561,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             {/* Content container: white widget box with subtle shadow */}
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-white shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-4 text-sm font-semibold overflow-x-auto no-scrollbar">
+              <nav className="flex items-center border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-6 sm:pt-7 text-sm font-semibold overflow-x-auto no-scrollbar">
                 <div className="flex items-center gap-3 sm:gap-5">
                   {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                     <button
@@ -613,7 +593,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
               </nav>
 
               {/* Content area */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5 pt-6 sm:pt-8 pb-6 sm:pb-8">
                 {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? '' : 'hidden'}>
                   {/* Stat summary row — Calidora pattern */}

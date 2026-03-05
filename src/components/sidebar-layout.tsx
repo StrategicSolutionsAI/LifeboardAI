@@ -15,6 +15,7 @@ import {
   Menu,
   ShoppingCart,
   MoreHorizontal,
+  LogOut,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/utils/supabase/client"
@@ -295,9 +296,19 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           id="main-content"
           className="flex-1 w-full px-6 sm:px-8 md:px-10 pb-24 pt-4 sm:pt-6 md:h-full md:overflow-y-auto md:pb-4 md:pt-8"
         >
-          <h1 className="text-2xl font-semibold text-theme-text-primary mb-6">
-            {currentRoute.title}
-          </h1>
+          <div className="flex items-center justify-between mb-10 sm:mb-12">
+            <h1 className="text-2xl font-semibold text-theme-text-primary">
+              {currentRoute.title}
+            </h1>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+              className="hidden md:inline-flex items-center gap-2 text-sm font-medium text-theme-primary border-theme-primary/40 hover:bg-theme-primary/5 hover:border-theme-primary/60"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </Button>
+          </div>
           {children}
         </main>
       </div>

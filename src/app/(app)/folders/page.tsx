@@ -338,17 +338,6 @@ export default function FoldersPage() {
 
   return (
     <div className="flex w-full flex-col pb-24">
-      <div className="flex items-center -mt-12 mb-10 sm:mb-14 md:mb-20">
-        <button
-          type="button"
-          onClick={openAddMode}
-          className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
-        >
-          <Plus size={15} />
-          <span className="hidden sm:inline">Add Folder</span>
-        </button>
-      </div>
-
       {/* Add Folder Modal */}
       {showModal && (
         <div
@@ -440,6 +429,18 @@ export default function FoldersPage() {
       )}
 
       <div className="rounded-2xl border border-theme-neutral-300 bg-white p-4 sm:p-6 md:p-8 shadow-sm">
+        {localBuckets.length > 0 && !loading && colorsLoaded && (
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={openAddMode}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
+            >
+              <Plus size={15} />
+              <span className="hidden sm:inline">Add Folder</span>
+            </button>
+          </div>
+        )}
         {loading || !colorsLoaded ? (
           <div className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6">
             {Array.from({ length: 4 }).map((_, i) => (
