@@ -1,14 +1,14 @@
 import { getUserPreferencesClient } from "./user-preferences";
 
 const UNASSIGNED_BUCKET_ID = "__unassigned";
-const BUCKET_COLOR_PALETTE = ["#6B8AF7","#48B882","#D07AA4","#4AADE0","#C4A44E","#8B7FD4","#E28A5D","#5E9B8C"] as const;
+const BUCKET_COLOR_PALETTE = ["#92BEFB","#89BAA2","#DEA2BF","#85C9E0","#FFE4A8","#C3C0FF","#FFC688","#B0DBD2"] as const;
 
 let cachedBucketColors: Record<string, string> | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function defaultBucketColorFromId(id: string): string {
-  if (id === UNASSIGNED_BUCKET_ID) return "#8e99a8";
+  if (id === UNASSIGNED_BUCKET_ID) return "#A9B0C5";
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash << 5) - hash + id.charCodeAt(i);
@@ -58,6 +58,15 @@ export function invalidateBucketColorCache(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
   }
+}
+
+/** Return a very dark shade of a hex color (factor 0 = black, 1 = original). */
+export function darkenHexColor(hex: string, factor = 0.38): string {
+  const h = hex.replace('#', '');
+  const r = Math.round(parseInt(h.substring(0, 2), 16) * factor);
+  const g = Math.round(parseInt(h.substring(2, 4), 16) * factor);
+  const b = Math.round(parseInt(h.substring(4, 6), 16) * factor);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 export { UNASSIGNED_BUCKET_ID, BUCKET_COLOR_PALETTE };

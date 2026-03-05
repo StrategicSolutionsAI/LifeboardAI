@@ -36,6 +36,7 @@ import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task } from "@/types/tasks";
 import type { ProgressEntry } from "@/features/dashboard/types";
 import { getSuggestedColorForBucket } from "@/features/dashboard/constants";
+import { darkenHexColor } from "@/lib/bucket-colors";
 import dynamic from 'next/dynamic';
 
 // Lazy-load these heavy components — only rendered when user opens a drawer/sheet
@@ -519,11 +520,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   backgroundColor: b === activeBucket ? getBucketColor(b) : 'rgba(252, 250, 248, 0.9)',
                   borderColor: b === activeBucket ? getBucketColor(b) : 'rgba(219, 214, 207, 0.6)',
                   borderBottomColor: b === activeBucket ? getBucketColor(b) : 'transparent',
-                  color: b === activeBucket ? 'white' : '#314158',
+                  color: b === activeBucket ? darkenHexColor(getBucketColor(b)) : '#314158',
                   marginBottom: '-1px',
                 }}
                 className={`relative flex h-[42px] sm:h-[48px] items-center justify-center whitespace-nowrap rounded-t-[14px] sm:rounded-t-[16px] px-3 sm:px-6  text-xs sm:text-[13px] font-medium capitalize transition-all duration-300 border ${b === activeBucket
-                  ? 'shadow-warm-sm text-white'
+                  ? 'shadow-warm-sm'
                   : 'shadow-none'
                   }`}
                 onMouseEnter={(e) => {
