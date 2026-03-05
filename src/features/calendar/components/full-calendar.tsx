@@ -580,8 +580,13 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
     return 'day';
   });
 
+  // Track whether the user has manually chosen a view on mobile.
+  // Prevents the auto-redirect from overriding an explicit user selection.
+  const hasUserChosenMobileView = useRef(false);
+
   // Persist view changes to localStorage
   const handleViewChange = useCallback((newView: CalendarView) => {
+    hasUserChosenMobileView.current = true;
     setView(newView);
     if (typeof window !== 'undefined') {
       localStorage.setItem('calendar-view', newView);
@@ -622,6 +627,19 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
+
+  // Mobile week view: scroll sync refs for 3-day horizontal scroll
+  const mobileWeekScrollRef = useRef<HTMLDivElement>(null);
+  const mobileWeekBodyRef = useRef<HTMLDivElement>(null);
+  const syncMobileWeekScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const src = e.currentTarget;
+    const other = src === mobileWeekScrollRef.current
+      ? mobileWeekBodyRef.current
+      : mobileWeekScrollRef.current;
+    if (other && other.scrollLeft !== src.scrollLeft) {
+      other.scrollLeft = src.scrollLeft;
+    }
+  }, []);
 
   useEffect(() => {
     setActiveStickerDay(null);
@@ -1727,15 +1745,33 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
     return () => mq.removeListener(update);
   }, []);
 
-  // Auto-switch to agenda view on mobile, day view on desktop
+  // Auto-switch to agenda on first mobile entry only.
+  // If the user manually picks a view, don't override it.
   useEffect(() => {
-    if (isCompactBreakpoint && view !== 'agenda') {
+    if (isCompactBreakpoint && !hasUserChosenMobileView.current && view !== 'agenda') {
       handleViewChange('agenda');
-    } else if (!isCompactBreakpoint && view === 'agenda') {
-      handleViewChange('day');
+      // Reset so the auto-switch doesn't count as a "user choice"
+      hasUserChosenMobileView.current = false;
+    }
+    if (!isCompactBreakpoint) {
+      hasUserChosenMobileView.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCompactBreakpoint]);
+
+  // Auto-scroll mobile week view to today's column on mount
+  useEffect(() => {
+    if (!isCompactBreakpoint || view !== 'week' || !mobileWeekBodyRef.current) return;
+    const weekDays = rows.flat();
+    const todayIdx = weekDays.findIndex(d => isSameDay(d, today));
+    if (todayIdx < 0) return;
+    const colWidth = mobileWeekBodyRef.current.scrollWidth / 7;
+    mobileWeekBodyRef.current.scrollLeft = todayIdx * colWidth;
+    if (mobileWeekScrollRef.current) {
+      mobileWeekScrollRef.current.scrollLeft = todayIdx * colWidth;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompactBreakpoint, view]);
 
   // Calculate dynamic max visible events based on event complexity
   const getMaxVisibleEvents = useCallback((dayEvents: DayEvent[]) => {
@@ -2123,62 +2159,88 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
         <div className="w-full flex-1 flex flex-col">
           <div className="bg-theme-surface-base overflow-hidden flex-1 flex flex-col">
             {/* Enhanced Day Header */}
-            <div className="px-5 pt-4 pb-3 border-b border-theme-neutral-300/50 bg-gradient-to-b from-theme-surface-alt/60 to-theme-surface-base">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-theme-text-tertiary mb-0.5">
-                    {format(currentDate, "EEEE")}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-semibold text-theme-text-primary tracking-tight">
-                      {format(currentDate, "MMMM d, yyyy")}
-                    </h2>
-                    <StickerRow
-                      dayStr={currentDateKey}
-                      className="flex"
-                      stickersByDate={stickersByDate}
-                      maxStickersPerDay={MAX_STICKERS_PER_DAY}
-                      activeStickerDay={activeStickerDay}
-                      setActiveStickerDay={setActiveStickerDay}
-                      setStickerPalettePosition={setStickerPalettePosition}
-                      stickerTriggerRef={stickerTriggerRef}
-                      removeStickerFromDate={removeStickerFromDate}
-                    />
-                  </div>
+            <div className={`border-b border-theme-neutral-300/50 bg-gradient-to-b from-theme-surface-alt/60 to-theme-surface-base ${isCompactBreakpoint ? 'px-3 pt-3 pb-2' : 'px-5 pt-4 pb-3'}`}>
+              <div className={`flex justify-between ${isCompactBreakpoint ? 'items-center gap-2' : 'items-start gap-4'}`}>
+                <div className="min-w-0 flex-1">
+                  {isCompactBreakpoint ? (
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-semibold text-theme-text-primary tracking-tight truncate">
+                        {format(currentDate, "EEE, MMM d")}
+                      </h2>
+                      <StickerRow
+                        dayStr={currentDateKey}
+                        className="flex"
+                        stickersByDate={stickersByDate}
+                        maxStickersPerDay={MAX_STICKERS_PER_DAY}
+                        activeStickerDay={activeStickerDay}
+                        setActiveStickerDay={setActiveStickerDay}
+                        setStickerPalettePosition={setStickerPalettePosition}
+                        stickerTriggerRef={stickerTriggerRef}
+                        removeStickerFromDate={removeStickerFromDate}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-[11px] font-semibold uppercase tracking-[1.2px] text-theme-text-tertiary mb-0.5">
+                        {format(currentDate, "EEEE")}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-semibold text-theme-text-primary tracking-tight">
+                          {format(currentDate, "MMMM d, yyyy")}
+                        </h2>
+                        <StickerRow
+                          dayStr={currentDateKey}
+                          className="flex"
+                          stickersByDate={stickersByDate}
+                          maxStickersPerDay={MAX_STICKERS_PER_DAY}
+                          activeStickerDay={activeStickerDay}
+                          setActiveStickerDay={setActiveStickerDay}
+                          setStickerPalettePosition={setStickerPalettePosition}
+                          stickerTriggerRef={stickerTriggerRef}
+                          removeStickerFromDate={removeStickerFromDate}
+                        />
+                      </div>
+                    </>
+                  )}
 
-                  {/* Day Summary Stats */}
-                  <div className="flex items-center gap-3 mt-2.5">
-                    {dayViewStats.taskCount > 0 && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
-                        <CheckCircle2 size={12} className="text-theme-primary-500" />
-                        {dayViewStats.taskCount} {dayViewStats.taskCount === 1 ? 'task' : 'tasks'}
-                      </span>
-                    )}
-                    {dayViewStats.plannedLabel && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
-                        <Clock size={12} className="text-theme-primary-500" />
-                        {dayViewStats.plannedLabel} planned
-                      </span>
-                    )}
-                    {dayViewStats.googleCount > 0 && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600">
-                        <CalendarDays size={12} />
-                        {dayViewStats.googleCount} {dayViewStats.googleCount === 1 ? 'event' : 'events'}
-                      </span>
-                    )}
-                    {dayViewStats.taskCount === 0 && !dayViewStats.plannedLabel && dayViewStats.googleCount === 0 && (
-                      <span className="text-[11px] text-theme-text-quaternary italic">No events scheduled</span>
-                    )}
-                  </div>
+                  {/* Day Summary Stats — hidden on mobile when all empty */}
+                  {(!isCompactBreakpoint || dayViewStats.taskCount > 0 || dayViewStats.plannedLabel || dayViewStats.googleCount > 0) && (
+                    <div className={`flex items-center flex-wrap ${isCompactBreakpoint ? 'gap-1.5 mt-1.5' : 'gap-3 mt-2.5'}`}>
+                      {dayViewStats.taskCount > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
+                          <CheckCircle2 size={12} className="text-theme-primary-500" />
+                          {dayViewStats.taskCount} {dayViewStats.taskCount === 1 ? 'task' : 'tasks'}
+                        </span>
+                      )}
+                      {dayViewStats.plannedLabel && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-theme-brand-tint-subtle px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary">
+                          <Clock size={12} className="text-theme-primary-500" />
+                          {dayViewStats.plannedLabel} planned
+                        </span>
+                      )}
+                      {dayViewStats.googleCount > 0 && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-600">
+                          <CalendarDays size={12} />
+                          {dayViewStats.googleCount} {dayViewStats.googleCount === 1 ? 'event' : 'events'}
+                        </span>
+                      )}
+                      {!isCompactBreakpoint && dayViewStats.taskCount === 0 && !dayViewStats.plannedLabel && dayViewStats.googleCount === 0 && (
+                        <span className="text-[11px] text-theme-text-quaternary italic">No events scheduled</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={() => hourlyPlannerRef.current?.openAddTaskModal()}
-                  className="flex items-center gap-2 rounded-lg bg-theme-primary px-3.5 py-2 text-xs font-medium text-white shadow-warm-sm transition-all hover:bg-[#a8896a] hover:shadow-warm active:scale-[0.97]"
+                  className={isCompactBreakpoint
+                    ? "flex items-center justify-center rounded-full bg-theme-primary w-8 h-8 text-white shadow-warm-sm active:scale-[0.97] shrink-0"
+                    : "flex items-center gap-2 rounded-lg bg-theme-primary px-3.5 py-2 text-xs font-medium text-white shadow-warm-sm transition-all hover:bg-[#a8896a] hover:shadow-warm active:scale-[0.97]"
+                  }
                 >
-                  <Plus size={14} strokeWidth={2.5} />
-                  <span>Add task</span>
+                  <Plus size={isCompactBreakpoint ? 16 : 14} strokeWidth={2.5} />
+                  {!isCompactBreakpoint && <span>Add task</span>}
                 </button>
               </div>
 
@@ -2324,6 +2386,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                       plannerDate={format(currentDate, 'yyyy-MM-dd')}
                       onTaskOpen={openTaskEditorById}
                       bucketColors={bucketColors}
+                      isMobile={isCompactBreakpoint}
                     />
                     {provided.placeholder}
                   </div>
@@ -2337,11 +2400,171 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
           <div className="overflow-x-auto sm:overflow-visible flex-1 flex flex-col">
             <div className={`sm:w-full ${multiDayMinWidth} sm:min-w-0 flex-1 flex flex-col`}>
               {view === 'week' ? (
-                // Week view: Calidora-style columns
-                <div className="flex-1 flex flex-col">
-                  {weekdayHeader}
-                  <div className="grid grid-cols-7 flex-1 min-h-[520px]">
-                    {rows.flat().map((day: Date, idx: number) => {
+                isCompactBreakpoint ? (
+                  // ── MOBILE WEEK: 3-day horizontal scroll ──
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Scrollable header */}
+                    <div
+                      className="overflow-x-auto scrollbar-none border-b border-theme-neutral-300/60"
+                      style={{ scrollbarWidth: 'none' }}
+                      ref={mobileWeekScrollRef}
+                      onScroll={syncMobileWeekScroll}
+                    >
+                      <div
+                        className="grid"
+                        style={{ gridTemplateColumns: 'repeat(7, calc((100vw - 1rem) / 3))' }}
+                      >
+                        {rows.flat().map((day: Date, i: number) => {
+                          const dayIsToday = isSameDay(day, today);
+                          return (
+                            <div
+                              key={i}
+                              className={`py-2 px-1 text-center ${i < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
+                            >
+                              <span className={`text-[10px] uppercase tracking-[0.6px] font-medium block ${
+                                dayIsToday ? 'text-theme-primary' : 'text-theme-text-tertiary'
+                              }`}>
+                                {weekDayLabels[i]}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => { handleDateChange(day); handleViewChange('day'); }}
+                                className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium mt-0.5 ${
+                                  dayIsToday
+                                    ? 'bg-theme-primary text-white'
+                                    : 'text-theme-text-primary active:bg-theme-brand-tint-strong'
+                                }`}
+                              >
+                                {format(day, 'd')}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Scrollable body — 3 columns visible, snaps per day */}
+                    <div
+                      className="overflow-x-auto flex-1 min-h-[420px] scrollbar-none"
+                      style={{
+                        scrollbarWidth: 'none',
+                        scrollSnapType: 'x mandatory',
+                        WebkitOverflowScrolling: 'touch',
+                      }}
+                      ref={mobileWeekBodyRef}
+                      onScroll={syncMobileWeekScroll}
+                    >
+                      <div
+                        className="grid h-full"
+                        style={{ gridTemplateColumns: 'repeat(7, calc((100vw - 1rem) / 3))' }}
+                      >
+                        {rows.flat().map((day: Date, idx: number) => {
+                          const dayStr = toDayKey(day);
+                          const dayEvents = eventsByDate[dayStr] ?? [];
+                          const dayIsToday = isSameDay(day, today);
+                          const formattedDayLabel = format(day, 'MMMM d, yyyy');
+                          const dayOfWeek = day.getDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const visibleEvents = getEventsForDisplay(dayEvents);
+
+                          return (
+                            <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.droppableProps}
+                                  className={`h-full ${idx < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
+                                  style={{ scrollSnapAlign: 'start' }}
+                                >
+                                  <div className={`px-2 pt-2 pb-3 h-full ${
+                                    snapshot.isDraggingOver
+                                      ? 'bg-theme-brand-tint-light'
+                                      : isWeekend
+                                      ? 'bg-[rgba(250,249,247,0.6)]'
+                                      : 'bg-white'
+                                  }`}>
+                                    {/* Add task button — always visible on mobile */}
+                                    <div className="flex items-center justify-end mb-2">
+                                      <button
+                                        type="button"
+                                        className="lb-day-add p-0.5 rounded active:bg-theme-brand-tint-strong text-theme-text-tertiary transition-all"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedModalDate(null);
+                                          taskEditorRef.current?.openNew(dayStr);
+                                        }}
+                                        title={`Add task on ${formattedDayLabel}`}
+                                        aria-label={`Add task on ${formattedDayLabel}`}
+                                      >
+                                        <Plus className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+
+                                    {/* Event pills */}
+                                    <div className="flex flex-col gap-1">
+                                      {visibleEvents.map((ev: DayEvent, filteredIndex: number) => {
+                                        const styles = resolveEventStyles(ev.source, ev);
+                                        const hasTask = Boolean(ev.taskId);
+                                        const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
+                                        const draggableId = hasTask
+                                          ? `lifeboard::${ev.taskId}`
+                                          : `event::${dayStr}::${filteredIndex}`;
+
+                                        return (
+                                          <Draggable
+                                            key={draggableId}
+                                            draggableId={draggableId}
+                                            index={filteredIndex}
+                                            isDragDisabled={!hasTask}
+                                          >
+                                            {(dragProvided, dragSnapshot) => (
+                                              <div
+                                                ref={dragProvided.innerRef}
+                                                {...dragProvided.draggableProps}
+                                                {...(hasTask ? dragProvided.dragHandleProps : {})}
+                                                role={canEditEvent ? 'button' : undefined}
+                                                tabIndex={canEditEvent ? 0 : undefined}
+                                                onClick={async (event) => {
+                                                  if (!canEditEvent) return;
+                                                  event.stopPropagation();
+                                                  await openCalendarEvent(ev, dayStr);
+                                                }}
+                                                className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-left transition-all active:bg-theme-surface-alt/80 ${
+                                                  dragSnapshot.isDragging ? 'opacity-40 shadow-sm' : ''
+                                                }`}
+                                                style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
+                                                title={ev.title}
+                                                data-task-id={ev.taskId}
+                                              >
+                                                <span
+                                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
+                                                  style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
+                                                />
+                                                <span className="text-[11px] leading-tight text-theme-text-primary truncate">
+                                                  {ev.title}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </Draggable>
+                                        );
+                                      })}
+                                    </div>
+                                    {provided.placeholder}
+                                  </div>
+                                </div>
+                              )}
+                            </Droppable>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // ── DESKTOP WEEK: unchanged 7-column grid ──
+                  <div className="flex-1 flex flex-col">
+                    {weekdayHeader}
+                    <div className="grid grid-cols-7 flex-1 min-h-[520px]">
+                      {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = toDayKey(day);
                 const dayEvents = eventsByDate[dayStr] ?? [];
                 const isToday = isSameDay(day, today);
@@ -2475,8 +2698,9 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                   </Droppable>
                 );
               })}
+                    </div>
                   </div>
-                </div>
+                )
               ) : (
                 // Month view: Calidora-style grid
                 <div className="flex-1 flex flex-col">

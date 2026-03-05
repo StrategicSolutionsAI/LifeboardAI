@@ -113,6 +113,8 @@ interface HourlyPlannerProps {
   onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => void;
   /** User-saved bucket→color map from preferences, for accurate color matching */
   bucketColors?: Record<string, string>;
+  /** When true, applies mobile-optimised layout (always-visible affordances, no resize) */
+  isMobile?: boolean;
 }
 
 export interface HourlyPlannerHandle {
@@ -130,6 +132,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   plannerDate,
   bucketColors: propBucketColors,
   onTaskOpen,
+  isMobile = false,
 }, ref) => {
   const {
     scheduledTasks,
@@ -707,7 +710,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   const content = (
     <div
       ref={containerRef}
-      className={`space-y-0 ${className} max-h-[600px] overflow-y-auto scrollbar-thin`}
+      className={`space-y-0 ${className} overflow-y-auto scrollbar-thin`}
     >
         {TIME_SLOTS.map((timeSlot, index) => {
           // Check if this is a major hour (on the hour)
@@ -779,7 +782,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                       <button
                         type="button"
                         onClick={() => openAddModal(timeSlot)}
-                        className="absolute inset-0 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-[1] cursor-pointer pl-1"
+                        className={`absolute inset-0 flex items-center transition-opacity z-[1] cursor-pointer pl-1 ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         aria-label={`Add task at ${timeSlot}`}
                       >
                         <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-theme-neutral-300/60 bg-theme-surface-alt/40 px-2 py-0.5 text-[10px] font-medium text-theme-text-quaternary hover:text-theme-text-secondary hover:bg-theme-brand-tint-subtle hover:border-theme-primary-300/40 transition-colors">
@@ -1014,10 +1017,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                   e.stopPropagation();
                                   await deleteTask(t.id, activePlannerDate);
                                 }}
-                                className="flex-shrink-0 opacity-0 group-hover:opacity-100
+                                className={`flex-shrink-0 transition-all duration-150
                                   hover:bg-red-50 hover:text-red-500
-                                  rounded-md p-1 transition-all duration-150
-                                  focus:opacity-100 focus:ring-2 focus:ring-red-200"
+                                  rounded-md ${isMobile ? 'p-2 opacity-100' : 'p-1 opacity-0 group-hover:opacity-100'}
+                                  focus:opacity-100 focus:ring-2 focus:ring-red-200`}
                                 title="Delete task permanently"
                                 data-no-drag="true"
                               >
@@ -1026,7 +1029,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                             </div>
 
                             {/* Resize handle */}
-                            {allowResize && (
+                            {allowResize && !isMobile && (
                               <div className="absolute -bottom-1 left-3 right-3 flex justify-center">
                                 <div
                                   onMouseDown={(e) => startResize(e, timeSlot, t.id)}
