@@ -4,14 +4,17 @@
   border: none;
   background: none;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .folderBack {
   position: relative;
-  width: 140px;
-  height: 112px;
+  width: 110px;
+  height: 88px;
   background: var(--folder-back, #4786ff);
-  border-radius: 0px 7px 7px 7px;
+  border-radius: 0px 6px 6px 6px;
 }
 
 .folderBack::after {
@@ -19,10 +22,10 @@
   bottom: 98%;
   left: 0;
   content: "";
-  width: 42px;
-  height: 14px;
+  width: 33px;
+  height: 11px;
   background: var(--folder-back, #4786ff);
-  border-radius: 7px 7px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 
 .paper {
@@ -33,7 +36,7 @@
   width: 70%;
   height: 80%;
   background: #e6e6e6;
-  border-radius: 5px;
+  border-radius: 4px;
   transition: transform 0.3s ease-in-out;
 }
 
@@ -54,7 +57,7 @@
   width: 100%;
   height: 100%;
   background: var(--folder-front, #70a1ff);
-  border-radius: 7px;
+  border-radius: 6px;
   transform-origin: bottom;
   transition: transform 0.3s ease-in-out;
 }
@@ -76,8 +79,8 @@
 }
 
 .label {
-  margin-top: 14px;
-  font-size: 14px;
+  margin-top: 10px;
+  font-size: 13px;
   font-weight: 500;
   text-align: center;
   color: var(--theme-text-secondary, #6b7280);
@@ -99,4 +102,42 @@
 
 .empty:hover .folderFrontRight {
   transform: skew(-10deg) scaleY(0.7);
+}
+
+/* ── Responsive: scale up on larger screens ── */
+@media (min-width: 640px) {
+  .folderBack {
+    width: 130px;
+    height: 104px;
+    border-radius: 0px 7px 7px 7px;
+  }
+  .folderBack::after {
+    width: 39px;
+    height: 13px;
+    border-radius: 7px 7px 0 0;
+  }
+  .paper {
+    border-radius: 5px;
+  }
+  .folderFront {
+    border-radius: 7px;
+  }
+  .label {
+    margin-top: 12px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .folderBack {
+    width: 140px;
+    height: 112px;
+  }
+  .folderBack::after {
+    width: 42px;
+    height: 14px;
+  }
+  .label {
+    margin-top: 14px;
+  }
 }

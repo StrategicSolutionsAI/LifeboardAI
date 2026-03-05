@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, Plus, X } from "lucide-react"
 import {
   DndContext,
@@ -20,23 +20,27 @@ import { CSSFolder } from "@/features/folders/components/css-folder"
 import { useBuckets } from "@/hooks/use-buckets"
 import { getBucketColorSync, BUCKET_COLOR_PALETTE } from "@/lib/bucket-colors"
 import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences"
+import type { BucketStatsData } from "@/features/folders/components/folder-stats"
 
 const COLOR_PALETTE = [
-  "#B1916A", "#6B8AF7", "#48B882", "#D07AA4", "#4AADE0", "#C4A44E",
-  "#8B7FD4", "#E28A5D", "#5E9B8C", "#bb9e7b", "#314158", "#8e99a8",
+  "#F29D9E", "#FFC6BD", "#FCC2CF", "#DEA2BF", "#E2C1F0",
+  "#C3C0FF", "#B8CEFF", "#92BEFB", "#B6D8FB", "#85C9E0",
+  "#B0DBD2", "#89BAA2", "#CCE0B5", "#E2ECA9", "#FFF9B2",
+  "#FFE4A8", "#FFC688", "#D8A289", "#DDC4AE", "#C1CFD8",
+  "#DEE2EE", "#A9B0C5",
 ] as const
 
 const SUGGESTED_COLORS: Record<string, string> = {
-  health: "#48B882",
-  wellness: "#5E9B8C",
-  family: "#4AADE0",
-  social: "#D07AA4",
-  work: "#B1916A",
-  personal: "#8B7FD4",
-  projects: "#6B8AF7",
-  home: "#5E9B8C",
-  finance: "#C4A44E",
-  fitness: "#E28A5D",
+  health: "#89BAA2",
+  wellness: "#B0DBD2",
+  family: "#92BEFB",
+  social: "#DEA2BF",
+  work: "#DDC4AE",
+  personal: "#E2C1F0",
+  projects: "#B8CEFF",
+  home: "#CCE0B5",
+  finance: "#FFE4A8",
+  fitness: "#FFC688",
 }
 
 function suggestColor(name: string, existingColors: Record<string, string>): string {
@@ -44,7 +48,7 @@ function suggestColor(name: string, existingColors: Record<string, string>): str
   if (SUGGESTED_COLORS[key]) return SUGGESTED_COLORS[key]
   const usedSet = new Set(Object.values(existingColors))
   const available = BUCKET_COLOR_PALETTE.find((c) => !usedSet.has(c))
-  return available ?? "#B1916A"
+  return available ?? "#C1CFD8"
 }
 
 async function saveBucketColors(
@@ -73,6 +77,54 @@ async function saveBucketColors(
   }
 }
 
+/* ── Color grid shared by inline + modal pickers ── */
+function ColorGrid({
+  selected,
+  onSelect,
+}: {
+  selected: string
+  onSelect: (color: string) => void
+}) {
+  return (
+    <div className="grid grid-cols-7 gap-2">
+      {COLOR_PALETTE.map((c) => {
+        const isActive = selected.toLowerCase() === c.toLowerCase()
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onSelect(c)}
+            className="relative w-7 h-7 rounded-full border-2 transition-all hover:scale-110"
+            style={{
+              backgroundColor: c,
+              borderColor: isActive ? "white" : "transparent",
+              boxShadow: isActive ? `0 0 0 2.5px ${c}` : "none",
+            }}
+            aria-label={`Select color ${c}`}
+          >
+            {isActive && (
+              <Check className="absolute inset-0 m-auto w-3.5 h-3.5 text-white drop-shadow-sm" />
+            )}
+          </button>
+        )
+      })}
+      <label
+        className="relative inline-flex items-center justify-center cursor-pointer w-7 h-7 rounded-full border-2 border-dashed border-theme-neutral-300 hover:border-theme-text-tertiary transition-colors"
+        title="Pick custom color"
+      >
+        <Plus className="w-3.5 h-3.5 text-theme-text-tertiary" />
+        <input
+          type="color"
+          value={selected}
+          onChange={(e) => onSelect(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          aria-label="Pick a custom color"
+        />
+      </label>
+    </div>
+  )
+}
+
 /* ── Sortable folder item ── */
 function SortableFolder({
   name,
@@ -82,6 +134,8 @@ function SortableFolder({
   onToggleEdit,
   onChangeColor,
   bucketColors,
+  stats,
+  visibleStatTypes,
 }: {
   name: string
   color: string
@@ -90,6 +144,8 @@ function SortableFolder({
   onToggleEdit: () => void
   onChangeColor: (color: string) => void
   bucketColors: Record<string, string>
+  stats?: BucketStatsData
+  visibleStatTypes?: Set<keyof BucketStatsData>
 }) {
   const {
     attributes,
@@ -113,55 +169,26 @@ function SortableFolder({
       style={style}
       {...attributes}
       {...listeners}
-      className="flex flex-col items-center cursor-grab active:cursor-grabbing"
+      data-folder-item
+      className="flex flex-col items-center cursor-grab active:cursor-grabbing w-[140px] sm:w-[170px] lg:w-[200px]"
     >
       <CSSFolder
         label={name}
         color={color}
         empty={empty}
         onClick={onToggleEdit}
+        stats={stats}
+        visibleStatTypes={visibleStatTypes}
       />
       {isEditing && !isDragging && (
-        <div className="flex items-center gap-1.5 mt-3 p-2 rounded-xl border border-theme-neutral-300/80 bg-white shadow-warm-sm">
-          {COLOR_PALETTE.map((c) => {
-            const current = getBucketColorSync(name, bucketColors)
-            const isActive = current.toLowerCase() === c.toLowerCase()
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => onChangeColor(c)}
-                className="relative w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-                style={{
-                  backgroundColor: c,
-                  borderColor: isActive ? "white" : "transparent",
-                  boxShadow: isActive ? `0 0 0 2px ${c}` : "none",
-                }}
-                aria-label={`Set ${name} color to ${c}`}
-              >
-                {isActive && (
-                  <Check className="absolute inset-0 m-auto w-3 h-3 text-white drop-shadow-sm" />
-                )}
-              </button>
-            )
-          })}
-          <label
-            className="relative inline-flex items-center gap-1 cursor-pointer rounded-md border border-theme-neutral-300 px-1.5 h-5 text-[10px] font-medium text-theme-text-secondary hover:bg-theme-surface-alt transition-colors"
-            title="Pick custom color"
-          >
-            <span
-              className="w-3 h-3 rounded-full shrink-0 border border-theme-neutral-300"
-              style={{ backgroundColor: getBucketColorSync(name, bucketColors) }}
-            />
-            Custom
-            <input
-              type="color"
-              value={getBucketColorSync(name, bucketColors)}
-              onChange={(e) => onChangeColor(e.target.value)}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              aria-label={`Custom color for ${name}`}
-            />
-          </label>
+        <div
+          data-color-picker
+          className="mt-3 p-3 rounded-xl border border-theme-neutral-300/80 bg-white shadow-warm-sm"
+        >
+          <ColorGrid
+            selected={getBucketColorSync(name, bucketColors)}
+            onSelect={onChangeColor}
+          />
         </div>
       )}
     </div>
@@ -194,9 +221,8 @@ export default function FoldersPage() {
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Track which buckets have content (tasks or widgets)
-  const [taskCountByBucket, setTaskCountByBucket] = useState<Record<string, number>>({})
-  const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, unknown[]>>({})
+  // Per-bucket stats (tasks, widgets, shopping, calendar)
+  const [bucketStats, setBucketStats] = useState<Record<string, BucketStatsData>>({})
 
   // Require 8px movement before activating drag — prevents accidental drags on click
   const sensors = useSensors(
@@ -211,25 +237,15 @@ export default function FoldersPage() {
   useEffect(() => {
     getUserPreferencesClient().then((prefs) => {
       setBucketColors(prefs?.bucket_colors || {})
-      setWidgetsByBucket(prefs?.widgets_by_bucket || {})
       setColorsLoaded(true)
     })
   }, [])
 
-  // Fetch task counts per bucket
+  // Fetch per-bucket stats (tasks, widgets, shopping, calendar)
   useEffect(() => {
-    fetch("/api/tasks?all=true", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((json) => {
-        const tasks: { bucket?: string; completed?: boolean }[] = Array.isArray(json) ? json : json.tasks ?? []
-        const counts: Record<string, number> = {}
-        for (const t of tasks) {
-          if (!t.completed && t.bucket) {
-            counts[t.bucket] = (counts[t.bucket] || 0) + 1
-          }
-        }
-        setTaskCountByBucket(counts)
-      })
+    fetch("/api/folder-stats", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { stats: {} }))
+      .then((json) => setBucketStats(json.stats ?? {}))
       .catch(() => {})
   }, [])
 
@@ -285,22 +301,44 @@ export default function FoldersPage() {
   const handleChangeColor = async (bucket: string, color: string) => {
     const nextColors = { ...bucketColors, [bucket]: color }
     setBucketColors(nextColors)
-    setEditingFolder(null)
     await saveBucketColors(null, nextColors)
   }
 
   const isBucketEmpty = useCallback((name: string) => {
-    const taskCount = taskCountByBucket[name] || 0
-    const widgetCount = (widgetsByBucket[name] || []).length
-    return taskCount === 0 && widgetCount === 0
-  }, [taskCountByBucket, widgetsByBucket])
+    const s = bucketStats[name]
+    if (!s) return true
+    return s.tasks === 0 && s.widgets === 0 && s.shopping === 0 && s.calendar === 0
+  }, [bucketStats])
+
+  const visibleStatTypes = useMemo(() => {
+    const types = new Set<keyof BucketStatsData>()
+    for (const s of Object.values(bucketStats)) {
+      if (s.tasks > 0) types.add("tasks")
+      if (s.widgets > 0) types.add("widgets")
+      if (s.shopping > 0) types.add("shopping")
+      if (s.calendar > 0) types.add("calendar")
+    }
+    return types
+  }, [bucketStats])
+
+  // Close inline color picker when clicking outside
+  useEffect(() => {
+    if (!editingFolder) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest("[data-color-picker]") || target.closest("[data-folder-item]")) return
+      setEditingFolder(null)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [editingFolder])
 
   const isDuplicate = localBuckets.includes(newName.trim())
   const canAdd = newName.trim().length > 0 && !isDuplicate
 
   return (
     <div className="flex w-full flex-col pb-24">
-      <div className="flex items-center -mt-12 mb-8">
+      <div className="flex items-center -mt-12 mb-10 sm:mb-14 md:mb-20">
         <button
           type="button"
           onClick={openAddMode}
@@ -373,43 +411,10 @@ export default function FoldersPage() {
               <label className="block text-sm font-medium text-theme-text-body mb-2">
                 Color
               </label>
-              <div className="flex items-center gap-2 flex-wrap">
-                {COLOR_PALETTE.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setSelectedColor(c)}
-                    className="relative w-7 h-7 rounded-full border-2 transition-all hover:scale-110"
-                    style={{
-                      backgroundColor: c,
-                      borderColor: selectedColor === c ? "white" : "transparent",
-                      boxShadow: selectedColor === c ? `0 0 0 2.5px ${c}` : "none",
-                    }}
-                    aria-label={`Select color ${c}`}
-                  >
-                    {selectedColor === c && (
-                      <Check className="absolute inset-0 m-auto w-3.5 h-3.5 text-white drop-shadow-sm" />
-                    )}
-                  </button>
-                ))}
-                <label
-                  className="relative inline-flex items-center gap-1 cursor-pointer rounded-lg border border-theme-neutral-300 px-2.5 h-7 text-xs font-medium text-theme-text-secondary hover:bg-theme-surface-alt transition-colors"
-                  title="Pick custom color"
-                >
-                  <span
-                    className="w-3.5 h-3.5 rounded-full shrink-0 border border-theme-neutral-300"
-                    style={{ backgroundColor: selectedColor }}
-                  />
-                  Custom
-                  <input
-                    type="color"
-                    value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    aria-label="Pick a custom color"
-                  />
-                </label>
-              </div>
+              <ColorGrid
+                selected={selectedColor}
+                onSelect={setSelectedColor}
+              />
             </div>
 
             {/* Actions */}
@@ -434,38 +439,62 @@ export default function FoldersPage() {
         </div>
       )}
 
-      {loading || !colorsLoaded ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-16 gap-y-20 pt-6 pb-8 justify-items-center">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="w-[140px] h-[140px] rounded-lg bg-theme-skeleton animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={localBuckets} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-16 gap-y-20 pt-6 pb-8 justify-items-center">
-              {localBuckets.map((name) => (
-                <SortableFolder
-                  key={name}
-                  name={name}
-                  color={getBucketColorSync(name, bucketColors)}
-                  empty={isBucketEmpty(name)}
-                  isEditing={editingFolder === name}
-                  onToggleEdit={() =>
-                    setEditingFolder(editingFolder === name ? null : name)
-                  }
-                  onChangeColor={(c) => handleChangeColor(name, c)}
-                  bucketColors={bucketColors}
-                />
-              ))}
+      <div className="rounded-2xl border border-theme-neutral-300 bg-white p-4 sm:p-6 md:p-8 shadow-sm">
+        {loading || !colorsLoaded ? (
+          <div className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="w-[110px] h-[110px] sm:w-[130px] sm:h-[130px] lg:w-[140px] lg:h-[140px] rounded-lg bg-theme-skeleton animate-pulse" />
+            ))}
+          </div>
+        ) : localBuckets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="opacity-50 pointer-events-none">
+              <CSSFolder label="" color="#C1CFD8" empty />
             </div>
-          </SortableContext>
-        </DndContext>
-      )}
+            <h3 className="mt-6 text-base font-semibold text-theme-text-secondary">
+              No folders yet
+            </h3>
+            <p className="mt-1.5 text-sm text-theme-text-tertiary text-center max-w-[260px]">
+              Create folders to organize your tasks, widgets, and calendar events.
+            </p>
+            <button
+              type="button"
+              onClick={openAddMode}
+              className="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
+            >
+              <Plus size={15} />
+              Add Folder
+            </button>
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={localBuckets} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6">
+                {localBuckets.map((name) => (
+                  <SortableFolder
+                    key={name}
+                    name={name}
+                    color={getBucketColorSync(name, bucketColors)}
+                    empty={isBucketEmpty(name)}
+                    stats={bucketStats[name] ?? { tasks: 0, widgets: 0, shopping: 0, calendar: 0 }}
+                    visibleStatTypes={visibleStatTypes}
+                    isEditing={editingFolder === name}
+                    onToggleEdit={() =>
+                      setEditingFolder(editingFolder === name ? null : name)
+                    }
+                    onChangeColor={(c) => handleChangeColor(name, c)}
+                    bucketColors={bucketColors}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
     </div>
   )
 }
