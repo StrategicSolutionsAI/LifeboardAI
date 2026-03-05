@@ -2323,6 +2323,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       // never show (or push) the previous user's data.
       const ownerChanged = ensureCacheOwner(user.id);
       if (ownerChanged) {
+        // Block save effects FIRST — prevents the empty state below from
+        // being written to Supabase before loadBuckets/loadWidgets finish.
+        setIsWidgetLoadComplete(false);
+        setBucketsInitialized(false);
+
         // Reset component state that was initialised from (now-stale) localStorage
         setBuckets([]);
         setActiveBucket('');
