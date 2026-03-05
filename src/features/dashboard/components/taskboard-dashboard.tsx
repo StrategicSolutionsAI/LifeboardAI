@@ -541,18 +541,22 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           </div>
           {/* scroll container ends */}
           {/* left & right fades indicating additional scrollable tabs (sit above scroll container) */}
-          {showLeftTabFade && (
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
-              style={{ zIndex: 70 }}
-            />
-          )}
-          {showRightTabFade && (
-            <div
-              className="pointer-events-none absolute inset-y-0 w-6 bg-gradient-to-l from-[#F6F6FC]/95 via-[#F6F6FC]/70 to-transparent"
-              style={{ zIndex: 70, right: '0px' }}
-            />
-          )}
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 w-10 transition-opacity duration-300 ease-in-out"
+            style={{
+              zIndex: 70,
+              opacity: showLeftTabFade ? 1 : 0,
+              background: 'linear-gradient(to right, rgba(252,250,248,0.95) 0%, rgba(252,250,248,0.6) 50%, transparent 100%)',
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 transition-opacity duration-300 ease-in-out"
+            style={{
+              zIndex: 70,
+              opacity: showRightTabFade ? 1 : 0,
+              background: 'linear-gradient(to left, rgba(252,250,248,0.95) 0%, rgba(252,250,248,0.6) 50%, transparent 100%)',
+            }}
+          />
         </div>
         {/* Main content container */}
         <div className="w-full flex-1 pb-24 md:pb-4">
