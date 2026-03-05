@@ -918,7 +918,7 @@ export default function WidgetEditorSheet({
                       <div className="font-medium mb-1">Preview:</div>
                       <div>🚭 Quitting {draft.quitHabitData.habitName}</div>
                       <div>📅 Since {new Date(draft.quitHabitData.quitDate).toLocaleDateString()}</div>
-                      <div className="text-green-600 font-medium">
+                      <div className="text-theme-text-primary font-medium">
                         {(() => {
                           const quitDate = new Date(draft.quitHabitData.quitDate);
                           const today = new Date();
@@ -961,7 +961,7 @@ export default function WidgetEditorSheet({
                             // Show success message
                             alert(`✅ Great job! You've successfully stayed clean for ${daysSince} days. Keep it up!`);
                           }}
-                          className="text-xs px-4 py-2 bg-green-100 text-green-700 rounded border border-green-200 hover:bg-green-200 transition-colors font-medium"
+                          className="text-xs px-4 py-2 bg-green-100 text-theme-text-primary rounded border border-green-200 hover:bg-green-200 transition-colors font-medium"
                         >
                           ✅ Check In for Today
                         </button>
@@ -992,7 +992,7 @@ export default function WidgetEditorSheet({
                               } : p);
                             }
                           }}
-                          className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors"
+                          className="text-xs px-3 py-1 bg-orange-100 text-theme-text-primary rounded border border-orange-200 hover:bg-orange-200 transition-colors"
                         >
                           🔄 Reset to Today
                         </button>
@@ -1176,9 +1176,9 @@ export default function WidgetEditorSheet({
                       {draft.weightData.startingWeight && draft.weightData.currentWeight && (
                         <div className={
                           draft.weightData.currentWeight < draft.weightData.startingWeight
-                            ? "text-green-600"
+                            ? "text-theme-text-primary"
                             : draft.weightData.currentWeight > draft.weightData.startingWeight
-                              ? "text-orange-600"
+                              ? "text-theme-text-primary"
                               : "text-theme-text-subtle"
                         }>
                           📈 Change: {(draft.weightData.currentWeight - draft.weightData.startingWeight > 0 ? '+' : '')}{(draft.weightData.currentWeight - draft.weightData.startingWeight).toFixed(1)} {draft.weightData.unit || draft.unit || 'lbs'}

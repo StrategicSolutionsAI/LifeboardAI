@@ -444,7 +444,7 @@ export function MeditationTimerWidget({
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="text-center text-sm text-indigo-500/70 mt-3 italic"
+              className="text-center text-sm text-theme-text-tertiary mt-3 italic"
             >
               Breathe and relax...
             </motion.p>
@@ -464,7 +464,7 @@ export function MeditationTimerWidget({
               <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
                 <Check className="h-7 w-7 text-emerald-600" />
               </div>
-              <p className="text-sm font-medium text-emerald-700">Session complete!</p>
+              <p className="text-sm font-medium text-theme-text-primary">Session complete!</p>
               <p className="text-xs text-theme-text-tertiary mt-0.5">
                 {selectedMinutes} minutes of mindfulness
               </p>
@@ -497,7 +497,7 @@ export function MeditationTimerWidget({
                 <Button
                   onClick={handlePause}
                   variant="outline"
-                  className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  className="gap-1.5 border-amber-300 text-theme-text-primary hover:bg-amber-50"
                 >
                   <Pause className="h-4 w-4" />
                   Pause

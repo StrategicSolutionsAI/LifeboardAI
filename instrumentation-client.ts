@@ -5,12 +5,8 @@ Sentry.init({
   tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 0.1,
-  integrations: [
-    Sentry.replayIntegration({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
+  // Replay integration is lazy-loaded after hydration (see deferred-monitoring.tsx)
+  // to keep it out of the critical shared chunk.
   beforeSend(event) {
     if (event.exception) {
       const error = event.exception.values?.[0];

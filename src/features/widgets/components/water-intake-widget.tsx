@@ -212,7 +212,7 @@ function WaterFillVisualization({
       {pct >= 1 && (
         <Badge
           variant="secondary"
-          className="mt-1 bg-emerald-100 text-emerald-700 text-[10px]"
+          className="mt-1 bg-emerald-100 text-theme-text-primary text-[10px]"
         >
           Goal met!
         </Badge>
@@ -486,7 +486,7 @@ export function WaterIntakeWidget({
                 onClick={() => setSelectedBeverage(bev.id)}
                 className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
                   isSelected
-                    ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
+                    ? "border-blue-400 bg-blue-50 text-theme-text-primary shadow-sm"
                     : "border-theme-neutral-200 bg-white text-theme-text-secondary hover:border-theme-neutral-300"
                 }`}
               >
@@ -509,7 +509,7 @@ export function WaterIntakeWidget({
               key={preset.label}
               whileTap={{ scale: 0.95 }}
               onClick={() => handleLogWater(preset.amount)}
-              className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-theme-text-primary hover:bg-blue-100 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               {preset.label}
@@ -725,7 +725,7 @@ export function WaterIntakeWidget({
                           {metGoal && (
                             <Badge
                               variant="secondary"
-                              className="bg-emerald-100 text-emerald-700 text-[9px] px-1.5 py-0"
+                              className="bg-emerald-100 text-theme-text-primary text-[9px] px-1.5 py-0"
                             >
                               Goal
                             </Badge>

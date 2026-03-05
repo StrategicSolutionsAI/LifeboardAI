@@ -251,7 +251,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
             className={
               isCompletedToday
                 ? "bg-green-600 hover:bg-green-700 text-white gap-1.5"
-                : "border-theme-neutral-300 text-theme-text-subtle hover:bg-green-50 hover:text-green-700 hover:border-green-300 gap-1.5"
+                : "border-theme-neutral-300 text-theme-text-subtle hover:bg-green-50 hover:text-theme-text-primary hover:border-green-300 gap-1.5"
             }
           >
             <Check className="h-4 w-4" />
@@ -362,7 +362,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                     {m.emoji}
                   </span>
                   <div className="min-w-0">
-                    <div className={`font-medium truncate ${m.achieved ? "text-green-700" : "text-theme-text-tertiary"}`}>
+                    <div className={`font-medium truncate ${m.achieved ? "text-theme-text-primary" : "text-theme-text-tertiary"}`}>
                       {m.label}
                     </div>
                     <div className="text-[10px] text-theme-neutral-400">

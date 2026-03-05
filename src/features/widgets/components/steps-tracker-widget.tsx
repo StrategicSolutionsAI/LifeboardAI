@@ -175,7 +175,7 @@ function StepsRingVisualization({
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className={`text-2xl font-bold ${goalMet ? "text-green-600" : "text-blue-600"}`}
+            className="text-2xl font-bold text-theme-text-primary"
           >
             {current.toLocaleString()}
           </span>
@@ -452,7 +452,7 @@ export function StepsTrackerWidget({
               onClick={() => setSelectedActivity(type.id)}
               className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs transition-all ${
                 active
-                  ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300"
+                  ? "bg-blue-100 text-theme-text-primary ring-2 ring-blue-300"
                   : "bg-gray-50 text-theme-text-secondary hover:bg-gray-100"
               }`}
             >
@@ -561,7 +561,7 @@ export function StepsTrackerWidget({
         </h4>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl border border-gray-100 p-3 text-center">
-            <p className="text-xl font-bold text-blue-600">
+            <p className="text-xl font-bold text-theme-text-primary">
               {todayTotal.toLocaleString()}
             </p>
             <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
@@ -643,7 +643,7 @@ export function StepsTrackerWidget({
                             })}
                           </span>
                           <span
-                            className={`text-xs font-semibold ${dayTotal >= target ? "text-green-600" : "text-theme-text-secondary"}`}
+                            className="text-xs font-semibold text-theme-text-secondary"
                           >
                             {dayTotal.toLocaleString()} steps
                           </span>

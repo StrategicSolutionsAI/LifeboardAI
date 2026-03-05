@@ -1,7 +1,15 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
+
+// Lazy-loaded Sentry — avoids pulling the full SDK into the shared chunk
+let _sentry: Promise<typeof import('@sentry/nextjs')> | null = null
+function getSentry() {
+  if (!_sentry) {
+    _sentry = import('@sentry/nextjs')
+  }
+  return _sentry
+}
 
 /**
  * Global error handler that catches unhandled promise rejections and
@@ -12,14 +20,15 @@ import * as Sentry from '@sentry/nextjs'
 export function GlobalErrorHandler() {
   useEffect(() => {
     function handleRejection(event: PromiseRejectionEvent) {
-      // Avoid double-reporting if Sentry's own integration already caught it
       const error =
         event.reason instanceof Error
           ? event.reason
           : new Error(String(event.reason ?? 'Unhandled promise rejection'))
 
-      Sentry.captureException(error, {
-        tags: { mechanism: 'onunhandledrejection' },
+      getSentry().then(Sentry => {
+        Sentry.captureException(error, {
+          tags: { mechanism: 'onunhandledrejection' },
+        })
       })
 
       // eslint-disable-next-line no-console
@@ -28,8 +37,10 @@ export function GlobalErrorHandler() {
 
     function handleError(event: ErrorEvent) {
       if (event.error) {
-        Sentry.captureException(event.error, {
-          tags: { mechanism: 'onerror' },
+        getSentry().then(Sentry => {
+          Sentry.captureException(event.error, {
+            tags: { mechanism: 'onerror' },
+          })
         })
       }
     }

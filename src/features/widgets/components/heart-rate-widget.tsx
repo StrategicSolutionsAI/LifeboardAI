@@ -105,10 +105,10 @@ function calculateStreak(
 }
 
 function getBpmZone(bpm: number): { label: string; color: string } {
-  if (bpm < 60) return { label: "Low", color: "text-blue-600" }
-  if (bpm <= 80) return { label: "Normal", color: "text-green-600" }
-  if (bpm <= 100) return { label: "Elevated", color: "text-amber-600" }
-  return { label: "High", color: "text-red-600" }
+  if (bpm < 60) return { label: "Low", color: "text-theme-text-primary" }
+  if (bpm <= 80) return { label: "Normal", color: "text-theme-text-primary" }
+  if (bpm <= 100) return { label: "Elevated", color: "text-theme-text-primary" }
+  return { label: "High", color: "text-theme-text-primary" }
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ function HeartBeatVisualization({
         />
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
           <span
-            className={`text-2xl font-bold ${hasReading ? zone.color : "text-gray-400"}`}
+            className={`text-2xl font-bold ${hasReading ? "text-theme-text-primary" : "text-gray-400"}`}
           >
             {hasReading ? bpm : "--"}
           </span>
@@ -422,7 +422,7 @@ export function HeartRateWidget({
               onClick={() => setSelectedContext(ctx.id)}
               className={`flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs transition-all ${
                 active
-                  ? "bg-red-50 text-red-700 ring-2 ring-red-300"
+                  ? "bg-red-50 text-theme-text-primary ring-2 ring-red-300"
                   : "bg-gray-50 text-theme-text-secondary hover:bg-gray-100"
               }`}
             >
@@ -487,7 +487,7 @@ export function HeartRateWidget({
                 >
                   <div className="flex items-center gap-2">
                     {getContextIcon(e.context)}
-                    <span className={`text-sm font-semibold ${zone.color}`}>
+                    <span className="text-sm font-semibold text-theme-text-primary">
                       {e.bpm} bpm
                     </span>
                     <Badge variant="secondary" className="text-[10px]">
@@ -530,7 +530,7 @@ export function HeartRateWidget({
         </h4>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl border border-gray-100 p-3 text-center">
-            <p className={`text-xl font-bold ${latestToday ? getBpmZone(latestToday.bpm).color : "text-gray-400"}`}>
+            <p className="text-xl font-bold text-theme-text-primary">
               {latestToday ? latestToday.bpm : "--"}
             </p>
             <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
@@ -548,7 +548,7 @@ export function HeartRateWidget({
           <div className="rounded-xl border border-gray-100 p-3 text-center">
             <div className="flex items-center justify-center gap-1">
               <TrendingDown className="h-4 w-4 text-blue-500" />
-              <p className="text-xl font-bold text-blue-600">
+              <p className="text-xl font-bold text-theme-text-primary">
                 {data.lowestRecorded ?? "--"}
               </p>
             </div>
@@ -559,7 +559,7 @@ export function HeartRateWidget({
           <div className="rounded-xl border border-gray-100 p-3 text-center">
             <div className="flex items-center justify-center gap-1">
               <TrendingUp className="h-4 w-4 text-red-500" />
-              <p className="text-xl font-bold text-red-600">
+              <p className="text-xl font-bold text-theme-text-primary">
                 {data.highestRecorded ?? "--"}
               </p>
             </div>
@@ -633,7 +633,7 @@ export function HeartRateWidget({
                               day: "numeric",
                             })}
                           </span>
-                          <span className={`text-xs font-semibold ${getBpmZone(dayAvg).color}`}>
+                          <span className="text-xs font-semibold text-theme-text-secondary">
                             avg {dayAvg} bpm
                           </span>
                         </div>
@@ -645,7 +645,7 @@ export function HeartRateWidget({
                             >
                               <div className="flex items-center gap-2">
                                 {getContextIcon(e.context)}
-                                <span className={`text-sm font-medium ${getBpmZone(e.bpm).color}`}>
+                                <span className="text-sm font-medium text-theme-text-primary">
                                   {e.bpm} bpm
                                 </span>
                                 <span className="text-xs text-theme-text-tertiary">

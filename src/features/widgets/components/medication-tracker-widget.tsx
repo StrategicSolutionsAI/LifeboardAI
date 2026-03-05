@@ -145,7 +145,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
             </div>
           </div>
           {refillNeeded.length > 0 && (
-            <Badge variant="outline" className="text-orange-600 border-orange-200">
+            <Badge variant="outline" className="text-theme-text-primary border-orange-200">
               {refillNeeded.length} Refill{refillNeeded.length > 1 ? 's' : ''}
             </Badge>
           )}
@@ -302,7 +302,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
                         </Button>
                       )}
                       {isTaken && (
-                        <Badge variant="outline" className="text-green-600 border-green-200">
+                        <Badge variant="outline" className="text-theme-text-primary border-green-200">
                           Taken
                         </Badge>
                       )}

@@ -63,7 +63,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
   // Unified drag and drop handler for sidebar to calendar
   const handleDragEnd = (result: DropResult) => {
-    console.log('[DnD] handleDragEnd', { source: result.source?.droppableId, destination: result.destination?.droppableId, draggableId: result.draggableId });
+    // console.log('[DnD] handleDragEnd', { source: result.source?.droppableId, destination: result.destination?.droppableId, draggableId: result.draggableId });
     // Ignore drops if a resize operation is active
     if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
       setIsDragging(false);
@@ -71,7 +71,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     }
     setIsDragging(false);
     if (!result.destination) {
-      console.log('[DnD] No destination - drop cancelled');
+      // console.log('[DnD] No destination - drop cancelled');
       return;
     }
 
@@ -417,10 +417,10 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
     // Handle drag from calendar day cells to sidebar lists (unschedule)
     if (isCalendarDay(source.droppableId) && (destination.droppableId === 'dailyTasks' || destination.droppableId === 'openTasks' || destination.droppableId === 'masterTodayTasks')) {
-      console.log('[DnD] calendar-day → sidebar handler entered');
-      if (!draggableId.startsWith('lifeboard::')) { console.log('[DnD] skipped: not lifeboard:: prefix'); return; }
+      // console.log('[DnD] calendar-day → sidebar handler entered');
+      if (!draggableId.startsWith('lifeboard::')) { return; }
       const taskId = draggableId.split('::')[1];
-      if (!taskId) { console.log('[DnD] skipped: no taskId extracted'); return; }
+      if (!taskId) { return; }
 
       let updates: any = { hourSlot: null, endHourSlot: null };
 
@@ -442,11 +442,11 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
         updates.allDay = true;
       }
 
-      console.log('[DnD] calling batchUpdateTasks', { taskId, updates, selectedDateStr });
+      // console.log('[DnD] calling batchUpdateTasks', { taskId, updates, selectedDateStr });
       batchUpdateTasks([
         { taskId, updates, occurrenceDate: selectedDateStr }
       ]).then(() => {
-        console.log('[DnD] batchUpdateTasks succeeded');
+        // console.log('[DnD] batchUpdateTasks succeeded');
       }).catch(error => {
         console.error('[DnD] batchUpdateTasks failed:', error);
       });

@@ -60,12 +60,27 @@ interface TaskUpdate {
   updates: Partial<Task>
 }
 
+// Module-level: persists across navigations so we don't re-probe Todoist on every page mount
+let _todoistConnected: boolean | null = null
+
+// Module-level cache for occurrence exceptions to avoid re-fetching on every page mount
+let _occurrenceExceptionsCache: { data: TaskOccurrenceException[]; ts: number } | null = null
+const OCCURRENCE_CACHE_TTL = 60_000 // 60s
+
 // Custom hook for managing tasks with optimistic updates
 export function useTasks(selectedDate?: Date) {
-  // Track whether Todoist is connected in this session; null = unknown
-  const todoistConnectedRef = useRef<boolean | null>(null)
+  // Module-level ref wrapper so closures inside useCallback always see the latest value
+  const todoistConnectedRef = useRef<boolean | null>(_todoistConnected)
+  // Keep module-level state in sync
+  const setTodoistConnected = (v: boolean | null) => {
+    _todoistConnected = v
+    todoistConnectedRef.current = v
+  }
   const lastSeenUpdateRef = useRef<number>(0)
   const sharedFetchRef = useRef<Promise<Task[]> | null>(null)
+  // Cache the last resolved result for 30s so the daily fetcher doesn't re-fetch
+  const sharedResultRef = useRef<{ data: Task[]; ts: number } | null>(null)
+  const SHARED_RESULT_TTL = 30_000
   const promptOccurrenceDecision = useOccurrencePrompt()
   const [occurrenceExceptions, setOccurrenceExceptions] = useState<TaskOccurrenceException[]>([])
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -74,8 +89,13 @@ export function useTasks(selectedDate?: Date) {
   // When true, the next fetch will bypass server-side Todoist cache (set by chat-created tasks)
   const nocacheRef = useRef(false)
 
-  const refreshOccurrenceExceptions = useCallback(async () => {
+  const refreshOccurrenceExceptions = useCallback(async (force = false) => {
     if (typeof window === 'undefined') return
+    // Return cached data if fresh (avoids re-fetching on every page navigation)
+    if (!force && _occurrenceExceptionsCache && Date.now() - _occurrenceExceptionsCache.ts < OCCURRENCE_CACHE_TTL) {
+      setOccurrenceExceptions(_occurrenceExceptionsCache.data)
+      return
+    }
     try {
       const res = await fetch('/api/task-occurrence-exceptions', {
         credentials: 'same-origin'
@@ -86,6 +106,7 @@ export function useTasks(selectedDate?: Date) {
       }
       const json = await res.json().catch(() => ({}))
       const list = Array.isArray(json?.exceptions) ? json.exceptions as TaskOccurrenceException[] : []
+      _occurrenceExceptionsCache = { data: list, ts: Date.now() }
       setOccurrenceExceptions(list)
     } catch (error) {
       console.warn('Failed to refresh task occurrence exceptions', error)
@@ -200,6 +221,12 @@ export function useTasks(selectedDate?: Date) {
       return sharedFetchRef.current
     }
 
+    // Return recently resolved result to prevent duplicate fetches
+    // (e.g. daily fetcher calling this right after prefetch resolved)
+    if (sharedResultRef.current && Date.now() - sharedResultRef.current.ts < SHARED_RESULT_TTL) {
+      return sharedResultRef.current.data
+    }
+
     const inflight = (async () => {
       const readSupabaseTasks = async (): Promise<Task[] | null> => {
         try {
@@ -244,78 +271,103 @@ export function useTasks(selectedDate?: Date) {
       try {
         // If we already know Todoist is not connected, skip trying it
         if (todoistConnectedRef.current === false) {
-          return fallbackToSupabaseOrLocal()
+          const fallback = await fallbackToSupabaseOrLocal()
+          sharedResultRef.current = { data: fallback, ts: Date.now() }
+          return fallback
         }
 
         const todoistUrl = nocacheRef.current
           ? '/api/integrations/todoist/tasks?all=true&nocache=1'
           : '/api/integrations/todoist/tasks?all=true'
         nocacheRef.current = false
-        const res = await fetchWithTimeout(todoistUrl, {
-          credentials: 'same-origin'
-        })
-        if (!res.ok) {
-          if (res.status === 400 || res.status === 401) {
-            todoistConnectedRef.current = false
-            return fallbackToSupabaseOrLocal()
-          }
-          if (res.status >= 500 || res.status === 429) {
-            let upstreamStatus: number | null = null
-            try {
-              const payload = await res.clone().json()
-              const reported = Number(payload?.upstreamStatus ?? payload?.status)
-              if (Number.isFinite(reported)) {
-                upstreamStatus = reported
+
+        // Fire Todoist and Supabase fetches in PARALLEL instead of serial
+        const [todoistResult, supabaseResult] = await Promise.all([
+          fetchWithTimeout(todoistUrl, { credentials: 'same-origin' })
+            .then(async (res) => {
+              if (!res.ok) {
+                if (res.status === 400 || res.status === 401) {
+                  setTodoistConnected(false)
+                  return { ok: false as const, tasks: [] as Task[] }
+                }
+                if (res.status >= 500 || res.status === 429) {
+                  let upstreamStatus: number | null = null
+                  try {
+                    const payload = await res.clone().json()
+                    const reported = Number(payload?.upstreamStatus ?? payload?.status)
+                    if (Number.isFinite(reported)) upstreamStatus = reported
+                  } catch {}
+                  if (upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410) {
+                    setTodoistConnected(false)
+                  }
+                  console.warn(
+                    `Upstream error fetching tasks: ${res.status}${upstreamStatus ? ` (upstream ${upstreamStatus})` : ''}. Falling back to Supabase/local.`
+                  )
+                  return { ok: false as const, tasks: [] as Task[] }
+                }
+                throw new Error(`Failed to fetch tasks: ${res.status}`)
               }
-            } catch {}
+              const data = await res.json()
+              setTodoistConnected(true)
+              const raw: Task[] = Array.isArray(data) ? data : (data.tasks ?? [])
+              return { ok: true as const, tasks: ensureTasksSource(raw, 'todoist') }
+            })
+            .catch((error) => {
+              if (isNetworkFetchError(error) || isAbortLikeError(error)) {
+                setTodoistConnected(false)
+                return { ok: false as const, tasks: [] as Task[] }
+              }
+              throw error
+            }),
+          // Supabase fetch runs in parallel — no longer waits for Todoist
+          fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
+            .then(async (supa) => {
+              if (!supa.ok) return [] as Task[]
+              const json = await supa.json()
+              const raw = Array.isArray(json) ? json : (json.tasks ?? [])
+              return ensureTasksSource(raw as Task[], 'supabase')
+            })
+            .catch((error) => {
+              console.warn('Failed to fetch Supabase tasks:', error)
+              return [] as Task[]
+            }),
+        ])
 
-            if (upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410) {
-              todoistConnectedRef.current = false
-            }
-
-            console.warn(
-              `Upstream error fetching tasks: ${res.status}${upstreamStatus ? ` (upstream ${upstreamStatus})` : ''}. Falling back to Supabase/local.`
-            )
-            return fallbackToSupabaseOrLocal()
-          }
-          throw new Error(`Failed to fetch tasks: ${res.status}`)
+        // If Todoist failed entirely, fall back to Supabase + local
+        if (!todoistResult.ok && supabaseResult.length === 0) {
+          return fallbackToSupabaseOrLocal()
         }
-        const todoistData = await res.json()
-        todoistConnectedRef.current = true
-        const todoistRaw: Task[] = Array.isArray(todoistData) ? todoistData : (todoistData.tasks ?? [])
-        const todoistTasks = ensureTasksSource(todoistRaw, 'todoist')
 
-        // When Todoist is connected, also fetch Supabase tasks and merge them
-        let supabaseTasks: Task[] = []
-        try {
-          const supa = await fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
-          if (supa.ok) {
-            const json = await supa.json()
-            const supabaseRaw = Array.isArray(json) ? json : (json.tasks ?? [])
-            supabaseTasks = ensureTasksSource(supabaseRaw as Task[], 'supabase')
-          }
-        } catch (error) {
-          console.warn('Failed to fetch Supabase tasks while connected to Todoist:', error)
-        }
-        
-        // Merge Todoist and Supabase tasks, with Todoist taking precedence for duplicates
+        const todoistTasks = todoistResult.tasks
+        const supabaseTasks = supabaseResult
+
+        // Merge: Supabase first, Todoist overwrites duplicates
         const taskMap = new Map<string, Task>()
-        
-        // Add Supabase tasks first
-        supabaseTasks.forEach((task: Task) => {
-          taskMap.set(task.id, task)
-        })
-        
-        // Add Todoist tasks (will overwrite any duplicates)
-        todoistTasks.forEach((task: Task) => {
-          taskMap.set(task.id, task)
-        })
-        
-        return Array.from(taskMap.values())
+        supabaseTasks.forEach((task: Task) => taskMap.set(task.id, task))
+        todoistTasks.forEach((task: Task) => taskMap.set(task.id, task))
+
+        // If Todoist failed but Supabase has data, include local tasks too
+        if (!todoistResult.ok) {
+          const localTasks = (() => {
+            try {
+              if (typeof window === 'undefined') return []
+              const raw = window.localStorage.getItem('lifeboard_local_tasks')
+              const list: Task[] = raw ? JSON.parse(raw) : []
+              return ensureTasksSource(list, 'local').filter(t => !t.completed)
+            } catch { return [] }
+          })()
+          localTasks.forEach(t => taskMap.set(t.id, t))
+        }
+
+        const merged = Array.from(taskMap.values())
+        sharedResultRef.current = { data: merged, ts: Date.now() }
+        return merged
       } catch (error) {
         if (isNetworkFetchError(error) || isAbortLikeError(error)) {
-          todoistConnectedRef.current = false
-          return fallbackToSupabaseOrLocal()
+          setTodoistConnected(false)
+          const fallback = await fallbackToSupabaseOrLocal()
+          sharedResultRef.current = { data: fallback, ts: Date.now() }
+          return fallback
         }
         throw error
       } finally {
@@ -392,6 +444,7 @@ export function useTasks(selectedDate?: Date) {
     refreshTimerRef.current = setTimeout(() => {
       // Force a fresh read after writes so stale in-flight fetches don't clobber optimistic state.
       sharedFetchRef.current = null
+      sharedResultRef.current = null
       try { refetchDaily() } catch {}
       try { refetchAll() } catch {}
       refreshTimerRef.current = null
@@ -444,6 +497,7 @@ export function useTasks(selectedDate?: Date) {
     const announceTaskUpdate = () => {
       if (typeof window !== 'undefined') {
         sharedFetchRef.current = null
+        sharedResultRef.current = null
         const timestamp = Date.now()
         localUpdateTimestamps.current.add(timestamp)
         window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
@@ -548,10 +602,10 @@ export function useTasks(selectedDate?: Date) {
           }).then(res => {
             if (!res.ok) {
               if (res.status === 400 || res.status === 401) {
-                todoistConnectedRef.current = false
+                setTodoistConnected(false)
               }
             } else {
-              todoistConnectedRef.current = true
+              setTodoistConnected(true)
             }
           }).catch(() => {
             // Todoist sync failed silently — Supabase already has the task
@@ -588,7 +642,7 @@ export function useTasks(selectedDate?: Date) {
       })
 
       if (res.ok) {
-        todoistConnectedRef.current = true
+        setTodoistConnected(true)
         const responseData = await res.json()
         const { task } = responseData
 
@@ -632,7 +686,7 @@ export function useTasks(selectedDate?: Date) {
       }
 
       if (res.status === 400 || res.status === 401) {
-        todoistConnectedRef.current = false
+        setTodoistConnected(false)
       }
     } catch {
       // Todoist also failed
@@ -710,6 +764,7 @@ export function useTasks(selectedDate?: Date) {
           }
           // Refetch to include newly synced tasks
           sharedFetchRef.current = null
+          sharedResultRef.current = null
           try { refetchDaily() } catch {}
           try { refetchAll() } catch {}
         }
@@ -855,7 +910,7 @@ export function useTasks(selectedDate?: Date) {
       if (res.ok) return
 
       if (res.status === 400 || res.status === 401) {
-        todoistConnectedRef.current = false
+        setTodoistConnected(false)
         await toggleViaSupabase()
         return
       }
@@ -1209,7 +1264,7 @@ export function useTasks(selectedDate?: Date) {
 
       if (!res.ok) {
         if (res.status === 400 || res.status === 401) {
-          todoistConnectedRef.current = false
+          setTodoistConnected(false)
           await deleteViaSupabase()
           return
         }

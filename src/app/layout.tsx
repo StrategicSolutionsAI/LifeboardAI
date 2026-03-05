@@ -1,13 +1,11 @@
 import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
-import { SpeedInsights } from '@vercel/speed-insights/next'
-import { Analytics } from '@vercel/analytics/next'
 
 import './globals.css'
-import PerfObserver from '@/components/perf-observer'
 import { GlobalErrorHandler } from '@/components/global-error-handler'
 import { ToastProvider } from '@/components/ui/use-toast'
+import { DeferredMonitoring } from '@/components/deferred-monitoring'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -87,11 +85,9 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             <GlobalErrorHandler />
-            <PerfObserver />
             {children}
           </ToastProvider>
-          <SpeedInsights />
-          <Analytics />
+          <DeferredMonitoring />
         </ThemeProvider>
       </body>
     </html>

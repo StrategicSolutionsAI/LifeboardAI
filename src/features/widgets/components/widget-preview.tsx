@@ -188,7 +188,7 @@ export function WidgetPreview({
                       Since {new Date(widget.quitHabitData.quitDate).toLocaleDateString()}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-green-600">
+                  <p className="text-sm font-bold text-theme-text-primary">
                     {(() => {
                       const quitDate = new Date(widget.quitHabitData.quitDate);
                       const today = new Date();
@@ -232,7 +232,7 @@ export function WidgetPreview({
                         onUpdate(updatedWidget);
                         alert(`✅ Great job! You've successfully stayed clean for ${daysSince} days. Keep it up!`);
                       }}
-                      className="w-full mt-2 px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium border border-green-200 hover:bg-green-200 transition-colors"
+                      className="w-full mt-2 px-2 py-1 bg-green-100 text-theme-text-primary rounded text-xs font-medium border border-green-200 hover:bg-green-200 transition-colors"
                     >
                       ✅ Check In for Today
                     </button>
@@ -252,7 +252,7 @@ export function WidgetPreview({
                       Current Weight
                     </p>
                   </div>
-                  <p className="text-lg font-bold text-amber-600">
+                  <p className="text-lg font-bold text-theme-text-primary">
                     {widget.weightData.currentWeight} {widget.weightData.unit || widget.unit || 'lbs'}
                   </p>
                   
@@ -260,10 +260,10 @@ export function WidgetPreview({
                     <div className="flex items-center gap-1">
                       <span className="text-xs">📈</span>
                       <p className={`text-xs ${
-                        widget.weightData.currentWeight < widget.weightData.startingWeight 
-                          ? 'text-green-600' 
-                          : widget.weightData.currentWeight > widget.weightData.startingWeight 
-                          ? 'text-orange-600' 
+                        widget.weightData.currentWeight < widget.weightData.startingWeight
+                          ? 'text-theme-text-primary'
+                          : widget.weightData.currentWeight > widget.weightData.startingWeight
+                          ? 'text-theme-text-primary'
                           : 'text-theme-text-subtle'
                       }`}>
                         {widget.weightData.currentWeight < widget.weightData.startingWeight ? 'Lost' : 
@@ -320,7 +320,7 @@ export function WidgetPreview({
                           alert(`✅ Weight logged: ${weight} ${widget.weightData?.unit || widget.unit || 'lbs'}`);
                         }
                       }}
-                      className="w-full mt-2 px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium border border-purple-200 hover:bg-amber-200 transition-colors"
+                      className="w-full mt-2 px-2 py-1 bg-amber-100 text-theme-text-primary rounded text-xs font-medium border border-purple-200 hover:bg-amber-200 transition-colors"
                     >
                       📝 Log Weight
                     </button>

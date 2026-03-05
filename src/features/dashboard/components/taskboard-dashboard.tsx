@@ -4,8 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/utils/supabase/client";
-import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
-import { invalidateTaskCaches } from "@/hooks/use-data-cache";
+import { getUserPreferencesClient, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
 import { useWeather } from "@/features/dashboard/hooks/use-weather";
 import { getPrefetchedGreetingName } from "@/lib/prefetch-user-prefs";
 import { WidgetModalsContainer } from "./WidgetModalsContainer";
@@ -27,7 +26,7 @@ import {
   debounce,
   migrateWidgetsToTemplates,
 } from "@/lib/dashboard-utils";
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import {
   type LucideIcon,
   Plus,
@@ -55,15 +54,11 @@ const WidgetLibrary = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
 );
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import type { DropResult } from "@hello-pangea/dnd";
 const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
-import { TasksQuickActions } from "@/features/tasks/components/tasks-quick-actions";
-import { TasksGroupedList } from "@/features/tasks/components/tasks-grouped-list";
-import { TasksDailyProgress } from "@/features/tasks/components/tasks-daily-progress";
 import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 const EnhancedTasksView = dynamic(
   () => import("@/features/tasks/components/enhanced-tasks-view").then(m => m.EnhancedTasksView),
@@ -465,6 +460,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return new Map(activeWidgets.map((widget) => [widget.instanceId, widget]));
   }, [activeWidgets]);
 
+  // Narrow memo: only recomputes when the specific linked tasks change,
+  // not on every allTasks reference change (optimistic updates, background refresh).
+  const linkedTaskDataByWidgetId = useMemo(() => {
+    const linkedIds = activeWidgets
+      .filter(w => w.linkedTaskId)
+      .map(w => w.linkedTaskId!);
+    if (linkedIds.length === 0) return {} as Record<string, { completed?: boolean; content?: string; dueDate?: string }>;
+    const result: Record<string, { completed?: boolean; content?: string; dueDate?: string }> = {};
+    for (const id of linkedIds) {
+      const task = allTasks.find(t => t.id?.toString?.() === id);
+      if (task) {
+        result[id] = { completed: task.completed, content: task.content, dueDate: task.due?.date };
+      }
+    }
+    return result;
+  }, [activeWidgets, allTasks]);
+
   const localWidgetLogs = useMemo<WidgetLogEntry[]>(() => {
     const logs: WidgetLogEntry[] = [];
 
@@ -569,14 +581,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       }
 
       if (widget.linkedTaskId) {
-        const linkedTask = allTasks.find((task) => task.id?.toString?.() === widget.linkedTaskId);
+        const linkedTask = linkedTaskDataByWidgetId[widget.linkedTaskId];
         logs.push({
           id: `task-link-${widget.instanceId}-${widget.linkedTaskId}`,
           widgetInstanceId: widget.instanceId,
           widgetName: widget.name,
           message: linkedTask?.completed ? "Linked task completed" : "Linked to Tasks tab",
           details: linkedTask?.content || widget.linkedTaskTitle,
-          occurredAt: linkedTask?.due?.date ? `${linkedTask.due.date}T09:00:00` : widget.createdAt,
+          occurredAt: linkedTask?.dueDate ? `${linkedTask.dueDate}T09:00:00` : widget.createdAt,
           kind: "task",
         });
       }
@@ -592,7 +604,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     });
 
     return logs;
-  }, [activeWidgets, progressByWidget, fitbitData, googleFitData, allTasks, todayDateString]);
+  }, [activeWidgets, progressByWidget, fitbitData, googleFitData, linkedTaskDataByWidgetId, todayDateString]);
 
   const combinedWidgetLogs = useMemo(() => {
     const merged = [...widgetHistoryLogs, ...localWidgetLogs];
@@ -859,7 +871,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           try {
             const resW = await fetch(`/api/integrations/withings/metrics?cb=${Date.now()}`, { credentials: 'include' });
             if (!resW.ok) {
-              if (resW.status !== 400) console.error('Failed to fetch Withings metrics');
+              if (resW.status === 400) return; // Withings not connected — expected
+              console.error('Failed to fetch Withings metrics');
               return;
             }
             const dataW = await resW.json();
@@ -1119,12 +1132,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return `${Math.floor(days / 30)} months`;
   };
 
-  const upcomingTasks = allTodoistTasks.filter((t: any) => {
-    if (!t.due?.date) return false;
-    return t.due.date > todayStr;
-  });
-
-  const groupUpcomingTasks = () => {
+  const upcomingTaskGroups = useMemo(() => {
+    const upcoming = allTodoistTasks.filter((t: any) => t.due?.date && t.due.date > todayStr);
     const groups = {
       next7Days: [] as any[],
       next2Weeks: [] as any[],
@@ -1132,7 +1141,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       noDueDate: allTodoistTasks.filter((t: any) => !t.due?.date)
     };
 
-    upcomingTasks.forEach((task: any) => {
+    upcoming.forEach((task: any) => {
       const daysUntil = getTimeUntilDue(task.due?.date);
       if (daysUntil !== null) {
         if (daysUntil <= 7) {
@@ -1146,9 +1155,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     });
 
     return groups;
-  };
-
-  const upcomingTaskGroups = groupUpcomingTasks();
+  }, [allTodoistTasks, todayStr]);
 
   const updateTaskDueDate = async (taskId: string, dueDate: string | null) => {
     try {
@@ -1534,8 +1541,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     loadProgress();
   }, [user]);
 
-  // Helper to get today string  
-  const todayStrGlobal = new Date().toISOString().slice(0, 10);
+  // todayStrGlobal is imported from @/lib/dashboard-utils (computed once at module load)
 
   const incrementProgress = async (w: WidgetInstance) => {
 
@@ -2500,9 +2506,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Safety net: if a user has preferences but somehow their onboarded flag
   // wasn't set, update it to prevent getting stuck in onboarding loop.
   // Runs as fire-and-forget so it never blocks widget rendering.
+  // Short-circuits via localStorage to avoid network calls for already-onboarded users.
   function ensureUserOnboarded() {
     void (async () => {
       try {
+        // Skip entirely if we've already confirmed onboarding in a previous session
+        if (typeof window !== 'undefined' && localStorage.getItem('lifeboard:onboarded') === '1') {
+          return;
+        }
+
         const cachedUser = await getCachedUser();
         if (!cachedUser) return;
 
@@ -2512,6 +2524,13 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         ]);
 
         const profile = profileRes?.profile;
+        if (profile?.onboarded === true) {
+          // Already onboarded — cache in localStorage so we never check again
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('lifeboard:onboarded', '1');
+          }
+          return;
+        }
         if (prefs?.life_buckets?.length && profile && profile.onboarded === false) {
           await fetch('/api/user/profile', {
             method: 'PATCH',
@@ -2519,6 +2538,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ onboarded: true }),
           });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('lifeboard:onboarded', '1');
+          }
         }
       } catch (err) {
         console.error('Error in ensureUserOnboarded:', err);
@@ -3338,47 +3360,34 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   }, [saveWidgets, fetchIntegrationsData]);
 
-  // Add a useEffect to check for resets when the component mounts and periodically
+  // Consolidated: check for widget resets on mount, date change, progress change,
+  // visibility change, and hourly interval — all in two effects to avoid
+  // firing checkAndResetWidgets 4x on initial mount.
   useEffect(() => {
-    // Check for resets immediately when component mounts
     checkAndResetWidgets();
 
-    // Set up an interval to check for resets periodically (every hour)
-    // This handles the case where the app is left open overnight
+    // Hourly check handles app left open overnight
     const intervalId = setInterval(checkAndResetWidgets, 60 * 60 * 1000);
 
-    return () => clearInterval(intervalId);
-  }, [checkAndResetWidgets]);
-
-  // Also add a check for date changes when the user interacts with the app
-  useEffect(() => {
-    // Check for resets when the selected date changes
-    checkAndResetWidgets();
-  }, [selectedDate, checkAndResetWidgets]);
-
-  // Re-evaluate reset once progress data has been loaded or changed (e.g., after localStorage load)
-  useEffect(() => {
-    checkAndResetWidgets();
-    // Dependency intentionally limited to top-level progress map to avoid deep comparisons
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progressByWidget]);
-
-  // Add a visibility change listener to check for resets when the user returns to the tab
-  useEffect(() => {
+    // Visibility change handles user returning to tab
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkAndResetWidgets();
       }
     };
-
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
-
-      return () => {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      };
     }
-  }, [checkAndResetWidgets]);
+
+    return () => {
+      clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+    // Also re-evaluate when selectedDate or progressByWidget changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkAndResetWidgets, selectedDate, progressByWidget]);
 
   return (
     <div className="flex-1 relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)' }}>

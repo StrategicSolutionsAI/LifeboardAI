@@ -566,7 +566,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{totalMinutes}</div>
+                <div className="text-2xl font-bold text-theme-text-primary">{totalMinutes}</div>
                 <div className="text-sm text-theme-text-subtle">of {goals.weeklyMinutes} minutes</div>
                 <div className="w-full bg-theme-skeleton rounded-full h-2 mt-2">
                   <div 
@@ -576,13 +576,13 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
+                <div className="text-2xl font-bold text-theme-text-primary">
                   {Math.round(totalMinutes / Math.max(completedWorkouts, 1))}
                 </div>
                 <div className="text-sm text-theme-text-subtle">avg minutes/workout</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="text-2xl font-bold text-theme-text-primary">
                   {currentWeekWorkouts.reduce((sum, w) => sum + (w.calories || 0), 0)}
                 </div>
                 <div className="text-sm text-theme-text-subtle">calories burned</div>
@@ -636,7 +636,7 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                         <div className="font-medium text-sm">{achievement.name}</div>
                         <div className="text-xs text-theme-text-subtle">{achievement.description}</div>
                         {achievement.unlocked && achievement.unlockedAt && (
-                          <div className="text-xs text-yellow-600 mt-1">
+                          <div className="text-xs text-theme-text-tertiary mt-1">
                             Unlocked {new Date(achievement.unlockedAt).toLocaleDateString()}
                           </div>
                         )}
@@ -685,9 +685,9 @@ export function ExerciseWidget({ onClose }: ExerciseWidgetProps) {
                           {template.duration} min
                         </span>
                         <Badge className={`text-xs ${
-                          template.intensity === 'low' ? 'bg-green-100 text-green-800' :
-                          template.intensity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          template.intensity === 'low' ? 'bg-green-100 text-theme-text-primary' :
+                          template.intensity === 'medium' ? 'bg-yellow-100 text-theme-text-primary' :
+                          'bg-red-100 text-theme-text-primary'
                         }`}>
                           {template.intensity}
                         </Badge>

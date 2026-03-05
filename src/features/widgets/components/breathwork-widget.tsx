@@ -221,11 +221,11 @@ function PatternSelector({
                   : "border-theme-neutral-200 bg-white hover:border-theme-neutral-300"
             }`}
           >
-            <div className={`text-sm font-semibold ${isSelected ? "text-indigo-700" : "text-theme-text-primary"}`}>
+            <div className="text-sm font-semibold text-theme-text-primary">
               {pattern.name}
             </div>
             <div className="text-[10px] text-theme-text-tertiary mt-0.5">{pattern.description}</div>
-            <div className={`text-xs mt-1 font-mono ${isSelected ? "text-indigo-500" : "text-theme-text-subtle"}`}>
+            <div className="text-xs mt-1 font-mono text-theme-text-subtle">
               {key}
             </div>
           </motion.button>
@@ -450,7 +450,7 @@ export function BreathworkWidget({
               exit={{ opacity: 0, y: -5 }}
               transition={{ duration: 0.3 }}
               className="text-center text-sm mt-3 italic"
-              style={{ color: currentPhase.color }}
+              style={{  }}
             >
               {currentPhase.prompt}
             </motion.p>
@@ -501,7 +501,7 @@ export function BreathworkWidget({
             <Button
               onClick={handleStop}
               variant="outline"
-              className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+              className="gap-1.5 border-red-300 text-theme-text-primary hover:bg-red-50"
             >
               <Square className="h-4 w-4" />
               End Session
@@ -596,7 +596,7 @@ export function BreathworkWidget({
                         {sessions.map((s, i) => (
                           <span
                             key={i}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[10px] font-medium"
+                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-theme-text-primary text-[10px] font-medium"
                           >
                             {patternDisplayName[s.pattern] || s.pattern} &middot; {s.cycles} cycles
                           </span>

@@ -368,7 +368,6 @@ export function DraggableWidgetCard({
                     linkedTaskCompleted
                       ? {
                           borderColor: wStyles.solid,
-                          color: wStyles.text,
                           backgroundColor: wStyles.tint,
                         }
                       : undefined
@@ -396,8 +395,7 @@ export function DraggableWidgetCard({
                 e.stopPropagation();
                 onIncrementProgress(w);
               }}
-              className="absolute bottom-2 right-2 text-xl font-bold leading-none hover:scale-110 transition-transform"
-              style={{ color: wStyles.text }}
+              className="absolute bottom-2 right-2 text-xl font-bold leading-none hover:scale-110 transition-transform text-theme-text-primary"
             >
               +
             </button>
@@ -725,14 +723,12 @@ function renderWidgetBody(
           </div>
           <div className="flex items-baseline gap-1">
             <span
-              className="text-2xl font-bold"
-              style={{ color: wStyles.text }}
+              className="text-2xl font-bold text-theme-text-primary"
             >
               {daysSince}
             </span>
             <span
-              className="text-sm font-medium"
-              style={{ color: wStyles.text }}
+              className="text-sm font-medium text-theme-text-primary"
             >
               days clean
             </span>
@@ -750,8 +746,7 @@ function renderWidgetBody(
             <div className="flex items-center gap-2 text-xs">
               <span className="text-sm">{latestMilestone.emoji}</span>
               <span
-                className="font-medium"
-                style={{ color: wStyles.text }}
+                className="font-medium text-theme-text-primary"
               >
                 {latestMilestone.label}
               </span>
@@ -824,14 +819,12 @@ function renderWidgetBody(
           </div>
           <div className="flex items-baseline gap-1">
             <span
-              className="text-2xl font-bold"
-              style={{ color: wStyles.text }}
+              className="text-2xl font-bold text-theme-text-primary"
             >
               {streak}
             </span>
             <span
-              className="text-sm font-medium"
-              style={{ color: wStyles.text }}
+              className="text-sm font-medium text-theme-text-primary"
             >
               day streak
             </span>
@@ -865,7 +858,7 @@ function renderWidgetBody(
                   ? ""
                   : "bg-theme-surface-alt text-theme-text-subtle hover:bg-theme-brand-tint-light"
               }`}
-              style={isCompletedToday ? { backgroundColor: wStyles.tint, color: wStyles.text } : undefined}
+              style={isCompletedToday ? { backgroundColor: wStyles.tint } : undefined}
             >
               {isCompletedToday ? "\u2714" : "\u25CB"}{" "}
               {isCompletedToday ? "Done" : "Log"}
@@ -909,7 +902,7 @@ function renderWidgetBody(
                   key={index}
                   className="text-xs text-theme-text-body flex items-start gap-1"
                 >
-                  <span className="text-yellow-500 mt-0.5">{"\u2022"}</span>
+                  <span className="text-theme-text-primary mt-0.5">{"\u2022"}</span>
                   <span className="italic">&quot;{item}&quot;</span>
                 </div>
               ))}
@@ -958,14 +951,14 @@ function renderWidgetBody(
               Current Weight
             </p>
           </div>
-          <p className="text-lg font-bold" style={{ color: wStyles.text }}>
+          <p className="text-lg font-bold text-theme-text-primary">
             {w.weightData.currentWeight}{" "}
             {w.weightData.unit || w.unit || "lbs"}
           </p>
           {w.weightData.startingWeight !== undefined && (
             <div className="flex items-center gap-1">
               <span className="text-xs">{"\uD83D\uDCC8"}</span>
-              <p className="text-xs" style={{ color: wStyles.text }}>
+              <p className="text-xs text-theme-text-secondary">
                 {w.weightData.currentWeight < w.weightData.startingWeight
                   ? "Lost"
                   : w.weightData.currentWeight > w.weightData.startingWeight
@@ -1083,8 +1076,7 @@ function renderWidgetBody(
           </div>
           <div>
             <div
-              className="text-sm font-semibold"
-              style={{ color: wStyles.text }}
+              className="text-sm font-semibold text-theme-text-primary"
             >
               {urgentProjects.length}
             </div>
@@ -1092,8 +1084,7 @@ function renderWidgetBody(
           </div>
           <div>
             <div
-              className="text-sm font-semibold"
-              style={{ color: wStyles.text }}
+              className="text-sm font-semibold text-theme-text-primary"
             >
               {completionRate}%
             </div>
@@ -1138,16 +1129,16 @@ function renderWidgetBody(
       return (
         <div className="mt-3 space-y-1.5">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-bold" style={{ color: wStyles.text }}>
+            <span className="text-2xl font-bold text-theme-text-primary">
               {displayEntry.duration}
             </span>
-            <span className="text-sm font-medium" style={{ color: wStyles.text }}>hrs</span>
+            <span className="text-sm font-medium text-theme-text-primary">hrs</span>
           </div>
-          <div className="text-xs text-amber-500">{stars}</div>
+          <div className="text-xs text-theme-text-primary">{stars}</div>
           {w.sleepData?.currentStreak && w.sleepData.currentStreak >= 2 && (
             <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-              style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+              style={{ backgroundColor: wStyles.tint }}
             >
               {"\uD83D\uDD25"} {w.sleepData.currentStreak} day streak
             </span>
@@ -1177,7 +1168,7 @@ function renderWidgetBody(
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: wStyles.solid }} />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: wStyles.solid }} />
             </span>
-            <span className="text-xs font-medium" style={{ color: wStyles.text }}>In Session</span>
+            <span className="text-xs font-medium text-theme-text-primary">In Session</span>
           </div>
           <div className="text-xs text-theme-text-tertiary">
             {Math.round((data.duration || 600) / 60)} min session
@@ -1190,16 +1181,16 @@ function renderWidgetBody(
       return (
         <div className="mt-3 space-y-1.5">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-bold" style={{ color: wStyles.text }}>
+            <span className="text-2xl font-bold text-theme-text-primary">
               {data?.totalMinutes || 0}
             </span>
-            <span className="text-sm font-medium" style={{ color: wStyles.text }}>min</span>
+            <span className="text-sm font-medium text-theme-text-primary">min</span>
           </div>
           <div className="text-xs text-theme-text-tertiary">{sessions} sessions total</div>
           {data?.currentStreak && data.currentStreak >= 2 && (
             <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-              style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+              style={{ backgroundColor: wStyles.tint }}
             >
               {"\uD83D\uDD25"} {data.currentStreak}
             </span>
@@ -1234,7 +1225,7 @@ function renderWidgetBody(
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: wStyles.solid }} />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: wStyles.solid }} />
             </span>
-            <span className="text-xs font-medium" style={{ color: wStyles.text }}>Breathing</span>
+            <span className="text-xs font-medium text-theme-text-primary">Breathing</span>
           </div>
           <div className="text-xs text-theme-text-tertiary">{patternName || "Active session"}</div>
         </div>
@@ -1245,18 +1236,18 @@ function renderWidgetBody(
       return (
         <div className="mt-3 space-y-1.5">
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-bold" style={{ color: wStyles.text }}>
+            <span className="text-2xl font-bold text-theme-text-primary">
               {data.totalSessions}
             </span>
-            <span className="text-sm font-medium" style={{ color: wStyles.text }}>sessions</span>
+            <span className="text-sm font-medium text-theme-text-primary">sessions</span>
           </div>
           <div className="text-xs text-theme-text-tertiary">
             {data.totalMinutes || 0} min total
           </div>
           {data.currentStreak && data.currentStreak >= 2 && (
             <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-              style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+              style={{ backgroundColor: wStyles.tint }}
             >
               {"\uD83D\uDD25"} {data.currentStreak}
             </span>
@@ -1289,8 +1280,8 @@ function renderWidgetBody(
         </div>
         {prog?.streak >= 2 && (
           <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-            style={{ backgroundColor: wStyles.tint, color: wStyles.text }}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-theme-text-primary"
+            style={{ backgroundColor: wStyles.tint }}
           >
             {"\uD83D\uDD25"} {prog.streak}
           </span>
@@ -1305,12 +1296,12 @@ function renderWidgetBody(
       {(w.dataSource === "fitbit" || w.dataSource === "googlefit") && (
         <div className="text-right mt-1 mb-1">
           {w.dataSource === "fitbit" && (
-            <span className="text-xs" style={{ color: wStyles.text }}>
+            <span className="text-xs text-theme-text-tertiary">
               Fitbit
             </span>
           )}
           {w.dataSource === "googlefit" && (
-            <span className="text-xs" style={{ color: wStyles.text }}>
+            <span className="text-xs text-theme-text-tertiary">
               Google Fit
             </span>
           )}

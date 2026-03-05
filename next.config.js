@@ -85,4 +85,13 @@ module.exports = withSentryConfig(nextConfig, {
 
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
   automaticVercelMonitors: true,
+
+  // Tree-shake unused Sentry Replay features to reduce bundle size
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+      excludeReplayIframe: true,
+      excludeReplayShadowDOM: true,
+    },
+  },
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, startTransition } from "react";
 import type { CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import {
@@ -1123,7 +1123,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       const params = new URLSearchParams({
         timeMin: new Date(rangeStartMs).toISOString(),
         timeMax: new Date(rangeEndMs).toISOString(),
-        maxResults: '2500',
+        maxResults: '500',
       });
       const resp = await fetchWithTimeout(`/api/integrations/google/calendar/events?${params.toString()}`);
       if (!resp.ok) {
@@ -1375,7 +1375,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       let matchedTask: any | undefined;
 
       if (resolvedTaskId) {
-        matchedTask = allTasks.find((task: any) => task.id?.toString?.() === resolvedTaskId);
+        matchedTask = resolveTaskById(resolvedTaskId);
       }
 
       if (!matchedTask) {
@@ -1498,7 +1498,11 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       });
     });
 
-    setEventsByDate(map);
+    // Defer the state update so the expensive event map rebuild doesn't block
+    // user interactions (typing, scrolling) while allTasks background-refreshes.
+    startTransition(() => {
+      setEventsByDate(map);
+    });
   }, [
     googleEvents,
     uploadedEvents,

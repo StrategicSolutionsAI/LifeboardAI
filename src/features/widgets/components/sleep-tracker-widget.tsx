@@ -306,7 +306,7 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
                 </span>
                 <span className="text-sm font-medium text-theme-text-tertiary">hours</span>
                 {todayEntry.duration >= target && (
-                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-700 text-[10px]">
+                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-theme-text-primary text-[10px]">
                     Goal met
                   </Badge>
                 )}
@@ -393,11 +393,7 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4 text-theme-text-tertiary" />
                 <span className="text-theme-text-secondary">Duration:</span>
-                <span
-                  className={`font-semibold ${
-                    previewDuration >= target ? "text-emerald-600" : "text-theme-text-primary"
-                  }`}
-                >
+                <span className="font-semibold text-theme-text-primary">
                   {previewDuration} hours
                 </span>
               </div>
@@ -462,11 +458,7 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
-            <div
-              className={`text-xl font-bold ${
-                sleepDebt > 0 ? "text-red-500" : "text-emerald-600"
-              }`}
-            >
+            <div className="text-xl font-bold text-theme-text-primary">
               {sleepDebt > 0 ? `-${sleepDebt}h` : `+${Math.abs(sleepDebt)}h`}
             </div>
             <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">

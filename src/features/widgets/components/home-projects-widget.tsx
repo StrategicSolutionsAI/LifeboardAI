@@ -322,7 +322,7 @@ export function HomeProjectsWidget({
                         e.stopPropagation()
                         handleQuickComplete(nextProject.id)
                       }}
-                      className="p-1 rounded text-green-600 hover:bg-green-100 transition-colors"
+                      className="p-1 rounded text-theme-text-primary hover:bg-green-100 transition-colors"
                       title="Mark Complete"
                     >
                       <Check className="w-3 h-3" />
@@ -343,7 +343,7 @@ export function HomeProjectsWidget({
                           e.stopPropagation()
                           handleAddToTasks(nextProject.id)
                         }}
-                        className="p-1 rounded text-amber-600 hover:bg-amber-100 transition-colors"
+                        className="p-1 rounded text-theme-text-primary hover:bg-amber-100 transition-colors"
                         title="Add to Tasks"
                       >
                         <ListPlus className="w-3 h-3" />
@@ -387,9 +387,9 @@ export function HomeProjectsWidget({
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-800">Needs Immediate Attention</span>
+                  <span className="text-sm font-medium text-theme-text-primary">Needs Immediate Attention</span>
                 </div>
-                <div className="text-xs text-red-700">
+                <div className="text-xs text-theme-text-secondary">
                   {urgentProjects.length} critical or overdue {urgentProjects.length === 1 ? 'project' : 'projects'} require action today
                 </div>
               </div>
@@ -407,9 +407,9 @@ export function HomeProjectsWidget({
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">All Caught Up</span>
+                  <span className="text-sm font-medium text-theme-text-primary">All Caught Up</span>
                 </div>
-                <div className="text-xs text-green-700">
+                <div className="text-xs text-theme-text-secondary">
                   No urgent projects! Great work staying on top of things.
                 </div>
               </div>

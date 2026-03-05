@@ -136,12 +136,12 @@ export function WithingsWeightWidget({
       {weightChange > 0 ? (
         <>
           <TrendingUp className="w-3 h-3 text-red-500" />
-          <span className="text-red-500 font-medium">+{Math.abs(weightChange).toFixed(1)} {unit}</span>
+          <span className="text-theme-text-primary font-medium">+{Math.abs(weightChange).toFixed(1)} {unit}</span>
         </>
       ) : (
         <>
           <TrendingDown className="w-3 h-3 text-green-500" />
-          <span className="text-green-500 font-medium">-{Math.abs(weightChange).toFixed(1)} {unit}</span>
+          <span className="text-theme-text-primary font-medium">-{Math.abs(weightChange).toFixed(1)} {unit}</span>
         </>
       )}
     </div>

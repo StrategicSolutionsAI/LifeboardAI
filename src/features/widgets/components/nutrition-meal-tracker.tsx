@@ -922,7 +922,7 @@ export function NutritionMealTracker({ className }: NutritionMealTrackerProps) {
             )}
 
             {!showFavorites && error && (
-              <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+              <div className="text-sm text-theme-text-primary bg-red-50 p-2 rounded">
                 {error}
               </div>
             )}

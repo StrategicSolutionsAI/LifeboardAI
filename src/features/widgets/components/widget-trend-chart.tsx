@@ -197,12 +197,12 @@ export default function WidgetTrendChart({
     const shortError = error.replace(/<[^>]+>/g, '').slice(0, 60) + (error.length > 60 ? '…' : '');
     return (
       <div className="rounded-xl border border-red-200 bg-red-50/80 p-4 shadow-warm-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-red-400 mb-1">{name}</p>
-        <p className="text-xs text-red-600/80 mb-3">{shortError}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-theme-text-primary mb-1">{name}</p>
+        <p className="text-xs text-theme-text-secondary mb-3">{shortError}</p>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-900 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-medium text-theme-text-primary hover:text-theme-text-primary transition-colors"
         >
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
           Retry
@@ -231,8 +231,8 @@ export default function WidgetTrendChart({
 
   /* ── Trend badge config ── */
   const trendConfig = {
-    up: { icon: TrendingUp, text: `+${analysis.trendPercentage.toFixed(0)}%`, bg: 'bg-emerald-100', color: 'text-emerald-700', border: 'border-emerald-200' },
-    down: { icon: TrendingDown, text: `-${analysis.trendPercentage.toFixed(0)}%`, bg: 'bg-red-100', color: 'text-red-700', border: 'border-red-200' },
+    up: { icon: TrendingUp, text: `+${analysis.trendPercentage.toFixed(0)}%`, bg: 'bg-emerald-100', color: 'text-theme-text-primary', border: 'border-emerald-200' },
+    down: { icon: TrendingDown, text: `-${analysis.trendPercentage.toFixed(0)}%`, bg: 'bg-red-100', color: 'text-theme-text-primary', border: 'border-red-200' },
     stable: { icon: Minus, text: 'Stable', bg: 'bg-theme-surface-selected', color: 'text-theme-primary-600', border: 'border-theme-neutral-300' },
   };
   const tc = trendConfig[analysis.trend];
