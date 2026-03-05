@@ -2,6 +2,7 @@ import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { OccurrenceDecision, useOccurrencePrompt } from '@/contexts/tasks-occurrence-prompt-context'
 import { useDataCache } from './use-data-cache'
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 
 // Types now live in @/types/tasks — re-exported for backward compatibility
 export type { RepeatRule, RepeatOption, KanbanStatus, TaskDue, Task, TaskOccurrenceException } from '@/types/tasks'
@@ -23,8 +24,6 @@ const ensureTaskSource = (task: Task, fallback?: Task['source']): Task => {
 const ensureTasksSource = (tasks: Task[] | null | undefined, fallback?: Task['source']): Task[] =>
   (tasks || []).map(task => ensureTaskSource(task, fallback))
 
-const EXTERNAL_FETCH_TIMEOUT_MS = 4500
-
 const isAbortLikeError = (error: unknown): boolean => {
   if (error instanceof DOMException && error.name === 'AbortError') return true
   if (error instanceof Error) {
@@ -38,22 +37,6 @@ const isNetworkFetchError = (error: unknown): boolean => {
   return error instanceof TypeError && error.message.includes('Failed to fetch')
 }
 
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-  timeoutMs = EXTERNAL_FETCH_TIMEOUT_MS
-) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-    })
-  } finally {
-    clearTimeout(timeout)
-  }
-}
 
 interface TaskUpdate {
   taskId: string
