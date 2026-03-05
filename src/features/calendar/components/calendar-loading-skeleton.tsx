@@ -107,6 +107,38 @@ export function HourlyPlannerSkeleton() {
   )
 }
 
+export function AgendaSkeleton() {
+  return (
+    <div className="space-y-6 p-4">
+      {[...Array(5)].map((_, dayIndex) => (
+        <div key={dayIndex} className="space-y-2">
+          {/* Day header */}
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 bg-theme-skeleton rounded-full animate-pulse" />
+            <div className="h-4 w-24 bg-theme-skeleton rounded animate-pulse" />
+            <div className="flex-1 h-px bg-theme-neutral-300" />
+          </div>
+          {/* Event cards */}
+          {[1, 2].map((i) => (
+            <div key={i} className="ml-12 rounded-lg border border-theme-neutral-300 p-3 animate-pulse">
+              <div className="flex items-start gap-3">
+                <div className="w-1 h-10 bg-theme-skeleton rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-theme-skeleton rounded" style={{ width: `${55 + i * 15}%` }} />
+                  <div className="flex gap-2">
+                    <div className="h-3 w-16 bg-theme-progress-track rounded" />
+                    <div className="h-3 w-12 bg-theme-progress-track rounded" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function CalendarHeaderSkeleton() {
   return (
     <div className="flex items-center justify-between p-4 border-b">

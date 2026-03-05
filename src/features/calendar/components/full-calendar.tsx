@@ -22,7 +22,7 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
+import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical, MoreHorizontal } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
@@ -40,7 +40,7 @@ import {
   computeStickerPalettePosition as computeStickerPos,
 } from "@/features/calendar/components/calendar-stickers";
 
-type CalendarView = 'month' | 'week' | 'day';
+type CalendarView = 'month' | 'week' | 'day' | 'agenda';
 
 const REPEAT_LABELS: Record<Exclude<RepeatOption, 'none'>, string> = {
   daily: 'Every day',
@@ -235,7 +235,7 @@ function buildDayMatrix(currentDate: Date) {
 }
 
 interface DayEvent {
-  source: 'google' | 'todoist' | 'lifeboard' | 'uploaded';
+  source: 'google' | 'todoist' | 'lifeboard' | 'uploaded' | 'cycle';
   title: string;
   time?: string;
   allDay?: boolean;
@@ -289,6 +289,126 @@ interface CalendarTaskMovedDetail {
   allDay?: boolean;
   duration?: number;
   repeatRule?: RepeatOption | null;
+}
+
+/* ─── Mobile Sub-components ─── */
+
+function MobileViewDropdown({ currentView, onViewChange }: { currentView: CalendarView; onViewChange: (v: CalendarView) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const viewOptions: { value: CalendarView; label: string }[] = [
+    { value: 'agenda', label: 'Agenda' },
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Week' },
+    { value: 'month', label: 'Month' },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 px-2 py-1 rounded-md border border-theme-neutral-300 text-[11px] font-medium text-theme-text-secondary"
+      >
+        {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+        <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg py-1">
+          {viewOptions.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onViewChange(opt.value); setOpen(false); }}
+              className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                currentView === opt.value
+                  ? 'bg-theme-brand-tint-light text-theme-primary font-medium'
+                  : 'text-theme-text-secondary active:bg-theme-surface-alt'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileOverflowMenu({
+  onUpload,
+  showFilter,
+  isFilterOpen,
+  onFilterToggle,
+  filterDisplayText,
+  selectedBucketFilters,
+  toggleBucketFilter,
+  filterableBuckets,
+  hasGoogleEvents,
+  hasUploadedEvents,
+}: {
+  onUpload: () => void;
+  showFilter: boolean;
+  isFilterOpen: boolean;
+  onFilterToggle: () => void;
+  filterDisplayText: string;
+  selectedBucketFilters: string[];
+  toggleBucketFilter: (bucket: string) => void;
+  filterableBuckets: string[];
+  hasGoogleEvents: boolean;
+  hasUploadedEvents: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(!open)} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="More options">
+        <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg py-1">
+          <button type="button" onClick={() => { onUpload(); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-theme-text-secondary active:bg-theme-surface-alt">
+            <Upload className="h-3.5 w-3.5" /> Upload Calendar
+          </button>
+          {showFilter && (
+            <>
+              <div className="border-t border-theme-neutral-300/40 my-1" />
+              <div className="px-3 py-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-theme-text-quaternary mb-1">Filter</p>
+                <label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">All Categories</span></label>
+                {filterableBuckets.map((bucket) => (<label key={bucket} className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">{bucket}</span></label>))}
+                {filterableBuckets.length > 0 && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Unassigned</span></label>)}
+                {hasGoogleEvents && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('google')} onChange={() => toggleBucketFilter('google')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Google Calendar</span></label>)}
+                {hasUploadedEvents && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('uploaded')} onChange={() => toggleBucketFilter('uploaded')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Uploaded Calendar</span></label>)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface FullCalendarProps {
@@ -453,7 +573,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<CalendarView>(() => {
     if (typeof window !== 'undefined') {
       const savedView = localStorage.getItem('calendar-view');
-      if (savedView && ['month', 'week', 'day'].includes(savedView)) {
+      if (savedView && ['month', 'week', 'day', 'agenda'].includes(savedView)) {
         return savedView as CalendarView;
       }
     }
@@ -962,6 +1082,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
           return addWeeks(currentDate, 1);
         case 'day':
           return addDays(currentDate, 1);
+        case 'agenda':
+          return addDays(currentDate, 7);
         default:
           return currentDate;
       }
@@ -978,6 +1100,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
           return addWeeks(currentDate, -1);
         case 'day':
           return addDays(currentDate, -1);
+        case 'agenda':
+          return addDays(currentDate, -7);
         default:
           return currentDate;
       }
@@ -1062,6 +1186,12 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
         return;
       }
 
+      if (lower === '4') {
+        event.preventDefault();
+        handleViewChange('agenda');
+        return;
+      }
+
       if (lower === '?') {
         event.preventDefault();
         setShowKeyboardHelp((prev) => !prev);
@@ -1099,6 +1229,11 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
         return {
           start: startOfDay(currentDate),
           end: endOfDay(currentDate)
+        };
+      case 'agenda':
+        return {
+          start: startOfDay(currentDate),
+          end: endOfDay(addDays(currentDate, 13))
         };
       default:
         return {
@@ -1183,6 +1318,28 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
 
   const uploadedEvents = useMemo(() => (Array.isArray(uploadedEventsRaw) ? uploadedEventsRaw : []), [uploadedEventsRaw]);
 
+  // Fetch cycle tracking entries for calendar display
+  const cycleCacheKey = `cycle-tracking-calendar`;
+  const cycleEntriesFetcher = useCallback(async () => {
+    try {
+      const resp = await fetchWithTimeout('/api/widgets/cycle-tracking?limit=90', { cache: 'no-store' });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      return Array.isArray(data?.entries) ? data.entries : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const {
+    data: cycleEntriesRaw,
+  } = useDataCache<any[] | null>(cycleCacheKey, cycleEntriesFetcher, {
+    ttl: 5 * 60 * 1000,
+    prefetch: false,
+  });
+
+  const cycleEntries = useMemo(() => (Array.isArray(cycleEntriesRaw) ? cycleEntriesRaw : []), [cycleEntriesRaw]);
+
   const rows = useMemo(() => {
     switch (view) {
       case 'month':
@@ -1191,6 +1348,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
         return buildWeekMatrix(currentDate);
       case 'day':
         return buildDayMatrix(currentDate);
+      case 'agenda':
+        return []; // Agenda uses agendaDays memo instead
       default:
         return buildMonthMatrix(currentDate);
     }
@@ -1207,6 +1366,8 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       }
       case 'day':
         return format(currentDate, "EEEE, MMMM d, yyyy");
+      case 'agenda':
+        return format(currentDate, "MMMM yyyy");
       default:
         return format(currentDate, "MMMM yyyy");
     }
@@ -1459,6 +1620,25 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
       }
     });
 
+    // Add cycle tracking entries as all-day events
+    cycleEntries.forEach((entry: any) => {
+      const dateStr = typeof entry.date === 'string' ? entry.date.slice(0, 10) : undefined;
+      if (!dateStr) return;
+      const flow = entry.flow_intensity || 'none';
+      if (flow === 'none') return; // Only show flow days on calendar
+      const flowLabel = flow.charAt(0).toUpperCase() + flow.slice(1);
+      const symptoms: string[] = Array.isArray(entry.symptoms) ? entry.symptoms : [];
+      const title = entry.period_start
+        ? `Period Start \u2014 ${flowLabel} flow`
+        : `${flowLabel} flow${symptoms.length ? ' \u00B7 ' + symptoms.slice(0, 2).join(', ') : ''}`;
+      const bucket = map[dateStr] ?? (map[dateStr] = []);
+      bucket.push({
+        source: 'cycle',
+        title,
+        allDay: true,
+      });
+    });
+
     // Single-pass: build all lifeboard events at once instead of per-date
     const lifeboardMap = buildAllLifeboardEvents(
       startOfDay(new Date(rangeStartMs)),
@@ -1506,6 +1686,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
   }, [
     googleEvents,
     uploadedEvents,
+    cycleEntries,
     rangeStartMs,
     rangeEndMs,
     buildAllLifeboardEvents,
@@ -1545,6 +1726,16 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
     mq.addListener(update);
     return () => mq.removeListener(update);
   }, []);
+
+  // Auto-switch to agenda view on mobile, day view on desktop
+  useEffect(() => {
+    if (isCompactBreakpoint && view !== 'agenda') {
+      handleViewChange('agenda');
+    } else if (!isCompactBreakpoint && view === 'agenda') {
+      handleViewChange('day');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompactBreakpoint]);
 
   // Calculate dynamic max visible events based on event complexity
   const getMaxVisibleEvents = useCallback((dayEvents: DayEvent[]) => {
@@ -1602,6 +1793,19 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
     });
   }, []);
 
+  // Compute agenda view data (14 days of events)
+  const agendaDays = useMemo(() => {
+    if (view !== 'agenda') return [];
+    const days: { date: Date; dateStr: string; events: DayEvent[]; isToday: boolean }[] = [];
+    for (let i = 0; i < 14; i++) {
+      const date = addDays(currentDate, i);
+      const dateStr = toDayKey(date);
+      const events = sortEventsForDisplay(eventsByDate[dateStr] ?? []);
+      days.push({ date, dateStr, events, isToday: isSameDay(date, today) });
+    }
+    return days;
+  }, [view, currentDate, eventsByDate, sortEventsForDisplay, today]);
+
   const getEventsForDisplay = useCallback((dayEvents: DayEvent[]) => {
     const sortedEvents = sortEventsForDisplay(dayEvents);
     if (view === 'week') {
@@ -1649,6 +1853,13 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
             dot: 'bg-purple-400',
             badge: 'text-purple-500'
           };
+        case 'cycle':
+          return {
+            container: 'border border-pink-200 bg-pink-50/90 text-pink-900 shadow-sm hover:bg-pink-100',
+            time: 'text-pink-500',
+            dot: 'bg-pink-400',
+            badge: 'text-pink-600'
+          };
         case 'lifeboard':
           return getBucketEventStyles(ev?.bucket, bucketColors);
         default:
@@ -1667,12 +1878,31 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="w-full max-w-none bg-white border border-theme-neutral-300/80 rounded-xl shadow-warm-sm overflow-hidden h-full flex flex-col">
-      {/* Calidora-style Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-3 border-b border-theme-neutral-300/60">
-        <h3 className="section-label-sm">
-          {headerTitle}
-        </h3>
-        <div className="flex items-center gap-2 sm:gap-3">
+      {/* Calendar Header */}
+      {isCompactBreakpoint ? (
+        /* ─── MOBILE HEADER ─── */
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-theme-neutral-300/60">
+          <h3 className="text-base font-semibold text-theme-text-primary truncate">
+            {format(currentDate, "MMMM yyyy")}
+          </h3>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => handleDateChange(new Date())} disabled={isOnToday}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${isOnToday ? 'bg-theme-surface-alt text-theme-text-quaternary' : 'bg-theme-primary text-white active:bg-[#a8896a]'}`}>Today</button>
+            <MobileViewDropdown currentView={view} onViewChange={handleViewChange} />
+            <button type="button" onClick={prevPeriod} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="Previous">
+              <svg className="h-4 w-4 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <button type="button" onClick={nextPeriod} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="Next">
+              <svg className="h-4 w-4 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
+            <MobileOverflowMenu onUpload={() => setIsUploadModalOpen(true)} showFilter={showFilterControls} isFilterOpen={isFilterDropdownOpen} onFilterToggle={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)} filterDisplayText={getFilterDisplayText()} selectedBucketFilters={selectedBucketFilters} toggleBucketFilter={toggleBucketFilter} filterableBuckets={filterableBuckets} hasGoogleEvents={googleEvents.length > 0} hasUploadedEvents={uploadedEvents.length > 0} />
+          </div>
+        </div>
+      ) : (
+        /* ─── DESKTOP HEADER ─── */
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-theme-neutral-300/60">
+          <h3 className="section-label-sm">{headerTitle}</h3>
+          <div className="flex items-center gap-3">
           {/* View Mode Toggle */}
           <div className="flex items-center rounded-lg border border-theme-neutral-300 overflow-hidden">
             {(['month', 'week', 'day'] as CalendarView[]).map((viewOption) => (
@@ -1790,9 +2020,105 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
           )}
         </div>
       </div>
+      )}
 
       {/* Calendar Grid */}
-      {view === 'day' ? (
+      {view === 'agenda' ? (
+        // Agenda view: Mobile-optimized scrollable list
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-3 py-2">
+            {agendaDays.map(({ date, dateStr, events, isToday }) => (
+              <div key={dateStr}>
+                {/* Day header */}
+                <div className="flex items-center gap-3 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                  <div className={`flex flex-col items-center w-11 shrink-0 ${isToday ? 'text-red-500' : 'text-theme-text-tertiary'}`}>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
+                    <span className={`text-lg font-bold leading-none mt-0.5 ${
+                      isToday ? 'bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center' : ''
+                    }`}>{format(date, 'd')}</span>
+                  </div>
+                  <div className="flex-1 border-t border-theme-neutral-300/40" />
+                </div>
+
+                {/* Now indicator for today */}
+                {isToday && (
+                  <div className="ml-11 pl-3 mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                      <div className="flex-1 h-px bg-red-500" />
+                      <span className="text-[10px] font-medium text-red-500 tabular-nums">{format(new Date(), 'h:mm a')}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Event cards */}
+                <div className="ml-11 pl-3 space-y-1.5 pb-2">
+                  {events.length === 0 ? (
+                    <p className="text-xs text-theme-text-quaternary italic py-2">No events scheduled</p>
+                  ) : (
+                    events.map((ev, idx) => {
+                      const styles = resolveEventStyles(ev.source, ev);
+                      const bucketColor = ev.bucket ? getBucketColorSync(normalizeBucketId(ev.bucket), bucketColors) : null;
+                      const timeStr = ev.time && !ev.allDay
+                        ? (() => { try { return format(new Date(ev.time), 'h:mm a'); } catch { return null; } })()
+                        : ev.allDay ? 'All day' : null;
+                      const durationStr = ev.duration ? `${ev.duration}m` : null;
+
+                      return (
+                        <button
+                          key={`${ev.taskId || ev.eventId || idx}-${dateStr}`}
+                          type="button"
+                          onClick={() => openCalendarEvent(ev, dateStr)}
+                          className="w-full text-left flex items-start gap-3 rounded-xl px-3 py-2.5 bg-white border border-theme-neutral-300/40 shadow-sm transition-all active:scale-[0.98]"
+                          style={bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-theme-text-primary truncate">{ev.title}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {timeStr && (
+                                <span className="text-[11px] text-theme-text-tertiary font-medium tabular-nums">{timeStr}</span>
+                              )}
+                              {durationStr && (
+                                <span className="text-[11px] text-theme-text-quaternary">{durationStr}</span>
+                              )}
+                              {ev.location && (
+                                <span className="text-[11px] text-theme-text-quaternary truncate max-w-[140px]">{ev.location}</span>
+                              )}
+                              {ev.bucket && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                  style={bucketColor ? { backgroundColor: bucketColor + '18', color: bucketColor } : {}}>
+                                  {ev.bucket}
+                                </span>
+                              )}
+                              {ev.repeatRule && ev.repeatRule !== 'none' && (
+                                <span className="text-[10px] text-theme-text-quaternary">{getRepeatLabel(ev.repeatRule)}</span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${styles.dot}`}
+                            style={styles.customColor ? { backgroundColor: styles.customColor } : {}} />
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))}
+            {/* Bottom spacer */}
+            <div className="h-20" />
+          </div>
+
+          {/* FAB - Add task */}
+          <button
+            type="button"
+            onClick={() => taskEditorRef.current?.openNew(format(new Date(), 'yyyy-MM-dd'))}
+            className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-theme-primary text-white shadow-warm-lg flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="Add task"
+          >
+            <Plus size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+      ) : view === 'day' ? (
         // Day view: Enhanced Calidora-style
         <div className="w-full flex-1 flex flex-col">
           <div className="bg-theme-surface-base overflow-hidden flex-1 flex flex-col">
@@ -2155,7 +2481,7 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
                 // Month view: Calidora-style grid
                 <div className="flex-1 flex flex-col">
                   {weekdayHeader}
-                  <div className="grid auto-rows-[minmax(120px,_1fr)] grid-cols-7 flex-1">
+                  <div className={`grid grid-cols-7 flex-1 ${isCompactBreakpoint ? 'auto-rows-[minmax(52px,_1fr)]' : 'auto-rows-[minmax(120px,_1fr)]'}`}>
               {rows.flat().map((day: Date, idx: number) => {
                 const dayStr = toDayKey(day);
                 const dayEvents = eventsByDate[dayStr] ?? [];
@@ -2186,6 +2512,45 @@ const stickerPaletteRef = useRef<HTMLDivElement | null>(null);
 
                       const displayEvents = getEventsForDisplay(dayEvents);
                       const filteredEvents = displayEvents;
+
+                      if (isCompactBreakpoint) {
+                        // MOBILE: Compact cell with dots
+                        return (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`h-full border-theme-neutral-300/50 ${borderClasses}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => { handleDateChange(day); handleViewChange('day'); }}
+                              className={`w-full h-full p-1 flex flex-col items-center justify-start transition-colors ${
+                                snapshot.isDraggingOver ? 'bg-theme-brand-tint-light'
+                                : isCurrentMonth ? 'bg-white' : 'bg-[rgba(252,250,248,0.3)]'
+                              }`}
+                            >
+                              <span className={`text-xs w-7 h-7 flex items-center justify-center rounded-full ${
+                                isToday ? 'bg-theme-primary text-white font-semibold'
+                                : isCurrentMonth ? 'text-theme-text-secondary' : 'text-theme-text-quaternary'
+                              }`}>
+                                {format(day, 'd')}
+                              </span>
+                              {isCurrentMonth && dayEvents.length > 0 && (
+                                <div className="flex items-center gap-[3px] mt-1">
+                                  {dayEvents.slice(0, 3).map((ev, i) => {
+                                    const dotStyles = resolveEventStyles(ev.source, ev);
+                                    return (
+                                      <span key={i} className={`w-[5px] h-[5px] rounded-full ${dotStyles.dot}`}
+                                        style={dotStyles.customColor ? { backgroundColor: dotStyles.customColor } : {}} />
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </button>
+                            {provided.placeholder}
+                          </div>
+                        );
+                      }
 
                       return (
                         <div

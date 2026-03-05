@@ -43,6 +43,7 @@ import {
   TrendingUp,
   Home as HomeIcon,
   Flag,
+  CalendarHeart,
 } from "lucide-react";
 
 export const widgetTemplates: WidgetTemplate[] = [
@@ -298,6 +299,17 @@ export const widgetTemplates: WidgetTemplate[] = [
     defaultTarget: 1,
     unit: "day",
     units: ["day"]
+  },
+  {
+    id: "cycle_tracking",
+    name: "Cycle Tracker",
+    description: "Track your menstrual cycle, symptoms, and predictions",
+    icon: CalendarHeart,
+    category: "medical",
+    color: "pink",
+    defaultTarget: 1,
+    unit: "entry",
+    units: ["entry"],
   },
   {
     id: "symptom_log",

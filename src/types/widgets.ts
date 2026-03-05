@@ -234,6 +234,22 @@ export interface WidgetInstance extends WidgetTemplate {
     totalChange?: number;        // total weight change from starting weight
     goalProgress?: number;       // percentage toward goal (0-100)
   };
+  // Cycle tracking data
+  cycleData?: {
+    entries: Array<{
+      date: string              // YYYY-MM-DD
+      flowIntensity: 'none' | 'light' | 'medium' | 'heavy'
+      symptoms: string[]        // cramps, headache, bloating, fatigue, etc.
+      mood: number              // 1-5
+      notes?: string
+      periodStart?: boolean
+      loggedAt: string          // ISO timestamp
+    }>
+    averageCycleLength?: number
+    lastPeriodStart?: string    // YYYY-MM-DD
+    currentStreak?: number
+    bestStreak?: number
+  }
   // Home Projects data
   homeProjectsData?: {
     projects?: Array<{

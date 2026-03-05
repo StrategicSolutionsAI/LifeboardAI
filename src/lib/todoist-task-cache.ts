@@ -69,3 +69,9 @@ export function invalidateTodoistTaskCache(userId: string) {
   cacheStore.delete(key)
   pendingStore.delete(key)
 }
+
+/** Clear all Todoist caches for every user (call on sign-out). */
+export function clearAllTodoistCaches() {
+  cacheStore.clear()
+  pendingStore.clear()
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, lazy, Suspense, useMemo } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
@@ -56,6 +56,17 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   const { batchUpdateTasks, allTasks, loading } = useTasksContext();
   const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   const loadTime = useComponentLoadTime('CalendarContent');
+
+  // Hide sidebar on mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 640px)');
+    const update = (e: MediaQueryListEvent | MediaQueryList) => setIsMobile(e.matches);
+    update(mq);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const handleDateChange = (newDate: Date) => {
     onDateChange(newDate);
@@ -593,30 +604,31 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           </Suspense>
         </div>
         
-        {/* Task list sidebar with Suspense */}
-        <div
-          className={`flex-shrink-0 w-full transition-[width] duration-300 ease-in-out ${
-            isSidebarCollapsed ? 'lg:w-[64px]' : 'lg:w-[360px]'
-          }`}
-        >
-          <Suspense fallback={<TaskListLoading />}>
-            <CalendarTaskList
-              selectedDate={selectedDate}
-              onDateChange={handleDateChange}
-              availableBuckets={buckets}
-              selectedBucket={activeBucket}
-              isDragging={isDragging}
-              disableInternalDragDrop={true}
-              onCollapsedChange={setIsSidebarCollapsed}
-              onTaskClick={(taskId, dateStr) => {
-                // Dispatch custom event to notify the calendar to open the task modal
-                window.dispatchEvent(new CustomEvent('lifeboard:task-click', {
-                  detail: { taskId, dateStr }
-                }));
-              }}
-            />
-          </Suspense>
-        </div>
+        {/* Task list sidebar — hidden on mobile where agenda view shows events inline */}
+        {!isMobile && (
+          <div
+            className={`flex-shrink-0 w-full transition-[width] duration-300 ease-in-out ${
+              isSidebarCollapsed ? 'lg:w-[64px]' : 'lg:w-[360px]'
+            }`}
+          >
+            <Suspense fallback={<TaskListLoading />}>
+              <CalendarTaskList
+                selectedDate={selectedDate}
+                onDateChange={handleDateChange}
+                availableBuckets={buckets}
+                selectedBucket={activeBucket}
+                isDragging={isDragging}
+                disableInternalDragDrop={true}
+                onCollapsedChange={setIsSidebarCollapsed}
+                onTaskClick={(taskId, dateStr) => {
+                  window.dispatchEvent(new CustomEvent('lifeboard:task-click', {
+                    detail: { taskId, dateStr }
+                  }));
+                }}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
     </DragDropContext>
   );

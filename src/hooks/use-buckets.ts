@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getUserPreferencesClient } from '@/lib/user-preferences';
 
-const DEFAULT_BUCKETS = ['Health', 'Work', 'Personal', 'Finance'];
 const BUCKETS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 interface BucketSnapshot {
@@ -23,11 +22,7 @@ function normalizeBuckets(values: unknown): string[] {
 
 function readLocalSnapshot(): BucketSnapshot {
   if (typeof window === 'undefined') {
-    return {
-      buckets: DEFAULT_BUCKETS,
-      activeBucket: DEFAULT_BUCKETS[0],
-      timestamp: Date.now(),
-    };
+    return { buckets: [], activeBucket: '', timestamp: Date.now() };
   }
 
   let parsedRaw: unknown = [];
@@ -36,12 +31,11 @@ function readLocalSnapshot(): BucketSnapshot {
   } catch (error) {
     parsedRaw = [];
   }
-  const parsedBuckets = normalizeBuckets(parsedRaw);
-  const buckets = parsedBuckets.length > 0 ? parsedBuckets : DEFAULT_BUCKETS;
+  const buckets = normalizeBuckets(parsedRaw);
   const storedActive = localStorage.getItem('active_bucket');
   const activeBucket = storedActive && buckets.includes(storedActive)
     ? storedActive
-    : buckets[0];
+    : buckets[0] ?? '';
 
   return { buckets, activeBucket, timestamp: Date.now() };
 }
@@ -94,8 +88,8 @@ async function fetchBucketsSnapshot(force = false): Promise<BucketSnapshot> {
         : mergedBuckets[0];
 
       const nextSnapshot: BucketSnapshot = {
-        buckets: mergedBuckets.length > 0 ? mergedBuckets : DEFAULT_BUCKETS,
-        activeBucket: activeBucket || DEFAULT_BUCKETS[0],
+        buckets: mergedBuckets,
+        activeBucket: activeBucket ?? '',
         timestamp: Date.now(),
       };
 
@@ -112,6 +106,12 @@ async function fetchBucketsSnapshot(force = false): Promise<BucketSnapshot> {
   })();
 
   return inFlightBucketsRequest;
+}
+
+/** Clear the module-level buckets snapshot (call on sign-out). */
+export function invalidateBucketsCache() {
+  bucketsSnapshot = null
+  inFlightBucketsRequest = null
 }
 
 export function useBuckets() {

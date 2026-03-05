@@ -51,17 +51,12 @@ export function WithingsWeightWidget({
     weightData,
     loading,
     error,
-    lastFetchTime,
     isPolling,
-    startPolling,
-    stopPolling,
     refreshNow,
     isConnected,
     hasData,
-    nextFetchIn
   } = useWithingsWeight({
     pollingInterval: 5 * 60 * 1000, // 5 minutes
-    autoStart: true,
     onNewData: (data) => {
       // Notify parent component of weight update
       const weight = unit === 'kg' ? data.weightKg : data.weightLbs
@@ -236,19 +231,11 @@ export function WithingsWeightWidget({
                 <div className="absolute inset-0 bg-red-500/10" />
               )}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={isPolling ? stopPolling : startPolling}
-              className="text-xs"
-            >
-              {isPolling ? 'Stop' : 'Start'} Auto-Update
-            </Button>
           </div>
-          
-          {lastFetchTime && (
+
+          {weightData?.lastUpdated && (
             <div className="text-xs text-theme-text-tertiary text-center">
-              Last updated: {lastFetchTime.toLocaleTimeString()}
+              Last updated: {new Date(weightData.lastUpdated).toLocaleTimeString()}
             </div>
           )}
         </div>

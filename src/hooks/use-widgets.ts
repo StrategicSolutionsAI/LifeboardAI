@@ -161,23 +161,21 @@ export function useWidgets() {
     debouncedSave()
   }, [debouncedSave])
   
-  // Remove widget
+  // Remove widget — saves immediately (not debounced) to prevent data loss on navigation/logout
   const removeWidget = useCallback((bucket: string, widgetId: string) => {
-    setWidgetsByBucket(prev => {
-      const updated = { ...prev }
-      updated[bucket] = (updated[bucket] || []).filter(w => w.instanceId !== widgetId)
-      return updated
-    })
-    
-    // Also remove progress data
-    setProgressByWidget(prev => {
-      const updated = { ...prev }
-      delete updated[widgetId]
-      return updated
-    })
-    
-    debouncedSave()
-  }, [debouncedSave])
+    // Compute next state from refs so we can save immediately
+    const nextWidgets = { ...widgetsByBucketRef.current }
+    nextWidgets[bucket] = (nextWidgets[bucket] || []).filter(w => w.instanceId !== widgetId)
+
+    const nextProgress = { ...progressByWidgetRef.current }
+    delete nextProgress[widgetId]
+
+    setWidgetsByBucket(nextWidgets)
+    setProgressByWidget(nextProgress)
+
+    // Save immediately — don't debounce destructive operations
+    saveWidgets(nextWidgets, nextProgress)
+  }, [saveWidgets])
   
   // Update widget
   const updateWidget = useCallback((bucket: string, widgetId: string, updates: Partial<WidgetInstance>) => {

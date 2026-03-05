@@ -131,8 +131,8 @@ async function handler(request: Request) {
       weightKg
     })
     
-    return NextResponse.json({ weightKg })
-    
+    return NextResponse.json({ weightKg }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } })
+
   } catch (error) {
     // Handle token errors with automatic refresh
     if (error instanceof Error && error.message === 'INVALID_TOKEN') {
@@ -158,8 +158,8 @@ async function handler(request: Request) {
             weightKg
           })
           
-          return NextResponse.json({ weightKg })
-          
+          return NextResponse.json({ weightKg }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } })
+
         } catch (retryError) {
           requestLogger.error('Failed to fetch metrics even after token refresh', {
             integrationId: integration.id

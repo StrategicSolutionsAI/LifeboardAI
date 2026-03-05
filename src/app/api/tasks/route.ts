@@ -58,7 +58,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
       return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
     });
 
-  return NextResponse.json({ tasks });
+  return NextResponse.json({ tasks }, { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' } });
 }, 'GET /api/tasks');
 
 export const POST = withAuthAndBody(createTaskSchema, async (req, { supabase, user, body }) => {

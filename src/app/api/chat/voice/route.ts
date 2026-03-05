@@ -8,13 +8,17 @@ import { chatLimiter, getRateLimitKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 120
 
-function getOpenAI() {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('Missing OPENAI_API_KEY')
+// Module-level singleton — reused across warm invocations
+let _openai: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) throw new Error('Missing OPENAI_API_KEY')
+    _openai = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 })
   }
-  return new OpenAI({ apiKey })
+  return _openai
 }
 
 export async function POST(req: NextRequest) {

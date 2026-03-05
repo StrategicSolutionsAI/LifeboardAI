@@ -48,6 +48,12 @@ export function prefetchGreetingName(): void {
   })()
 }
 
+/** Invalidate the greeting name cache (call on sign-out). */
+export function invalidateGreetingNameCache() {
+  _greetingNameCache = null
+  _greetingNamePromise = null
+}
+
 /**
  * Get the prefetched greeting name. Returns immediately if cached,
  * or awaits the in-flight promise if prefetch was already started.

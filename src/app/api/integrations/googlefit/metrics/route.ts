@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
   try {
     // Use the improved retry mechanism for better data accuracy
     const steps = await fetchGoogleFitStepsWithRetry(accessToken, dateStr)
-    return NextResponse.json({ steps })
+    return NextResponse.json({ steps }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } })
   } catch (e) {
     console.error('Google Fit steps fetch failed', e)
     const errMessage = e instanceof Error ? e.message : String(e)

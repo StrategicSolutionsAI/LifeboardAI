@@ -8,6 +8,10 @@ interface CacheOptions {
   ttl?: number
   prefetch?: boolean
   optimisticUpdate?: boolean
+  /** React Query refetchInterval — automatic refetch on a timer */
+  refetchInterval?: number | false
+  /** React Query refetchOnWindowFocus — refetch when the browser tab regains focus */
+  refetchOnWindowFocus?: boolean
 }
 
 // ── Global invalidation (callable outside React) ────────────────────────
@@ -111,7 +115,7 @@ export function useGlobalCache<T>(
   fetcher: () => Promise<T>,
   options: CacheOptions = {},
 ) {
-  const { ttl = DEFAULT_TTL } = options
+  const { ttl = DEFAULT_TTL, refetchInterval, refetchOnWindowFocus } = options
   const queryClient = useQueryClient()
 
   const { data, isLoading, error, refetch } = useQuery<T>({
@@ -119,6 +123,8 @@ export function useGlobalCache<T>(
     queryFn: fetcher,
     staleTime: ttl,
     gcTime: ttl * 2,
+    ...(refetchInterval !== undefined && { refetchInterval }),
+    ...(refetchOnWindowFocus !== undefined && { refetchOnWindowFocus }),
   })
 
   const invalidate = useCallback(() => {

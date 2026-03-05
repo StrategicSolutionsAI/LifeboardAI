@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import type { Bucket as BoardBucket, Task as BoardTask } from "@/features/tasks/components/TasksBoard";
-import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import type { ListTask } from "@/features/tasks/components/task-list-view";
 import type { KanbanTask } from "@/features/tasks/components/task-kanban-board";
 import type { KanbanStatus } from "@/types/tasks";
@@ -66,9 +66,6 @@ const TaskKanbanBoard = dynamic(
   }
 );
 
-const TaskEditorModal = dynamic(() => import("@/features/tasks/components/task-editor-modal"), {
-  ssr: false,
-});
 
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
 

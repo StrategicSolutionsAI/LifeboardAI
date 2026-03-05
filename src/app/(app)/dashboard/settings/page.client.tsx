@@ -448,7 +448,7 @@ export default function SettingsPageClient() {
               </div>
 
               <div className="space-y-2">
-                {(userPreferences?.life_buckets || ['Health', 'Work', 'Personal', 'Finance']).map((bucket) => (
+                {(userPreferences?.life_buckets || []).map((bucket) => (
                   <div key={bucket} className="flex items-center justify-between p-3 bg-theme-surface-alt rounded-lg">
                     <div className="flex items-center gap-3">
                       <div

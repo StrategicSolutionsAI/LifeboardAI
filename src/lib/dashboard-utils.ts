@@ -60,6 +60,7 @@ import {
   Hammer,
   Brush,
   CalendarDays,
+  CalendarHeart,
 } from "lucide-react";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import { widgetTemplates } from "@/lib/widget-templates";
@@ -160,6 +161,7 @@ export const iconMap: Record<string, LucideIcon> = {
   medication: Pill,
   quit_habit: ShieldOff,
   habit_tracker: Target,
+  cycle_tracking: CalendarHeart,
   symptom_log: ClipboardList,
   medical_bills: DollarSign,
   home_projects: Hammer,

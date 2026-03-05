@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useGlobalCache } from './use-data-cache'
 
 interface WithingsWeightData {
@@ -10,7 +10,6 @@ interface WithingsWeightData {
 
 interface UseWithingsWeightOptions {
   pollingInterval?: number // in milliseconds, default 5 minutes
-  autoStart?: boolean // whether to start polling immediately
   onNewData?: (data: WithingsWeightData) => void // callback when new data arrives
 }
 
@@ -20,20 +19,16 @@ const CACHE_KEY = 'withings-weight-data'
 export function useWithingsWeight(options: UseWithingsWeightOptions = {}) {
   const {
     pollingInterval = DEFAULT_POLLING_INTERVAL,
-    autoStart = true,
     onNewData
   } = options
 
-  const [isPolling, setIsPolling] = useState(false)
-  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const previousDataRef = useRef<WithingsWeightData | null>(null)
 
   // Fetcher function for the cache
   const fetchWithingsWeight = useCallback(async (): Promise<WithingsWeightData> => {
     try {
       const response = await fetch('/api/integrations/withings/metrics')
-      
+
       if (!response.ok) {
         if (response.status === 429) {
           throw new Error('Rate limited - please try again later')
@@ -53,39 +48,34 @@ export function useWithingsWeight(options: UseWithingsWeightOptions = {}) {
 
       const data = await response.json()
       const weightKg = data.weightKg
-      const weightLbs = Math.round(weightKg * 2.20462 * 10) / 10 // Convert to lbs with 1 decimal
+      const weightLbs = Math.round(weightKg * 2.20462 * 10) / 10
 
       const result: WithingsWeightData = {
-        weightKg: Math.round(weightKg * 10) / 10, // Round to 1 decimal
+        weightKg: Math.round(weightKg * 10) / 10,
         weightLbs,
         lastUpdated: new Date().toISOString(),
       }
 
-      // Check if this is new data compared to previous fetch
-      if (previousDataRef.current && 
+      if (previousDataRef.current &&
           previousDataRef.current.weightKg !== result.weightKg) {
         onNewData?.(result)
       }
-      
+
       previousDataRef.current = result
-      setLastFetchTime(new Date())
-      
       return result
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      const result: WithingsWeightData = {
+      return {
         weightKg: 0,
         weightLbs: 0,
         lastUpdated: new Date().toISOString(),
         error: errorMessage
       }
-      
-      setLastFetchTime(new Date())
-      return result
     }
   }, [onNewData])
 
-  // Use the global cache for data management
+  // React Query handles staleness, refetchInterval, and refetchOnWindowFocus —
+  // no need for manual setInterval or focus/visibility event listeners.
   const {
     data: weightData,
     loading,
@@ -95,101 +85,27 @@ export function useWithingsWeight(options: UseWithingsWeightOptions = {}) {
   } = useGlobalCache<WithingsWeightData>(
     CACHE_KEY,
     fetchWithingsWeight,
-    { ttl: pollingInterval }
+    {
+      ttl: pollingInterval,
+      refetchInterval: pollingInterval,
+      refetchOnWindowFocus: true,
+    }
   )
-
-  // Start polling
-  const startPolling = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-
-    setIsPolling(true)
-    
-    // Fetch immediately
-    refetch()
-    
-    // Set up interval for subsequent fetches
-    intervalRef.current = setInterval(() => {
-      refetch()
-    }, pollingInterval)
-  }, [refetch, pollingInterval])
-
-  // Stop polling
-  const stopPolling = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-    setIsPolling(false)
-  }, [])
 
   // Manual refresh
   const refreshNow = useCallback(async () => {
-    invalidate() // Clear cache to force fresh fetch
+    invalidate()
     return refetch()
   }, [invalidate, refetch])
 
-  // Auto-start polling on mount if enabled
-  useEffect(() => {
-    if (autoStart) {
-      startPolling()
-    }
-
-    // Cleanup on unmount
-    return () => {
-      stopPolling()
-    }
-  }, [autoStart, startPolling, stopPolling])
-
-  // Check for new data when component becomes visible (Page Visibility API)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPolling) {
-        // Refresh data when page becomes visible
-        refreshNow()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [isPolling, refreshNow])
-
-  // Check for new data when window gains focus
-  useEffect(() => {
-    const handleFocus = () => {
-      if (isPolling) {
-        refreshNow()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    return () => {
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [isPolling, refreshNow])
-
   return {
-    // Data
     weightData,
     loading,
     error,
-    lastFetchTime,
-    
-    // Polling controls
-    isPolling,
-    startPolling,
-    stopPolling,
+    isPolling: true,
     refreshNow,
-    
-    // Utilities
     isConnected: !error && !weightData?.error,
     hasData: !!weightData && !weightData.error,
-    nextFetchIn: isPolling && lastFetchTime 
-      ? Math.max(0, pollingInterval - (Date.now() - lastFetchTime.getTime()))
-      : null
   }
 }
 

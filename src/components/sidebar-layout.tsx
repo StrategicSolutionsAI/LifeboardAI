@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/utils/supabase/client"
+import { clearAllUserCaches } from "@/lib/auth-cleanup"
 import { Button } from "@/components/ui/button"
 import { prefetchCalendarExperience } from "@/lib/prefetch-calendar"
 
@@ -123,6 +124,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   )
 
   async function handleSignOut() {
+    clearAllUserCaches()
     await supabase.auth.signOut()
     router.push("/")
   }

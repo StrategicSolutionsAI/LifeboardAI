@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { User } from "@supabase/supabase-js";
 
 import { supabase } from "@/utils/supabase/client";
-import { getUserPreferencesClient, updateUserPreferenceFields, getCachedUser, invalidateAuthCache } from "@/lib/user-preferences";
+import { getUserPreferencesClient, updateUserPreferenceFields, getCachedUser, invalidatePreferencesCache } from "@/lib/user-preferences";
+import { clearAllUserCaches, ensureCacheOwner } from "@/lib/auth-cleanup";
 import { useWeather } from "@/features/dashboard/hooks/use-weather";
 import { getPrefetchedGreetingName } from "@/lib/prefetch-user-prefs";
 import { WidgetModalsContainer } from "./WidgetModalsContainer";
@@ -91,6 +92,43 @@ const WidgetCardSkeleton = dynamic(
   { ssr: false }
 );
 
+
+// ── Module-scope constants (allocated once, never recreated per render) ───
+const MODAL_WIDGET_IDS = new Set([
+  'nutrition', 'medication', 'exercise', 'home_projects', 'habit_tracker',
+  'sleep', 'meditation', 'breathwork', 'water', 'mood', 'steps', 'heartrate', 'caffeine',
+  'cycle_tracking',
+]);
+
+const SUGGESTED_BUCKETS = [
+  'Health', 'Wellness', 'Family', 'Social', 'Work',
+  'Finance', 'Personal', 'Fitness', 'Projects', 'Home',
+] as const;
+
+const SUGGESTED_BUCKET_COLOR_MAP: Record<string, string> = {
+  health: '#48B882', wellness: '#5E9B8C', family: '#4AADE0',
+  social: '#D07AA4', work: '#B1916A', personal: '#8B7FD4',
+  projects: '#6B8AF7', home: '#5E9B8C', finance: '#C4A44E',
+  fitness: '#E28A5D',
+};
+
+function getSuggestedColorForBucket(name: string): string {
+  const key = name?.toLowerCase?.().trim() || '';
+  return SUGGESTED_BUCKET_COLOR_MAP[key] || '#B1916A';
+}
+
+function formatTimeUntilDue(days: number | null): string {
+  if (days === null) return '';
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Tomorrow';
+  if (days === -1) return 'Yesterday';
+  if (days < 0) return `${Math.abs(days)} days ago`;
+  if (days === 7) return '1 week';
+  if (days < 7) return `${days} days`;
+  if (days < 14) return `${days} days`;
+  if (days < 30) return `${Math.floor(days / 7)} weeks`;
+  return `${Math.floor(days / 30)} months`;
+}
 
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
@@ -183,73 +221,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     return bucketColors[bucket] || '#B1916A'
   }
 
-  // Suggested bucket presets for quick adding in the Manage Tabs sheet
-  const SUGGESTED_BUCKETS = [
-    'Health',
-    'Wellness',
-    'Family',
-    'Social',
-    'Work',
-    'Finance',
-    'Personal',
-    'Fitness',
-    'Projects',
-    'Home'
-  ] as const
-
-  // Recommended color per common bucket name (Calidora palette)
-  const SUGGESTED_BUCKET_COLOR_MAP: Record<string, string> = {
-    health: '#48B882',     // green (Calidora)
-    wellness: '#5E9B8C',   // teal (Calidora)
-    family: '#4AADE0',     // sky blue (Calidora)
-    social: '#D07AA4',     // rose (Calidora)
-    work: '#B1916A',       // warm brown (Calidora)
-    personal: '#8B7FD4',   // plum (Calidora)
-    projects: '#6B8AF7',   // blue (Calidora)
-    home: '#5E9B8C',       // teal (Calidora)
-    finance: '#C4A44E',    // golden (Calidora)
-    fitness: '#E28A5D',    // orange (Calidora)
-  }
-
-  function getSuggestedColorForBucket(name: string): string {
-    const key = name?.toLowerCase?.().trim() || ''
-    return SUGGESTED_BUCKET_COLOR_MAP[key] || '#B1916A'
-  }
-
   const suggestedToShow = useMemo(
     () => SUGGESTED_BUCKETS.filter((name) => !buckets.includes(name)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [buckets]
   )
-
-  // Preset color palette (hex) for bucket color selection (Calidora palette)
-  const BUCKET_COLOR_PALETTE = [
-    '#B1916A', // warm brown (Calidora)
-    '#6B8AF7', // blue (Calidora)
-    '#48B882', // green (Calidora)
-    '#D07AA4', // rose (Calidora)
-    '#4AADE0', // sky blue (Calidora)
-    '#C4A44E', // golden (Calidora)
-    '#8B7FD4', // plum (Calidora)
-    '#E28A5D', // orange (Calidora)
-    '#5E9B8C', // teal (Calidora)
-    '#bb9e7b', // sand (Calidora)
-    '#314158', // dark slate (Calidora)
-    '#8e99a8', // muted gray (Calidora)
-  ] as const
-
-  // Create lighter opaque colors by blending with white
-  const getLighterColor = (hex: string, amount: number) => {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-
-    // Blend with white (255, 255, 255)
-    const newR = Math.round(r + (255 - r) * amount)
-    const newG = Math.round(g + (255 - g) * amount)
-    const newB = Math.round(b + (255 - b) * amount)
-
-    return `rgb(${newR}, ${newG}, ${newB})`
-  }
 
   // Listen for bucket color changes
   useEffect(() => {
@@ -451,7 +427,50 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const [selectedLogsWidget, setSelectedLogsWidget] = useState<string | 'all'>('all');
   const [selectedSettingsWidget, setSelectedSettingsWidget] = useState<string | 'all'>('all');
   const activeWidgets = useMemo(() => getDisplayWidgets(activeBucket), [widgetsByBucket, activeBucket]);
-  const todayDateString = new Date().toISOString().slice(0, 10);
+
+  // ── R4: Single-pass progress stats memo (replaces 6 inline .filter() calls) ──
+  const widgetProgressStats = useMemo(() => {
+    let completed = 0;
+    let inProgress = 0;
+    let notStarted = 0;
+    activeWidgets.forEach(w => {
+      const prog = progressByWidget[w.instanceId];
+      const val = prog && prog.date === todayStrGlobal ? prog.value : 0;
+      const target = w.target && w.target > 0 ? w.target : 1;
+      if (val >= target) completed++;
+      else if (val > 0) inProgress++;
+      else notStarted++;
+    });
+    const pct = activeWidgets.length > 0 ? Math.round((completed / activeWidgets.length) * 100) : 0;
+    return { completed, inProgress, notStarted, pct, total: activeWidgets.length };
+  }, [activeWidgets, progressByWidget]);
+
+  // ── R1: Stable callbacks for widget cards (prevents re-renders of memoized children) ──
+  const handleCardClick = useCallback((widget: WidgetInstance) => {
+    if (['water', 'steps', 'heartrate'].includes(widget.id) && widget.dataSource && widget.dataSource !== 'manual') {
+      setEditingWidget(widget); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
+      return;
+    }
+    if (MODAL_WIDGET_IDS.has(widget.id)) {
+      setActiveModalWidget(widget);
+      setOpenWidgetModal(widget.id);
+    } else {
+      setEditingWidget(widget);
+      setEditingBucket(activeBucket);
+      setNewlyCreatedWidgetId(null);
+    }
+  }, [activeBucket]);
+
+  const handleEditSettings = useCallback((widget: WidgetInstance) => {
+    setEditingWidget(widget);
+    setEditingBucket(activeBucket);
+    setNewlyCreatedWidgetId(null);
+  }, [activeBucket]);
+
+  const handleToggleTaskCompletion = useCallback((taskId: string) => {
+    void toggleTaskCompletionContext(taskId);
+  }, [toggleTaskCompletionContext]);
+
   const [widgetHistoryLogs, setWidgetHistoryLogs] = useState<WidgetLogEntry[]>([]);
   const [isWidgetLogsLoading, setIsWidgetLogsLoading] = useState(false);
   const [widgetLogsError, setWidgetLogsError] = useState<string | null>(null);
@@ -478,6 +497,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   }, [activeWidgets, allTasks]);
 
   const localWidgetLogs = useMemo<WidgetLogEntry[]>(() => {
+    // R6: Skip expensive log generation when the Logs tab isn't active
+    if (activeSubTab !== 'Logs') return [];
+
     const logs: WidgetLogEntry[] = [];
 
     activeWidgets.forEach((widget) => {
@@ -505,12 +527,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
         if (typeof syncedValue === "number") {
           logs.push({
-            id: `integration-${widget.instanceId}-${todayDateString}`,
+            id: `integration-${widget.instanceId}-${todayStrGlobal}`,
             widgetInstanceId: widget.instanceId,
             widgetName: widget.name,
             message: `Synced from ${widget.dataSource === "fitbit" ? "Fitbit" : "Google Fit"}`,
             details: `${syncedValue.toLocaleString()} ${widget.unit || ""}`.trim(),
-            occurredAt: `${todayDateString}T12:00:00`,
+            occurredAt: `${todayStrGlobal}T12:00:00`,
             kind: "integration",
           });
         }
@@ -604,7 +626,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     });
 
     return logs;
-  }, [activeWidgets, progressByWidget, fitbitData, googleFitData, linkedTaskDataByWidgetId, todayDateString]);
+  }, [activeSubTab, activeWidgets, progressByWidget, fitbitData, googleFitData, linkedTaskDataByWidgetId]);
 
   const combinedWidgetLogs = useMemo(() => {
     const merged = [...widgetHistoryLogs, ...localWidgetLogs];
@@ -1107,33 +1129,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
   // ----------------------------------------------------------------------
   // Upcoming tasks filtering and grouping logic
+  // Uses stable module-level todayStrGlobal so the memo doesn't invalidate
+  // on every render due to a fresh `new Date()` call.
   // ----------------------------------------------------------------------
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-
-  const getTimeUntilDue = (dueDate: string | null) => {
-    if (!dueDate) return null;
-    const due = new Date(dueDate);
-    const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const formatTimeUntilDue = (days: number | null) => {
-    if (days === null) return '';
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    if (days === -1) return 'Yesterday';
-    if (days < 0) return `${Math.abs(days)} days ago`;
-    if (days === 7) return '1 week';
-    if (days < 7) return `${days} days`;
-    if (days < 14) return `${days} days`;
-    if (days < 30) return `${Math.floor(days / 7)} weeks`;
-    return `${Math.floor(days / 30)} months`;
-  };
-
   const upcomingTaskGroups = useMemo(() => {
-    const upcoming = allTodoistTasks.filter((t: any) => t.due?.date && t.due.date > todayStr);
+    const todayMs = new Date(todayStrGlobal + 'T00:00:00').getTime();
+    const upcoming = allTodoistTasks.filter((t: any) => t.due?.date && t.due.date > todayStrGlobal);
     const groups = {
       next7Days: [] as any[],
       next2Weeks: [] as any[],
@@ -1142,20 +1143,19 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     };
 
     upcoming.forEach((task: any) => {
-      const daysUntil = getTimeUntilDue(task.due?.date);
-      if (daysUntil !== null) {
-        if (daysUntil <= 7) {
-          groups.next7Days.push(task);
-        } else if (daysUntil <= 14) {
-          groups.next2Weeks.push(task);
-        } else {
-          groups.later.push(task);
-        }
+      const dueMs = new Date(task.due.date + 'T00:00:00').getTime();
+      const diffDays = Math.ceil((dueMs - todayMs) / 86400000);
+      if (diffDays <= 7) {
+        groups.next7Days.push(task);
+      } else if (diffDays <= 14) {
+        groups.next2Weeks.push(task);
+      } else {
+        groups.later.push(task);
       }
     });
 
     return groups;
-  }, [allTodoistTasks, todayStr]);
+  }, [allTodoistTasks]);
 
   const updateTaskDueDate = async (taskId: string, dueDate: string | null) => {
     try {
@@ -1417,6 +1417,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
 
       // Determine what date to set based on destination
       let newDueDate: string | null = null;
+      const today = new Date();
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       const prevWeek = new Date(selectedDate.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -1747,6 +1748,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       // Flush any pending debounced saves before logging out
       debouncedSaveToSupabase.flush?.();
 
+      // Purge all client-side caches BEFORE the network call so stale data
+      // cannot survive if the page navigates before SIGNED_OUT fires.
+      clearAllUserCaches();
+
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: {
@@ -1758,9 +1763,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         throw new Error('Logout failed');
       }
 
-      // On successful logout, the auth listener will detect the change,
-      // and the useEffect hook will handle clearing state and redirecting.
-      window.location.href = '/'; // Manually redirect after successful API call
+      window.location.href = '/';
 
     } catch (error) {
       console.error('Client: Error during sign out:', error);
@@ -2144,9 +2147,11 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
       const hasLocal = loadedFromLocal && localCount > 0;
 
       if (hasSupabase || hasLocal) {
-        // Merge strategy: combine widgets from both sources by instanceId
-        // so that newly-added local widgets are never lost even when the
-        // async Supabase save didn't complete before a page refresh.
+        // Merge strategy: Supabase is authoritative for which widgets exist.
+        // localStorage provides potentially fresher widget config for
+        // widgets that already exist in Supabase. This ensures deletions
+        // saved to Supabase are never undone by stale localStorage data.
+        // When Supabase has no data, fall back to localStorage entirely.
         const merged: Record<string, WidgetInstance[]> = {};
         const allBucketKeys = Array.from(new Set([
           ...Object.keys(supabaseWidgets),
@@ -2158,19 +2163,32 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           const sbList: WidgetInstance[] = supabaseWidgets[bucket] ?? [];
           const localList: WidgetInstance[] = localWidgets[bucket] ?? [];
 
-          // Index by instanceId for fast lookup
-          const byId = new Map<string, WidgetInstance>();
-          // Supabase widgets go in first (baseline)
-          for (const w of sbList) {
-            if (w && w.instanceId) byId.set(w.instanceId, w);
-          }
-          // Local widgets override / add — local state is always the
-          // most-recently-edited copy on this device
-          for (const w of localList) {
-            if (w && w.instanceId) byId.set(w.instanceId, w);
+          if (hasSupabase) {
+            // Supabase is authoritative for widget existence.
+            // Use local version of each widget if available (may have fresher config).
+            const localById = new Map<string, WidgetInstance>();
+            for (const w of localList) {
+              if (w && w.instanceId) localById.set(w.instanceId, w);
+            }
+
+            const byId = new Map<string, WidgetInstance>();
+            for (const w of sbList) {
+              if (w && w.instanceId) {
+                // Prefer local version (fresher config) if it exists
+                byId.set(w.instanceId, localById.get(w.instanceId) || w);
+              }
+            }
+
+            merged[bucket] = Array.from(byId.values());
+          } else {
+            // No Supabase data — use localStorage as-is
+            const byId = new Map<string, WidgetInstance>();
+            for (const w of localList) {
+              if (w && w.instanceId) byId.set(w.instanceId, w);
+            }
+            merged[bucket] = Array.from(byId.values());
           }
 
-          merged[bucket] = Array.from(byId.values());
           if (merged[bucket].length !== sbList.length) {
             mergedDiffersFromSupabase = true;
           }
@@ -2230,12 +2248,16 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // preferences can share the same auth round-trip instead of re-fetching.
   useEffect(() => {
     getCachedUser().then((resolvedUser) => {
+      // Clear stale caches immediately so subsequent effects (greeting name,
+      // bucket loading, etc.) never read another user's data.
+      if (resolvedUser) ensureCacheOwner(resolvedUser.id);
       setUser(resolvedUser);
       setAuthInitialized(true);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') invalidateAuthCache();
+      if (event === 'SIGNED_OUT') clearAllUserCaches();
+      if (session?.user) ensureCacheOwner(session.user.id);
       setUser(session?.user ?? null);
       setAuthInitialized(true);
     });
@@ -2297,12 +2319,49 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     if (!authInitialized) return;
 
     if (user) {
-      // Run in parallel — prefs fetch is deduplicated internally
-      void Promise.all([
-        loadBuckets({ fetchFromSupabase: true }),
-        loadWidgets(),
-      ]);
-      ensureUserOnboarded();
+      // If a different user just signed in, purge all caches first so we
+      // never show (or push) the previous user's data.
+      const ownerChanged = ensureCacheOwner(user.id);
+      if (ownerChanged) {
+        // Reset component state that was initialised from (now-stale) localStorage
+        setBuckets([]);
+        setActiveBucket('');
+        setBucketColors({});
+        setWidgetsByBucket({});
+        setProgressByWidget({});
+        bucketsRef.current = [];
+      }
+
+      // Load data — if user changed, check for corrupted Supabase data first
+      void (async () => {
+        if (ownerChanged) {
+          // Check if this is a genuinely new user whose Supabase data was
+          // corrupted by a previous user's stale caches being pushed.
+          // A new user will have onboarded === false in their profile.
+          try {
+            const res = await fetch('/api/user/profile', { credentials: 'same-origin' });
+            if (res.ok) {
+              const { profile } = await res.json();
+              if (profile && profile.onboarded === false) {
+                await fetch('/api/user/preferences', {
+                  method: 'DELETE',
+                  credentials: 'same-origin',
+                });
+                invalidatePreferencesCache();
+              }
+            }
+          } catch (err) {
+            console.error('Failed to check/reset corrupted preferences:', err);
+          }
+        }
+
+        // Now load fresh data (after any cleanup)
+        await Promise.all([
+          loadBuckets({ fetchFromSupabase: true }),
+          loadWidgets(),
+        ]);
+        ensureUserOnboarded();
+      })();
     } else {
       loadBuckets({ fetchFromSupabase: false });
     }
@@ -2472,32 +2531,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           if (ok) markBucketsSynced();
         });
       } else {
-        // If no buckets found anywhere, set default buckets
-        const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
-        bucketsRef.current = defaultBuckets;
-        setBuckets(defaultBuckets);
-        const defaultColors: Record<string, string> = Object.fromEntries(
-          defaultBuckets.map((n) => [n, getSuggestedColorForBucket(n)])
-        );
-        setBucketColors(defaultColors);
-        const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-        setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('life_buckets', JSON.stringify(defaultBuckets));
-          localStorage.setItem('bucket_colors', JSON.stringify(defaultColors));
-          window.dispatchEvent(new CustomEvent('bucketColorsChanged'));
-        }
-
-        void updateUserPreferenceFields({ life_buckets: defaultBuckets, bucket_colors: defaultColors });
+        // No buckets found anywhere — leave empty so the user can add their own
+        bucketsRef.current = [];
+        setBuckets([]);
+        setBucketColors({});
+        setActiveBucket('');
       }
     } catch (err) {
       console.error('Failed to load preferences', err);
-      // Set defaults on error too
-      const defaultBuckets = ['Health', 'Work', 'Personal', 'Finance'];
-      setBuckets(defaultBuckets);
-      const savedActive = typeof window !== 'undefined' ? localStorage.getItem('active_bucket') : null;
-      setActiveBucket(savedActive && defaultBuckets.includes(savedActive) ? savedActive : defaultBuckets[0]);
     } finally {
       setBucketsInitialized(true);
     }
@@ -2625,26 +2666,22 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   };
 
   const removeWidgetByIdImmediate = async (widgetId: string) => {
-    let nextWidgetsState: Record<string, WidgetInstance[]> | undefined;
-    setWidgetsByBucket((prev) => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach((bucketName) => {
-        updated[bucketName] = (updated[bucketName] ?? []).filter(
-          (widget) => widget.instanceId !== widgetId
-        );
-      });
-      nextWidgetsState = updated;
-      widgetsByBucketRef.current = updated;
-      return updated;
-    });
+    // Compute new state from refs (guaranteed synchronous) rather than
+    // capturing inside a setState updater which may be deferred in React 18.
+    const nextWidgets: Record<string, WidgetInstance[]> = {};
+    for (const [bucketName, widgets] of Object.entries(widgetsByBucketRef.current)) {
+      nextWidgets[bucketName] = (widgets ?? []).filter(
+        (widget) => widget.instanceId !== widgetId
+      );
+    }
+    widgetsByBucketRef.current = nextWidgets;
+    setWidgetsByBucket(nextWidgets);
 
     const { [widgetId]: _removedProgress, ...nextProgressState } = progressByWidgetRef.current;
     progressByWidgetRef.current = nextProgressState;
     setProgressByWidget(nextProgressState);
 
-    if (nextWidgetsState) {
-      await saveWidgets(nextWidgetsState, nextProgressState);
-    }
+    await saveWidgets(nextWidgets, nextProgressState);
   };
 
   const requestRemoveWidget = (widget: WidgetInstance) => {
@@ -3385,9 +3422,10 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-    // Also re-evaluate when selectedDate or progressByWidget changes
+    // R8: removed progressByWidget — the callback reads it via progressByWidgetRef.
+    // Having it here caused interval/listener re-registration on every widget increment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkAndResetWidgets, selectedDate, progressByWidget]);
+  }, [checkAndResetWidgets, selectedDate]);
 
   return (
     <div className="flex-1 relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)' }}>
@@ -3403,38 +3441,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             </h1>
             <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>
-          {/* Completion ring card */}
+          {/* Completion ring card — uses memoized widgetProgressStats */}
           <div className="hidden md:flex items-center gap-3 bg-white border border-theme-neutral-300 rounded-2xl px-5 py-3 shadow-warm-sm">
             <div className="relative w-12 h-12">
               <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
                 <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(219,214,207,0.4)" strokeWidth="3" />
                 <circle cx="24" cy="24" r="20" fill="none" stroke="#48B882" strokeWidth="3" strokeLinecap="round"
-                  strokeDasharray={`${Math.round((activeWidgets.filter(w => {
-                    const prog = progressByWidget[w.instanceId];
-                    const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                    const target = w.target && w.target > 0 ? w.target : 1;
-                    return todayVal >= target;
-                  }).length / Math.max(activeWidgets.length, 1)) * 125.6)} 125.6`}
+                  strokeDasharray={`${Math.round((widgetProgressStats.pct / 100) * 125.6)} 125.6`}
                 />
               </svg>
               <span className="absolute inset-0 flex items-center justify-center  text-[11px] font-medium text-theme-text-primary">
-                {activeWidgets.length > 0 ? `${Math.round((activeWidgets.filter(w => {
-                  const prog = progressByWidget[w.instanceId];
-                  const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                  const target = w.target && w.target > 0 ? w.target : 1;
-                  return todayVal >= target;
-                }).length / activeWidgets.length) * 100)}%` : '0%'}
+                {widgetProgressStats.pct}%
               </span>
             </div>
             <div>
               <p className=" text-[13px] font-medium text-theme-text-primary">Today's Progress</p>
               <p className=" text-[11px] text-theme-text-tertiary">
-                {activeWidgets.filter(w => {
-                  const prog = progressByWidget[w.instanceId];
-                  const todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
-                  const target = w.target && w.target > 0 ? w.target : 1;
-                  return todayVal >= target;
-                }).length} of {activeWidgets.length} goals met
+                {widgetProgressStats.completed} of {widgetProgressStats.total} goals met
               </p>
             </div>
           </div>
@@ -3610,21 +3633,21 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.15)] mb-2">
                           <Activity className="h-[18px] w-[18px] text-theme-info" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val > 0 && val < (w.target || 1); }).length}</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.inProgress}</p>
                         <p className=" text-xs text-theme-text-tertiary mt-1">In Progress</p>
                       </div>
                       <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.15)] mb-2">
                           <Check className="h-[18px] w-[18px] text-theme-success" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val >= (w.target || 1); }).length}</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.completed}</p>
                         <p className=" text-xs text-theme-text-tertiary mt-1">Completed</p>
                       </div>
                       <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
                         <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.15)] mb-2">
                           <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.filter(w => { const prog = progressByWidget[w.instanceId]; const val = prog && prog.date === todayStrGlobal ? prog.value : 0; return val === 0; }).length}</p>
+                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.notStarted}</p>
                         <p className=" text-xs text-theme-text-tertiary mt-1">Not Started</p>
                       </div>
                     </div>
@@ -3652,34 +3675,15 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       activeBucket={activeBucket}
                       bucketHex={getBucketColor(activeBucket)}
                       progressByWidget={progressByWidget}
-                      allTasks={allTasks}
+                      linkedTaskData={linkedTaskDataByWidgetId[w.linkedTaskId ?? ''] ?? null}
                       fitbitData={fitbitData}
                       googleFitData={googleFitData}
-                      onCardClick={(widget) => {
-                        const MODAL_WIDGET_IDS = ['nutrition', 'medication', 'exercise', 'home_projects', 'habit_tracker', 'sleep', 'meditation', 'breathwork', 'water', 'mood', 'steps', 'heartrate', 'caffeine'];
-                        // Some widgets only open modals when using manual data source
-                        if (['water', 'steps', 'heartrate'].includes(widget.id) && widget.dataSource && widget.dataSource !== 'manual') {
-                          setEditingWidget(widget); setEditingBucket(activeBucket); setNewlyCreatedWidgetId(null);
-                          return;
-                        }
-                        if (MODAL_WIDGET_IDS.includes(widget.id)) {
-                          setActiveModalWidget(widget);
-                          setOpenWidgetModal(widget.id);
-                        } else {
-                          setEditingWidget(widget);
-                          setEditingBucket(activeBucket);
-                          setNewlyCreatedWidgetId(null);
-                        }
-                      }}
-                      onEditSettings={(widget) => {
-                        setEditingWidget(widget);
-                        setEditingBucket(activeBucket);
-                        setNewlyCreatedWidgetId(null);
-                      }}
+                      onCardClick={handleCardClick}
+                      onEditSettings={handleEditSettings}
                       onConvertToTask={convertWidgetToTask}
                       onRemove={requestRemoveWidget}
                       onIncrementProgress={incrementProgress}
-                      onToggleTaskCompletion={(taskId) => void toggleTaskCompletionContext(taskId)}
+                      onToggleTaskCompletion={handleToggleTaskCompletion}
                       onHabitToggle={handleHabitToggle}
                     />
                   ))}

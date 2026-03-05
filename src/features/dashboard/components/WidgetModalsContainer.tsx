@@ -61,6 +61,10 @@ const CaffeineTrackerWidget = dynamic(
   () => import('@/features/widgets/components/caffeine-tracker-widget').then(m => m.CaffeineTrackerWidget),
   { ssr: false },
 )
+const CycleTrackingWidget = dynamic(
+  () => import('@/features/widgets/components/cycle-tracking-widget').then(m => m.CycleTrackingWidget),
+  { ssr: false },
+)
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -359,6 +363,25 @@ export function WidgetModalsContainer({
           <div className="mt-2">
             {isOpen('caffeine') && activeWidget && (
               <CaffeineTrackerWidget
+                widget={activeWidget}
+                onUpdate={makeOnUpdate(activeWidget)}
+                progress={computeProgress(activeWidget, progressByWidget)}
+                onComplete={() => onIncrementProgress(activeWidget)}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Cycle Tracking */}
+      <Sheet open={isOpen('cycle_tracking')} onOpenChange={(open) => { if (!open) onClose() }}>
+        <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-theme-text-primary">Cycle Tracker</SheetTitle>
+          </SheetHeader>
+          <div className="mt-2">
+            {isOpen('cycle_tracking') && activeWidget && (
+              <CycleTrackingWidget
                 widget={activeWidget}
                 onUpdate={makeOnUpdate(activeWidget)}
                 progress={computeProgress(activeWidget, progressByWidget)}

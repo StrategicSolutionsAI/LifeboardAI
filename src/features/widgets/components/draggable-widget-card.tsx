@@ -10,7 +10,6 @@ import {
   Check,
 } from "lucide-react";
 import type { WidgetInstance } from "@/types/widgets";
-import type { Task } from "@/types/tasks";
 import {
   getIconComponent,
   getWidgetColorStyles,
@@ -50,7 +49,8 @@ interface DraggableWidgetCardProps {
   activeBucket: string;
   bucketHex: string;
   progressByWidget: Record<string, ProgressEntry>;
-  allTasks: Task[];
+  /** Pre-resolved linked task data — avoids O(tasks) .find() per widget per render */
+  linkedTaskData: { completed?: boolean; content?: string; dueDate?: string } | null;
   fitbitData: Record<string, number>;
   googleFitData: Record<string, number>;
   onCardClick: (widget: WidgetInstance) => void;
@@ -62,13 +62,13 @@ interface DraggableWidgetCardProps {
   onHabitToggle: (widget: WidgetInstance, completed: boolean) => void;
 }
 
-export function DraggableWidgetCard({
+export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
   widget: w,
   index,
   activeBucket,
   bucketHex,
   progressByWidget,
-  allTasks,
+  linkedTaskData,
   fitbitData,
   googleFitData,
   onCardClick,
@@ -79,17 +79,13 @@ export function DraggableWidgetCard({
   onToggleTaskCompletion,
   onHabitToggle,
 }: DraggableWidgetCardProps) {
-  // Linked task resolution
+  // Linked task resolution — uses pre-computed data instead of allTasks.find()
   const isLinkedTask = Boolean(w.linkedTaskId);
-  const linkedTask = isLinkedTask
-    ? allTasks.find((task) => task.id?.toString?.() === w.linkedTaskId)
-    : undefined;
-  const linkedTaskCompleted = Boolean(linkedTask?.completed);
+  const linkedTaskCompleted = Boolean(linkedTaskData?.completed);
   const linkedTaskContent =
-    linkedTask?.content ?? w.linkedTaskTitle ?? w.name;
+    linkedTaskData?.content ?? w.linkedTaskTitle ?? w.name;
   const linkedTaskDueDisplay = (() => {
-    const linkedTaskDueRaw =
-      linkedTask?.due?.date ?? linkedTask?.due?.datetime ?? null;
+    const linkedTaskDueRaw = linkedTaskData?.dueDate ?? null;
     if (!linkedTaskDueRaw) return null;
     try {
       const parsed =
@@ -149,6 +145,8 @@ export function DraggableWidgetCard({
     todayVal = w.caffeineData.entries
       .filter((e: { date: string; cups: number }) => e.date === today)
       .reduce((sum: number, e: { date: string; cups: number }) => sum + e.cups, 0);
+  } else if (w.id === "cycle_tracking" && w.cycleData?.entries?.length) {
+    todayVal = w.cycleData.entries.some((e) => e.date === todayStrGlobal) ? 1 : 0;
   } else {
     const prog = progressByWidget[w.instanceId];
     todayVal = prog && prog.date === todayStrGlobal ? prog.value : 0;
@@ -189,6 +187,7 @@ export function DraggableWidgetCard({
       "steps",
       "heartrate",
       "caffeine",
+      "cycle_tracking",
     ].includes(w.id) &&
     !isLinkedTask;
 
@@ -355,15 +354,15 @@ export function DraggableWidgetCard({
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    if (!linkedTask) return;
-                    onToggleTaskCompletion(linkedTask.id.toString());
+                    if (!w.linkedTaskId) return;
+                    onToggleTaskCompletion(w.linkedTaskId);
                   }}
-                  disabled={!linkedTask}
+                  disabled={!linkedTaskData}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                     linkedTaskCompleted
                       ? ""
                       : "border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-brand-tint-light"
-                  } ${!linkedTask ? "opacity-60 cursor-not-allowed" : ""}`}
+                  } ${!linkedTaskData ? "opacity-60 cursor-not-allowed" : ""}`}
                   style={
                     linkedTaskCompleted
                       ? {
@@ -404,7 +403,7 @@ export function DraggableWidgetCard({
       )}
     </Draggable>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Widget body renderer — handles all widget-type-specific content
@@ -1260,6 +1259,98 @@ function renderWidgetBody(
         <div className="text-2xl mb-2">{"\uD83C\uDF2C\uFE0F"}</div>
         <div className="text-xs text-theme-text-subtle mb-1">Breathwork</div>
         <div className="text-xs text-theme-text-tertiary italic">Tap to start breathing</div>
+      </div>
+    );
+  }
+
+  // Cycle Tracking
+  if (w.id === "cycle_tracking") {
+    const cycleEntries = w.cycleData?.entries || [];
+    const todayEntry = cycleEntries.find((e) => e.date === todayStrGlobal);
+    const periodStarts = cycleEntries
+      .filter((e) => e.periodStart)
+      .map((e) => e.date)
+      .sort();
+    const lastStart = periodStarts.length ? periodStarts[periodStarts.length - 1] : null;
+    const cycleDay = lastStart
+      ? Math.round((Date.now() - new Date(lastStart + "T12:00:00").getTime()) / 86400000) + 1
+      : null;
+
+    // Compute average cycle length for prediction
+    let nextPeriodLabel: string | null = null;
+    if (periodStarts.length >= 2) {
+      const gaps: number[] = [];
+      for (let i = 1; i < periodStarts.length; i++) {
+        const diff = Math.round(
+          (new Date(periodStarts[i] + "T12:00:00").getTime() -
+            new Date(periodStarts[i - 1] + "T12:00:00").getTime()) /
+            86400000
+        );
+        if (diff >= 15 && diff <= 60) gaps.push(diff);
+      }
+      if (gaps.length && lastStart) {
+        const avg = Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+        const nextDate = new Date(lastStart + "T12:00:00");
+        nextDate.setDate(nextDate.getDate() + avg);
+        nextPeriodLabel = nextDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      }
+    }
+
+    const flowColors: Record<string, string> = {
+      light: "#f9a8d4",
+      medium: "#f472b6",
+      heavy: "#ec4899",
+    };
+
+    if (todayEntry) {
+      const flowColor = flowColors[todayEntry.flowIntensity] || wStyles.solid;
+      return (
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-2">
+            {todayEntry.flowIntensity !== "none" && (
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: flowColor }}
+              />
+            )}
+            <span className="text-sm font-medium text-theme-text-primary capitalize">
+              {todayEntry.flowIntensity === "none" ? "Logged" : `${todayEntry.flowIntensity} flow`}
+            </span>
+            {todayEntry.periodStart && (
+              <span className="text-[9px] font-medium text-pink-600 bg-pink-100 rounded-full px-1.5 py-0.5">
+                Start
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-theme-text-tertiary">
+            {cycleDay && <span>Day {cycleDay}</span>}
+            {nextPeriodLabel && <span>Next: {nextPeriodLabel}</span>}
+          </div>
+          {todayEntry.symptoms.length > 0 && (
+            <div className="text-[10px] text-theme-text-tertiary truncate">
+              {todayEntry.symptoms.slice(0, 3).join(", ")}
+              {todayEntry.symptoms.length > 3 && ` +${todayEntry.symptoms.length - 3}`}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center gap-3 text-xs text-theme-text-secondary">
+          {cycleDay && (
+            <span className="font-medium">Day {cycleDay}</span>
+          )}
+          {nextPeriodLabel && (
+            <span>Next: {nextPeriodLabel}</span>
+          )}
+        </div>
+        {!cycleDay && !nextPeriodLabel && (
+          <div className="text-center">
+            <div className="text-xs text-theme-text-tertiary">Tap to log today</div>
+          </div>
+        )}
       </div>
     );
   }

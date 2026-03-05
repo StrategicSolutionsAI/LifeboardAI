@@ -4,13 +4,19 @@ import { File as NodeFile } from 'buffer';
 // Use Node.js File (available in Node 20+ from buffer module)
 const FileImpl = typeof globalThis.File !== 'undefined' ? globalThis.File : NodeFile;
 
-function getReplicate() {
-  if (!process.env.REPLICATE_API_TOKEN) {
-    throw new Error('REPLICATE_API_TOKEN is not set in environment variables');
+// Module-level singleton — reused across warm invocations in the same
+// serverless container instead of re-instantiating on every request.
+let _replicate: Replicate | null = null;
+function getReplicate(): Replicate {
+  if (!_replicate) {
+    if (!process.env.REPLICATE_API_TOKEN) {
+      throw new Error('REPLICATE_API_TOKEN is not set in environment variables');
+    }
+    _replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
   }
-  return new Replicate({
-    auth: process.env.REPLICATE_API_TOKEN,
-  });
+  return _replicate;
 }
 
 export interface GeminiMessage {

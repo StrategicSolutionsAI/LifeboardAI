@@ -24,3 +24,10 @@ export function getQueryClient() {
   }
   return browserClient
 }
+
+/** Clear all cached queries and reset the singleton (call on sign-out). */
+export function resetQueryClient() {
+  if (browserClient) {
+    browserClient.clear()
+  }
+}

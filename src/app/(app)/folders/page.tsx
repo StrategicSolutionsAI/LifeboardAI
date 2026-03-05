@@ -183,6 +183,14 @@ export default function FoldersPage() {
   const [showModal, setShowModal] = useState(false)
   const [newName, setNewName] = useState("")
   const [selectedColor, setSelectedColor] = useState<string>(COLOR_PALETTE[0])
+  const [colorsLoaded, setColorsLoaded] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    try {
+      return localStorage.getItem("bucket_colors") !== null
+    } catch {
+      return false
+    }
+  })
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -204,6 +212,7 @@ export default function FoldersPage() {
     getUserPreferencesClient().then((prefs) => {
       setBucketColors(prefs?.bucket_colors || {})
       setWidgetsByBucket(prefs?.widgets_by_bucket || {})
+      setColorsLoaded(true)
     })
   }, [])
 
@@ -425,7 +434,7 @@ export default function FoldersPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading || !colorsLoaded ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-16 gap-y-20 pt-6 pb-8 justify-items-center">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="w-[140px] h-[140px] rounded-lg bg-theme-skeleton animate-pulse" />

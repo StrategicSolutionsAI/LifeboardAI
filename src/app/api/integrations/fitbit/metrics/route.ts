@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       console.warn('Fitbit water fetch failed (non-fatal)', err instanceof Error ? err.message : err)
     }
 
-    return NextResponse.json({ steps, calories, water: waterCups })
+    return NextResponse.json({ steps, calories, water: waterCups }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } })
   } catch (e) {
     console.error('Failed to fetch Fitbit summary', e)
     const errMessage = e instanceof Error ? e.message : String(e)

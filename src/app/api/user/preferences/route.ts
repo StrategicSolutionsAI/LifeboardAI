@@ -109,12 +109,44 @@ async function getHandler(request: Request) {
     );
   }
 
-  return NextResponse.json(data || { 
-    life_buckets: [], 
-    widgets_by_bucket: {} 
-  });
+  return NextResponse.json(data || {
+    life_buckets: [],
+    widgets_by_bucket: {}
+  }, { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=600' } });
+}
+
+async function deleteHandler() {
+  const supabase = supabaseServer();
+  const authResult = await supabase.auth.getUser();
+  const user = authResult?.data?.user;
+
+  if (!user) {
+    throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED');
+  }
+
+  // Reset preferences to empty defaults (deletes corrupted data)
+  const defaults = {
+    user_id: user.id,
+    life_buckets: [],
+    bucket_colors: {},
+    widgets_by_bucket: {},
+    progress_by_widget: {},
+    hourly_plan: {},
+  };
+
+  const { error } = await supabase
+    .from('user_preferences')
+    .upsert(defaults, { onConflict: 'user_id' })
+    .select();
+
+  if (error) {
+    throw createApiError('Failed to reset preferences', 500, 'DB_RESET_ERROR', error);
+  }
+
+  return NextResponse.json({ message: 'Preferences reset to defaults' });
 }
 
 // Export handlers with error handling
 export const POST = withErrorHandling(postHandler, 'user/preferences/POST');
 export const GET = withErrorHandling(getHandler, 'user/preferences/GET');
+export const DELETE = withErrorHandling(deleteHandler, 'user/preferences/DELETE');
