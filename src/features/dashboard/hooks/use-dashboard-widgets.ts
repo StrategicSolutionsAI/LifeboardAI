@@ -75,6 +75,9 @@ export function useDashboardWidgets({
   // Keep shared ref in sync
   progressByWidgetRef.current = progressByWidget;
 
+  // Dirty flag — prevents the useEffect watcher from writing back freshly-loaded data
+  const isDirtyRef = useRef(false);
+
   // Editor state
   const [editingWidget, setEditingWidget] = useState<WidgetInstance | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
@@ -130,6 +133,12 @@ export function useDashboardWidgets({
     return new Map(activeWidgets.map((widget) => [widget.instanceId, widget]));
   }, [activeWidgets]);
 
+  // O(1) task lookup map — built once per allTasks change
+  const taskLookupMap = useMemo(
+    () => new Map(allTasks.map(t => [t.id?.toString?.() ?? '', t])),
+    [allTasks],
+  );
+
   const linkedTaskDataByWidgetId = useMemo(() => {
     const linkedIds = activeWidgets
       .filter(w => w.linkedTaskId)
@@ -137,13 +146,13 @@ export function useDashboardWidgets({
     if (linkedIds.length === 0) return {} as Record<string, { completed?: boolean; content?: string; dueDate?: string }>;
     const result: Record<string, { completed?: boolean; content?: string; dueDate?: string }> = {};
     for (const id of linkedIds) {
-      const task = allTasks.find(t => t.id?.toString?.() === id);
+      const task = taskLookupMap.get(id);
       if (task) {
         result[id] = { completed: task.completed, content: task.content, dueDate: task.due?.date };
       }
     }
     return result;
-  }, [activeWidgets, allTasks]);
+  }, [activeWidgets, taskLookupMap]);
 
   const linkedTaskMap = useMemo(() => {
     const map: Record<string, { bucket: string; widgetId: string }> = {};
@@ -204,6 +213,7 @@ export function useDashboardWidgets({
 
   // ── Progress ──────────────────────────────────────────────────────────
   const incrementProgress = useCallback(async (w: WidgetInstance) => {
+    isDirtyRef.current = true;
     setProgressByWidget(prev => {
       const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
       let { value, streak, lastCompleted } = entry;
@@ -282,6 +292,7 @@ export function useDashboardWidgets({
     if (!destination) return;
     if (source.index === destination.index) return;
 
+    isDirtyRef.current = true;
     setWidgetsByBucket((prev) => {
       const bucketWidgets = [...(prev[activeBucket] || [])];
       const displayWidgets = bucketWidgets.filter(w => !w.instanceId?.startsWith('debug-'));
@@ -292,23 +303,23 @@ export function useDashboardWidgets({
       widgetsByBucketRef.current = updated;
       return updated;
     });
-    debouncedSaveToSupabase();
-  }, [activeBucket, debouncedSaveToSupabase, widgetsByBucketRef]);
+  }, [activeBucket, widgetsByBucketRef]);
 
   // ── Widget modal update ───────────────────────────────────────────────
   const handleWidgetModalUpdate = useCallback((widget: WidgetInstance, updates: Partial<WidgetInstance>) => {
+    isDirtyRef.current = true;
     setWidgetsByBucket(prev => {
       const next = { ...prev };
-      next[activeBucket] = (next[activeBucket] ?? []).map(w =>
+      // Find the widget's actual bucket instead of assuming activeBucket
+      const targetBucket = Object.keys(next).find(bkt =>
+        (next[bkt] ?? []).some(w => w.instanceId === widget.instanceId)
+      ) ?? activeBucket;
+      next[targetBucket] = (next[targetBucket] ?? []).map(w =>
         w.instanceId === widget.instanceId ? { ...w, ...updates } : w
       );
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-      }
       return next;
     });
-    saveWidgets(widgetsByBucketRef.current, progressByWidgetRef.current);
-  }, [activeBucket, saveWidgets, widgetsByBucketRef, progressByWidgetRef]);
+  }, [activeBucket]);
 
   // ── Habit toggle ──────────────────────────────────────────────────────
   const handleHabitToggle = useCallback((widget: WidgetInstance, isCompletedToday: boolean) => {
@@ -353,20 +364,19 @@ export function useDashboardWidgets({
       },
     };
 
+    isDirtyRef.current = true;
     setWidgetsByBucket(prev => {
       const next = { ...prev };
       next[activeBucket] = (next[activeBucket] ?? []).map(ww =>
         ww.instanceId === widget.instanceId ? { ...ww, ...updatedData } : ww
       );
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: next, savedAt: new Date().toISOString() }));
-      }
       return next;
     });
   }, [activeBucket, incrementProgress]);
 
   // ── Widget CRUD ───────────────────────────────────────────────────────
   const patchWidgetInActiveBucket = useCallback((widgetId: string, updates: Partial<WidgetInstance>) => {
+    isDirtyRef.current = true;
     setWidgetsByBucket((prev) => {
       const updated = { ...prev };
       updated[activeBucket] = (updated[activeBucket] ?? []).map((widget) =>
@@ -378,6 +388,7 @@ export function useDashboardWidgets({
   }, [activeBucket, widgetsByBucketRef]);
 
   const removeWidgetByIdImmediate = useCallback(async (widgetId: string) => {
+    isDirtyRef.current = true;
     const nextWidgets: Record<string, WidgetInstance[]> = {};
     for (const [bucketName, widgets] of Object.entries(widgetsByBucketRef.current)) {
       nextWidgets[bucketName] = (widgets ?? []).filter(
@@ -439,6 +450,7 @@ export function useDashboardWidgets({
   }, [activeBucket, buckets, pushUndo, setConfirmState, removeWidgetByIdImmediate, saveWidgets, widgetsByBucketRef, progressByWidgetRef]);
 
   const resetWidgetProgress = useCallback(async (widget: WidgetInstance) => {
+    isDirtyRef.current = true;
     const nextProgressState: Record<string, ProgressEntry> = {
       ...progressByWidgetRef.current,
       [widget.instanceId]: {
@@ -455,25 +467,17 @@ export function useDashboardWidgets({
 
   const handleSaveWidget = useCallback((updated: WidgetInstance) => {
     if (!editingBucket) return;
-    let nextState: Record<string, WidgetInstance[]> | undefined;
+    isDirtyRef.current = true;
     setWidgetsByBucket(prev => {
       const updatedState = { ...prev };
       updatedState[editingBucket] = (updatedState[editingBucket] ?? []).map(w =>
         w.instanceId === updated.instanceId ? updated : w
       );
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('widgets_by_bucket', JSON.stringify({ widgets: updatedState, savedAt: new Date().toISOString() }));
-      }
-      nextState = updatedState;
       return updatedState;
     });
-    if (nextState) {
-      widgetsByBucketRef.current = nextState;
-      void saveWidgets(nextState, progressByWidgetRef.current);
-    }
     setEditingWidget(null);
     setNewlyCreatedWidgetId(null);
-  }, [editingBucket, saveWidgets, widgetsByBucketRef, progressByWidgetRef]);
+  }, [editingBucket]);
 
   // ── Task-widget linking ───────────────────────────────────────────────
   const findWidgetForTask = useCallback((taskId: string) => {
@@ -835,12 +839,13 @@ export function useDashboardWidgets({
   // ── Debug cleanup ─────────────────────────────────────────────────────
   const cleanupDebugWidgets = useCallback(async () => {
     const cleaned: Record<string, WidgetInstance[]> = {};
-    Object.entries(widgetsByBucket).forEach(([bkt, widgets]) => {
+    Object.entries(widgetsByBucketRef.current).forEach(([bkt, widgets]) => {
       cleaned[bkt] = widgets.filter(w => !w.instanceId?.startsWith('debug-'));
     });
+    isDirtyRef.current = true;
     setWidgetsByBucket(cleaned);
     await saveWidgets(cleaned);
-  }, [widgetsByBucket, saveWidgets]);
+  }, [widgetsByBucketRef, saveWidgets]);
 
   // ── Effects ───────────────────────────────────────────────────────────
 
@@ -879,6 +884,7 @@ export function useDashboardWidgets({
   // Save widgets whenever they change
   useEffect(() => {
     if (!isWidgetLoadComplete || !user) return;
+    if (!isDirtyRef.current) return;
 
     const widgetCount = Object.values(widgetsByBucket).reduce(
       (sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0
@@ -913,6 +919,7 @@ export function useDashboardWidgets({
   // Save progress whenever it changes
   useEffect(() => {
     if (!isWidgetLoadComplete || !user) return;
+    if (!isDirtyRef.current) return;
 
     if (typeof window !== 'undefined') {
       try {

@@ -236,6 +236,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Wire flushRef so useAuth's sign-out can flush debounced saves
   flushRef.current = flushDebouncedSave;
 
+  // Memoize the active bucket's hex color so widget cards get a stable string prop
+  const activeBucketHex = useMemo(() => getBucketColor(activeBucket), [getBucketColor, activeBucket]);
+
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const weather = useWeather();
 
@@ -681,11 +684,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       widget={w}
                       index={widgetIndex}
                       activeBucket={activeBucket}
-                      bucketHex={getBucketColor(activeBucket)}
-                      progressByWidget={progressByWidget}
+                      bucketHex={activeBucketHex}
+                      progressEntry={progressByWidget[w.instanceId]}
                       linkedTaskData={linkedTaskDataByWidgetId[w.linkedTaskId ?? ''] ?? null}
-                      fitbitData={fitbitData}
-                      googleFitData={googleFitData}
+                      integrationValue={
+                        (w.id === "water" || w.id === "steps") && w.dataSource === "fitbit" ? fitbitData[w.id]
+                        : (w.id === "water" || w.id === "steps") && w.dataSource === "googlefit" ? googleFitData[w.id]
+                        : undefined
+                      }
                       onCardClick={handleCardClick}
                       onEditSettings={handleEditSettings}
                       onConvertToTask={convertWidgetToTask}
@@ -805,7 +811,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             availableBuckets={buckets}
             defaultBucket={activeBucket}
             selectedDate={selectedDate}
-            bucketColor={getBucketColor(activeBucket)}
+            bucketColor={activeBucketHex}
           />
         )}
 
@@ -824,7 +830,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             <div className="flex-1 overflow-y-auto px-4 pb-8 sm:px-0 sm:pb-0">
               <WidgetLibrary
                 bucket={activeBucket}
-                bucketColor={getBucketColor(activeBucket)}
+                bucketColor={activeBucketHex}
                 onAdd={(widgetOrTemplate: WidgetTemplate | WidgetInstance) => {
                   const isInstance = (widgetOrTemplate as any).instanceId !== undefined;
                   const newInstance: WidgetInstance = isInstance
@@ -925,7 +931,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             activeWidget={activeModalWidget}
             setActiveWidget={setActiveModalWidget}
             onWidgetUpdate={handleWidgetModalUpdate}
-            progressByWidget={progressByWidget}
+            progressEntry={activeModalWidget ? progressByWidget[activeModalWidget.instanceId] : undefined}
             onIncrementProgress={incrementProgress}
           />
         )}
