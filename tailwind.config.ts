@@ -22,6 +22,8 @@ const config = {
         sans: ['var(--font-dm-sans)', 'var(--font-inter)', '"DM Sans"', 'Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
       boxShadow: {
+        'micro': '0px 1px 2px rgba(163, 133, 96, 0.04)',
+        'xs': '0px 2px 6px rgba(163, 133, 96, 0.05)',
         'warm-sm': '0px 4px 16px rgba(163, 133, 96, 0.06)',
         'warm': '0px 6px 20px rgba(163, 133, 96, 0.1)',
         'warm-lg': '0px 8px 30px rgba(163, 133, 96, 0.1)',
@@ -162,7 +164,27 @@ const config = {
           sunken: 'var(--theme-surface-sunken)',
           alt: 'var(--theme-surface-alt)',
           selected: 'var(--theme-surface-selected)',
+          'warm-30': 'var(--theme-surface-warm-30)',
+          'warm-50': 'var(--theme-surface-warm-50)',
+          'warm-60': 'var(--theme-surface-warm-60)',
+          'warm-70': 'var(--theme-surface-warm-70)',
+          'warm-80': 'var(--theme-surface-warm-80)',
+          'warm-90': 'var(--theme-surface-warm-90)',
+          warm: 'var(--theme-surface-warm)',
         },
+
+        // Border opacity variants
+        'theme-border': {
+          'subtle-60': 'var(--theme-border-subtle-60)',
+          'subtle-70': 'var(--theme-border-subtle-70)',
+          'subtle-90': 'var(--theme-border-subtle-90)',
+        },
+
+        // Status tints (icon backgrounds)
+        'theme-info-tint': 'var(--theme-info-tint)',
+        'theme-success-tint': 'var(--theme-success-tint)',
+        'theme-warning-tint': 'var(--theme-warning-tint)',
+        'theme-error-tint': 'var(--theme-error-tint)',
 
         // Additional semantic tokens
         'theme-skeleton': 'var(--theme-skeleton)',

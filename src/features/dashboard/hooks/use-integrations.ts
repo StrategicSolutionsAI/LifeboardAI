@@ -466,9 +466,15 @@ export function useIntegrations({
   // ------------------------------------------------------------------
   // Computed values
   // ------------------------------------------------------------------
-  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  const selectedDateStr = useMemo(() =>
+    `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`,
+    [selectedDate]
+  );
 
-  const openTasksToShow = allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr);
+  const openTasksToShow = useMemo(
+    () => allTodoistTasks.filter((t: any) => t.due?.date !== selectedDateStr),
+    [allTodoistTasks, selectedDateStr]
+  );
 
   const upcomingTaskGroups = useMemo(() => {
     const todayMs = new Date(todayStrGlobal + 'T00:00:00').getTime();
@@ -799,10 +805,18 @@ export function useIntegrations({
     if (!isWidgetLoadComplete || hasFetchedIntegrationsRef.current) return;
     hasFetchedIntegrationsRef.current = true;
 
-    const timeout = setTimeout(fetchIntegrationsData, 1500);
+    // Use requestIdleCallback for faster idle-time fetching instead of flat 1500ms delay
+    let cleanupTimer: (() => void) | undefined;
+    if (typeof requestIdleCallback !== 'undefined') {
+      const id = requestIdleCallback(() => fetchIntegrationsData(), { timeout: 2000 });
+      cleanupTimer = () => cancelIdleCallback(id);
+    } else {
+      const timeout = setTimeout(fetchIntegrationsData, 800);
+      cleanupTimer = () => clearTimeout(timeout);
+    }
     const int = setInterval(fetchIntegrationsData, 30 * 60 * 1000); // 30 min
     return () => {
-      clearTimeout(timeout);
+      cleanupTimer?.();
       clearInterval(int);
     };
   }, [isWidgetLoadComplete, fetchIntegrationsData]);

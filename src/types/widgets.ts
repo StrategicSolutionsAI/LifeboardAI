@@ -250,6 +250,21 @@ export interface WidgetInstance extends WidgetTemplate {
     currentStreak?: number
     bestStreak?: number
   }
+  // Family Members data
+  familyMembersData?: {
+    members: Array<{
+      id: string
+      name: string
+      relationship: 'spouse' | 'child' | 'parent' | 'grandparent' | 'sibling' | 'pet' | 'other'
+      birthday?: string        // YYYY-MM-DD
+      phone?: string
+      email?: string
+      avatarColor: string      // hex color for initials avatar
+      allergens?: string[]
+      medicalNotes?: string
+      createdAt: string        // ISO timestamp
+    }>
+  }
   // Home Projects data
   homeProjectsData?: {
     projects?: Array<{

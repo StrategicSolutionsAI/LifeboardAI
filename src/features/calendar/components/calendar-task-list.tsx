@@ -3,101 +3,48 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
 import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { useTasksContext } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
+import { normalizeBucketId } from "@/features/calendar/types";
+import { EnhancedTaskCard, getCustomBucketStyles } from "@/features/calendar/components/calendar-task-card";
+import { useTaskOrdering } from "@/features/calendar/hooks/use-task-ordering";
 
 // ---- Bucket mapping helpers ----
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
 
-const normalizeBucketId = (name?: string | null) => {
-  const trimmed = (name ?? '').trim();
-  return trimmed.length > 0 ? trimmed : UNASSIGNED_BUCKET_ID;
+// Module-scope color maps — allocated once, shared across all renders
+const BUCKET_COLOR_CLASS_MAP: Record<string, string> = {
+  "#6B8AF7": "bg-[#f0f3fe] text-[#5570c7] border-[#c8d3f9]",
+  "#48B882": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]",
+  "#D07AA4": "bg-[#fdf1f6] text-[#b05c86] border-[#ebc3d6]",
+  "#4AADE0": "bg-[#eef7fc] text-[#3889b5] border-[#b0daf0]",
+  "#C4A44E": "bg-[#faf6ec] text-[#9e843e] border-[#e0d4a8]",
+  "#8B7FD4": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]",
+  "#E28A5D": "bg-[#fdf3ee] text-[#b56e4a] border-[#f0c8b3]",
+  "#5E9B8C": "bg-[#eff7f5] text-[#4b7c70] border-[#b8d8cf]",
+  "#8e99a8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300",
+  "#4F46E5": "bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300",
+  "#22C55E": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]",
+  "#F97316": "bg-orange-100 text-orange-700 border-orange-200",
+  "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",
+  "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",
+  "#8B5CF6": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]",
+  "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",
+  "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",
+  "#94A3B8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300",
+  "#ff52bf": "bg-pink-100 text-pink-700 border-pink-200",
 };
 
 const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
   if (!bucketName) return "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300";
-
-  const bucketId = normalizeBucketId(bucketName);
-  const color = getBucketColorSync(bucketId, bucketColors);
-
-  // Map hex colors to Tailwind classes (Calidora palette)
-  const colorMap: Record<string, string> = {
-    "#6B8AF7": "bg-[#f0f3fe] text-[#5570c7] border-[#c8d3f9]", // blue (Calidora)
-    "#48B882": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]", // green (Calidora)
-    "#D07AA4": "bg-[#fdf1f6] text-[#b05c86] border-[#ebc3d6]", // rose (Calidora)
-    "#4AADE0": "bg-[#eef7fc] text-[#3889b5] border-[#b0daf0]", // sky blue (Calidora)
-    "#C4A44E": "bg-[#faf6ec] text-[#9e843e] border-[#e0d4a8]", // golden (Calidora)
-    "#8B7FD4": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // plum (Calidora)
-    "#E28A5D": "bg-[#fdf3ee] text-[#b56e4a] border-[#f0c8b3]", // orange (Calidora)
-    "#5E9B8C": "bg-[#eff7f5] text-[#4b7c70] border-[#b8d8cf]", // teal (Calidora)
-    "#8e99a8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300", // gray (unassigned - Calidora)
-    // Legacy colors for backwards compatibility
-    "#4F46E5": "bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300", // indigo (legacy)
-    "#22C55E": "bg-[#eefaf3] text-[#3a9468] border-[#b0e3cb]", // green (legacy)
-    "#F97316": "bg-orange-100 text-orange-700 border-orange-200", // orange (legacy)
-    "#EC4899": "bg-pink-100 text-pink-700 border-pink-200",     // pink (legacy)
-    "#14B8A6": "bg-teal-100 text-teal-700 border-teal-200",     // teal (legacy)
-    "#8B5CF6": "bg-[#f3f1fb] text-[#6f65aa] border-[#c8c2e8]", // violet (legacy)
-    "#F59E0B": "bg-amber-100 text-amber-700 border-amber-200",   // amber (legacy)
-    "#06B6D4": "bg-cyan-100 text-cyan-700 border-cyan-200",     // cyan (legacy)
-    "#94A3B8": "bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300", // gray (legacy)
-    "#ff52bf": "bg-pink-100 text-pink-700 border-pink-200"      // custom pink
-  };
-
-  // Check if we have a predefined style for this color
-  if (colorMap[color]) {
-    return colorMap[color];
-  }
-
-  // For custom colors, return a generic class and let parent apply inline styles
-  return "border border-theme-neutral-300 custom-bucket-color";
+  const color = getBucketColorSync(normalizeBucketId(bucketName), bucketColors);
+  return BUCKET_COLOR_CLASS_MAP[color] ?? "border border-theme-neutral-300 custom-bucket-color";
 };
 
-const getCustomBucketStyles = (bucketName?: string | null, bucketColors?: Record<string, string>) => {
-  if (!bucketName) return {};
-
-  const bucketId = normalizeBucketId(bucketName);
-  const color = getBucketColorSync(bucketId, bucketColors);
-
-  // Check if this is a custom color (not in predefined map)
-  const colorMap: Record<string, string> = {
-    "#6B8AF7": "predefined",
-    "#48B882": "predefined",
-    "#D07AA4": "predefined",
-    "#4AADE0": "predefined",
-    "#C4A44E": "predefined",
-    "#8B7FD4": "predefined",
-    "#E28A5D": "predefined",
-    "#5E9B8C": "predefined",
-    "#8e99a8": "predefined",
-    // Legacy colors
-    "#4F46E5": "predefined",
-    "#22C55E": "predefined",
-    "#F97316": "predefined",
-    "#EC4899": "predefined",
-    "#14B8A6": "predefined",
-    "#8B5CF6": "predefined",
-    "#F59E0B": "predefined",
-    "#06B6D4": "predefined",
-    "#94A3B8": "predefined",
-    "#ff52bf": "predefined"
-  };
-
-  if (!colorMap[color]) {
-    // This is a custom color, return inline styles
-    return {
-      backgroundColor: color + '20', // 20 = ~12% opacity
-      borderColor: color,
-      color: color
-    };
-  }
-
-  return {};
-};
 
 const doesTaskOccurOnDate = (task: any, dateStr: string): boolean => {
   if (!task || task.completed) return false;
@@ -145,343 +92,10 @@ interface CalendarTaskListProps {
   availableBuckets?: string[];
   selectedBucket?: string;
   isDragging?: boolean;
-  disableInternalDragDrop?: boolean;
   dashboardView?: boolean; // Simplified view for dashboard usage
   onCollapsedChange?: (collapsed: boolean) => void;
   onTaskClick?: (taskId: string, dateStr: string) => void; // Callback when a task is clicked
 }
-
-// Enhanced task card component with priority-based styling and progressive disclosure
-interface EnhancedTaskCardProps {
-  task: any;
-  index: number;
-  isExpanded: boolean;
-  onToggle: (taskId: string) => void;
-  onExpand: (taskId: string) => void;
-  onQuickAction?: (taskId: string, action: string) => void;
-  availableBuckets?: string[];
-  batchUpdateTasks?: any;
-  isRescheduleActive?: boolean;
-  onRescheduleSelect?: (taskId: string, newDate: string | null) => void | Promise<void>;
-  onRescheduleCancel?: () => void;
-  bucketColors?: Record<string, string>;
-  onTaskClick?: (taskId: string, dateStr: string) => void;
-}
-
-const EnhancedTaskCard = React.memo(function EnhancedTaskCard({
-  task,
-  index,
-  isExpanded,
-  onToggle,
-  onExpand,
-  onQuickAction,
-  availableBuckets = [],
-  batchUpdateTasks,
-  isRescheduleActive = false,
-  onRescheduleSelect,
-  onRescheduleCancel,
-  bucketColors = {},
-  onTaskClick,
-}: EnhancedTaskCardProps) {
-  const getPriorityStyles = (priority?: string | number) => {
-    const priorityStr = priority?.toString().toLowerCase();
-    switch (priorityStr) {
-      case 'critical':
-      case '4': return {
-        border: 'border-l-red-500 border-red-200/50',
-        bg: 'bg-gradient-to-r from-red-50/80 to-white',
-        icon: 'text-red-600',
-        badge: 'bg-red-100 text-red-700 border-red-200'
-      };
-      case 'high':
-      case '3': return {
-        border: 'border-l-orange-500 border-orange-200/50',
-        bg: 'bg-gradient-to-r from-orange-50/80 to-white',
-        icon: 'text-orange-600',
-        badge: 'bg-orange-100 text-orange-700 border-orange-200'
-      };
-      case 'medium':
-      case '2': return {
-        border: 'border-l-theme-secondary border-theme-neutral-300/50',
-        bg: 'bg-gradient-to-r from-theme-primary-50/80 to-white',
-        icon: 'text-theme-primary-600',
-        badge: 'bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300'
-      };
-      case 'low':
-      case '1': return {
-        border: 'border-l-theme-neutral-400 border-theme-neutral-300/50',
-        bg: 'bg-gradient-to-r from-theme-surface-alt/80 to-white',
-        icon: 'text-theme-text-subtle',
-        badge: 'bg-theme-brand-tint-light text-theme-text-body border-theme-neutral-300'
-      };
-      default: return {
-        border: 'border-l-theme-neutral-300 border-theme-neutral-300/50',
-        bg: 'bg-white',
-        icon: 'text-theme-text-tertiary/70',
-        badge: 'bg-theme-brand-tint-light text-theme-text-subtle border-theme-neutral-300'
-      };
-    }
-  };
-
-  const formatDueDate = (dueDate?: { date: string }) => {
-    if (!dueDate?.date) return null;
-    // Parse date-only strings as local dates to avoid timezone shifts
-    const date = parse(dueDate.date, 'yyyy-MM-dd', new Date());
-    const today = new Date();
-    const diffDays = differenceInDays(date, startOfDay(today));
-
-    if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, color: 'text-red-600', urgent: true };
-    if (diffDays === 0) return { text: 'Today', color: 'text-theme-primary-600', urgent: false };
-    if (diffDays === 1) return { text: 'Tomorrow', color: 'text-green-600', urgent: false };
-    if (diffDays <= 7) return { text: `${diffDays} days`, color: 'text-theme-text-subtle', urgent: false };
-    return { text: format(date, 'MMM d'), color: 'text-theme-text-tertiary', urgent: false };
-  };
-
-  const dueDateInfo = formatDueDate(task.due);
-  const priorityStyles = getPriorityStyles(task.priority);
-  const [customRescheduleDate, setCustomRescheduleDate] = useState(task.due?.date ?? '');
-
-  useEffect(() => {
-    if (isRescheduleActive) {
-      setCustomRescheduleDate(task.due?.date ?? '');
-    }
-  }, [isRescheduleActive, task.due?.date]);
-
-  const quickRescheduleOptions = useMemo(() => {
-    const base = task.due?.date
-      ? parse(task.due.date, 'yyyy-MM-dd', new Date())
-      : new Date();
-    const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
-    const today = new Date();
-
-    return [
-      { label: 'Today', value: format(today, 'yyyy-MM-dd') },
-      { label: 'Tomorrow', value: format(addDays(today, 1), 'yyyy-MM-dd') },
-      { label: 'Next Week', value: format(addDays(safeBase, 7), 'yyyy-MM-dd') },
-      { label: 'Next Monday', value: format(startOfWeek(addDays(safeBase, 7), { weekStartsOn: 1 }), 'yyyy-MM-dd') },
-      { label: 'Clear due date', value: null as string | null },
-    ];
-  }, [task.due?.date]);
-
-  const currentDueDate = task.due?.date ?? null;
-  const rescheduleButtonClasses = `group flex items-center gap-2 px-3 py-2 text-xs font-medium transition-all duration-200 rounded-lg shadow-sm border ${isRescheduleActive
-      ? 'text-theme-primary-600 bg-theme-primary-50 border-theme-neutral-300 hover:bg-theme-surface-selected hover:border-theme-neutral-400'
-      : 'text-theme-text-subtle hover:text-theme-primary-600 bg-white/80 hover:bg-theme-primary-50 border-theme-neutral-300 hover:border-theme-neutral-300'
-    }`;
-
-  return (
-    <Draggable draggableId={task.id.toString()} index={index} key={task.id}>
-      {(provided: any) => (
-        <li
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          style={provided.draggableProps.style}
-          className={`group relative ${priorityStyles.bg} rounded-2xl border border-theme-neutral-300 transition-all duration-200 shadow-[0_4px_16px_rgba(163,133,96,0.06)] hover:shadow-[0_6px_20px_rgba(163,133,96,0.1)] hover:-translate-y-0.5 ${isExpanded ? 'shadow-[0_8px_30px_rgba(163,133,96,0.1)]' : ''
-            } cursor-grab active:cursor-grabbing`}
-        >
-          {/* Premium Task Row */}
-          <div className="flex items-start gap-4 px-5 py-4">
-            <label className="flex items-center cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={task.completed ?? false}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onToggle(task.id.toString());
-                }}
-                className="sr-only"
-              />
-              <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${task.completed
-                  ? 'bg-theme-secondary border-theme-secondary scale-110'
-                  : 'border-theme-neutral-300 hover:border-theme-secondary group-hover:border-theme-secondary group-hover:scale-110'
-                }`}>
-                {task.completed && (
-                  <svg className="w-3 h-3 text-white animate-in fade-in duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-            </label>
-
-            <div
-              className="flex-1 min-w-0 cursor-pointer"
-              onClick={() => onTaskClick?.(task.id.toString(), task.due?.date || '')}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium leading-relaxed transition-all duration-200 ${task.completed ? 'line-through text-theme-text-tertiary/70' : 'text-theme-text-primary'
-                    }`}>
-                    {task.content}
-                  </p>
-
-                  {/* Metadata Row */}
-                  <div className="flex items-center gap-2 mt-2">
-                    {task.bucket && (
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-black/5 text-theme-text-body"
-                        style={getCustomBucketStyles(task.bucket, bucketColors)}
-                      >
-                        {task.bucket}
-                      </span>
-                    )}
-
-                    {task.priority && (
-                      <div className="flex items-center gap-1">
-                        <Star size={12} className={`transition-colors duration-200 ${priorityStyles.icon} fill-current`} />
-                        <span className={`text-xs font-medium ${priorityStyles.icon}`}>
-                          {task.priority?.toString().toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 text-right">
-                  {dueDateInfo && (
-                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium ${dueDateInfo.urgent
-                        ? 'bg-red-50 text-red-700'
-                        : 'bg-theme-surface-alt text-theme-text-subtle'
-                      }`}>
-                      {dueDateInfo.urgent && <AlertCircle size={11} />}
-                      <span>{dueDateInfo.text}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-1.5">
-                    {/* Expand/Collapse Indicator */}
-                    <div className={`w-6 h-6 rounded-lg bg-theme-brand-tint-light/80 flex items-center justify-center transition-all duration-200 ${isExpanded ? 'bg-theme-surface-selected rotate-90' : 'group-hover:bg-theme-skeleton/80'
-                      }`}>
-                      <ChevronRight size={12} className={`transition-colors duration-200 ${isExpanded ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-text-body'
-                        }`} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Premium Expanded Content */}
-          {isExpanded && (
-            <div className="px-5 pb-4 border-t border-theme-neutral-300 bg-gradient-to-b from-theme-surface-alt/30 to-theme-surface-alt/60 animate-in slide-in-from-top-2 duration-300">
-              {/* Task Details */}
-              {task.description && (
-                <div className="mt-4 mb-4 p-3 bg-white/80 rounded-lg border border-theme-neutral-300">
-                  <p className="text-sm text-theme-text-body leading-relaxed">
-                    {task.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Premium Action Buttons */}
-              <div className="mt-4 flex flex-col gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onQuickAction?.(task.id.toString(), 'reschedule');
-                    }}
-                    className={rescheduleButtonClasses}
-                  >
-                    <Calendar
-                      size={14}
-                      className={`transition-transform duration-200 ${isRescheduleActive ? 'text-theme-primary-600' : 'text-theme-text-tertiary group-hover:text-theme-primary-600'
-                        } group-hover:scale-110`}
-                    />
-                    Reschedule
-                  </button>
-
-
-                  {availableBuckets?.length > 0 && (
-                    <select
-                      value={task.bucket || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        batchUpdateTasks?.([
-                          { taskId: task.id.toString(), updates: { bucket: val || undefined } }
-                        ]).catch((err: any) => console.error('Failed to update bucket', err));
-                      }}
-                      className="px-3 py-2 text-xs font-medium bg-white/80 border border-theme-neutral-300 rounded-lg hover:bg-theme-surface-alt focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none transition-all duration-200 shadow-sm"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <option value="">No project</option>
-                      {availableBuckets.map((b) => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {isRescheduleActive && (
-                  <div
-                    className="w-full rounded-lg border border-theme-neutral-300 bg-theme-primary-50/70 p-3 shadow-inner"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <p className="text-xs font-semibold text-theme-primary-600 mb-2">Quick reschedule</p>
-                    <div className="flex flex-wrap gap-2">
-                      {quickRescheduleOptions.map(({ label, value }) => {
-                        const isCurrent = value === currentDueDate || (!value && !currentDueDate);
-                        return (
-                          <button
-                            key={label}
-                            type="button"
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors duration-200 ${isCurrent
-                                ? 'bg-theme-secondary text-white border-theme-secondary shadow-sm'
-                                : 'bg-white text-theme-text-subtle border-theme-neutral-300 hover:bg-theme-surface-selected hover:text-theme-primary-600'
-                              }`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void onRescheduleSelect?.(task.id.toString(), value);
-                            }}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
-                      <input
-                        type="date"
-                        value={customRescheduleDate}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => setCustomRescheduleDate(event.target.value)}
-                        className="rounded-lg border border-theme-neutral-300 bg-white px-2 py-1.5 text-xs text-theme-text-body focus:border-theme-secondary focus:ring-[3px] focus:ring-theme-focus/15 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-theme-secondary text-white hover:bg-theme-primary-600 disabled:bg-theme-skeleton disabled:text-theme-text-tertiary disabled:cursor-not-allowed"
-                        disabled={!customRescheduleDate}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (!customRescheduleDate) return;
-                          void onRescheduleSelect?.(task.id.toString(), customRescheduleDate);
-                        }}
-                      >
-                        Apply
-                      </button>
-                      <button
-                        type="button"
-                        className="px-3 py-1.5 text-xs font-medium rounded-md border border-transparent text-theme-primary-600 hover:underline"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRescheduleCancel?.();
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </li>
-      )}
-    </Draggable>
-  );
-});
 
 // Smart task grouping function
 function useTaskGrouping(tasks: any[]) {
@@ -529,7 +143,7 @@ function useTaskGrouping(tasks: any[]) {
   }, [tasks]);
 }
 
-export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false, dashboardView = false, onCollapsedChange, onTaskClick }: CalendarTaskListProps) {
+export function CalendarTaskList({ selectedDate = new Date(), availableBuckets = [], selectedBucket, isDragging = false, dashboardView = false, onCollapsedChange, onTaskClick }: CalendarTaskListProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDailyCollapsed, setIsDailyCollapsed] = useState(false);
 
@@ -700,28 +314,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     return filtered;
   }, [allTasks, todayStr, selectedBucket, dashboardView]);
 
-  // Local order for today's tasks, persisted per-day in localStorage
-  const todayOrderKey = `daily-order-${todayStr}`;
-
-  // Force re-render trigger for today tasks
-  const [todayTasksRenderKey, setTodayTasksRenderKey] = React.useState(0);
-
-  const todayTasksOrdered = useMemo(() => {
-    try {
-      if (typeof window === 'undefined') return todayTasks;
-      const raw = window.localStorage.getItem(todayOrderKey);
-      const idOrder: string[] = raw ? JSON.parse(raw) : [];
-      const map = new Map(todayTasks.map(t => [t.id.toString(), t]));
-      const ordered: any[] = [];
-      idOrder.forEach(id => { if (map.has(id)) { ordered.push(map.get(id)!); map.delete(id); } });
-      // Append any new tasks not yet in the stored order
-      ordered.push(...Array.from(map.values()));
-      return ordered;
-    } catch {
-      return todayTasks;
-    }
-  }, [todayTasks, todayOrderKey]);
-
   // Open tasks (only shown in Master List tab)
   const openTasksBase = useMemo(() => {
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot);
@@ -734,153 +326,13 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     return filtered;
   }, [allTasks, selectedBucket, dashboardView]);
 
-  // Maintain a local, immediately responsive list for open tasks
-  const [openTasksLocal, setOpenTasksLocal] = useState<any[]>([]);
-
-  // Track if we're currently reordering to prevent sync interference
-  const [isReordering, setIsReordering] = React.useState(false);
-
-  // Sync local list when membership changes (add/remove), but don't override order on mere metadata updates
-  React.useEffect(() => {
-    // Don't sync if we're in the middle of a reorder operation
-    if (isReordering) {
-      return;
-    }
-
-    const baseMap = new Map(openTasksBase.map(t => [t.id.toString(), t]));
-    const localIds = new Set(openTasksLocal.map(t => t.id.toString()));
-
-    // Check if any tasks have position values - if so, use API order
-    const hasPositions = openTasksBase.some(t => t.position !== undefined);
-
-    if (hasPositions) {
-      // Use API order when tasks have positions (they're already sorted by API)
-      // Only update if the order is actually different to prevent infinite loops
-      const currentOrder = openTasksLocal.map(t => t.id.toString()).join(',');
-      const baseOrder = openTasksBase.map(t => t.id.toString()).join(',');
-      if (currentOrder !== baseOrder) {
-        setOpenTasksLocal(openTasksBase);
-      }
-      return;
-    }
-
-    let changed = false;
-    // Remove items no longer in base
-    let next = openTasksLocal.filter(t => baseMap.has(t.id.toString()));
-    if (next.length !== openTasksLocal.length) changed = true;
-    // Append new items at the end preserving current local order
-    openTasksBase.forEach(t => {
-      const id = t.id.toString();
-      if (!localIds.has(id)) { next.push(t); changed = true; }
-    });
-    if (changed || openTasksLocal.length === 0) {
-      // Only update if there's an actual change to prevent infinite loops
-      const nextOrder = next.map(t => t.id.toString()).join(',');
-      const currentOrder = openTasksLocal.map(t => t.id.toString()).join(',');
-      if (nextOrder !== currentOrder) {
-        setOpenTasksLocal(next);
-      }
-    }
-  }, [openTasksBase, openTasksLocal, isReordering]);
-
-  // Render from local list
-  const openTasksToShow = useMemo(() => {
-    return openTasksLocal.length ? openTasksLocal : openTasksBase;
-  }, [openTasksLocal, openTasksBase]);
-
-
-
-  // Listen for reorder events from parent DragDropContext
-  React.useEffect(() => {
-    const handleReorderOpenTasks = (event: CustomEvent) => {
-      const { source, destination } = event.detail;
-
-      // Set reordering flag to prevent sync interference
-      setIsReordering(true);
-
-      const list = [...openTasksToShow];
-      const [moved] = list.splice(source.index, 1);
-      list.splice(destination.index, 0, moved);
-
-      // Update local state immediately for instant UI feedback
-      setOpenTasksLocal(list);
-
-      // Persist as positions for all visible tasks
-      const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
-
-      batchUpdateTasks(updates)
-        .then(() => {
-          // Clear reordering flag after successful API call
-          setTimeout(() => setIsReordering(false), 1000);
-        })
-        .catch(err => {
-          console.error('Failed to persist order', err);
-          // Clear reordering flag even on error
-          setIsReordering(false);
-        });
-    };
-
-    const handleReorderDailyTasks = (event: CustomEvent) => {
-      const { source, destination } = event.detail;
-
-      const list = [...todayTasksOrdered];
-      const [moved] = list.splice(source.index, 1);
-      list.splice(destination.index, 0, moved);
-
-      // Force immediate re-render by updating the localStorage and triggering a state change
-      if (typeof window !== 'undefined') {
-        const newOrder = list.map(t => t.id.toString());
-        try {
-          window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder));
-
-          // Trigger a custom event to force re-render of today tasks
-          window.dispatchEvent(new CustomEvent('todayTasksReordered'));
-        } catch { }
-      }
-    };
-
-    const handleReorderMasterTodayTasks = (event: CustomEvent) => {
-      const { source, destination } = event.detail;
-
-      const list = [...todayTasksOrdered];
-      const [moved] = list.splice(source.index, 1);
-      list.splice(destination.index, 0, moved);
-
-      // Force immediate re-render by updating the localStorage and triggering a state change
-      if (typeof window !== 'undefined') {
-        const newOrder = list.map(t => t.id.toString());
-        try {
-          window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder));
-
-          // Trigger a custom event to force re-render of today tasks
-          window.dispatchEvent(new CustomEvent('todayTasksReordered'));
-        } catch { }
-      }
-    };
-
-    const handleReorderUpcomingTasks = () => {
-      // Upcoming tasks don't have persistent ordering like today tasks.
-      // The UI handles regrouping so no additional action is required here.
-    };
-
-    const handleTodayTasksReordered = () => {
-      setTodayTasksRenderKey(prev => prev + 1);
-    };
-
-    window.addEventListener('reorderOpenTasks', handleReorderOpenTasks as EventListener);
-    window.addEventListener('reorderDailyTasks', handleReorderDailyTasks as EventListener);
-    window.addEventListener('reorderMasterTodayTasks', handleReorderMasterTodayTasks as EventListener);
-    window.addEventListener('reorderUpcomingTasks', handleReorderUpcomingTasks as EventListener);
-    window.addEventListener('todayTasksReordered', handleTodayTasksReordered);
-
-    return () => {
-      window.removeEventListener('reorderOpenTasks', handleReorderOpenTasks as EventListener);
-      window.removeEventListener('reorderDailyTasks', handleReorderDailyTasks as EventListener);
-      window.removeEventListener('reorderMasterTodayTasks', handleReorderMasterTodayTasks as EventListener);
-      window.removeEventListener('reorderUpcomingTasks', handleReorderUpcomingTasks as EventListener);
-      window.removeEventListener('todayTasksReordered', handleTodayTasksReordered);
-    };
-  }, [openTasksToShow, todayTasksOrdered, todayOrderKey, batchUpdateTasks]);
+  // Task ordering: localStorage-persisted today order + position-based open tasks order
+  const { todayTasksOrdered, openTasksToShow } = useTaskOrdering({
+    todayTasks,
+    openTasksBase,
+    todayStr,
+    batchUpdateTasks,
+  });
 
   // New task input state
   const [newDailyTask, setNewDailyTask] = useState("");
@@ -911,162 +363,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
       setNewUpcomingTaskDate("");
     }
   };
-
-  // Unified drag and drop handler
-  function handleDragEnd(result: DropResult) {
-    // Ignore drops if a resize operation is active in the planner
-    if (typeof document !== 'undefined' && document.body.classList.contains('lb-resizing')) {
-      return;
-    }
-    if (!result.destination) return;
-
-    const { source, destination, draggableId } = result;
-
-    // Helper functions
-    const isHour = (id: string) => id.startsWith('hour-');
-    const hourKey = (id: string) => id.replace('hour-', '');
-
-    // Same list reorder - persist for specific lists
-    if (source.droppableId === destination.droppableId && source.index !== destination.index) {
-      // Reorder for today's list (persist to localStorage, no API call)
-      if (destination.droppableId === 'dailyTasks') {
-        const list = [...todayTasksOrdered];
-        const [moved] = list.splice(source.index, 1);
-        list.splice(destination.index, 0, moved);
-
-        // Update localStorage immediately for instant UI feedback
-        if (typeof window !== 'undefined') {
-          const newOrder = list.map(t => t.id.toString());
-          try {
-            window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder));
-            // Trigger immediate re-render
-            setTodayTasksRenderKey(prev => prev + 1);
-          } catch { }
-        }
-        return;
-      }
-      // Reorder for open tasks: update local order immediately and persist positions
-      if (destination.droppableId === 'openTasks') {
-        // Set reordering flag to prevent sync interference
-        setIsReordering(true);
-
-        const list = [...openTasksToShow];
-        const [moved] = list.splice(source.index, 1);
-        list.splice(destination.index, 0, moved);
-
-        // Update local state immediately for instant UI feedback
-        setOpenTasksLocal(list);
-
-        // Persist as positions for all visible tasks
-        const updates = list.map((t, idx) => ({ taskId: t.id.toString(), updates: { position: idx } }));
-
-        batchUpdateTasks(updates)
-          .then(() => {
-            // Clear reordering flag after successful API call
-            setTimeout(() => setIsReordering(false), 1000);
-          })
-          .catch(err => {
-            console.error('Failed to persist order', err);
-            // Clear reordering flag even on error
-            setIsReordering(false);
-          });
-        return;
-      }
-    }
-
-    // Handle moves to/from hourly planner (if calendar has hourly view)
-    if (source.droppableId === 'dailyTasks' && isHour(destination.droppableId)) {
-      // Daily task → Hour slot: Set the hourSlot to schedule the task
-      const dstHour = hourKey(destination.droppableId);
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: todayStr }
-      ]).catch(error => {
-        console.error('Failed to update task hourSlot:', error);
-      });
-      return;
-    }
-
-    if (isHour(source.droppableId) && destination.droppableId === 'dailyTasks') {
-      // Hour slot → Daily tasks: Remove hourSlot to unschedule
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: null as any }, occurrenceDate: todayStr }
-      ]).catch(error => {
-        console.error('Failed to remove task hourSlot:', error);
-      });
-      return;
-    }
-
-    if (isHour(source.droppableId) && isHour(destination.droppableId)) {
-      // Hour slot → Different hour slot: Change hourSlot
-      const dstHour = hourKey(destination.droppableId);
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { hourSlot: dstHour }, occurrenceDate: todayStr }
-      ]).catch(error => {
-        console.error('Failed to update task hourSlot:', error);
-      });
-      return;
-    }
-
-    // Handle moves between daily and open tasks
-    if (source.droppableId === 'openTasks' && destination.droppableId === 'dailyTasks') {
-      // Open task → Today list: Set due date to real today
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { due: { date: todayStr } } }
-      ]).catch(error => {
-        console.error('Failed to update task due date:', error);
-      });
-      return;
-    }
-
-    if (source.droppableId === 'dailyTasks' && destination.droppableId === 'openTasks') {
-      // Daily task → Open: Remove due date
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { due: null } }
-      ]).catch(error => {
-        console.error('Failed to remove task due date:', error);
-      });
-      return;
-    }
-
-    // Handle moves between Master List today section and open tasks
-    if (source.droppableId === 'openTasks' && destination.droppableId === 'masterTodayTasks') {
-      // Open task → Master List Today: Set due date to real today
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { due: { date: todayStr } } }
-      ]).catch(error => {
-        console.error('Failed to update task due date:', error);
-      });
-      return;
-    }
-
-    if (source.droppableId === 'masterTodayTasks' && destination.droppableId === 'openTasks') {
-      // Master List Today → Open: Remove due date
-      batchUpdateTasks([
-        { taskId: draggableId, updates: { due: null } }
-      ]).catch(error => {
-        console.error('Failed to remove task due date:', error);
-      });
-      return;
-    }
-
-    // Handle reordering within Master List today section
-    if (source.droppableId === destination.droppableId && destination.droppableId === 'masterTodayTasks') {
-      const list = [...todayTasksOrdered];
-      const [moved] = list.splice(source.index, 1);
-      list.splice(destination.index, 0, moved);
-
-      // Update localStorage immediately for instant UI feedback
-      if (typeof window !== 'undefined') {
-        const newOrder = list.map(t => t.id.toString());
-        try {
-          window.localStorage.setItem(todayOrderKey, JSON.stringify(newOrder));
-          // Trigger immediate re-render
-          setTodayTasksRenderKey(prev => prev + 1);
-        } catch { }
-      }
-      return;
-    }
-  }
 
   if (isCollapsed) {
     return (
@@ -1230,13 +526,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
       {/* Task lists with drag & drop */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full px-6 py-2 overflow-y-auto">
-          {!disableInternalDragDrop ? (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              {renderTaskContent()}
-            </DragDropContext>
-          ) : (
-            renderTaskContent()
-          )}
+          {renderTaskContent()}
         </div>
       </div>
     </div>

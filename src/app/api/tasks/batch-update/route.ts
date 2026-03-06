@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       if (typeof patch.position === 'number') updateData.position = patch.position
       if (typeof patch.duration === 'number') updateData.duration = patch.duration
       if (typeof patch.kanbanStatus === 'string') updateData.kanban_status = patch.kanbanStatus
+      if (patch.assigneeId !== undefined) updateData.assignee_id = patch.assigneeId ?? null
       if (updateData.due_date === undefined && updateData.start_date !== undefined) {
         updateData.due_date = updateData.start_date
       }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('id', taskId)
         .eq('user_id', user.id)
-        .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status')
+        .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status, assignee_id')
         .single()
       if (error) {
         console.warn('Supabase batch update error for', taskId, error)

@@ -48,7 +48,6 @@ export interface FullCalendarProps {
   availableBuckets?: string[];
   selectedBucket?: string;
   isDragging?: boolean;
-  disableInternalDragDrop?: boolean;
 }
 
 interface BucketEventStyles {
@@ -218,6 +217,24 @@ export const isTypingInFormField = (target: EventTarget | null) => {
   if (target.isContentEditable) return true;
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+};
+
+/* ─── Hour-slot Utilities ─── */
+
+/** Convert an hour-slot string (e.g. "hour-9AM", "hour-2:30PM") to an ISO timestamp for a given date. */
+export const hourSlotToISO = (hourSlot: string | undefined | null, dateStr: string): string | undefined => {
+  if (!hourSlot) return undefined;
+  const label = hourSlot.replace(/^hour-/, '');
+  const match = label.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
+  if (!match) return undefined;
+  let hour = parseInt(match[1], 10);
+  const minute = match[2] ? parseInt(match[2], 10) : 0;
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  const base = new Date(`${dateStr}T00:00:00`);
+  base.setHours(hour, minute, 0, 0);
+  return base.toISOString();
 };
 
 /* ─── Matrix Builders ─── */

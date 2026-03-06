@@ -9,6 +9,7 @@ import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/co
 import type { ListTask } from "@/features/tasks/components/task-list-view";
 import type { KanbanTask } from "@/features/tasks/components/task-kanban-board";
 import type { KanbanStatus } from "@/types/tasks";
+import { useFamilyMembers } from "@/hooks/use-family-members";
 import { differenceInCalendarDays, parseISO, isValid, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Search, Activity, CheckCircle2, AlertTriangle, X, ListChecks, CheckSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -129,6 +130,7 @@ function TasksBoardShell() {
   const { allTasks, toggleTaskCompletion, createTask, batchUpdateTasks, deleteTask } =
     useTasksContext();
   const { buckets } = useBuckets();
+  const familyMembers = useFamilyMembers();
   const { toast } = useToast();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
@@ -1000,6 +1002,7 @@ function TasksBoardShell() {
         selectedBucket={quickBucket || null}
         getDefaultDate={() => format(new Date(), "yyyy-MM-dd")}
         bucketColors={bucketColors}
+        familyMembers={familyMembers}
       />
     </div>
   );

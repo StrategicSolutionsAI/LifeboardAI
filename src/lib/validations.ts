@@ -30,6 +30,8 @@ export const createTaskSchema = z.object({
   repeatRule: z.string().max(200).nullable().optional(),
   kanban_status: z.enum(['todo', 'in_progress', 'done']).optional(),
   kanbanStatus: z.enum(['todo', 'in_progress', 'done']).optional(),
+  assignee_id: z.string().nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
 })
 
 export const updateTaskSchema = z.object({
@@ -54,6 +56,8 @@ export const updateTaskSchema = z.object({
   repeatRule: z.string().max(200).nullable().optional(),
   kanban_status: z.enum(['todo', 'in_progress', 'done']).optional(),
   kanbanStatus: z.enum(['todo', 'in_progress', 'done']).optional(),
+  assignee_id: z.string().nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
 })
 
 // ---------- Shopping List ----------
@@ -64,6 +68,7 @@ export const createShoppingItemSchema = z.object({
   quantity: z.string().max(100).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   neededBy: dateString.nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
 })
 
 export const updateShoppingItemSchema = z.object({
@@ -81,10 +86,28 @@ export const updateShoppingItemSchema = z.object({
   widgetBucket: z.string().nullable().optional(),
   taskId: z.string().nullable().optional(),
   taskCreatedAt: z.string().nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
 })
 
 export const deleteShoppingItemSchema = z.object({
   id: z.string().min(1, 'id required'),
+})
+
+// ---------- Household ----------
+
+export const createHouseholdSchema = z.object({
+  name: z.string().min(1, 'name required').max(100),
+})
+
+export const inviteHouseholdMemberSchema = z.object({
+  email: z.string().email('valid email required'),
+  displayName: z.string().max(100).optional(),
+})
+
+export const updateHouseholdMemberSchema = z.object({
+  memberId: z.string().min(1, 'memberId required'),
+  role: z.enum(['admin', 'member']).optional(),
+  displayName: z.string().max(100).optional(),
 })
 
 // ---------- Helpers ----------

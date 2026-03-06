@@ -203,6 +203,22 @@ export async function buildChatContext(
       contextParts.push(`\n\nToday's Steps: ${contextData.steps}`)
     }
 
+    // Extract family members from widget data
+    const allWidgets = Object.values(prefs.widgets_by_bucket || {}).flat() as any[]
+    const familyWidget = allWidgets.find((w: any) => w?.id === 'family_members' && w?.familyMembersData?.members?.length)
+    if (familyWidget) {
+      const familySummary = familyWidget.familyMembersData.members
+        .map((m: any) => {
+          const parts = [`- ${m.name} (${m.relationship})`]
+          if (m.birthday) parts.push(`birthday: ${m.birthday}`)
+          if (m.allergens?.length) parts.push(`allergens: ${m.allergens.join(', ')}`)
+          if (m.medicalNotes) parts.push(`medical: ${m.medicalNotes}`)
+          return parts.join(' | ')
+        })
+        .join('\n')
+      contextParts.push(`\n\nFamily Members (${familyWidget.familyMembersData.members.length}):\n${familySummary}`)
+    }
+
     systemContext = `System: ${contextParts.join('\n')}`
   } catch (e) {
     console.error('Failed to build chat system context', e)

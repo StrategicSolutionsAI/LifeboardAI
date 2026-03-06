@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import {
@@ -12,7 +12,7 @@ import {
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical, MoreHorizontal } from "lucide-react";
+import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTasksContext } from "@/contexts/tasks-context";
@@ -23,6 +23,7 @@ import { useCalendarNavigation } from "@/features/calendar/hooks/use-calendar-na
 import { useCalendarActions } from "@/features/calendar/hooks/use-calendar-actions";
 import { useCalendarDisplay, WEEKDAY_LABELS } from "@/features/calendar/hooks/use-calendar-display";
 import { EventDetailsModal, DeleteConfirmModal, CalendarUploadModal } from "@/features/calendar/components/calendar-modals";
+import { useFamilyMembers } from "@/hooks/use-family-members";
 import {
   type CalendarView,
   type DayEvent,
@@ -31,6 +32,7 @@ import {
   normalizeBucketId,
   toDayKey,
   isTypingInFormField,
+  hourSlotToISO,
 } from "@/features/calendar/types";
 import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/features/calendar/hooks/use-calendar-stickers";
 import {
@@ -39,6 +41,7 @@ import {
   StickerPalette,
   StickerRow,
 } from "@/features/calendar/components/calendar-stickers";
+import { MobileViewDropdown, MobileOverflowMenu, EventPill } from "@/features/calendar/components/calendar-mobile-components";
 
 
 const CalendarFileUpload = dynamic(
@@ -46,7 +49,7 @@ const CalendarFileUpload = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="rounded-2xl border border-theme-neutral-300 bg-white p-5 text-sm text-theme-text-tertiary shadow-sm">
+      <div className="rounded-2xl border border-theme-neutral-300 bg-theme-surface-raised p-5 text-sm text-theme-text-tertiary shadow-sm">
         Loading calendar uploader...
       </div>
     ),
@@ -54,127 +57,7 @@ const CalendarFileUpload = dynamic(
 );
 
 
-/* ─── Mobile Sub-components ─── */
-
-function MobileViewDropdown({ currentView, onViewChange }: { currentView: CalendarView; onViewChange: (v: CalendarView) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const viewOptions: { value: CalendarView; label: string }[] = [
-    { value: 'agenda', label: 'Agenda' },
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-  ];
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 rounded-md border border-theme-neutral-300 text-[11px] font-medium text-theme-text-secondary"
-      >
-        {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-        <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg py-1">
-          {viewOptions.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => { onViewChange(opt.value); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                currentView === opt.value
-                  ? 'bg-theme-brand-tint-light text-theme-primary font-medium'
-                  : 'text-theme-text-secondary active:bg-theme-surface-alt'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MobileOverflowMenu({
-  onUpload,
-  showFilter,
-  isFilterOpen,
-  onFilterToggle,
-  filterDisplayText,
-  selectedBucketFilters,
-  toggleBucketFilter,
-  filterableBuckets,
-  hasGoogleEvents,
-  hasUploadedEvents,
-}: {
-  onUpload: () => void;
-  showFilter: boolean;
-  isFilterOpen: boolean;
-  onFilterToggle: () => void;
-  filterDisplayText: string;
-  selectedBucketFilters: string[];
-  toggleBucketFilter: (bucket: string) => void;
-  filterableBuckets: string[];
-  hasGoogleEvents: boolean;
-  hasUploadedEvents: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="More options">
-        <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[200px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg py-1">
-          <button type="button" onClick={() => { onUpload(); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-theme-text-secondary active:bg-theme-surface-alt">
-            <Upload className="h-3.5 w-3.5" /> Upload Calendar
-          </button>
-          {showFilter && (
-            <>
-              <div className="border-t border-theme-neutral-300/40 my-1" />
-              <div className="px-3 py-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-theme-text-quaternary mb-1">Filter</p>
-                <label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">All Categories</span></label>
-                {filterableBuckets.map((bucket) => (<label key={bucket} className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">{bucket}</span></label>))}
-                {filterableBuckets.length > 0 && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Unassigned</span></label>)}
-                {hasGoogleEvents && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('google')} onChange={() => toggleBucketFilter('google')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Google Calendar</span></label>)}
-                {hasUploadedEvents && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('uploaded')} onChange={() => toggleBucketFilter('uploaded')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Uploaded Calendar</span></label>)}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false, disableInternalDragDrop = false }: FullCalendarProps = {}) {
+export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false }: FullCalendarProps = {}) {
   // Bucket colors — currently empty; getBucketColorSync has built-in fallbacks
   const bucketColors: Record<string, string> = {};
   const [selectedBucketFilters, setSelectedBucketFilters] = useState<string[]>(['all']);
@@ -187,6 +70,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
   const hourlyPlannerRef = useRef<HourlyPlannerHandle | null>(null);
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
+  const familyMembers = useFamilyMembers();
 
   // Calendar navigation: date/view state, keyboard shortcuts, period navigation
   const {
@@ -217,7 +101,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     uploadedEvents,
     resolveTaskById,
     ensureTaskForEvent,
-    hourSlotToISO,
     rows,
     dateRange,
   } = useCalendarEvents({
@@ -291,7 +174,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {WEEKDAY_LABELS.map((label, i) => (
         <div
           key={label}
-          className={`py-2 text-center text-[10px] font-medium tracking-[0.8px] uppercase text-theme-text-tertiary ${
+          className={`py-2 text-center text-[12px] sm:text-[10px] font-medium tracking-[0.8px] uppercase text-theme-text-tertiary ${
             i < 6 ? 'border-r border-theme-neutral-300/40' : ''
           }`}
         >
@@ -304,7 +187,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const showFilterControls = filterableBuckets.length > 0 || googleEvents.length > 0 || uploadedEvents.length > 0;
 
   return (
-    <div className="w-full max-w-none bg-white border border-theme-neutral-300/80 rounded-xl shadow-warm-sm overflow-hidden h-full flex flex-col">
+    <div className="w-full max-w-none bg-theme-surface-raised border border-theme-neutral-300/80 rounded-xl shadow-warm-sm overflow-hidden h-full flex flex-col">
       {/* Calendar Header */}
       {isCompactBreakpoint ? (
         /* ─── MOBILE HEADER ─── */
@@ -314,7 +197,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           </h3>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => handleDateChange(new Date())} disabled={isOnToday}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${isOnToday ? 'bg-theme-surface-alt text-theme-text-quaternary' : 'bg-theme-primary text-white active:bg-[#a8896a]'}`}>Today</button>
+              className={`px-2.5 py-1 rounded-full text-[13px] sm:text-[11px] font-medium transition-colors ${isOnToday ? 'bg-theme-surface-alt text-theme-text-quaternary' : 'bg-theme-primary text-white active:bg-[#a8896a]'}`}>Today</button>
             <MobileViewDropdown currentView={view} onViewChange={handleViewChange} />
             <button type="button" onClick={prevPeriod} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="Previous">
               <svg className="h-4 w-4 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -338,10 +221,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 key={viewOption}
                 onClick={() => handleViewChange(viewOption)}
                 aria-pressed={view === viewOption}
-                className={`px-3 py-1.5  text-[11px] tracking-[0.6px] uppercase transition-colors ${
+                className={`px-3 py-1.5  text-[13px] sm:text-[11px] tracking-[0.6px] uppercase transition-colors ${
                   view === viewOption
                     ? 'bg-theme-primary text-white'
-                    : 'text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)]'
+                    : 'text-theme-text-secondary hover:bg-theme-surface-warm-50'
                 }`}
               >
                 {viewOption}
@@ -356,7 +239,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             className={`px-3 py-1.5 rounded-lg border border-theme-neutral-300 text-xs transition-colors ${
               isOnToday
                 ? 'cursor-default text-[#c5c9d0]'
-                : 'text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)]'
+                : 'text-theme-text-secondary hover:bg-theme-surface-warm-50'
             }`}
             title="Jump to today (T)"
           >
@@ -366,7 +249,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <button
             type="button"
             onClick={prevPeriod}
-            className="p-1.5 rounded-lg hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-theme-surface-warm-50 transition-colors"
             aria-label="Previous period"
           >
             <svg className="h-[18px] w-[18px] text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -376,7 +259,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <button
             type="button"
             onClick={nextPeriod}
-            className="p-1.5 rounded-lg hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-theme-surface-warm-50 transition-colors"
             aria-label="Next period"
           >
             <svg className="h-[18px] w-[18px] text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -387,7 +270,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <button
             type="button"
             onClick={() => setIsUploadModalOpen(true)}
-            className="p-1.5 rounded-lg border border-theme-neutral-300 text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+            className="p-1.5 rounded-lg border border-theme-neutral-300 text-theme-text-secondary hover:bg-theme-surface-warm-50 transition-colors"
             title="Upload calendar file"
             aria-label="Upload calendar file"
           >
@@ -399,7 +282,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <button
                 type="button"
                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                className="flex items-center gap-1 rounded-lg border border-theme-neutral-300 px-2.5 py-1.5 text-xs text-theme-text-secondary hover:bg-[rgba(252,250,248,0.5)] transition-colors"
+                className="flex items-center gap-1 rounded-lg border border-theme-neutral-300 px-2.5 py-1.5 text-xs text-theme-text-secondary hover:bg-theme-surface-warm-50 transition-colors"
                 aria-haspopup="listbox"
                 aria-expanded={isFilterDropdownOpen}
               >
@@ -410,32 +293,32 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               </button>
 
               {isFilterDropdownOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-theme-neutral-300 bg-white shadow-warm-lg">
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-lg">
                   <div className="py-1">
-                    <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
+                    <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                       <input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
                       <span className="text-xs text-theme-text-secondary">All Categories</span>
                     </label>
                     {filterableBuckets.map((bucket) => (
-                      <label key={bucket} className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
+                      <label key={bucket} className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                         <input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
                         <span className="text-xs text-theme-text-secondary">{bucket}</span>
                       </label>
                     ))}
                     {filterableBuckets.length > 0 && (
-                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
+                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                         <input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
                         <span className="text-xs text-theme-text-secondary">Unassigned</span>
                       </label>
                     )}
                     {googleEvents.length > 0 && (
-                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
+                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                         <input type="checkbox" checked={selectedBucketFilters.includes('google')} onChange={() => toggleBucketFilter('google')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
                         <span className="text-xs text-theme-text-secondary">Google Calendar</span>
                       </label>
                     )}
                     {uploadedEvents.length > 0 && (
-                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-[rgba(252,250,248,0.5)]">
+                      <label className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                         <input type="checkbox" checked={selectedBucketFilters.includes('uploaded')} onChange={() => toggleBucketFilter('uploaded')} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
                         <span className="text-xs text-theme-text-secondary">Uploaded Calendar</span>
                       </label>
@@ -457,9 +340,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             {agendaDays.map(({ date, dateStr, events, isToday }) => (
               <div key={dateStr}>
                 {/* Day header */}
-                <div className="flex items-center gap-3 py-3 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                <div className="flex items-center gap-3 py-3 sticky top-0 bg-theme-surface-raised/95 backdrop-blur-sm z-10">
                   <div className={`flex flex-col items-center w-11 shrink-0 ${isToday ? 'text-red-500' : 'text-theme-text-tertiary'}`}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
+                    <span className="text-[12px] sm:text-[10px] font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
                     <span className={`text-lg font-bold leading-none mt-0.5 ${
                       isToday ? 'bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center' : ''
                     }`}>{format(date, 'd')}</span>
@@ -473,7 +356,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
                       <div className="flex-1 h-px bg-red-500" />
-                      <span className="text-[10px] font-medium text-red-500 tabular-nums">{format(new Date(), 'h:mm a')}</span>
+                      <span className="text-[12px] sm:text-[10px] font-medium text-red-500 tabular-nums">{format(new Date(), 'h:mm a')}</span>
                     </div>
                   </div>
                 )}
@@ -496,7 +379,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           key={`${ev.taskId || ev.eventId || idx}-${dateStr}`}
                           type="button"
                           onClick={() => openCalendarEvent(ev, dateStr)}
-                          className="w-full text-left flex items-start gap-3 rounded-xl px-3 py-2.5 bg-white border border-theme-neutral-300/40 shadow-sm transition-all active:scale-[0.98]"
+                          className="w-full text-left flex items-start gap-3 rounded-xl px-3 py-2.5 bg-theme-surface-raised border border-theme-neutral-300/40 shadow-sm transition-all active:scale-[0.98]"
                           style={bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}}
                         >
                           <div className="flex-1 min-w-0">
@@ -672,8 +555,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 ref={dragProv.innerRef}
                                 {...dragProv.draggableProps}
                                 {...dragProv.dragHandleProps}
-                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-theme-text-secondary bg-white border border-theme-neutral-300/50 cursor-grab active:cursor-grabbing transition-all ${
-                                  dragSnap.isDragging ? 'shadow-warm-lg ring-2 ring-theme-primary-300/60 scale-105 bg-white' : 'shadow-sm hover:shadow-warm hover:border-theme-primary-300/60'
+                                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-theme-text-secondary bg-theme-surface-raised border border-theme-neutral-300/50 cursor-grab active:cursor-grabbing transition-all ${
+                                  dragSnap.isDragging ? 'shadow-warm-lg ring-2 ring-theme-primary-300/60 scale-105' : 'shadow-sm hover:shadow-warm hover:border-theme-primary-300/60'
                                 }`}
                                 style={{
                                   ...(dragProv.draggableProps.style || {}),
@@ -871,8 +754,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                     snapshot.isDraggingOver
                                       ? 'bg-theme-brand-tint-light'
                                       : isWeekend
-                                      ? 'bg-[rgba(250,249,247,0.6)]'
-                                      : 'bg-white'
+                                      ? 'bg-theme-surface-warm-60'
+                                      : 'bg-theme-surface-raised'
                                   }`}>
                                     {/* Add task button — always visible on mobile */}
                                     <div className="flex items-center justify-end mb-2">
@@ -893,52 +776,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
                                     {/* Event pills */}
                                     <div className="flex flex-col gap-1">
-                                      {visibleEvents.map((ev: DayEvent, filteredIndex: number) => {
-                                        const styles = resolveEventStyles(ev.source, ev);
-                                        const hasTask = Boolean(ev.taskId);
-                                        const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
-                                        const draggableId = hasTask
-                                          ? `lifeboard::${ev.taskId}`
-                                          : `event::${dayStr}::${filteredIndex}`;
-
-                                        return (
-                                          <Draggable
-                                            key={draggableId}
-                                            draggableId={draggableId}
-                                            index={filteredIndex}
-                                            isDragDisabled={!hasTask}
-                                          >
-                                            {(dragProvided, dragSnapshot) => (
-                                              <div
-                                                ref={dragProvided.innerRef}
-                                                {...dragProvided.draggableProps}
-                                                {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                                role={canEditEvent ? 'button' : undefined}
-                                                tabIndex={canEditEvent ? 0 : undefined}
-                                                onClick={async (event) => {
-                                                  if (!canEditEvent) return;
-                                                  event.stopPropagation();
-                                                  await openCalendarEvent(ev, dayStr);
-                                                }}
-                                                className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-left transition-all active:bg-theme-surface-alt/80 ${
-                                                  dragSnapshot.isDragging ? 'opacity-40 shadow-sm' : ''
-                                                }`}
-                                                style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
-                                                title={ev.title}
-                                                data-task-id={ev.taskId}
-                                              >
-                                                <span
-                                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
-                                                  style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                                />
-                                                <span className="text-[11px] leading-tight text-theme-text-primary truncate">
-                                                  {ev.title}
-                                                </span>
-                                              </div>
-                                            )}
-                                          </Draggable>
-                                        );
-                                      })}
+                                      {visibleEvents.map((ev: DayEvent, filteredIndex: number) => (
+                                        <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
+                                          ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
+                                          styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
+                                      ))}
                                     </div>
                                     {provided.placeholder}
                                   </div>
@@ -971,8 +813,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         snapshot.isDraggingOver
                           ? 'bg-theme-brand-tint-light'
                           : isWeekend
-                          ? 'bg-[rgba(250,249,247,0.6)]'
-                          : 'bg-white',
+                          ? 'bg-theme-surface-warm-60'
+                          : 'bg-theme-surface-raised',
                       ].filter(Boolean).join(' ');
                       const visibleEvents = getEventsForDisplay(dayEvents);
                       const filteredEvents = visibleEvents;
@@ -1034,52 +876,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
                           {/* Compact event pills */}
                           <div className="flex flex-col gap-1">
-                            {filteredEvents.map((ev: DayEvent, filteredIndex: number) => {
-                                const styles = resolveEventStyles(ev.source, ev);
-                                const hasTask = Boolean(ev.taskId);
-                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
-                                const draggableId = hasTask
-                                  ? `lifeboard::${ev.taskId}`
-                                  : `event::${dayStr}::${filteredIndex}`;
-
-                                return (
-                                  <Draggable
-                                    key={draggableId}
-                                    draggableId={draggableId}
-                                    index={filteredIndex}
-                                    isDragDisabled={!hasTask}
-                                  >
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                        role={canEditEvent ? 'button' : undefined}
-                                        tabIndex={canEditEvent ? 0 : undefined}
-                                        onClick={async (event) => {
-                                          if (!canEditEvent) return;
-                                          event.stopPropagation();
-                                          await openCalendarEvent(ev, dayStr);
-                                        }}
-                                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-left transition-all hover:bg-theme-surface-alt/80 cursor-grab active:cursor-grabbing ${
-                                          dragSnapshot.isDragging ? 'opacity-40 shadow-sm' : ''
-                                        }`}
-                                        style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
-                                        title={ev.title}
-                                        data-task-id={ev.taskId}
-                                      >
-                                        <span
-                                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
-                                          style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                        />
-                                        <span className="text-[11px] leading-tight text-theme-text-primary truncate">
-                                          {ev.title}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                );
-                              })}
+                            {filteredEvents.map((ev: DayEvent, filteredIndex: number) => (
+                              <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
+                                ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
+                                styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
+                            ))}
                           </div>
                           {provided.placeholder}
                           </div>
@@ -1121,8 +922,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         snapshot.isDraggingOver
                           ? 'bg-theme-brand-tint-light'
                           : isCurrentMonth
-                          ? 'bg-white'
-                          : 'bg-[rgba(252,250,248,0.3)]',
+                          ? 'bg-theme-surface-raised'
+                          : 'bg-theme-surface-warm-30',
                       ].filter(Boolean).join(' ');
 
                       const displayEvents = getEventsForDisplay(dayEvents);
@@ -1141,7 +942,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               onClick={() => { handleDateChange(day); handleViewChange('day'); }}
                               className={`w-full h-full p-1 flex flex-col items-center justify-start transition-colors ${
                                 snapshot.isDraggingOver ? 'bg-theme-brand-tint-light'
-                                : isCurrentMonth ? 'bg-white' : 'bg-[rgba(252,250,248,0.3)]'
+                                : isCurrentMonth ? 'bg-theme-surface-raised' : 'bg-theme-surface-warm-30'
                               }`}
                             >
                               <span className={`text-xs w-7 h-7 flex items-center justify-center rounded-full ${
@@ -1225,51 +1026,11 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
                           {/* Calidora-style compact event pills */}
                           <div className="flex flex-col gap-1">
-                            {filteredEvents.slice(0, 3).map((ev: DayEvent, filteredIndex: number) => {
-                                const styles = resolveEventStyles(ev.source, ev);
-                                const hasTask = Boolean(ev.taskId);
-                                const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
-                                const draggableId = hasTask
-                                  ? `lifeboard::${ev.taskId}`
-                                  : `event::${dayStr}::${filteredIndex}`;
-
-                                return (
-                                  <Draggable
-                                    key={draggableId}
-                                    draggableId={draggableId}
-                                    index={filteredIndex}
-                                    isDragDisabled={!hasTask}
-                                  >
-                                    {(dragProvided, dragSnapshot) => (
-                                      <div
-                                        ref={dragProvided.innerRef}
-                                        {...dragProvided.draggableProps}
-                                        {...(hasTask ? dragProvided.dragHandleProps : {})}
-                                        role={canEditEvent ? 'button' : undefined}
-                                        tabIndex={canEditEvent ? 0 : undefined}
-                                        onClick={async (event) => {
-                                          if (!canEditEvent) return;
-                                          event.stopPropagation();
-                                          await openCalendarEvent(ev, dayStr);
-                                        }}
-                                        className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-colors hover:bg-[rgba(252,250,248,0.8)] cursor-grab active:cursor-grabbing ${
-                                          dragSnapshot.isDragging ? 'opacity-40' : ''
-                                        }`}
-                                        style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
-                                        title={ev.title}
-                                      >
-                                        <span
-                                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
-                                          style={styles.customColor ? { backgroundColor: styles.customColor } : {}}
-                                        />
-                                        <span className="text-[11px] text-theme-text-primary truncate">
-                                          {ev.title}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                );
-                              })}
+                            {filteredEvents.slice(0, 3).map((ev: DayEvent, filteredIndex: number) => (
+                              <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
+                                ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
+                                styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
+                            ))}
                             {dayEvents.length > 3 && (
                               <button
                                 type="button"

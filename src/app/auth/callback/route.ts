@@ -81,6 +81,28 @@ export async function GET(request: NextRequest) {
   if (!profile) {
     await supabase.from('profiles').insert({ id: user.id, onboarded: false }).throwOnError()
     destination = '/onboarding/0'
+
+    // Auto-join household if this email was invited
+    if (user.email) {
+      const { data: pendingInvite } = await supabase
+        .from('household_members')
+        .select('id')
+        .eq('invited_email', user.email.toLowerCase())
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle()
+
+      if (pendingInvite) {
+        await supabase
+          .from('household_members')
+          .update({
+            user_id: user.id,
+            status: 'active',
+            joined_at: new Date().toISOString(),
+          })
+          .eq('id', pendingInvite.id)
+      }
+    }
   }
 
   // Create the final redirect, copying cookies set earlier into the redirect response

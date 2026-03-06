@@ -2,13 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useGlobalCache } from './use-data-cache'
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from '@/lib/user-preferences'
 import type { WidgetInstance } from '@/types/widgets'
-
-interface ProgressEntry {
-  value: number
-  date: string
-  streak: number
-  lastCompleted: string
-}
+import type { ProgressEntry } from '@/features/dashboard/types'
 
 // Debounce function
 function debounce<T extends (...args: any[]) => any>(

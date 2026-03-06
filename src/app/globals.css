@@ -147,6 +147,26 @@
     --theme-brand-tint: rgba(177, 145, 106, 0.12);
     --theme-brand-tint-strong: rgba(177, 145, 106, 0.15);
 
+    /* Warm-tint surfaces (replaces hardcoded rgba(252,250,248,...)) */
+    --theme-surface-warm-30: rgba(252, 250, 248, 0.3);
+    --theme-surface-warm-50: rgba(252, 250, 248, 0.5);
+    --theme-surface-warm-60: rgba(250, 249, 247, 0.6);
+    --theme-surface-warm-70: rgba(252, 250, 248, 0.7);
+    --theme-surface-warm-80: rgba(252, 250, 248, 0.8);
+    --theme-surface-warm-90: rgba(252, 250, 248, 0.9);
+    --theme-surface-warm: rgba(252, 250, 248, 1);
+
+    /* Border opacity variants (replaces hardcoded rgba(219,214,207,...)) */
+    --theme-border-subtle-60: rgba(219, 214, 207, 0.6);
+    --theme-border-subtle-70: rgba(219, 214, 207, 0.7);
+    --theme-border-subtle-90: rgba(219, 214, 207, 0.9);
+
+    /* Status tints (icon backgrounds on stat cards) */
+    --theme-info-tint: rgba(74, 173, 224, 0.15);
+    --theme-success-tint: rgba(72, 184, 130, 0.15);
+    --theme-warning-tint: rgba(196, 164, 78, 0.15);
+    --theme-error-tint: rgba(212, 24, 61, 0.15);
+
     --theme-primary: var(--theme-primary-500);
     --theme-secondary: var(--theme-secondary-500);
     --theme-accent: var(--theme-primary-300);
@@ -209,6 +229,26 @@
     --theme-brand-tint-light: rgba(177, 145, 106, 0.1);
     --theme-brand-tint: rgba(177, 145, 106, 0.16);
     --theme-brand-tint-strong: rgba(177, 145, 106, 0.2);
+
+    /* Warm-tint surfaces (dark mode) */
+    --theme-surface-warm-30: rgba(30, 28, 26, 0.3);
+    --theme-surface-warm-50: rgba(30, 28, 26, 0.5);
+    --theme-surface-warm-60: rgba(30, 28, 26, 0.6);
+    --theme-surface-warm-70: rgba(30, 28, 26, 0.7);
+    --theme-surface-warm-80: rgba(30, 28, 26, 0.8);
+    --theme-surface-warm-90: rgba(30, 28, 26, 0.9);
+    --theme-surface-warm: #1e1c1a;
+
+    /* Border opacity variants (dark mode) */
+    --theme-border-subtle-60: rgba(60, 56, 52, 0.6);
+    --theme-border-subtle-70: rgba(60, 56, 52, 0.7);
+    --theme-border-subtle-90: rgba(60, 56, 52, 0.9);
+
+    /* Status tints (dark mode — slightly brighter for dark backgrounds) */
+    --theme-info-tint: rgba(74, 173, 224, 0.2);
+    --theme-success-tint: rgba(72, 184, 130, 0.2);
+    --theme-warning-tint: rgba(196, 164, 78, 0.2);
+    --theme-error-tint: rgba(212, 24, 61, 0.2);
   }
 }
 
@@ -447,5 +487,19 @@
 @media (hover: none) {
   .drag-handle-touch {
     opacity: 0.3;
+  }
+}
+
+/* PWA standalone mode adjustments */
+@media (display-mode: standalone) {
+  /* Remove extra bottom padding that accounts for browser chrome */
+  body {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tighten bottom nav since browser chrome is gone */
+  .pwa-standalone-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

@@ -20,6 +20,7 @@ import {
   withRetry,
   getContrastText,
 } from "@/lib/dashboard-utils";
+import { card, text, surface, iconBox } from "@/lib/styles";
 import {
   Plus,
   Target,
@@ -239,6 +240,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Memoize the active bucket's hex color so widget cards get a stable string prop
   const activeBucketHex = useMemo(() => getBucketColor(activeBucket), [getBucketColor, activeBucket]);
 
+  // Extract family members from the Family Members widget (any bucket)
+  const familyMembers = useMemo(() => {
+    const allWidgets = Object.values(widgetsByBucket).flat();
+    const fmWidget = allWidgets.find((w) => w.id === 'family_members');
+    const members = (fmWidget as any)?.familyMembersData?.members;
+    if (!Array.isArray(members)) return [];
+    return members.map((m: any) => ({
+      id: m.id as string,
+      name: m.name as string,
+      avatarColor: m.avatarColor as string,
+      relationship: m.relationship as string,
+    }));
+  }, [widgetsByBucket]);
+
+  // Assignee filter for tasks — null means show all
+  const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
+
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const weather = useWeather();
 
@@ -455,7 +473,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   });
 
   return (
-    <div className="flex-1 relative min-h-screen overflow-hidden" style={{ background: 'linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)' }}>
+    <div className="flex-1 relative min-h-screen overflow-hidden bg-theme-surface-warm-70">
 
       {/* Main wrapper */}
       <div className="relative z-10 flex flex-col">
@@ -527,8 +545,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   // Active tab always highest; otherwise cascade left-over-right without negative z-index
                   zIndex: b === activeBucket ? 50 : Math.max(buckets.length - idx, 1),
                   marginRight: '-10px',
-                  backgroundColor: b === activeBucket ? getBucketColor(b) : 'rgba(252, 250, 248, 0.9)',
-                  borderColor: b === activeBucket ? getBucketColor(b) : 'rgba(219, 214, 207, 0.6)',
+                  backgroundColor: b === activeBucket ? getBucketColor(b) : 'var(--theme-surface-warm-90)',
+                  borderColor: b === activeBucket ? getBucketColor(b) : 'var(--theme-border-subtle-60)',
                   borderBottomColor: b === activeBucket ? getBucketColor(b) : 'transparent',
                   color: b === activeBucket ? getContrastText(getBucketColor(b)) : '#314158',
                   marginBottom: '-1px',
@@ -539,14 +557,14 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   }`}
                 onMouseEnter={(e) => {
                   if (b !== activeBucket) {
-                    e.currentTarget.style.backgroundColor = 'rgba(252, 250, 248, 1)'
-                    e.currentTarget.style.borderColor = 'rgba(219, 214, 207, 0.9)'
+                    e.currentTarget.style.backgroundColor = 'var(--theme-surface-warm)'
+                    e.currentTarget.style.borderColor = 'var(--theme-border-subtle-90)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (b !== activeBucket) {
-                    e.currentTarget.style.backgroundColor = 'rgba(252, 250, 248, 0.9)'
-                    e.currentTarget.style.borderColor = 'rgba(219, 214, 207, 0.6)'
+                    e.currentTarget.style.backgroundColor = 'var(--theme-surface-warm-90)'
+                    e.currentTarget.style.borderColor = 'var(--theme-border-subtle-60)'
                   }
                 }}
               >
@@ -562,7 +580,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 marginBottom: '-1px',
                 borderBottomColor: 'transparent',
               }}
-              className="relative flex h-[42px] sm:h-[48px] items-center justify-center rounded-t-[14px] sm:rounded-t-[16px] bg-white px-4 sm:px-8 text-[18px] font-medium transition-colors hover:bg-[rgba(252,250,248,1)] border border-theme-neutral-300 shadow-none"
+              className="relative flex h-[42px] sm:h-[48px] items-center justify-center rounded-t-[14px] sm:rounded-t-[16px] bg-theme-surface-raised px-4 sm:px-8 text-[18px] font-medium transition-colors hover:bg-theme-surface-warm border border-theme-neutral-300 shadow-none"
             >
               <span className="text-theme-primary">
                 +
@@ -576,7 +594,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             style={{
               zIndex: 70,
               opacity: showLeftTabFade ? 1 : 0,
-              background: 'linear-gradient(to right, rgba(252,250,248,0.95) 0%, rgba(252,250,248,0.6) 50%, transparent 100%)',
+              background: 'linear-gradient(to right, var(--theme-surface-warm-90) 0%, var(--theme-surface-warm-60) 50%, transparent 100%)',
             }}
           />
           <div
@@ -584,7 +602,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             style={{
               zIndex: 70,
               opacity: showRightTabFade ? 1 : 0,
-              background: 'linear-gradient(to left, rgba(252,250,248,0.95) 0%, rgba(252,250,248,0.6) 50%, transparent 100%)',
+              background: 'linear-gradient(to left, var(--theme-surface-warm-90) 0%, var(--theme-surface-warm-60) 50%, transparent 100%)',
             }}
           />
         </div>
@@ -593,9 +611,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           {/* Left section: tabs and widgets */}
           <div className="flex-1 w-full">
             {/* Content container: white widget box with subtle shadow */}
-            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-white shadow-warm-sm">
+            <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center border-b border-[rgba(219,214,207,0.7)] px-3 sm:px-5 pt-6 sm:pt-7 text-sm font-semibold overflow-x-auto no-scrollbar">
+              <nav className="flex items-center border-b border-theme-border-subtle-70 px-3 sm:px-5 pt-6 sm:pt-7 text-sm font-semibold overflow-x-auto no-scrollbar">
                 <div className="flex items-center gap-3 sm:gap-5">
                   {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                     <button
@@ -633,33 +651,33 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   {/* Stat summary row — Calidora pattern */}
                   {activeWidgets.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-theme-brand-tint-strong mb-2">
+                      <div className={card.stat}>
+                        <div className={`${iconBox.md} bg-theme-brand-tint-strong mb-2`}>
                           <LayoutDashboard className="h-[18px] w-[18px] text-theme-primary" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{activeWidgets.length}</p>
-                        <p className=" text-xs text-theme-text-tertiary mt-1">Total Widgets</p>
+                        <p className={text.statValue}>{activeWidgets.length}</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Total Widgets</p>
                       </div>
-                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(74,173,224,0.15)] mb-2">
+                      <div className={card.stat}>
+                        <div className={`${iconBox.md} ${surface.infoTint} mb-2`}>
                           <Activity className="h-[18px] w-[18px] text-theme-info" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.inProgress}</p>
-                        <p className=" text-xs text-theme-text-tertiary mt-1">In Progress</p>
+                        <p className={text.statValue}>{widgetProgressStats.inProgress}</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">In Progress</p>
                       </div>
-                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(72,184,130,0.15)] mb-2">
+                      <div className={card.stat}>
+                        <div className={`${iconBox.md} ${surface.successTint} mb-2`}>
                           <Check className="h-[18px] w-[18px] text-theme-success" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.completed}</p>
-                        <p className=" text-xs text-theme-text-tertiary mt-1">Completed</p>
+                        <p className={text.statValue}>{widgetProgressStats.completed}</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Completed</p>
                       </div>
-                      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4 shadow-warm-sm">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[rgba(214,42,154,0.15)] mb-2">
+                      <div className={card.stat}>
+                        <div className={`${iconBox.md} bg-[rgba(214,42,154,0.15)] mb-2`}>
                           <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
                         </div>
-                        <p className=" text-[28px] text-theme-text-primary leading-none">{widgetProgressStats.notStarted}</p>
-                        <p className=" text-xs text-theme-text-tertiary mt-1">Not Started</p>
+                        <p className={text.statValue}>{widgetProgressStats.notStarted}</p>
+                        <p className="text-xs text-theme-text-tertiary mt-1">Not Started</p>
                       </div>
                     </div>
                   )}
@@ -704,7 +722,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   {/* DnD placeholder */}
                   {droppableProvided.placeholder}
                   {/* Add Widget card */}
-                  <button className="widget-card-size rounded-xl border border-dashed border-theme-neutral-300 bg-white p-4 hover:bg-[rgba(252,250,248,0.5)] transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
+                  <button className="widget-card-size rounded-xl border border-dashed border-theme-neutral-300 bg-theme-surface-raised p-4 hover:bg-theme-surface-warm-50 transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-theme-neutral-300 bg-theme-brand-tint-subtle">
                       <Plus className="h-5 w-5 text-theme-primary" />
                     </div>
@@ -752,6 +770,9 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                         linkedTaskMap={linkedTaskMap}
                         onToggleTaskWidget={handleToggleTaskWidget}
                         onEditTask={(taskId: string) => taskEditorRef.current?.openByTaskId(taskId)}
+                        familyMembers={familyMembers}
+                        assigneeFilter={assigneeFilter}
+                        onAssigneeFilterChange={setAssigneeFilter}
                       />
                     )}
                   </div>
@@ -975,6 +996,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         availableBuckets={buckets}
         selectedBucket={activeBucket}
         bucketColors={bucketColors}
+        familyMembers={familyMembers}
       />
     </div>
   );

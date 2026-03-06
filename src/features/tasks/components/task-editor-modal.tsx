@@ -48,12 +48,20 @@ export interface TaskEditorModalHandle {
   close: () => void;
 }
 
+export interface FamilyMemberOption {
+  id: string;
+  name: string;
+  avatarColor: string;
+  relationship: string;
+}
+
 interface TaskEditorModalProps {
   availableBuckets?: string[];
   selectedBucket?: string | null;
   getDefaultDate?: () => string;
   onSubmitSuccess?: (result: { action: "create" | "update"; taskId?: string | null; date: string }) => void;
   bucketColors?: Record<string, string>;
+  familyMembers?: FamilyMemberOption[];
 }
 
 const toHourSlot = (label: string): string | null => {
@@ -64,7 +72,7 @@ const toHourSlot = (label: string): string | null => {
 const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
-  ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {} }, ref) => {
+  ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {}, familyMembers = [] }, ref) => {
     const { allTasks, createTask, batchUpdateTasks, deleteTask, refetch } = useTasksContext();
     const { toast } = useToast();
 
@@ -82,6 +90,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [shoppingItemId, setShoppingItemId] = useState<string | null>(null);
     const [isShoppingBusy, setIsShoppingBusy] = useState(false);
+    const [formAssignee, setFormAssignee] = useState<string | null>(null);
 
     const resolveDefaultDate = useCallback(() => {
       return getDefaultDate?.() ?? resolveTodayKey();
@@ -106,6 +115,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setShowDeleteConfirm(false);
       setShoppingItemId(null);
       setIsShoppingBusy(false);
+      setFormAssignee(null);
     }, [evaluateBucketDefault]);
 
     const ensureTaskLookup = useCallback((taskId?: string | null): Task | undefined => {
@@ -138,6 +148,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setStartDate(effectiveDate);
       setFormEndDate(fallbackEndDate);
       setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
+      setFormAssignee(task?.assigneeId ?? null);
       setIsSubmitting(false);
       setShowDeleteConfirm(false);
       setIsOpen(true);
@@ -242,6 +253,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
               endDate: resolvedEndDate,
               endHourSlot: isAllDayEvent ? null : endHourNum,
               allDay: isAllDayEvent,
+              assigneeId: formAssignee,
             }
           );
           resetState();
@@ -263,6 +275,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             allDay: isAllDayEvent,
             due: resolvedStartDate ? { date: resolvedStartDate } : null,
             repeatRule: formRepeat === "none" ? null : formRepeat,
+            assigneeId: formAssignee,
           };
           if (bucketValue !== undefined) {
             updates.bucket = bucketValue || null;
@@ -303,6 +316,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       availableBuckets.length,
       formBucket,
       formRepeat,
+      formAssignee,
       editTaskId,
       createTask,
       resetState,
@@ -567,6 +581,59 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                       >
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                         {bucket}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Assign to */}
+            {familyMembers.length > 0 && (
+              <div>
+                <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
+                  Assign to
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormAssignee(null)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
+                      !formAssignee
+                        ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary font-medium"
+                        : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
+                    )}
+                  >
+                    None
+                  </button>
+                  {familyMembers.map((member) => {
+                    const active = formAssignee === member.id;
+                    const initials = member.name
+                      .split(" ")
+                      .map((w) => w[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+                    return (
+                      <button
+                        type="button"
+                        key={member.id}
+                        onClick={() => setFormAssignee(member.id)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] transition-all",
+                          active
+                            ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary font-medium"
+                            : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
+                        )}
+                      >
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+                          style={{ backgroundColor: member.avatarColor }}
+                        >
+                          {initials}
+                        </span>
+                        {member.name}
                       </button>
                     );
                   })}

@@ -31,6 +31,12 @@ export const metadata: Metadata = {
   },
   description:
     'The first emotion-first life-dashboard that fuses task, habit, and health data into one ruthlessly prioritised command centre.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Lifeboard',
+  },
   openGraph: {
     type: 'website',
     siteName: 'Lifeboard.ai',
@@ -55,6 +61,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: '#B1916A',
 }
 
 export default function RootLayout({
@@ -68,6 +75,12 @@ export default function RootLayout({
         {/* Preconnect to external APIs used during page lifecycle */}
         <link rel="dns-prefetch" href="https://api.openai.com" />
         <link rel="dns-prefetch" href="https://api.open-meteo.com" />
+        {/* Register service worker for PWA */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')})}`
+          }}
+        />
         {/*
           Inline theme script: injects a <style> tag with CSS custom properties
           from localStorage BEFORE React hydrates, preventing the blank flash

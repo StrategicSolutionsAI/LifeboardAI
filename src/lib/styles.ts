@@ -1,14 +1,54 @@
-// =============================================================================
-// LifeboardAI Style Library
-// Centralized Tailwind class tokens for consistent UI across the application.
-//
-// Usage:
-//   import { card, text, surface, elevation, interactive } from '@/lib/styles'
-//   <div className={cn(card.base, "p-4")}>
-//
-// All tokens reference CSS variables from globals.css via Tailwind mappings,
-// ensuring theme changes propagate automatically.
-// =============================================================================
+/**
+ * =============================================================================
+ * LifeboardAI Style Library
+ * =============================================================================
+ *
+ * Centralized Tailwind class tokens for consistent UI across the application.
+ * All tokens reference CSS variables from globals.css via Tailwind mappings in
+ * tailwind.config.ts, ensuring theme changes propagate automatically.
+ *
+ * USAGE:
+ *   import { card, text, surface, elevation, layout } from '@/lib/styles'
+ *   <div className={cn(card.base, layout.padding.standard)}>
+ *
+ * ---------------------------------------------------------------------------
+ * STYLE GUIDE — Design Decisions
+ * ---------------------------------------------------------------------------
+ *
+ * BORDER RADIUS (by element type):
+ *   - Card / container:  rounded-xl   (card.base, card.stat, card.interactive)
+ *   - Modal / sheet:     rounded-2xl  (card.panel)
+ *   - Button / input:    rounded-lg   (form.input, button.*)
+ *   - Badge:             rounded-md   (badge.base) or rounded-full (badge.pill)
+ *   - Icon box:          rounded-lg   (iconBox.*)
+ *   - Pill / chip:       rounded-full (badge.count)
+ *
+ * SHADOW HIERARCHY (lightest → heaviest):
+ *   none → micro → xs → warm-sm → warm → warm-lg → popover
+ *   Use elevation tokens which pair shadow + border for consistency.
+ *
+ * TYPOGRAPHY HIERARCHY (largest → smallest):
+ *   pageTitle → heading.2xl → heading.xl → heading.lg → heading.md →
+ *   heading.sm → heading.xs → size.lg → size.md → size.sm → caption
+ *
+ *   Stat-specific: metric (3xl black) > statValue (lg bold) > unit (sm medium)
+ *
+ * SPACING SCALE:
+ *   compact:  p-3, gap-3        (tight cards, compact lists)
+ *   standard: p-4, gap-4        (default card padding, grid gaps)
+ *   spacious: p-5, gap-5        (section content with breathing room)
+ *   section:  p-4 sm:p-6, gap-6 (page-level sections, responsive)
+ *
+ * WARM-TINT SURFACES (opacity scale):
+ *   30 → 50 → 60 → 70 → 80 → 90 → 100
+ *   Used for: weekend cells (60), inactive tabs (90), hover states (50),
+ *   off-month cells (30), page backgrounds (70)
+ *
+ * STATUS TINT COLORS:
+ *   info (blue) / success (green) / warning (amber) / error (red)
+ *   Used for stat card icon backgrounds at 15% opacity.
+ * =============================================================================
+ */
 
 // -----------------------------------------------------------------------------
 // TEXT — Color hierarchy + typography presets
@@ -29,6 +69,7 @@ export const text = {
 
   // Heading presets (size + weight, no color — compose with a color token)
   heading: {
+    '2xl': 'text-[28px] font-semibold leading-tight',
     xl: 'text-2xl font-semibold leading-tight',
     lg: 'text-xl font-semibold leading-tight',
     md: 'text-lg font-semibold leading-snug',
@@ -44,10 +85,12 @@ export const text = {
   },
 
   // Composed presets (size + weight + color — ready to use as-is)
+  pageTitle: 'text-[24px] font-semibold tracking-tight text-theme-text-primary',
   label: 'text-[11px] font-semibold uppercase tracking-widest text-theme-text-subtle',
   sectionLabel: 'text-xs font-semibold uppercase tracking-wide text-theme-secondary',
   metric: 'text-3xl font-black leading-none tracking-tight text-theme-text-primary',
   metricLg: 'text-4xl font-black leading-none tracking-tight text-theme-text-primary',
+  statValue: 'text-[28px] leading-none text-theme-text-primary',
   unit: 'text-sm font-medium text-theme-text-tertiary',
   caption: 'text-[10px] font-medium text-theme-text-tertiary',
   tableHeader: 'text-[11px] font-medium tracking-wide uppercase text-theme-text-tertiary',
@@ -68,6 +111,21 @@ export const surface = {
   progressTrack: 'bg-theme-progress-track',
   selected: 'bg-theme-surface-selected',
   page: 'bg-theme-surface-alt',
+
+  // Warm-tint opacity scale (for backgrounds with warm paper-like feel)
+  warm30: 'bg-theme-surface-warm-30',
+  warm50: 'bg-theme-surface-warm-50',
+  warm60: 'bg-theme-surface-warm-60',
+  warm70: 'bg-theme-surface-warm-70',
+  warm80: 'bg-theme-surface-warm-80',
+  warm90: 'bg-theme-surface-warm-90',
+  warm: 'bg-theme-surface-warm',
+
+  // Status tints (icon/stat card backgrounds)
+  infoTint: 'bg-theme-info-tint',
+  successTint: 'bg-theme-success-tint',
+  warningTint: 'bg-theme-warning-tint',
+  errorTint: 'bg-theme-error-tint',
 } as const
 
 // -----------------------------------------------------------------------------
@@ -81,6 +139,11 @@ export const border = {
   brand: 'border-theme-primary-400',
   focus: 'border-theme-secondary',
   divider: 'border-t border-theme-neutral-300',
+
+  // Opacity variants (for warm-tinted borders)
+  subtle60: 'border-theme-border-subtle-60',
+  subtle70: 'border-theme-border-subtle-70',
+  subtle90: 'border-theme-border-subtle-90',
 } as const
 
 // -----------------------------------------------------------------------------
@@ -89,6 +152,8 @@ export const border = {
 
 export const elevation = {
   none: 'shadow-none border border-theme-neutral-300',
+  micro: 'shadow-micro border border-theme-neutral-300',
+  xs: 'shadow-xs border border-theme-neutral-300',
   sm: 'shadow-warm-sm border border-theme-neutral-300',
   md: 'shadow-warm border border-theme-neutral-300/80',
   lg: 'shadow-warm-lg border border-theme-neutral-300/60',
@@ -108,6 +173,31 @@ export const card = {
   task: 'group bg-theme-surface-raised rounded-xl border border-theme-neutral-300/80 p-3.5 transition-all cursor-default',
   stat: 'rounded-xl border border-theme-neutral-300 bg-theme-surface-raised p-4 shadow-warm-sm',
   inset: 'rounded-lg bg-theme-surface-alt border border-theme-neutral-300',
+} as const
+
+// -----------------------------------------------------------------------------
+// LAYOUT — Spacing tokens for padding, gap, and section sizing
+// -----------------------------------------------------------------------------
+
+export const layout = {
+  padding: {
+    compact: 'p-3',
+    standard: 'p-4',
+    spacious: 'p-5',
+    section: 'p-4 sm:p-6',
+  },
+  gap: {
+    compact: 'gap-3',
+    standard: 'gap-4',
+    spacious: 'gap-5',
+    section: 'gap-6',
+  },
+  px: {
+    compact: 'px-3',
+    standard: 'px-4',
+    spacious: 'px-5',
+    section: 'px-4 sm:px-6',
+  },
 } as const
 
 // -----------------------------------------------------------------------------
@@ -132,6 +222,7 @@ export const interactive = {
   hover: 'hover:bg-theme-hover transition-colors',
   hoverBrand: 'hover:bg-theme-brand-tint-light transition-colors duration-150',
   hoverSubtle: 'hover:bg-theme-surface-alt transition-colors',
+  hoverWarm: 'hover:bg-theme-surface-warm-50 transition-colors',
   focus: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40',
   focusTight: 'focus-visible:outline-none focus-visible:ring-[1px] focus-visible:ring-theme-primary/50',
   active: 'active:scale-[0.98] active:translate-y-0',

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, startTransition } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -22,6 +22,7 @@ import {
   buildMonthMatrix,
   buildWeekMatrix,
   buildDayMatrix,
+  hourSlotToISO,
 } from "@/features/calendar/types";
 
 /* ─── Options ─── */
@@ -45,14 +46,35 @@ export function useCalendarEvents({
   allTasks,
   getTaskForOccurrence,
 }: UseCalendarEventsOptions) {
-  const [eventsByDate, setEventsByDate] = useState<Record<string, DayEvent[]>>({});
+  // Optimistic overrides applied on top of the memoized base event map.
+  // When callers use setEventsByDate, the patch is stored here and merged.
+  // The patch auto-clears when the base inputs change (data re-fetched / tasks updated).
+  const [optimisticPatch, setOptimisticPatch] = useState<
+    ((prev: Record<string, DayEvent[]>) => Record<string, DayEvent[]>) | null
+  >(null);
 
-  /* ── O(1) task lookup ── */
+  /* ── O(1) task lookups ── */
 
   const taskLookup = useMemo(
     () => new Map(allTasks.map(t => [t.id?.toString(), t])),
     [allTasks],
   );
+
+  // Title-based lookup for uploaded event → task matching (avoids allTasks.find() in externalEventMap)
+  const taskTitleIndex = useMemo(() => {
+    const index = new Map<string, Task>();
+    for (const task of allTasks) {
+      if (task.source !== 'supabase') continue;
+      const bucketName = sanitizeBucketName(task.bucket);
+      if (bucketName && bucketName !== 'Imported Calendar') continue;
+      const dueDate = task.due?.date ?? '';
+      const title = (task.content ?? '').trim().toLowerCase();
+      if (dueDate && title) {
+        index.set(`${dueDate}::${title}`, task);
+      }
+    }
+    return index;
+  }, [allTasks]);
 
   const resolveTaskById = useCallback(
     (taskId?: string | null) => {
@@ -61,23 +83,6 @@ export function useCalendarEvents({
     },
     [taskLookup],
   );
-
-  /* ── Helper: hour-slot → ISO ── */
-
-  const hourSlotToISO = useCallback((hourSlot: string | undefined, dateStr: string): string | undefined => {
-    if (!hourSlot) return undefined;
-    const normalized = hourSlot.replace(/^hour-/, '');
-    const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
-    if (!match) return undefined;
-    let hours = parseInt(match[1], 10);
-    const minutes = match[2] ? parseInt(match[2], 10) : 0;
-    const period = match[3].toUpperCase();
-    if (period === 'PM' && hours !== 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
-    const base = new Date(`${dateStr}T00:00:00`);
-    base.setHours(hours, minutes, 0, 0);
-    return base.toISOString();
-  }, []);
 
   /* ── Helper: normalize date strings ── */
 
@@ -125,14 +130,22 @@ export function useCalendarEvents({
     }
   }, [currentDate, view]);
 
-  /* ── Build lifeboard events (single-pass repeat expansion) ── */
+  /* ── Build lifeboard events (useMemo — pure computation) ── */
+  // Previously useCallback, but this is a deterministic function of its
+  // inputs. Converting to useMemo avoids a callback identity change on
+  // every allTasks update that previously cascaded into the master useEffect.
 
-  const buildAllLifeboardEvents = useCallback((rangeStart: Date, rangeEnd: Date): Record<string, DayEvent[]> => {
+  const lifeboardEventMap = useMemo((): Record<string, DayEvent[]> => {
+    const rangeStart = startOfDay(new Date(rangeStartMs));
+    const rangeEnd = startOfDay(new Date(rangeEndMs));
     const result: Record<string, DayEvent[]> = {};
     const rStartMs = rangeStart.getTime();
     const rEndMs = rangeEnd.getTime();
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const filterAll = selectedBucketFilters.includes('all');
+    // Pre-compute range boundary strings once instead of per-task
+    const rangeStartStr = format(rangeStart, 'yyyy-MM-dd');
+    const rangeEndStr = format(rangeEnd, 'yyyy-MM-dd');
 
     const addEvent = (dateStr: string, event: DayEvent) => {
       const bucket = result[dateStr] ?? (result[dateStr] = []);
@@ -189,8 +202,8 @@ export function useCalendarEvents({
 
       const rule = task.repeatRule as string | undefined;
       if (!rule || rule === 'none') {
-        const clampedStart = startRaw < format(rangeStart, 'yyyy-MM-dd') ? format(rangeStart, 'yyyy-MM-dd') : startRaw;
-        const clampedEnd = endRaw > format(rangeEnd, 'yyyy-MM-dd') ? format(rangeEnd, 'yyyy-MM-dd') : endRaw;
+        const clampedStart = startRaw < rangeStartStr ? rangeStartStr : startRaw;
+        const clampedEnd = endRaw > rangeEndStr ? rangeEndStr : endRaw;
         if (clampedStart > clampedEnd) return;
 
         let cursor = new Date(`${clampedStart}T00:00:00`);
@@ -263,7 +276,7 @@ export function useCalendarEvents({
     });
 
     return result;
-  }, [allTasks, getTaskForOccurrence, hourSlotToISO, normalizeDateString, selectedBucketFilters]);
+  }, [allTasks, getTaskForOccurrence, normalizeDateString, selectedBucketFilters, rangeStartMs, rangeEndMs]);
 
   /* ── Ensure task for uploaded event ── */
 
@@ -392,11 +405,13 @@ export function useCalendarEvents({
   });
   const cycleEntries = useMemo(() => (Array.isArray(cycleEntriesRaw) ? cycleEntriesRaw : []), [cycleEntriesRaw]);
 
-  /* ── Master Event Map Builder ── */
+  /* ── External-source event map (Google, uploaded, cycle) ── */
+  // Separated from lifeboard so that task changes only recompute the
+  // lifeboard portion — external sources are independent of allTasks.
 
   const IMPORTED_CALENDAR_BUCKET_NAME = 'Imported Calendar';
 
-  useEffect(() => {
+  const externalEventMap = useMemo(() => {
     const map: Record<string, DayEvent[]> = {};
     const seenTaskInstanceKeys = new Set<string>();
 
@@ -416,7 +431,10 @@ export function useCalendarEvents({
       });
     });
 
-    // Uploaded calendar events
+    // Uploaded calendar events — use taskLookup for O(1) matching
+    const rangeStart = startOfDay(new Date(rangeStartMs));
+    const rangeEnd = startOfDay(new Date(rangeEndMs));
+
     uploadedEvents.forEach((ev: any) => {
       if (!selectedBucketFilters.includes('all') && !selectedBucketFilters.includes('uploaded')) return;
 
@@ -424,8 +442,6 @@ export function useCalendarEvents({
       if (!startDateStr) return;
       const endDateStr = ev.end_date || startDateStr;
 
-      const rangeStart = startOfDay(new Date(rangeStartMs));
-      const rangeEnd = startOfDay(new Date(rangeEndMs));
       const startDateObj = startOfDay(new Date(`${startDateStr}T00:00:00`));
       const endDateObj = startOfDay(new Date(`${endDateStr}T00:00:00`));
 
@@ -439,19 +455,14 @@ export function useCalendarEvents({
       }
 
       if (!matchedTask) {
-        const normalizedTitle = (ev.title ?? '').trim().toLowerCase();
-        matchedTask = allTasks.find((task: any) => {
-          if (resolvedTaskId) return task.id?.toString?.() === resolvedTaskId;
-          const bucketName = sanitizeBucketName(task.bucket);
-          const isLegacyImportedBucket = bucketName === IMPORTED_CALENDAR_BUCKET_NAME;
-          const isUnassigned = !bucketName;
-          const isSupabaseTask = task.source === 'supabase';
-          if (!isSupabaseTask) return false;
-          if (!isUnassigned && !isLegacyImportedBucket) return false;
-          if ((task.due?.date ?? '') !== startDateStr) return false;
-          const taskTitle = (task.content ?? '').trim().toLowerCase();
-          return taskTitle === normalizedTitle;
-        });
+        if (resolvedTaskId) {
+          // ID-based fallback via O(1) lookup
+          matchedTask = taskLookup.get(resolvedTaskId);
+        } else {
+          // Title-based O(1) lookup for unlinked uploaded events
+          const normalizedTitle = (ev.title ?? '').trim().toLowerCase();
+          matchedTask = taskTitleIndex.get(`${startDateStr}::${normalizedTitle}`);
+        }
         if (matchedTask?.id && !resolvedTaskId) {
           resolvedTaskId = matchedTask.id?.toString?.() ?? matchedTask.id;
         }
@@ -528,61 +539,80 @@ export function useCalendarEvents({
       bucket.push({ source: 'cycle', title, allDay: true });
     });
 
-    // Lifeboard events (single-pass repeat expansion)
-    const lifeboardMap = buildAllLifeboardEvents(
-      startOfDay(new Date(rangeStartMs)),
-      startOfDay(new Date(rangeEndMs)),
-    );
-    for (const dateStr of Object.keys(lifeboardMap)) {
+    return { map, seenTaskInstanceKeys };
+  }, [googleEvents, uploadedEvents, cycleEntries, rangeStartMs, rangeEndMs, selectedBucketFilters, taskLookup, taskTitleIndex, resolveTaskById]);
+
+  /* ── Merged event map (external + lifeboard, deduped) ── */
+  // Both halves are useMemo. When allTasks changes, only lifeboardEventMap
+  // recomputes. When Google/uploaded/cycle data changes, only externalEventMap
+  // recomputes. The merge is lightweight — just concatenation + dedup.
+
+  const computedEventsByDate = useMemo(() => {
+    const { map: extMap, seenTaskInstanceKeys } = externalEventMap;
+    // Clone both the map and the seen-set so we never mutate the memoized externalEventMap value
+    const seen = new Set(seenTaskInstanceKeys);
+    const map: Record<string, DayEvent[]> = {};
+    for (const dateStr of Object.keys(extMap)) {
+      map[dateStr] = [...extMap[dateStr]];
+    }
+
+    // Merge lifeboard events, skipping already-seen task instances
+    for (const dateStr of Object.keys(lifeboardEventMap)) {
       const bucket = map[dateStr] ?? (map[dateStr] = []);
-      for (const event of lifeboardMap[dateStr]) {
+      for (const event of lifeboardEventMap[dateStr]) {
         const taskIdKey = event.taskId ? event.taskId.toString() : undefined;
         const seenKey = taskIdKey ? `${taskIdKey}-${dateStr}` : undefined;
-        if (seenKey && seenTaskInstanceKeys.has(seenKey)) continue;
+        if (seenKey && seen.has(seenKey)) continue;
         bucket.push(event);
-        if (seenKey) seenTaskInstanceKeys.add(seenKey);
+        if (seenKey) seen.add(seenKey);
       }
     }
 
     // Cross-source dedup: prefer lifeboard entries over imported/Google
-    Object.keys(map).forEach(dateStr => {
+    for (const dateStr of Object.keys(map)) {
       const events = map[dateStr];
       const lifeboardKeys = new Set(
         events
           .filter((event) => event.source === 'lifeboard')
           .map((event) => buildCrossSourceEventKey(event)),
       );
-      if (lifeboardKeys.size === 0) return;
+      if (lifeboardKeys.size === 0) continue;
       map[dateStr] = events.filter((event) => {
         if (event.source === 'lifeboard' || event.taskId) return true;
         return !lifeboardKeys.has(buildCrossSourceEventKey(event));
       });
-    });
+    }
 
-    startTransition(() => {
-      setEventsByDate(map);
-    });
-  }, [
-    googleEvents,
-    uploadedEvents,
-    cycleEntries,
-    rangeStartMs,
-    rangeEndMs,
-    buildAllLifeboardEvents,
-    selectedBucketFilters,
-    allTasks,
-    hourSlotToISO,
-    resolveTaskById,
-  ]);
+    return map;
+  }, [externalEventMap, lifeboardEventMap]);
+
+  // Apply optimistic patch on top of computed base.
+  // Patch is cleared automatically when the base changes (data re-fetched).
+  const finalEventsByDate = useMemo(() => {
+    if (!optimisticPatch) return computedEventsByDate;
+    return optimisticPatch(computedEventsByDate);
+  }, [computedEventsByDate, optimisticPatch]);
+
+  // setEventsByDate: accepts a function (prev => next) for optimistic updates.
+  // Compatible with the existing callers in use-calendar-actions.ts and full-calendar.tsx.
+  const setEventsByDate = useCallback(
+    (updater: React.SetStateAction<Record<string, DayEvent[]>>) => {
+      if (typeof updater === 'function') {
+        setOptimisticPatch(() => updater as (prev: Record<string, DayEvent[]>) => Record<string, DayEvent[]>);
+      } else {
+        setOptimisticPatch(() => () => updater);
+      }
+    },
+    [],
+  );
 
   return {
-    eventsByDate,
+    eventsByDate: finalEventsByDate,
     setEventsByDate,
     googleEvents,
     uploadedEvents,
     resolveTaskById,
     ensureTaskForEvent,
-    hourSlotToISO,
     rows,
     dateRange,
   };

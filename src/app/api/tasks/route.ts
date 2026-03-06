@@ -96,6 +96,7 @@ export const POST = withAuthAndBody(createTaskSchema, async (req, { supabase, us
         ? body.allDay
         : !hourSlot && !endHourSlot,
     repeat_rule: (body.repeat_rule as string | undefined) ?? (body.repeatRule as string | undefined) ?? null,
+    assignee_id: (body.assignee_id as string | undefined) ?? (body.assigneeId as string | undefined) ?? null,
   };
 
   const { data, error } = await supabase
@@ -172,6 +173,11 @@ export const PATCH = withAuthAndBody(updateTaskSchema, async (req, { supabase, u
   const kanbanStatus = (body as any).kanban_status ?? (body as any).kanbanStatus;
   if (typeof kanbanStatus === 'string' && ['todo', 'in_progress', 'done'].includes(kanbanStatus)) {
     updatePayload.kanban_status = kanbanStatus;
+  }
+
+  const assigneeId = body.assignee_id ?? body.assigneeId;
+  if (assigneeId !== undefined) {
+    updatePayload.assignee_id = assigneeId ? String(assigneeId).trim() : null;
   }
 
   if (Object.keys(updatePayload).length === 0) {

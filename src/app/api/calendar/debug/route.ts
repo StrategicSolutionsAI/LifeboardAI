@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 export async function GET(request: NextRequest) {
+  if (!isDev) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
     const supabase = supabaseServer();
 
@@ -64,6 +67,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isDev) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   try {
     const supabase = supabaseServer();
 

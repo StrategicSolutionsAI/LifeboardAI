@@ -445,6 +445,7 @@ export function useTasks(selectedDate?: Date) {
       endDate?: string | null
       endHourSlot?: number | string | null
       allDay?: boolean | null
+      assigneeId?: string | null
     }
   ) => {
     const trimmed = content.trim()
@@ -517,6 +518,7 @@ export function useTasks(selectedDate?: Date) {
           endDate: resolvedEndDate ?? undefined,
           hourSlot: normalizedHourSlot,
           endHourSlot: normalizedEndHourSlot,
+          assigneeId: options?.assigneeId ?? null,
           bucket: bucket || undefined,
           position: undefined,
           created_at: new Date().toISOString(),
@@ -549,6 +551,7 @@ export function useTasks(selectedDate?: Date) {
       repeat_rule: repeatRule,
       allDay: resolvedAllDay,
       duration: options && 'duration' in options ? (options as any).duration : undefined,
+      assignee_id: options?.assigneeId ?? null,
     }
 
     // ── Step 1: Always write to Supabase first ──

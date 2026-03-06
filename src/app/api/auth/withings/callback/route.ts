@@ -28,12 +28,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/error?message=No authorization code from Withings`)
   }
 
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const origin = forwardedProto && forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin
+
   try {
-    const forwardedProto = request.headers.get('x-forwarded-proto')
-    const forwardedHost = request.headers.get('x-forwarded-host')
-    const origin = forwardedProto && forwardedHost
-      ? `${forwardedProto}://${forwardedHost}`
-      : new URL(request.url).origin
     const tokenData = await exchangeWithingsCodeForToken(code, origin)
 
     const supabase = supabaseServer()
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}${redirectUrl}`)
   } catch (err) {
     console.error('Withings OAuth callback error', err)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/error?message=Withings authentication failed`)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || origin || 'http://localhost:3000'
+    return NextResponse.redirect(`${baseUrl}/error?message=Withings authentication failed`)
   }
 } 

@@ -7,29 +7,18 @@ export const metadata: Metadata = {
   title: "Calendar | LifeboardAI",
 };
 
-// Eagerly start downloading the calendar chunk at module evaluation time.
-const calendarChunk = import("./OptimizedCalendarView");
-
 const CalendarView = dynamic(
-  () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('optimized') === 'false') {
-        return import("./CalendarView");
-      }
-    }
-    return calendarChunk;
-  },
+  () => import("./OptimizedCalendarView"),
   {
     ssr: false,
     loading: () => (
       <div className="h-full">
         <CalendarHeaderSkeleton />
-        <div className="flex gap-6 p-4">
+        <div className="flex flex-col lg:flex-row gap-6 p-4">
           <div className="flex-1">
             <CalendarMonthSkeleton />
           </div>
-          <div className="w-[360px]">
+          <div className="hidden lg:block lg:w-[360px]">
             <TaskListSkeleton />
           </div>
         </div>
@@ -47,11 +36,11 @@ export default function CalendarPage() {
       <Suspense fallback={
         <div className="h-full">
           <CalendarHeaderSkeleton />
-          <div className="flex gap-6 p-4">
+          <div className="flex flex-col lg:flex-row gap-6 p-4">
             <div className="flex-1">
               <CalendarMonthSkeleton />
             </div>
-            <div className="w-[360px]">
+            <div className="hidden lg:block lg:w-[360px]">
               <TaskListSkeleton />
             </div>
           </div>

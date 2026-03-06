@@ -729,8 +729,8 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                 <div
                   className={`relative flex items-start gap-3 transition-colors group ${
                     isMainHour
-                      ? 'border-t border-theme-neutral-300/30 h-[18px]'
-                      : hasTask ? 'h-[17px]' : 'h-[17px]'
+                      ? 'border-t border-theme-neutral-300/30 h-[28px] sm:h-[18px]'
+                      : hasTask ? 'h-[28px] sm:h-[17px]' : 'h-[28px] sm:h-[17px]'
                   } ${index === 0 ? 'border-t-0' : ''} ${
                     snapshot.isDraggingOver
                       ? 'bg-theme-primary-50/80'
@@ -758,7 +758,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   <ul
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="flex-1 relative overflow-visible min-h-[15px]"
+                    className="flex-1 relative overflow-visible min-h-[28px] sm:min-h-[15px]"
                     style={{ minHeight: SLOT_HEIGHT }}
                   >
                     {/* Drag-over indicator */}
@@ -1106,4 +1106,4 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
 
 HourlyPlanner.displayName = "HourlyPlanner";
 
-export default HourlyPlanner;
+export default React.memo(HourlyPlanner);

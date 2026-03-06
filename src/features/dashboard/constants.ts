@@ -1,10 +1,9 @@
+import { WIDGET_MODAL_REGISTRY } from '@/features/widgets/widget-modal-registry'
+
 // ── Module-scope constants (allocated once, never recreated per render) ───
 
-export const MODAL_WIDGET_IDS = new Set([
-  'nutrition', 'medication', 'exercise', 'home_projects', 'habit_tracker',
-  'sleep', 'meditation', 'breathwork', 'water', 'mood', 'steps', 'heartrate', 'caffeine',
-  'cycle_tracking',
-]);
+/** Derived from the widget modal registry — auto-updates when new widgets are added */
+export const MODAL_WIDGET_IDS = new Set(Object.keys(WIDGET_MODAL_REGISTRY));
 
 export const SUGGESTED_BUCKETS = [
   'Health', 'Wellness', 'Family', 'Social', 'Work',

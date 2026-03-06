@@ -6,6 +6,7 @@ export interface ShoppingListItem {
   name: string;
   quantity: string | null;
   notes: string | null;
+  assigneeId: string | null;
   isPurchased: boolean;
   neededBy: string | null;
   calendarEventId: string | null;

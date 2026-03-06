@@ -19,6 +19,7 @@ export interface Task {
   duration?: number
   hourSlot?: string | null
   endHourSlot?: string | null
+  assigneeId?: string | null
   bucket?: string
   position?: number
   created_at?: string

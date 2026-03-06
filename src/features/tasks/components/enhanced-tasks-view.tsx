@@ -17,12 +17,22 @@ import { TasksGroupedList } from "./tasks-grouped-list";
 import { TasksDailyProgress } from "./tasks-daily-progress";
 import { ExternalLink, LayoutDashboard, ListChecks, Pencil, Zap } from "lucide-react";
 
+interface FamilyMemberOption {
+  id: string;
+  name: string;
+  avatarColor: string;
+  relationship: string;
+}
+
 interface EnhancedTasksViewProps {
   activeBucket: string;
   buckets: string[];
   linkedTaskMap?: Record<string, { bucket: string; widgetId: string }>;
   onToggleTaskWidget?: (task: Task) => Promise<void>;
   onEditTask?: (taskId: string) => void;
+  familyMembers?: FamilyMemberOption[];
+  assigneeFilter?: string | null;
+  onAssigneeFilterChange?: (assigneeId: string | null) => void;
 }
 
 type DueBadgeTone = "default" | "accent" | "destructive";
@@ -86,6 +96,9 @@ export function EnhancedTasksView({
   linkedTaskMap,
   onToggleTaskWidget,
   onEditTask,
+  familyMembers = [],
+  assigneeFilter,
+  onAssigneeFilterChange,
 }: EnhancedTasksViewProps) {
   const { allTasks, createTask, toggleTaskCompletion } = useTasksContext();
   const { toast } = useToast();
@@ -93,6 +106,12 @@ export function EnhancedTasksView({
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
   const [updatingCompletion, setUpdatingCompletion] = useState<Set<string>>(new Set());
   const linkedMap = linkedTaskMap ?? {};
+
+  const memberMap = useMemo(() => {
+    const map = new Map<string, FamilyMemberOption>();
+    familyMembers.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [familyMembers]);
 
   const bucketTasks = useMemo(() => {
     const tasks = Array.isArray(allTasks) ? allTasks : [];
@@ -194,7 +213,11 @@ export function EnhancedTasksView({
       return openTasks;
     })();
 
-    return base.slice().sort((a, b) => {
+    const afterAssignee = assigneeFilter
+      ? base.filter((task) => task.assigneeId === assigneeFilter)
+      : base;
+
+    return afterAssignee.slice().sort((a, b) => {
       const dueA = parseDueDate(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
       const dueB = parseDueDate(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
       if (dueA !== dueB) {
@@ -202,7 +225,7 @@ export function EnhancedTasksView({
       }
       return a.content.localeCompare(b.content);
     });
-  }, [activeFilter, completedTasks, openTasks]);
+  }, [activeFilter, completedTasks, openTasks, assigneeFilter]);
 
   const handleQuickAdd = async (taskContent: string) => {
     try {
@@ -284,15 +307,36 @@ export function EnhancedTasksView({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h4
-                className={`text-sm font-medium ${
-                  task.completed
-                    ? "text-theme-text-tertiary line-through"
-                    : "text-theme-text-primary"
-                }`}
-              >
-                {task.content}
-              </h4>
+              <div className="flex items-center gap-2">
+                <h4
+                  className={`text-sm font-medium ${
+                    task.completed
+                      ? "text-theme-text-tertiary line-through"
+                      : "text-theme-text-primary"
+                  }`}
+                >
+                  {task.content}
+                </h4>
+                {task.assigneeId && (() => {
+                  const member = memberMap.get(task.assigneeId);
+                  if (!member) return null;
+                  const initials = member.name
+                    .split(" ")
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2);
+                  return (
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
+                      style={{ backgroundColor: member.avatarColor }}
+                      title={member.name}
+                    >
+                      {initials}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {onEditTask ? (
                   <button
@@ -420,6 +464,54 @@ export function EnhancedTasksView({
         onFilterChange={setActiveFilter}
         quickAddPlaceholder={`Add a task to ${bucketLabel}...`}
       />
+
+      {familyMembers.length > 0 && onAssigneeFilterChange && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mr-1">
+            Assigned to
+          </span>
+          <button
+            type="button"
+            onClick={() => onAssigneeFilterChange(null)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+              !assigneeFilter
+                ? "bg-theme-brand-tint border-theme-primary/35 text-theme-primary"
+                : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
+            }`}
+          >
+            All
+          </button>
+          {familyMembers.map((member) => {
+            const active = assigneeFilter === member.id;
+            const initials = member.name
+              .split(" ")
+              .map((w) => w[0])
+              .join("")
+              .toUpperCase()
+              .slice(0, 2);
+            return (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => onAssigneeFilterChange(active ? null : member.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                  active
+                    ? "bg-theme-brand-tint border-theme-primary/35 text-theme-primary"
+                    : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
+                }`}
+              >
+                <span
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-semibold text-white"
+                  style={{ backgroundColor: member.avatarColor }}
+                >
+                  {initials}
+                </span>
+                {member.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {completionStats.total > 0 && (
         <TasksDailyProgress

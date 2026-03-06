@@ -315,7 +315,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Mobile bottom nav */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-theme-neutral-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-theme-neutral-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 pwa-standalone-bottom"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <ul className="grid grid-cols-5 items-center py-1.5">

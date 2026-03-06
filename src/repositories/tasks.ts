@@ -1,7 +1,7 @@
 import type { Task } from '@/types/tasks'
 
 export const TASK_SELECT_COLUMNS =
-  'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, kanban_status, created_at, updated_at'
+  'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, kanban_status, assignee_id, created_at, updated_at'
 
 export function mapRowToTask(row: any): Task {
   const startDate: string | undefined = row.start_date ?? row.due_date ?? undefined
@@ -21,6 +21,7 @@ export function mapRowToTask(row: any): Task {
     repeatRule: row.repeat_rule && row.repeat_rule !== 'none' ? row.repeat_rule : undefined,
     allDay: row.all_day ?? (row.hour_slot ? false : true),
     kanbanStatus: row.kanban_status ?? (row.completed ? 'done' : 'todo'),
+    assigneeId: row.assignee_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }

@@ -7,7 +7,7 @@ const WITHINGS_TOKEN_URL = 'https://wbsapi.withings.net/v2/oauth2'
 export const WITHINGS_SCOPES = ['user.metrics']
 
 function getRedirectUri(origin?: string) {
-  const base = origin || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const base = process.env.NEXT_PUBLIC_SITE_URL || origin || 'http://localhost:3000'
   return `${base}/api/auth/withings/callback`
 }
 
@@ -125,7 +125,7 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
       throw new Error(`Withings API error: ${data.status} - ${data.error || 'Unknown error'}`)
     }
   }
-  
+
   if (!data.body?.measuregrps || data.body.measuregrps.length === 0) {
     throw new Error('No weight measurements found')
   }
@@ -137,7 +137,7 @@ export async function fetchWithingsLatestWeight(accessToken: string) {
 
   // Take the last group (most recent)
   const latestGroup = sortedGroups[sortedGroups.length - 1]
-  
+
   // Find the weight measurement (type 1) in the latest group
   const weightMeasure = latestGroup.measures.find((m: any) => m.type === 1)
   if (!weightMeasure) {
