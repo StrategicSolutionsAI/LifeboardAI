@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { Plus, CalendarDays, GripVertical, LayoutGrid, Activity, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,7 @@ function formatDue(due: string | null, isRecurring: boolean) {
 
 /* ─── Kanban Card ─── */
 
-function KanbanCard({
+const KanbanCard = memo(function KanbanCard({
   task,
   index,
   columnId,
@@ -207,11 +207,11 @@ function KanbanCard({
       )}
     </Draggable>
   );
-}
+});
 
 /* ─── Kanban Column ─── */
 
-function KanbanColumn({
+const KanbanColumn = memo(function KanbanColumn({
   column,
   tasks,
   onAddTask,
@@ -374,7 +374,7 @@ function KanbanColumn({
       </div>
     </div>
   );
-}
+});
 
 /* ─── Main Kanban Board ─── */
 

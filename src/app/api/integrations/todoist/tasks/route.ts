@@ -221,14 +221,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
     }
 
+    const cacheHeaders = { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' };
+
     const respondWithTasks = (tasks: TodoistApiTask[]) => {
       if (date && !allParam) {
-        return NextResponse.json({ tasks: filterTasksByDate(tasks, date) });
+        return NextResponse.json({ tasks: filterTasksByDate(tasks, date) }, { headers: cacheHeaders });
       }
       if (allParam) {
-        return NextResponse.json({ tasks: sortTasksByPosition(tasks) });
+        return NextResponse.json({ tasks: sortTasksByPosition(tasks) }, { headers: cacheHeaders });
       }
-      return NextResponse.json({ tasks });
+      return NextResponse.json({ tasks }, { headers: cacheHeaders });
     };
 
     // Allow clients to bypass server-side cache (e.g. after chat-created tasks in a

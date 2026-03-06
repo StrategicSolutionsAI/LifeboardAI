@@ -135,9 +135,11 @@ export function useDashboardWidgets({
       .filter(w => w.linkedTaskId)
       .map(w => w.linkedTaskId!);
     if (linkedIds.length === 0) return {} as Record<string, { completed?: boolean; content?: string; dueDate?: string }>;
+    // Build a Map for O(1) lookups instead of O(n) .find() per linked ID
+    const taskById = new Map(allTasks.map(t => [t.id?.toString?.(), t]));
     const result: Record<string, { completed?: boolean; content?: string; dueDate?: string }> = {};
     for (const id of linkedIds) {
-      const task = allTasks.find(t => t.id?.toString?.() === id);
+      const task = taskById.get(id);
       if (task) {
         result[id] = { completed: task.completed, content: task.content, dueDate: task.due?.date };
       }

@@ -19,28 +19,6 @@ async function postHandler(request: Request) {
     throw createApiError('Invalid request body', 400, 'INVALID_BODY');
   }
 
-  // Fetch existing preferences
-  const { data: existingPrefs, error: fetchError } = await supabase
-    .from('user_preferences')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (fetchError && fetchError.code !== 'PGRST116') { // Ignore 'not found' error
-    throw createApiError(
-      'Failed to fetch existing preferences', 
-      500, 
-      'DB_FETCH_ERROR', 
-      fetchError
-    );
-  }
-
-    const existingWidgets = existingPrefs?.widgets_by_bucket || {};
-    const newWidgets = body.widgets_by_bucket || {};
-
-    // Merge widgets - new widgets take precedence
-    const combinedWidgets = { ...existingWidgets, ...newWidgets };
-
     // Prepare the update data
     const updateData: Record<string, unknown> = {
       user_id: user.id,
@@ -53,14 +31,26 @@ async function postHandler(request: Request) {
     if (body.life_buckets !== undefined) {
       updateData.life_buckets = body.life_buckets;
     }
-    if (body.widgets_by_bucket !== undefined) {
-      updateData.widgets_by_bucket = combinedWidgets;
-    }
 
-    // If neither field is provided, just use existing data
-    if (body.life_buckets === undefined && body.widgets_by_bucket === undefined) {
-      updateData.life_buckets = existingPrefs?.life_buckets || [];
-      updateData.widgets_by_bucket = existingWidgets;
+    // For widgets_by_bucket, we need to merge with existing data
+    if (body.widgets_by_bucket !== undefined) {
+      const { data: existingPrefs, error: fetchError } = await supabase
+        .from('user_preferences')
+        .select('widgets_by_bucket')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw createApiError(
+          'Failed to fetch existing preferences',
+          500,
+          'DB_FETCH_ERROR',
+          fetchError
+        );
+      }
+
+      const existingWidgets = existingPrefs?.widgets_by_bucket || {};
+      updateData.widgets_by_bucket = { ...existingWidgets, ...body.widgets_by_bucket };
     }
 
     // Now save the merged user preferences

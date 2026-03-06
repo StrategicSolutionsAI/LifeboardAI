@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { memo, useState, useMemo, useCallback, useEffect } from "react";
 import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
 import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -168,7 +168,7 @@ interface EnhancedTaskCardProps {
   onTaskClick?: (taskId: string, dateStr: string) => void;
 }
 
-function EnhancedTaskCard({
+const EnhancedTaskCard = memo(function EnhancedTaskCard({
   task,
   index,
   isExpanded,
@@ -481,7 +481,7 @@ function EnhancedTaskCard({
       )}
     </Draggable>
   );
-}
+});
 
 // Smart task grouping function
 function useTaskGrouping(tasks: any[]) {
