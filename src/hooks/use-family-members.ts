@@ -17,7 +17,7 @@ export interface FamilyMemberOption {
  */
 
 let _cache: { data: FamilyMemberOption[]; ts: number } | null = null
-const CACHE_TTL = 120_000 // 2 min
+const CACHE_TTL = 15_000 // 15s
 
 export function useFamilyMembers(): FamilyMemberOption[] {
   const [members, setMembers] = useState<FamilyMemberOption[]>(_cache?.data ?? [])
