@@ -1078,6 +1078,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
         selectedBucket={selectedBucket}
         getDefaultDate={taskEditorDefaultDate}
         bucketColors={bucketColors}
+        familyMembers={familyMembers}
       />
 
       {/* Delete Confirmation Modal */}

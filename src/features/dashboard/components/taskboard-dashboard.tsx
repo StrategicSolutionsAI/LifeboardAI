@@ -52,6 +52,7 @@ const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppabl
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import { useFamilyMembers } from "@/hooks/use-family-members";
 const TaskEditorModal = dynamic(
   () => import("@/features/tasks/components/task-editor-modal"),
   { ssr: false, loading: () => null }
@@ -240,19 +241,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   // Memoize the active bucket's hex color so widget cards get a stable string prop
   const activeBucketHex = useMemo(() => getBucketColor(activeBucket), [getBucketColor, activeBucket]);
 
-  // Extract family members from the Family Members widget (any bucket)
-  const familyMembers = useMemo(() => {
-    const allWidgets = Object.values(widgetsByBucket).flat();
-    const fmWidget = allWidgets.find((w) => w.id === 'family_members');
-    const members = (fmWidget as any)?.familyMembersData?.members;
-    if (!Array.isArray(members)) return [];
-    return members.map((m: any) => ({
-      id: m.id as string,
-      name: m.name as string,
-      avatarColor: m.avatarColor as string,
-      relationship: m.relationship as string,
-    }));
-  }, [widgetsByBucket]);
+  // Family members from user preferences (shared hook, works on all pages)
+  const familyMembers = useFamilyMembers();
 
   // Assignee filter for tasks — null means show all
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
