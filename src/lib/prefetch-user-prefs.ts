@@ -1,10 +1,10 @@
 import { getCachedUser, getUserPreferencesClient } from '@/lib/user-preferences'
 import { supabase } from '@/utils/supabase/client'
+import { GREETING_CACHE_TTL_MS } from '@/lib/cache-config'
 
 // Greeting name prefetch with dedup + short-lived cache
 let _greetingNamePromise: Promise<string | null> | null = null
 let _greetingNameCache: { name: string | null; ts: number } | null = null
-const GREETING_CACHE_TTL = 60_000
 
 /**
  * Start fetching user preferences as early as possible (module evaluation time).
@@ -25,7 +25,7 @@ export function prefetchUserPreferences(): void {
  */
 export function prefetchGreetingName(): void {
   if (typeof window === 'undefined') return
-  if (_greetingNameCache && Date.now() - _greetingNameCache.ts < GREETING_CACHE_TTL) return
+  if (_greetingNameCache && Date.now() - _greetingNameCache.ts < GREETING_CACHE_TTL_MS) return
   if (_greetingNamePromise) return
 
   _greetingNamePromise = (async () => {
@@ -59,7 +59,7 @@ export function invalidateGreetingNameCache() {
  * or awaits the in-flight promise if prefetch was already started.
  */
 export async function getPrefetchedGreetingName(): Promise<string | null> {
-  if (_greetingNameCache && Date.now() - _greetingNameCache.ts < GREETING_CACHE_TTL) {
+  if (_greetingNameCache && Date.now() - _greetingNameCache.ts < GREETING_CACHE_TTL_MS) {
     return _greetingNameCache.name
   }
   if (_greetingNamePromise) return _greetingNamePromise

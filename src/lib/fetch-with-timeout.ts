@@ -1,4 +1,6 @@
-const DEFAULT_TIMEOUT_MS = 5000;
+import { FETCH_DEFAULT_TIMEOUT_MS } from '@/lib/cache-config'
+
+const DEFAULT_TIMEOUT_MS = FETCH_DEFAULT_TIMEOUT_MS;
 
 export async function fetchWithTimeout(
   input: RequestInfo | URL,

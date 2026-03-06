@@ -28,7 +28,7 @@ const pendingStore = getPendingStore()
 
 const buildCacheKey = (userId: string) => `${CACHE_NAMESPACE}:${userId}`
 
-export const TODOIST_TASK_CACHE_TTL_MS = 15 * 1000
+import { TODOIST_TASK_CACHE_TTL_MS } from '@/lib/cache-config'
 
 export function readTodoistTaskCache(userId: string) {
   const key = buildCacheKey(userId)

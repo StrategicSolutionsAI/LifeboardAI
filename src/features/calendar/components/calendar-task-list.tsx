@@ -168,7 +168,7 @@ interface EnhancedTaskCardProps {
   onTaskClick?: (taskId: string, dateStr: string) => void;
 }
 
-function EnhancedTaskCard({
+const EnhancedTaskCard = React.memo(function EnhancedTaskCard({
   task,
   index,
   isExpanded,
@@ -481,7 +481,7 @@ function EnhancedTaskCard({
       )}
     </Draggable>
   );
-}
+});
 
 // Smart task grouping function
 function useTaskGrouping(tasks: any[]) {

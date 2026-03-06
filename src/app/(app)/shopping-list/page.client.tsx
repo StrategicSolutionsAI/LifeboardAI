@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +34,7 @@ import type { WidgetInstance } from "@/types/widgets";
 import { useWidgets } from "@/hooks/use-widgets";
 import { hexToRgba } from "@/lib/dashboard-utils";
 import { card, form, interactive, surface, text } from "@/lib/styles";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 const UNSORTED_LABEL = "Unsorted";
 
@@ -83,6 +84,203 @@ const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> 
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
+/* ─── Extracted Shopping Item Cards ─── */
+
+interface ShoppingListItemCardProps {
+  item: ShoppingListItem;
+  bucketColors: Record<string, string>;
+  isPurchaseAnimating: boolean;
+  isNewlyCreated: boolean;
+  onTogglePurchased: (item: ShoppingListItem) => void;
+  onOpenConvert: (item: ShoppingListItem) => void;
+  onDelete: (item: ShoppingListItem) => void;
+}
+
+const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
+  item,
+  bucketColors,
+  isPurchaseAnimating,
+  isNewlyCreated,
+  onTogglePurchased,
+  onOpenConvert,
+  onDelete,
+}: ShoppingListItemCardProps) {
+  const color = getBucketColorSync(item.bucket ?? UNASSIGNED_BUCKET_ID, bucketColors);
+  const conversionComplete = Boolean(item.calendarEventId) && Boolean(item.widgetInstanceId);
+  const isUnsorted = !item.bucket;
+  const bucketLabel = isUnsorted ? UNSORTED_LABEL : item.bucket;
+  const badgeColor = getBucketColorSync(
+    isUnsorted ? UNASSIGNED_BUCKET_ID : item.bucket!,
+    bucketColors,
+  );
+
+  return (
+    <div
+      className={cn(
+        "group flex items-start justify-between rounded-xl border p-3.5",
+        "border-theme-neutral-300/80 bg-white",
+        interactive.transitionFast,
+        "hover:shadow-warm-sm hover:border-theme-neutral-300",
+        isPurchaseAnimating && "bg-emerald-50/60 border-emerald-200",
+        isNewlyCreated && "animate-row-enter",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <Checkbox
+          checked={item.isPurchased}
+          onCheckedChange={() => onTogglePurchased(item)}
+          className="mt-0.5"
+        />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className={cn(
+              "text-[14px] font-medium text-theme-text-primary",
+              isPurchaseAnimating && "animate-strike",
+            )}>
+              {item.name}
+            </p>
+            <Badge
+              className="border-0 text-xs font-medium"
+              style={{ backgroundColor: hexToRgba(badgeColor, 0.15), color: badgeColor }}
+            >
+              {bucketLabel}
+            </Badge>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            {item.quantity && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-surface-alt text-theme-text-secondary border border-theme-neutral-300/50">
+                Qty: {item.quantity}
+              </span>
+            )}
+            {item.neededBy && (
+              <span className="text-[11px] text-theme-text-tertiary">
+                Needed by {item.neededBy}
+              </span>
+            )}
+            <span className="flex items-center gap-1 text-[10px] font-medium text-theme-text-tertiary">
+              <span
+                className="inline-flex h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              Added{" "}
+              {new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          </div>
+          {(item.calendarEventId || item.widgetInstanceId) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {item.calendarEventId && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-brand-tint-subtle text-theme-primary-600">
+                  <CalendarPlus className="mr-1 h-3 w-3" />
+                  Event
+                </span>
+              )}
+              {item.widgetInstanceId && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700">
+                  <LayoutGrid className="mr-1 h-3 w-3" />
+                  Widget
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+        <button
+          type="button"
+          className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
+          onClick={() => onOpenConvert(item)}
+          aria-label={`Edit ${item.name}`}
+          title={conversionComplete ? "Edit linked event or widget" : "Convert to calendar event, widget, or both"}
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
+          onClick={() => onDelete(item)}
+          aria-label={`Delete ${item.name}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
+interface PurchasedItemCardProps {
+  item: ShoppingListItem;
+  bucketColors: Record<string, string>;
+  onRestore: (item: ShoppingListItem) => void;
+  onDelete: (item: ShoppingListItem) => void;
+}
+
+const PurchasedItemCard = React.memo(function PurchasedItemCard({
+  item,
+  bucketColors,
+  onRestore,
+  onDelete,
+}: PurchasedItemCardProps) {
+  const isUnsorted = !item.bucket;
+  const bucketLabel = isUnsorted ? UNSORTED_LABEL : item.bucket;
+  const badgeColor = getBucketColorSync(
+    isUnsorted ? UNASSIGNED_BUCKET_ID : item.bucket!,
+    bucketColors,
+  );
+
+  return (
+    <div
+      className={cn(
+        "group flex items-center justify-between rounded-xl border p-3",
+        "border-theme-neutral-300/40 bg-white/60",
+        interactive.transitionFast,
+      )}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 shrink-0">
+          <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium line-through text-theme-text-tertiary">
+            {item.name}
+          </p>
+          <div className="mt-0.5 flex items-center gap-2">
+            {item.quantity && (
+              <span className="text-[10px] font-medium text-theme-text-tertiary">Qty: {item.quantity}</span>
+            )}
+            <Badge
+              className="border-0 text-xs font-medium"
+              style={{ backgroundColor: hexToRgba(badgeColor, 0.15), color: badgeColor }}
+            >
+              {bucketLabel}
+            </Badge>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+        <button
+          type="button"
+          className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
+          onClick={() => onRestore(item)}
+          aria-label={`Restore ${item.name}`}
+          title="Restore to active list"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
+          onClick={() => onDelete(item)}
+          aria-label={`Delete ${item.name}`}
+          title="Delete permanently"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+});
 
 function ShoppingListLayout() {
   const { toast } = useToast();
@@ -296,7 +494,7 @@ function ShoppingListLayout() {
     }
   };
 
-  const handleTogglePurchased = async (item: ShoppingListItem) => {
+  const handleTogglePurchased = useCallback(async (item: ShoppingListItem) => {
     const wasPurchased = item.isPurchased;
     try {
       if (!wasPurchased) {
@@ -329,9 +527,9 @@ function ShoppingListLayout() {
         type: "error",
       });
     }
-  };
+  }, [togglePurchased, toast]);
 
-  const handleDelete = (item: ShoppingListItem) => {
+  const handleDelete = useCallback((item: ShoppingListItem) => {
     // Optimistically hide the item
     setHiddenItems((prev) => new Set(prev).add(item.id));
 
@@ -369,12 +567,12 @@ function ShoppingListLayout() {
         toast({ title: "Item restored", type: "success", duration: 2000 });
       },
     });
-  };
+  }, [deleteItem, toast]);
 
-  const handleOpenConvert = (item: ShoppingListItem) => {
+  const handleOpenConvert = useCallback((item: ShoppingListItem) => {
     setConvertItem(item);
     setConvertOpen(true);
-  };
+  }, []);
 
   const handleToggleArchive = () => {
     const next = !showArchive;
@@ -385,7 +583,7 @@ function ShoppingListLayout() {
     }
   };
 
-  const handleRestore = async (item: ShoppingListItem) => {
+  const handleRestore = useCallback(async (item: ShoppingListItem) => {
     try {
       await togglePurchased(item.id, false);
       toast({
@@ -401,7 +599,7 @@ function ShoppingListLayout() {
         type: "error",
       });
     }
-  };
+  }, [togglePurchased, toast]);
 
   useEffect(() => {
     if (!convertOpen || !convertItem) return;
@@ -822,7 +1020,7 @@ function ShoppingListLayout() {
     }
   };
 
-  const renderBucketBadge = (bucketValue: string | null) => {
+  const renderBucketBadge = useCallback((bucketValue: string | null) => {
     const isUnsorted = !bucketValue;
     const label = isUnsorted ? UNSORTED_LABEL : bucketValue;
     const color = getBucketColorSync(
@@ -841,7 +1039,37 @@ function ShoppingListLayout() {
         {label}
       </Badge>
     );
-  };
+  }, [bucketColors]);
+
+  // ── Virtualizer setup ──
+  const activeScrollRef = useRef<HTMLDivElement>(null);
+  const purchasedScrollRef = useRef<HTMLDivElement>(null);
+
+  const activeVirtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => activeScrollRef.current,
+    estimateSize: () => 76,
+    overscan: 5,
+  });
+
+  const purchasedVirtualizer = useVirtualizer({
+    count: purchasedItems.length,
+    getScrollElement: () => purchasedScrollRef.current,
+    estimateSize: () => 56,
+    overscan: 5,
+  });
+
+  // Reset scroll position when bucket filter changes
+  useEffect(() => {
+    activeScrollRef.current?.scrollTo({ top: 0 });
+  }, [selectedBucket]);
+
+  // Scroll to bottom when a new item is created
+  useEffect(() => {
+    if (lastCreatedId && filteredItems.length > 0) {
+      activeVirtualizer.scrollToIndex(filteredItems.length - 1, { align: 'end' });
+    }
+  }, [lastCreatedId, filteredItems.length, activeVirtualizer]);
 
   return (
     <>
@@ -1042,7 +1270,7 @@ function ShoppingListLayout() {
           })}
         </div>
 
-        {/* ── Items List ── */}
+        {/* ── Items List (Virtualized) ── */}
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-theme-brand-tint-subtle">
@@ -1060,113 +1288,48 @@ function ShoppingListLayout() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredItems.map((item) => {
-              const color = getBucketColorSync(
-                item.bucket ?? UNASSIGNED_BUCKET_ID,
-                bucketColors,
-              );
-              const conversionComplete =
-                Boolean(item.calendarEventId) && Boolean(item.widgetInstanceId);
-
-              const isPurchaseAnimating = justPurchased.has(item.id);
-              const isNewlyCreated = lastCreatedId === item.id;
-
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "group flex items-start justify-between rounded-xl border p-3.5",
-                    "border-theme-neutral-300/80 bg-white",
-                    interactive.transitionFast,
-                    "hover:shadow-warm-sm hover:border-theme-neutral-300",
-                    isPurchaseAnimating && "bg-emerald-50/60 border-emerald-200",
-                    isNewlyCreated && "animate-row-enter",
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={item.isPurchased}
-                      onCheckedChange={() => handleTogglePurchased(item)}
-                      className="mt-0.5"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className={cn(
-                          "text-[14px] font-medium text-theme-text-primary",
-                          isPurchaseAnimating && "animate-strike",
-                        )}>
-                          {item.name}
-                        </p>
-                        {renderBucketBadge(item.bucket)}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2.5">
-                        {item.quantity && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-surface-alt text-theme-text-secondary border border-theme-neutral-300/50">
-                            Qty: {item.quantity}
-                          </span>
-                        )}
-                        {item.neededBy && (
-                          <span className="text-[11px] text-theme-text-tertiary">
-                            Needed by {item.neededBy}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-theme-text-tertiary">
-                          <span
-                            className="inline-flex h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: color }}
-                          />
-                          Added{" "}
-                          {new Date(item.createdAt).toLocaleDateString(
-                            undefined,
-                            { month: "short", day: "numeric" },
-                          )}
-                        </span>
-                      </div>
-                      {(item.calendarEventId || item.widgetInstanceId) && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {item.calendarEventId && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-theme-brand-tint-subtle text-theme-primary-600">
-                              <CalendarPlus className="mr-1 h-3 w-3" />
-                              Event
-                            </span>
-                          )}
-                          {item.widgetInstanceId && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700">
-                              <LayoutGrid className="mr-1 h-3 w-3" />
-                              Widget
-                            </span>
-                          )}
-                        </div>
-                      )}
+          <div
+            ref={activeScrollRef}
+            className="overflow-y-auto rounded-xl"
+            style={{ maxHeight: '60vh' }}
+          >
+            <div
+              style={{
+                height: `${activeVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {activeVirtualizer.getVirtualItems().map((virtualRow) => {
+                const item = filteredItems[virtualRow.index];
+                return (
+                  <div
+                    key={item.id}
+                    data-index={virtualRow.index}
+                    ref={activeVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <div className="pb-2">
+                      <ShoppingListItemCard
+                        item={item}
+                        bucketColors={bucketColors}
+                        isPurchaseAnimating={justPurchased.has(item.id)}
+                        isNewlyCreated={lastCreatedId === item.id}
+                        onTogglePurchased={handleTogglePurchased}
+                        onOpenConvert={handleOpenConvert}
+                        onDelete={handleDelete}
+                      />
                     </div>
                   </div>
-                  <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
-                    <button
-                      type="button"
-                      className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
-                      onClick={() => handleOpenConvert(item)}
-                      aria-label={`Edit ${item.name}`}
-                      title={
-                        conversionComplete
-                          ? "Edit linked event or widget"
-                          : "Convert to calendar event, widget, or both"
-                      }
-                    >
-                      <Sparkles className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
-                      onClick={() => handleDelete(item)}
-                      aria-label={`Delete ${item.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1198,56 +1361,45 @@ function ShoppingListLayout() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-1.5">
-                {purchasedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      "group flex items-center justify-between rounded-xl border p-3",
-                      "border-theme-neutral-300/40 bg-white/60",
-                      interactive.transitionFast,
-                    )}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 shrink-0">
-                        <svg className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-medium line-through text-theme-text-tertiary">
-                          {item.name}
-                        </p>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          {item.quantity && (
-                            <span className="text-[10px] font-medium text-theme-text-tertiary">Qty: {item.quantity}</span>
-                          )}
-                          {renderBucketBadge(item.bucket)}
+              <div
+                ref={purchasedScrollRef}
+                className="overflow-y-auto rounded-xl"
+                style={{ maxHeight: '40vh' }}
+              >
+                <div
+                  style={{
+                    height: `${purchasedVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {purchasedVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const item = purchasedItems[virtualRow.index];
+                    return (
+                      <div
+                        key={item.id}
+                        data-index={virtualRow.index}
+                        ref={purchasedVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <div className="pb-1.5">
+                          <PurchasedItemCard
+                            item={item}
+                            bucketColors={bucketColors}
+                            onRestore={handleRestore}
+                            onDelete={handleDelete}
+                          />
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
-                      <button
-                        type="button"
-                        className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
-                        onClick={() => handleRestore(item)}
-                        aria-label={`Restore ${item.name}`}
-                        title="Restore to active list"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-1.5 text-theme-text-tertiary transition-colors duration-150 hover:bg-red-50 hover:text-red-500"
-                        onClick={() => handleDelete(item)}
-                        aria-label={`Delete ${item.name}`}
-                        title="Delete permanently"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

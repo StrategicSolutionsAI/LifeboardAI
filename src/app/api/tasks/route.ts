@@ -43,20 +43,27 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     query = query.eq('completed', false);
   }
 
+  // Sort in SQL: position ASC (nulls last), then created_at DESC
+  query = query
+    .order('position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  // Optional pagination (backwards-compatible — omit for all results)
+  const limitParam = sp.get('limit');
+  const offsetParam = sp.get('offset');
+  if (limitParam) {
+    const limit = Math.max(1, Math.min(1000, parseInt(limitParam, 10) || 100));
+    const offset = Math.max(0, parseInt(offsetParam ?? '0', 10) || 0);
+    query = query.range(offset, offset + limit - 1);
+  }
+
   const { data, error } = await query;
   if (error) {
     console.error('Supabase select lifeboard_tasks error', error);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
 
-  const tasks = (data || [])
-    .map(mapRowToTask)
-    .sort((a, b) => {
-      const pa = a.position ?? Number.MAX_SAFE_INTEGER;
-      const pb = b.position ?? Number.MAX_SAFE_INTEGER;
-      if (pa !== pb) return pa - pb;
-      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
-    });
+  const tasks = (data || []).map(mapRowToTask);
 
   return NextResponse.json({ tasks }, { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' } });
 }, 'GET /api/tasks');

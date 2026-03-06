@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { RATE_LIMIT_CLEANUP_INTERVAL_MS } from '@/lib/cache-config'
 
 /**
  * Simple in-memory sliding-window rate limiter.
@@ -27,7 +28,7 @@ export class RateLimiter {
   private readonly maxRequests: number
   private readonly windowMs: number
   private lastCleanup = Date.now()
-  private readonly cleanupInterval = 60_000 // prune stale keys every 60s
+  private readonly cleanupInterval = RATE_LIMIT_CLEANUP_INTERVAL_MS
 
   constructor(config: RateLimitConfig) {
     this.maxRequests = config.maxRequests

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getUserPreferencesClient } from '@/lib/user-preferences';
-
-const BUCKETS_CACHE_TTL_MS = 2 * 60 * 1000;
+import { BUCKETS_CACHE_TTL_MS } from '@/lib/cache-config';
 
 interface BucketSnapshot {
   buckets: string[];

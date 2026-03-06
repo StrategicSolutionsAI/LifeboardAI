@@ -1,8 +1,9 @@
 import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getQueryClient } from '@/lib/query-client'
+import { DATA_CACHE_DEFAULT_TTL_MS } from '@/lib/cache-config'
 
-const DEFAULT_TTL = 5 * 60 * 1000 // 5 minutes
+const DEFAULT_TTL = DATA_CACHE_DEFAULT_TTL_MS
 
 interface CacheOptions {
   ttl?: number

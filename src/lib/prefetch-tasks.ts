@@ -1,8 +1,9 @@
 import { prefetchToGlobalCache } from '@/hooks/use-data-cache'
 import type { Task } from '@/types/tasks'
+import { PREFETCH_TASKS_TIMEOUT_MS } from '@/lib/cache-config'
 
 const CACHE_KEY = 'tasks-all-open'
-const FETCH_TIMEOUT_MS = 4500
+const FETCH_TIMEOUT_MS = PREFETCH_TASKS_TIMEOUT_MS
 
 /**
  * Trigger task fetching as early as possible (e.g. at module evaluation time

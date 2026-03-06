@@ -2,160 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageSquare, X, Send, Mic, Volume2, VolumeX, Settings, Copy, Check, RotateCcw, Trash2, WifiOff } from "lucide-react"
+import { MessageSquare, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
-
-/** Format a timestamp for display next to a message */
-function formatMessageTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
-/** Format a day divider label */
-function formatDayDivider(ts: number): string {
-  const date = new Date(ts)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (date.toDateString() === today.toDateString()) return 'Today'
-  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
-  return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-/** Determine if a day divider should be shown before this message */
-function shouldShowDivider(messages: { timestamp?: number }[], index: number): boolean {
-  const curr = messages[index]?.timestamp
-  if (!curr) return false
-  if (index === 0) return true
-  const prev = messages[index - 1]?.timestamp
-  if (!prev) return true
-  return new Date(curr).toDateString() !== new Date(prev).toDateString()
-}
-
-/** Generate contextual follow-up chips based on the last assistant message */
-function getFollowUpChips(lastAssistantMsg: Message | undefined): string[] {
-  if (!lastAssistantMsg) return []
-  const c = lastAssistantMsg.content.toLowerCase()
-  if (lastAssistantMsg.createdTask) return ['Show my tasks', 'Add another task']
-  if (/calendar|event|schedule|meeting/i.test(c)) return ['Show my calendar', "What's next today?"]
-  if (/task|todo|reminder/i.test(c)) return ['Show my tasks', 'What should I focus on?']
-  return ['Tell me more', 'What else can you help with?']
-}
-
-/** Lightweight inline markdown renderer for chat messages */
-function renderMarkdown(text: string) {
-  // Split into lines for block-level parsing
-  const lines = text.split('\n')
-  const elements: React.ReactNode[] = []
-  let listItems: string[] = []
-  let key = 0
-
-  const flushList = () => {
-    if (listItems.length > 0) {
-      elements.push(
-        <ul key={key++} className="list-disc list-inside space-y-0.5 my-1">
-          {listItems.map((item, i) => <li key={i}>{renderInline(item)}</li>)}
-        </ul>
-      )
-      listItems = []
-    }
-  }
-
-  for (const line of lines) {
-    const bulletMatch = line.match(/^[\s]*[-*•]\s+(.+)/)
-    const numberedMatch = line.match(/^[\s]*\d+[.)]\s+(.+)/)
-    if (bulletMatch || numberedMatch) {
-      listItems.push((bulletMatch || numberedMatch)![1])
-    } else {
-      flushList()
-      if (line.trim() === '') {
-        elements.push(<br key={key++} />)
-      } else {
-        elements.push(<span key={key++}>{renderInline(line)}{'\n'}</span>)
-      }
-    }
-  }
-  flushList()
-  return elements
-}
-
-/** Render inline formatting: **bold**, *italic*, `code`, [links](url), raw URLs */
-function renderInline(text: string): React.ReactNode[] {
-  // Regex matches: `code`, **bold**, *italic*, [text](url), or raw URLs
-  const pattern = /`([^`]+)`|\*\*(.+?)\*\*|\*(.+?)\*|\[([^\]]+)\]\((https?:\/\/[^)]+)\)|(https?:\/\/[^\s<]+)/g
-  const parts: React.ReactNode[] = []
-  let lastIndex = 0
-  let match
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index))
-    }
-    if (match[1]) {
-      parts.push(<code key={match.index} className="bg-black/5 px-1 rounded text-[0.85em]">{match[1]}</code>)
-    } else if (match[2]) {
-      parts.push(<strong key={match.index}>{match[2]}</strong>)
-    } else if (match[3]) {
-      parts.push(<em key={match.index}>{match[3]}</em>)
-    } else if (match[4] && match[5]) {
-      parts.push(<a key={match.index} href={match[5]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[4]}</a>)
-    } else if (match[6]) {
-      parts.push(<a key={match.index} href={match[6]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[6]}</a>)
-    }
-    lastIndex = match.index + match[0].length
-  }
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex))
-  }
-  return parts
-}
-
-let _msgIdCounter = 0
-
-interface Message {
-  id?: string
-  role: "user" | "assistant"
-  content: string
-  audio?: string // Optional audio URL for voice messages
-  isError?: boolean
-  timestamp?: number
-  createdTask?: {
-    id?: string
-    content?: string
-    due?: { date?: string }
-    completed?: boolean
-  } | null
-}
-
-/** Generate a stable, unique ID for each chat message. */
-function msgId(): string {
-  return `msg-${++_msgIdCounter}-${Date.now()}`
-}
-
-const CHAT_STORAGE_KEY = 'lifeboard:chat-messages'
-
-function loadStoredMessages(): Message[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    // Strip audio blob URLs (they don't survive page refresh) and keep last 50.
-    // Backfill `id` for messages loaded from storage that pre-date this field.
-    return parsed.slice(-50).map((m: any) => ({
-      id: m.id || msgId(),
-      role: m.role,
-      content: m.content,
-      timestamp: m.timestamp || undefined,
-      createdTask: m.createdTask || undefined,
-    }))
-  } catch { return [] }
-}
-
-/** Ensure every message has a stable `id` — auto-assigns one if missing. */
-function ensureIds(msgs: Message[]): Message[] {
-  return msgs.map((m) => (m.id ? m : { ...m, id: msgId() }))
-}
+import type { Message } from "./chat/chat-types"
+import {
+  getFollowUpChips,
+  loadStoredMessages,
+  ensureIds,
+  cleanAssistantContent,
+  CHAT_STORAGE_KEY,
+} from "./chat/chat-utils"
+import { ChatHeader } from "./chat/chat-header"
+import { ChatMessage } from "./chat/chat-message"
+import { ChatInput } from "./chat/chat-input"
+import { ChatSettingsPanel } from "./chat/chat-settings-panel"
 
 export function ChatBar() {
   const [messages, _setMessagesRaw] = useState<Message[]>(loadStoredMessages)
@@ -265,20 +125,6 @@ export function ChatBar() {
       }
     }
   }, [])
-
-  // Helper to aggressively clean filler phrases from assistant text so we don't
-  // accidentally create tasks like "All . You've got a reminder ."
-  function cleanAssistantContent(raw: string): string {
-    let s = raw
-      .replace(/\b(all\s*set|got\s*it|no\s*problem|okay|ok|sure|done|noted)\b[.!]?\s*/ig, ' ')
-      .replace(/\byou(?:'|’)?ve\s+got\s+a\s+reminder(?:\s+for)?\b/ig, ' ')
-      .replace(/\bi(?:'|’)?ll\s+note\s+(?:that|this)(?:\s+down)?(?:\s+for\s+you)?\b[.!]?\s*/ig, ' ')
-      .replace(/^\s*all\s*[.!]?\s*/i, ' ')
-      .replace(/\s*[.?!]\s*/g, ' ') // collapse stray punctuation
-      .replace(/\s{2,}/g, ' ')
-      .trim()
-    return s
-  }
 
   // Load persisted TTS settings
   useEffect(() => {
@@ -1758,6 +1604,39 @@ export function ChatBar() {
   const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant' && !m.isError)
   const followUpChips = !isProcessing && messages.length > 0 ? getFollowUpChips(lastAssistantMsg) : []
 
+  const handleCompleteTask = useCallback(async (messageIndex: number, taskId: string) => {
+    try {
+      const res = await fetch('/api/integrations/todoist/tasks/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      })
+      if (res.ok) {
+        setMessages(prev => prev.map((msg, idx) => idx === messageIndex ? ({
+          ...msg,
+          createdTask: { ...(msg.createdTask as any), completed: true }
+        }) : msg))
+      }
+    } catch {}
+  }, [setMessages])
+
+  const handleToggleSpeakReplies = useCallback(() => {
+    setSpeakReplies(prev => {
+      const next = !prev
+      if (!next) cancelTTS()
+      // In realtime mode, mute/unmute the remote audio
+      if (rtRemoteAudioRef.current) {
+        rtRemoteAudioRef.current.muted = !next
+        rtRemoteAudioRef.current.volume = next ? 1 : 0
+      }
+      return next
+    })
+  }, [])
+
+  const handleToggleSettings = useCallback(() => {
+    setShowSettings(s => !s)
+  }, [])
+
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-4 right-3 sm:right-4 z-50">
       <AnimatePresence>
@@ -1774,35 +1653,16 @@ export function ChatBar() {
           transition={{ duration: 0.2, ease: 'easeOut' }}
           className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[min(70vh,480px)] md:h-[420px] relative pb-[env(safe-area-inset-bottom)]"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b">
-            <div className="flex items-center gap-2 font-medium text-sm text-theme-text-body">
-              <MessageSquare className="w-4 h-4 text-theme-secondary" /> Chat
-              {isVoiceMode && (
-                <span
-                  className={`ml-2 text-[11px] leading-5 inline-flex items-center gap-1 rounded-full px-2 border ${
-                    isRealtimeActive
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                  title={isRealtimeActive ? `conn:${rtConnState || 'active'} ice:${rtIceState || 'n/a'} gather:${rtGatheringState || 'n/a'}` : 'HTTP voice fallback'}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${isRealtimeActive ? 'bg-green-500' : 'bg-amber-500'}`}></span>
-                  {isRealtimeActive ? 'Realtime' : 'Voice (fallback)'}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {messages.length > 0 && (
-                <button onClick={handleClearChat} aria-label="Clear chat" title="Clear chat" className="text-[#8e99a8] hover:text-[#4a5568]">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button onClick={handleCloseChat} aria-label="Close chat">
-                <X className="w-4 h-4 text-theme-text-tertiary" />
-              </button>
-            </div>
-          </div>
+          <ChatHeader
+            isVoiceMode={isVoiceMode}
+            isRealtimeActive={isRealtimeActive}
+            rtConnState={rtConnState}
+            rtIceState={rtIceState}
+            rtGatheringState={rtGatheringState}
+            hasMessages={messages.length > 0}
+            onClearChat={handleClearChat}
+            onClose={handleCloseChat}
+          />
 
           {/* Offline banner */}
           {isOffline && (
@@ -1830,107 +1690,16 @@ export function ChatBar() {
               </div>
             )}
             {messages.map((m, i) => (
-              <div key={m.id}>
-                {/* Day divider */}
-                {shouldShowDivider(messages, i) && m.timestamp && (
-                  <div className="flex items-center gap-2 my-2">
-                    <div className="flex-1 h-px bg-theme-neutral-200" />
-                    <span className="text-[10px] text-theme-text-tertiary font-medium">{formatDayDivider(m.timestamp)}</span>
-                    <div className="flex-1 h-px bg-theme-neutral-200" />
-                  </div>
-                )}
-                <div className={m.role === "user" ? "text-right" : "text-left group"}>
-                  <div
-                    className={`inline-block rounded-lg px-3 py-2 whitespace-pre-wrap max-w-[80%] ${
-                      m.role === "user"
-                        ? "bg-theme-secondary text-white"
-                        : m.isError
-                          ? "bg-red-50 text-red-700 border border-red-200"
-                          : "bg-theme-brand-tint-light text-theme-text-primary"
-                    }`}
-                  >
-                    {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
-                    {m.audio && m.role === 'user' && (
-                      <div className="mt-2">
-                        <audio controls className="w-full max-w-[200px]">
-                          <source src={m.audio} type="audio/webm" />
-                          Your browser does not support the audio element.
-                        </audio>
-                      </div>
-                    )}
-                    {m.createdTask && m.role === 'assistant' && (
-                      <div className="mt-2 border border-theme-neutral-300 rounded-md bg-white text-theme-text-primary p-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs">
-                            <div className="font-medium">{m.createdTask.content || 'New task'}</div>
-                            {m.createdTask.due?.date && (
-                              <div className="text-theme-text-tertiary">Due {m.createdTask.due.date}</div>
-                            )}
-                          </div>
-                          {!m.createdTask.completed ? (
-                            <button
-                              onClick={async () => {
-                                const taskId = (m.createdTask as any)?.id
-                                if (!taskId) return
-                                try {
-                                  const res = await fetch('/api/integrations/todoist/tasks/complete', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ taskId: String(taskId) })
-                                  })
-                                  if (res.ok) {
-                                    setMessages(prev => prev.map((msg, idx) => idx === i ? ({
-                                      ...msg,
-                                      createdTask: { ...(msg.createdTask as any), completed: true }
-                                    }) : msg))
-                                  }
-                                } catch {}
-                              }}
-                              className="text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700"
-                            >
-                              Mark done
-                            </button>
-                          ) : (
-                            <span className="text-xs text-green-600">Completed</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {/* Timestamp + Copy + Retry for assistant messages */}
-                  {m.role === 'assistant' && (
-                    <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {m.timestamp && (
-                        <span className="text-[10px] text-theme-text-tertiary mr-1">{formatMessageTime(m.timestamp)}</span>
-                      )}
-                      <button
-                        onClick={() => handleCopy(m.content, i)}
-                        className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
-                        title="Copy"
-                        aria-label="Copy message"
-                      >
-                        {copiedIndex === i ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                      {m.isError && (
-                        <button
-                          onClick={handleRetry}
-                          className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
-                          title="Retry"
-                          aria-label="Retry message"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {/* User message timestamp */}
-                  {m.role === 'user' && m.timestamp && (
-                    <div className="text-[10px] text-theme-text-tertiary mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {formatMessageTime(m.timestamp)}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ChatMessage
+                key={m.id}
+                message={m}
+                index={i}
+                messages={messages}
+                copiedIndex={copiedIndex}
+                onCopy={handleCopy}
+                onRetry={handleRetry}
+                onCompleteTask={handleCompleteTask}
+              />
             ))}
             {/* Follow-up suggestion chips */}
             {followUpChips.length > 0 && !isProcessing && (
@@ -1968,263 +1737,52 @@ export function ChatBar() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
-          <div className="border-t flex items-center gap-2 px-3 py-2 relative">
-            {/* Recording indicator replaces input when actively recording */}
-            {isVoiceMode && isRecording ? (
-              <div className="flex-1 flex items-center gap-2">
-                <div className="flex items-center gap-1.5 relative">
-                  {/* Silence countdown ring */}
-                  {silenceProgress > 0 && (
-                    <svg className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)]" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10" fill="none" stroke="#fca5a5" strokeWidth="2" strokeDasharray={`${silenceProgress * 62.8} 62.8`} strokeLinecap="round" transform="rotate(-90 12 12)" />
-                    </svg>
-                  )}
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium text-red-600">
-                    {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
-                  </span>
-                </div>
-                <div className="flex-1 flex items-center justify-center gap-[3px] px-2">
-                  {/* Reactive audio level bars driven by mic RMS */}
-                  {[0.6, 1.0, 0.8, 1.0, 0.6].map((scale, i) => (
-                    <div
-                      key={i}
-                      className="w-1 bg-red-400 rounded-full transition-[height] duration-100"
-                      style={{
-                        height: `${4 + micLevel * scale * 16}px`,
-                      }}
-                    />
-                  ))}
-                </div>
-                <span className="text-[11px] text-theme-text-tertiary">
-                  {silenceProgress > 0 ? 'Sending soon...' : 'Tap mic to send'}
-                </span>
-              </div>
-            ) : (
-              <textarea
-                className="flex-1 text-sm outline-none placeholder-theme-text-tertiary resize-none max-h-20 overflow-y-auto bg-theme-surface-alt/50 rounded-lg px-2.5 py-1.5 focus:bg-theme-surface-alt transition-colors"
-                rows={1}
-                placeholder={
-                  isVoiceMode
-                    ? (isSpeaking ? "AI speaking… tap mic to interrupt" :
-                       processingStage === 'transcribing' ? "Transcribing…" :
-                       processingStage === 'thinking' ? "Thinking…" :
-                       processingStage === 'speaking' ? "Generating audio…" :
-                       isProcessing ? "Processing…" :
-                       "Tap mic or hold Space to speak")
-                    : "Type a message…"
-                }
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value)
-                  // Auto-resize: reset to 1 row then expand to content
-                  e.target.style.height = 'auto'
-                  e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px'
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSend()
-                  }
-                }}
-                ref={inputRef}
-              />
-            )}
-            {/* Settings Toggle */}
-            <button
-              onClick={() => setShowSettings(s => !s)}
-              className="text-theme-text-tertiary/70 hover:text-theme-primary-600"
-              aria-label="TTS settings"
-              title="Voice settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            {/* Speak Replies Toggle */}
-            <button
-              onClick={() => {
-                setSpeakReplies(prev => {
-                  const next = !prev
-                  if (!next) cancelTTS()
-                  // In realtime mode, mute/unmute the remote audio
-                  if (rtRemoteAudioRef.current) {
-                    rtRemoteAudioRef.current.muted = !next
-                    rtRemoteAudioRef.current.volume = next ? 1 : 0
-                  }
-                  return next
-                })
-              }}
-              className={`transition-colors ${speakReplies ? 'text-theme-primary-600 bg-theme-primary-50 rounded-full p-1' : 'text-theme-text-tertiary/70 hover:text-theme-primary-600'}`}
-              aria-label={speakReplies ? 'Mute spoken replies' : 'Enable spoken replies'}
-              title={speakReplies ? 'Spoken replies on' : 'Spoken replies off'}
-            >
-              {speakReplies ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-
-            {/* Voice Mode Toggle / Push-to-talk */}
-            <button
-              onClick={toggleVoiceMode}
-              className={`transition-all ${
-                isRecording
-                  ? 'text-white bg-red-500 rounded-full p-1.5 shadow-md hover:bg-red-600'
-                  : isSpeaking
-                    ? 'text-theme-secondary bg-theme-primary-50 rounded-full p-1 hover:bg-theme-surface-selected ring-2 ring-theme-secondary/30'
-                    : isVoiceMode
-                      ? 'text-green-500 bg-green-50 rounded-full p-1 hover:bg-green-100'
-                      : 'text-theme-text-tertiary/70 hover:text-theme-primary-600'
-              }`}
-              aria-label={isRecording ? "Stop recording and send" : isSpeaking ? "Tap to interrupt" : isVoiceMode ? "Start recording" : "Start voice conversation"}
-              title={isRecording ? "Tap to send" : isSpeaking ? "Tap to interrupt" : isVoiceMode ? "Tap to record" : "Voice mode"}
-            >
-              {isRecording ? (
-                <Send className="w-4 h-4" />
-              ) : isVoiceMode ? (
-                <div className="flex items-center gap-1">
-                  {isSpeaking ? (
-                    <div className="w-2 h-2 bg-theme-secondary rounded-full animate-pulse"></div>
-                  ) : isProcessing ? (
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                  ) : (
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  )}
-                  <Mic className="w-4 h-4" />
-                </div>
-              ) : (
-                <Mic className="w-4 h-4" />
-              )}
-            </button>
-            {!isRecording && (
-              <button onClick={handleSend} className="text-theme-secondary" aria-label="Send message">
-                <Send className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          <ChatInput
+            isVoiceMode={isVoiceMode}
+            isRecording={isRecording}
+            silenceProgress={silenceProgress}
+            recordingDuration={recordingDuration}
+            micLevel={micLevel}
+            input={input}
+            onInputChange={setInput}
+            isProcessing={isProcessing}
+            isSpeaking={isSpeaking}
+            processingStage={processingStage}
+            inputRef={inputRef}
+            onToggleSettings={handleToggleSettings}
+            speakReplies={speakReplies}
+            onToggleSpeakReplies={handleToggleSpeakReplies}
+            onToggleVoiceMode={toggleVoiceMode}
+            onSend={handleSend}
+          />
 
           {/* Hidden audio element for realtime playback */}
           <audio ref={rtRemoteAudioRef as any} className="hidden" autoPlay />
 
-          {/* Settings Panel */}
           {showSettings && (
-            <div ref={settingsPanelRef} className="absolute bottom-14 right-3 bg-white border shadow-warm-lg rounded-md p-3 w-64 z-50">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-medium text-theme-text-body">Voice Settings</div>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="text-theme-text-tertiary hover:text-theme-text-body p-0.5 rounded transition-colors"
-                  aria-label="Close settings"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <label className="flex items-center justify-between mb-3 text-xs text-theme-text-body">
-                <span>Realtime voice (beta)</span>
-                <input
-                  type="checkbox"
-                  checked={useRealtime}
-                  onChange={(e) => setUseRealtime(e.target.checked)}
-                />
-              </label>
-              <div className="mb-3">
-                <button
-                  onClick={() => enumerateAudioDevices(true)}
-                  className="text-[11px] text-theme-text-subtle hover:text-theme-text-primary underline"
-                >
-                  {isEnumerating ? 'Detecting devices…' : 'Detect audio devices'}
-                </button>
-              </div>
-              <label className="block mb-2">
-                <span className="text-xs text-theme-text-tertiary">Voice</span>
-                <select
-                  value={ttsVoice}
-                  onChange={(e) => setTtsVoice(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1 text-sm"
-                >
-                  {['Chloe','Evelyn','Laura','Madison','Anaya','Abigail','Meera','Marisol','Lucy','Aaron','Ethan','Brian','Gordon','Andy','Dylan','Archer','Emmanuel','Gavin','Ivan','Walter'].map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block mb-2">
-                <span className="text-xs text-theme-text-tertiary">Microphone</span>
-                <select
-                  value={micDeviceId}
-                  onChange={(e) => setMicDeviceId(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1 text-sm"
-                >
-                  <option value="">System default</option>
-                  {devices.filter(d => d.kind === 'audioinput').map(d => (
-                    <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>
-                  ))}
-                </select>
-                {micDeviceId && /iphone|continuity/i.test((devices.find(d=>d.deviceId===micDeviceId)?.label)||'') && (
-                  <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">Selected mic appears to be an iPhone/Continuity device. If you see macOS “Audio Disconnected” alerts, choose a built‑in or USB mic.</div>
-                )}
-              </label>
-              <label className="block mb-3">
-                <span className="text-xs text-theme-text-tertiary">Speaker</span>
-                <select
-                  value={speakerDeviceId}
-                  onChange={(e) => setSpeakerDeviceId(e.target.value)}
-                  className="mt-1 w-full border rounded px-2 py-1 text-sm"
-                >
-                  <option value="">Browser default</option>
-                  {devices.filter(d => d.kind === 'audiooutput').map(d => (
-                    <option key={d.deviceId} value={d.deviceId}>{d.label || 'Speaker'}</option>
-                  ))}
-                </select>
-                <div className="mt-1 flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const a = new Audio('data:audio/wav;base64,UklGRkQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQwAAAAA//8AAP//AAD//wAA//8AAP//AAD//wAA')
-                        if (speakerDeviceId && typeof (a as any).setSinkId === 'function') {
-                          await (a as any).setSinkId(speakerDeviceId)
-                        }
-                        await a.play()
-                      } catch (e) { console.warn('Test beep failed', e) }
-                    }}
-                    className="text-[11px] px-2 py-1 rounded border hover:bg-theme-surface-alt"
-                  >
-                    Test beep
-                  </button>
-                </div>
-              </label>
-              <label className="block">
-                <div className="flex items-center justify-between text-xs text-theme-text-tertiary">
-                  <span>Speaking rate</span>
-                  <span>{ttsRate.toFixed(2)}×</span>
-                </div>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={1.5}
-                  step={0.05}
-                  value={ttsRate}
-                  onChange={(e) => setTtsRate(Number(e.target.value))}
-                  className="w-full"
-                />
-              </label>
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-3 border-t pt-2">
-                  <div className="text-[10px] text-theme-text-tertiary">Debug</div>
-                  <div className="text-[10px] text-theme-text-tertiary">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
-                  {isRealtimeActive && (
-                    <div className="text-[10px] text-theme-text-tertiary">
-                      conn:{rtConnState || '—'} ice:{rtIceState || '—'} gather:{rtGatheringState || '—'}
-                    </div>
-                  )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      onClick={reconnectRealtime}
-                      className={`text-xs px-2 py-1 rounded border ${rtReconnecting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-theme-surface-alt'}`}
-                      disabled={rtReconnecting}
-                    >
-                      {rtReconnecting ? 'Reconnecting…' : 'Reconnect Realtime'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ChatSettingsPanel
+              panelRef={settingsPanelRef}
+              onClose={() => setShowSettings(false)}
+              useRealtime={useRealtime}
+              onRealtimeChange={setUseRealtime}
+              onDetectDevices={() => enumerateAudioDevices(true)}
+              isEnumerating={isEnumerating}
+              ttsVoice={ttsVoice}
+              onVoiceChange={setTtsVoice}
+              micDeviceId={micDeviceId}
+              onMicChange={setMicDeviceId}
+              devices={devices}
+              speakerDeviceId={speakerDeviceId}
+              onSpeakerChange={setSpeakerDeviceId}
+              ttsRate={ttsRate}
+              onRateChange={setTtsRate}
+              isRealtimeActive={isRealtimeActive}
+              rtConnState={rtConnState}
+              rtIceState={rtIceState}
+              rtGatheringState={rtGatheringState}
+              rtReconnecting={rtReconnecting}
+              onReconnect={reconnectRealtime}
+            />
           )}
         </motion.div>
       ) : (

@@ -1,11 +1,11 @@
 import { getUserPreferencesClient } from "./user-preferences";
+import { BUCKET_COLORS_CACHE_TTL_MS } from "@/lib/cache-config";
 
 const UNASSIGNED_BUCKET_ID = "__unassigned";
 const BUCKET_COLOR_PALETTE = ["#92BEFB","#89BAA2","#DEA2BF","#85C9E0","#FFE4A8","#C3C0FF","#FFC688","#B0DBD2"] as const;
 
 let cachedBucketColors: Record<string, string> | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function defaultBucketColorFromId(id: string): string {
   if (id === UNASSIGNED_BUCKET_ID) return "#A9B0C5";
@@ -22,7 +22,7 @@ async function getBucketColors(): Promise<Record<string, string>> {
   const now = Date.now();
 
   // Return cached colors if still valid
-  if (cachedBucketColors && (now - cacheTimestamp) < CACHE_DURATION) {
+  if (cachedBucketColors && (now - cacheTimestamp) < BUCKET_COLORS_CACHE_TTL_MS) {
     return cachedBucketColors;
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Plus,
   MoreHorizontal,
@@ -69,7 +69,7 @@ const STATUS_CONFIG = {
   done: { label: "Done", color: "#48B882" },
 } as const;
 
-function HighlightText({ text, query }: { text: string; query?: string }) {
+const HighlightText = React.memo(function HighlightText({ text, query }: { text: string; query?: string }) {
   if (!query || !query.trim()) return <>{text}</>;
   const q = query.trim();
   const idx = text.toLowerCase().indexOf(q.toLowerCase());
@@ -81,7 +81,7 @@ function HighlightText({ text, query }: { text: string; query?: string }) {
       {text.slice(idx + q.length)}
     </>
   );
-}
+});
 
 function formatDue(dueDate?: string | null, isRecurring?: boolean) {
   if (!dueDate) return null;
@@ -105,7 +105,7 @@ function getTaskStatus(task: ListTask): TaskStatus {
 
 /* ─── StatusBadge ─── */
 
-function StatusBadge({
+const StatusBadge = React.memo(function StatusBadge({
   taskId,
   status,
   onStatusChange,
@@ -153,7 +153,7 @@ function StatusBadge({
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
 
 /* ─── BucketBadge ─── */
 
@@ -689,7 +689,7 @@ function TaskSection({
 
 /* ─── TaskTableRow ─── */
 
-function TaskTableRow({
+const TaskTableRow = React.memo(function TaskTableRow({
   task,
   index,
   isLast,
@@ -874,7 +874,7 @@ function TaskTableRow({
       )}
     </Draggable>
   );
-}
+});
 
 /* ─── TaskRowDropdown ─── */
 

@@ -78,7 +78,7 @@ function formatDue(due: string | null, isRecurring: boolean) {
 
 /* ─── Kanban Card ─── */
 
-function KanbanCard({
+const KanbanCard = React.memo(function KanbanCard({
   task,
   index,
   columnId,
@@ -207,7 +207,7 @@ function KanbanCard({
       )}
     </Draggable>
   );
-}
+});
 
 /* ─── Kanban Column ─── */
 

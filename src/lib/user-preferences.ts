@@ -1,5 +1,6 @@
 import { supabase } from "@/utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { AUTH_CACHE_TTL_MS, PREFS_CACHE_TTL_MS } from "@/lib/cache-config";
 
 export interface UserPreferences {
   id?: string;
@@ -23,11 +24,10 @@ export interface UserPreferences {
 // ---------------------------------------------------------------------------
 let _authFlight: Promise<User | null> | null = null
 let _authCache: { user: User | null; ts: number } | null = null
-const AUTH_CACHE_TTL = 30_000 // 30 seconds
 
 /** Get the current Supabase user with deduplication + caching. */
 export async function getCachedUser(): Promise<User | null> {
-  if (_authCache && Date.now() - _authCache.ts < AUTH_CACHE_TTL) {
+  if (_authCache && Date.now() - _authCache.ts < AUTH_CACHE_TTL_MS) {
     return _authCache.user
   }
   if (_authFlight) return _authFlight
@@ -65,7 +65,6 @@ export function invalidateAuthCache() {
 // ---------------------------------------------------------------------------
 let _prefsCache: { data: UserPreferences | null; ts: number } | null = null
 let _prefsFlight: Promise<UserPreferences | null> | null = null
-const PREFS_CACHE_TTL = 60_000 // 60 seconds
 
 /** Invalidate the in-memory preferences cache (call after saves). */
 export function invalidatePreferencesCache() {
@@ -75,7 +74,7 @@ export function invalidatePreferencesCache() {
 
 export async function getUserPreferencesClient() {
   // Return cached result if still fresh
-  if (_prefsCache && Date.now() - _prefsCache.ts < PREFS_CACHE_TTL) {
+  if (_prefsCache && Date.now() - _prefsCache.ts < PREFS_CACHE_TTL_MS) {
     return _prefsCache.data
   }
   // Deduplicate concurrent in-flight requests
