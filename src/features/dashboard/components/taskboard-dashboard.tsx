@@ -11,16 +11,14 @@ import { useDailyReset } from "@/features/dashboard/hooks/use-daily-reset";
 import { useDashboardWidgets } from "@/features/dashboard/hooks/use-dashboard-widgets";
 import { useIntegrations } from "@/features/dashboard/hooks/use-integrations";
 import { useWidgetLogs } from "@/features/dashboard/hooks/use-widget-logs";
-import { WidgetModalsContainer } from "./WidgetModalsContainer";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UndoToast } from "./UndoToast";
-import { WidgetLogsTab } from "./WidgetLogsTab";
-import { WidgetSettingsTab } from "./WidgetSettingsTab";
 import { ManageTabsSheet } from "./ManageTabsSheet";
 import {
   type DestructiveConfirmState,
   type UndoState,
   withRetry,
+  getContrastText,
 } from "@/lib/dashboard-utils";
 import {
   Plus,
@@ -36,7 +34,6 @@ import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task } from "@/types/tasks";
 import type { ProgressEntry } from "@/features/dashboard/types";
 import { getSuggestedColorForBucket } from "@/features/dashboard/constants";
-import { darkenHexColor } from "@/lib/bucket-colors";
 import dynamic from 'next/dynamic';
 
 // Lazy-load these heavy components — only rendered when user opens a drawer/sheet
@@ -53,7 +50,23 @@ const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.Dr
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
-import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+const TaskEditorModal = dynamic(
+  () => import("@/features/tasks/components/task-editor-modal"),
+  { ssr: false, loading: () => null }
+);
+const WidgetModalsContainer = dynamic(
+  () => import("./WidgetModalsContainer").then(m => m.WidgetModalsContainer),
+  { ssr: false, loading: () => null }
+);
+const WidgetLogsTab = dynamic(
+  () => import("./WidgetLogsTab").then(m => m.WidgetLogsTab),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
+);
+const WidgetSettingsTab = dynamic(
+  () => import("./WidgetSettingsTab").then(m => m.WidgetSettingsTab),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
+);
 const EnhancedTasksView = dynamic(
   () => import("@/features/tasks/components/enhanced-tasks-view").then(m => m.EnhancedTasksView),
   { ssr: false, loading: () => <Skeleton className="h-64 w-full" /> }
@@ -226,14 +239,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   const taskEditorRef = useRef<TaskEditorModalHandle | null>(null);
   const weather = useWeather();
 
-  const [isMobileView, setIsMobileView] = useState(false);
+  // Use matchMedia instead of resize listener — fires only at breakpoint crossing
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
   const [chatBarReady, setChatBarReady] = useState(false);
 
   useEffect(() => {
-    const updateMobileView = () => setIsMobileView(window.innerWidth < 768);
-    updateMobileView();
-    window.addEventListener('resize', updateMobileView);
-    return () => window.removeEventListener('resize', updateMobileView);
+    const mql = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobileView(e.matches);
+    setIsMobileView(mql.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
   }, []);
 
   useEffect(() => {
@@ -385,17 +402,27 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   useEffect(() => {
     const el = tabsScrollRef.current;
     if (!el) return;
+    let rafId = 0;
     const updateFades = () => {
-      const { scrollLeft, scrollWidth, clientWidth } = el;
-      setShowLeftTabFade(scrollLeft > 0);
-      setShowRightTabFade(scrollLeft + clientWidth < scrollWidth - 1);
+      if (rafId) return; // already scheduled
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        const { scrollLeft, scrollWidth, clientWidth } = el;
+        setShowLeftTabFade(scrollLeft > 0);
+        setShowRightTabFade(scrollLeft + clientWidth < scrollWidth - 1);
+      });
     };
-    updateFades();
-    el.addEventListener('scroll', updateFades);
+    // Initial sync check (no RAF needed)
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setShowLeftTabFade(scrollLeft > 0);
+    setShowRightTabFade(scrollLeft + clientWidth < scrollWidth - 1);
+
+    el.addEventListener('scroll', updateFades, { passive: true });
     window.addEventListener('resize', updateFades);
     return () => {
       el.removeEventListener('scroll', updateFades);
       window.removeEventListener('resize', updateFades);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, []);
 
@@ -500,7 +527,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   backgroundColor: b === activeBucket ? getBucketColor(b) : 'rgba(252, 250, 248, 0.9)',
                   borderColor: b === activeBucket ? getBucketColor(b) : 'rgba(219, 214, 207, 0.6)',
                   borderBottomColor: b === activeBucket ? getBucketColor(b) : 'transparent',
-                  color: b === activeBucket ? darkenHexColor(getBucketColor(b)) : '#314158',
+                  color: b === activeBucket ? getContrastText(getBucketColor(b)) : '#314158',
                   marginBottom: '-1px',
                 }}
                 className={`relative flex h-[42px] sm:h-[48px] items-center justify-center whitespace-nowrap rounded-t-[14px] sm:rounded-t-[16px] px-3 sm:px-6  text-xs sm:text-[13px] font-medium capitalize transition-all duration-300 border ${b === activeBucket
@@ -890,16 +917,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           onBucketDragEnd={handleBucketDragEnd}
         />
 
-        {/* Widget modals (nutrition, medication, exercise, etc.) */}
-        <WidgetModalsContainer
-          openModalId={openWidgetModal}
-          onClose={() => setOpenWidgetModal(null)}
-          activeWidget={activeModalWidget}
-          setActiveWidget={setActiveModalWidget}
-          onWidgetUpdate={handleWidgetModalUpdate}
-          progressByWidget={progressByWidget}
-          onIncrementProgress={incrementProgress}
-        />
+        {/* Widget modals — only mount when open to avoid loading chunk eagerly */}
+        {openWidgetModal !== null && (
+          <WidgetModalsContainer
+            openModalId={openWidgetModal}
+            onClose={() => setOpenWidgetModal(null)}
+            activeWidget={activeModalWidget}
+            setActiveWidget={setActiveModalWidget}
+            onWidgetUpdate={handleWidgetModalUpdate}
+            progressByWidget={progressByWidget}
+            onIncrementProgress={incrementProgress}
+          />
+        )}
 
       </div>
 

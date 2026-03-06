@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Check, Plus, X } from "lucide-react"
+import { Check, ListChecks, LayoutGrid, ShoppingCart, Calendar, Plus, Trash2, X } from "lucide-react"
 import {
   DndContext,
   closestCenter,
@@ -130,20 +130,14 @@ function SortableFolder({
   name,
   color,
   empty,
-  isEditing,
-  onToggleEdit,
-  onChangeColor,
-  bucketColors,
+  onEdit,
   stats,
   visibleStatTypes,
 }: {
   name: string
   color: string
   empty: boolean
-  isEditing: boolean
-  onToggleEdit: () => void
-  onChangeColor: (color: string) => void
-  bucketColors: Record<string, string>
+  onEdit: () => void
   stats?: BucketStatsData
   visibleStatTypes?: Set<keyof BucketStatsData>
 }) {
@@ -169,28 +163,200 @@ function SortableFolder({
       style={style}
       {...attributes}
       {...listeners}
-      data-folder-item
       className="flex flex-col items-center cursor-grab active:cursor-grabbing w-[140px] sm:w-[170px] lg:w-[200px]"
     >
       <CSSFolder
         label={name}
         color={color}
         empty={empty}
-        onClick={onToggleEdit}
+        onClick={onEdit}
         stats={stats}
         visibleStatTypes={visibleStatTypes}
       />
-      {isEditing && !isDragging && (
-        <div
-          data-color-picker
-          className="mt-3 p-3 rounded-xl border border-theme-neutral-300/80 bg-white shadow-warm-sm"
-        >
+    </div>
+  )
+}
+
+/* ── Stats row for edit modal ── */
+const STAT_CONFIG = [
+  { key: "tasks" as const, icon: ListChecks, label: "Tasks" },
+  { key: "widgets" as const, icon: LayoutGrid, label: "Widgets" },
+  { key: "shopping" as const, icon: ShoppingCart, label: "Shopping" },
+  { key: "calendar" as const, icon: Calendar, label: "Events" },
+]
+
+/* ── Folder edit modal ── */
+function FolderEditModal({
+  folderName,
+  bucketColors,
+  stats,
+  allBuckets,
+  onChangeColor,
+  onRename,
+  onDelete,
+  onClose,
+}: {
+  folderName: string
+  bucketColors: Record<string, string>
+  stats: BucketStatsData
+  allBuckets: string[]
+  onChangeColor: (color: string) => void
+  onRename: (oldName: string, newName: string) => void
+  onDelete: (name: string) => void
+  onClose: () => void
+}) {
+  const color = getBucketColorSync(folderName, bucketColors)
+  const [editName, setEditName] = useState(folderName)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const trimmed = editName.trim()
+  const isDuplicate = trimmed !== folderName && allBuckets.includes(trimmed)
+  const canSaveName = trimmed.length > 0 && !isDuplicate && trimmed !== folderName
+
+  const commitRename = () => {
+    if (canSaveName) onRename(folderName, trimmed)
+  }
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [onClose])
+
+  const hasAnyStats = stats.tasks > 0 || stats.widgets > 0 || stats.shopping > 0 || stats.calendar > 0
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Edit ${folderName}`}
+        className="w-full max-w-sm rounded-2xl border border-theme-neutral-300 bg-white p-6 shadow-xl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-theme-text-primary">Edit Folder</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-theme-text-tertiary hover:bg-theme-surface-alt transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Live preview */}
+        <div className="flex justify-center mb-5">
+          <CSSFolder
+            label={trimmed || folderName}
+            color={color}
+          />
+        </div>
+
+        {/* Name input */}
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-theme-text-body mb-1.5">
+            Name
+          </label>
+          <input
+            ref={nameInputRef}
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                commitRename()
+                nameInputRef.current?.blur()
+              }
+            }}
+            className="w-full h-10 px-3 rounded-lg border border-theme-neutral-300 bg-white text-sm text-theme-text-primary placeholder:text-theme-text-tertiary focus:outline-none focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary transition-colors"
+          />
+          {isDuplicate && trimmed && (
+            <p className="mt-1.5 text-xs text-red-500">A folder with this name already exists</p>
+          )}
+        </div>
+
+        {/* Color picker */}
+        <div className="mb-5">
+          <label className="block text-sm font-medium text-theme-text-body mb-2">
+            Color
+          </label>
           <ColorGrid
-            selected={getBucketColorSync(name, bucketColors)}
+            selected={color}
             onSelect={onChangeColor}
           />
         </div>
-      )}
+
+        {/* Stats row */}
+        {hasAnyStats && (
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-theme-text-body mb-2">
+              Contents
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {STAT_CONFIG.map(({ key, icon: Icon, label }) => {
+                const count = stats[key]
+                if (count === 0) return null
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 bg-theme-surface-alt text-theme-text-secondary text-xs font-medium"
+                  >
+                    <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+                    <span>{count} {label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Delete section */}
+        <div className="pt-4 border-t border-theme-neutral-300/60">
+          {!confirmDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Folder
+            </button>
+          ) : (
+            <div className="space-y-2.5">
+              <p className="text-sm text-red-600 font-medium">
+                Delete &ldquo;{folderName}&rdquo;? All tasks, widgets, and items in this folder will be removed.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg border border-theme-neutral-300 px-3 py-1.5 text-sm text-theme-text-body hover:bg-theme-surface-alt transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(folderName)}
+                  className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -304,6 +470,54 @@ export default function FoldersPage() {
     await saveBucketColors(null, nextColors)
   }
 
+  const handleRename = async (oldName: string, newName: string) => {
+    if (oldName === newName || localBuckets.includes(newName)) return
+    const updated = localBuckets.map((b) => (b === oldName ? newName : b))
+    const nextColors = { ...bucketColors }
+    nextColors[newName] = nextColors[oldName] ?? getBucketColorSync(oldName, bucketColors)
+    delete nextColors[oldName]
+
+    setLocalBuckets(updated)
+    setBucketColors(nextColors)
+    setEditingFolder(newName)
+
+    // Migrate stats key
+    setBucketStats((prev) => {
+      const next = { ...prev }
+      if (next[oldName]) {
+        next[newName] = next[oldName]
+        delete next[oldName]
+      }
+      return next
+    })
+
+    await saveBucketColors(updated, nextColors)
+  }
+
+  const handleDeleteFolder = async (name: string) => {
+    const updated = localBuckets.filter((b) => b !== name)
+    const nextColors = { ...bucketColors }
+    delete nextColors[name]
+
+    setLocalBuckets(updated)
+    setBucketColors(nextColors)
+    setEditingFolder(null)
+
+    await saveBucketColors(updated, nextColors)
+
+    // Cascade delete server-side
+    try {
+      await fetch("/api/user/bucket-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ bucket: name }),
+      })
+    } catch (err) {
+      console.error("Failed to cascade-delete bucket:", err)
+    }
+  }
+
   const isBucketEmpty = useCallback((name: string) => {
     const s = bucketStats[name]
     if (!s) return true
@@ -321,23 +535,25 @@ export default function FoldersPage() {
     return types
   }, [bucketStats])
 
-  // Close inline color picker when clicking outside
-  useEffect(() => {
-    if (!editingFolder) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest("[data-color-picker]") || target.closest("[data-folder-item]")) return
-      setEditingFolder(null)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [editingFolder])
-
   const isDuplicate = localBuckets.includes(newName.trim())
   const canAdd = newName.trim().length > 0 && !isDuplicate
 
   return (
     <div className="flex w-full flex-col pb-24">
+      {/* Edit Folder Modal */}
+      {editingFolder && (
+        <FolderEditModal
+          folderName={editingFolder}
+          bucketColors={bucketColors}
+          stats={bucketStats[editingFolder] ?? { tasks: 0, widgets: 0, shopping: 0, calendar: 0 }}
+          allBuckets={localBuckets}
+          onChangeColor={(c) => handleChangeColor(editingFolder, c)}
+          onRename={handleRename}
+          onDelete={handleDeleteFolder}
+          onClose={() => setEditingFolder(null)}
+        />
+      )}
+
       {/* Add Folder Modal */}
       {showModal && (
         <div
@@ -483,12 +699,7 @@ export default function FoldersPage() {
                     empty={isBucketEmpty(name)}
                     stats={bucketStats[name] ?? { tasks: 0, widgets: 0, shopping: 0, calendar: 0 }}
                     visibleStatTypes={visibleStatTypes}
-                    isEditing={editingFolder === name}
-                    onToggleEdit={() =>
-                      setEditingFolder(editingFolder === name ? null : name)
-                    }
-                    onChangeColor={(c) => handleChangeColor(name, c)}
-                    bucketColors={bucketColors}
+                    onEdit={() => setEditingFolder(name)}
                   />
                 ))}
               </div>
