@@ -122,6 +122,7 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
   const cardEntry = WIDGET_CARD_REGISTRY[w.id];
   const showIncrement =
     cardEntry?.showIncrement !== false && !isLinkedTask;
+  const hideTaskConvert = cardEntry?.hideTaskConvert === true;
 
   return (
     <Draggable draggableId={w.instanceId} index={index}>
@@ -142,7 +143,7 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
         >
           {/* Goal completion badge */}
           <AnimatePresence>
-            {goalMet && (
+            {goalMet && !hideTaskConvert && (
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -179,31 +180,33 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
                 <SettingsIcon className="h-3 w-3 text-theme-text-secondary" />
               </button>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onConvertToTask(w, activeBucket);
-              }}
-              className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary/40 transition ${
-                w.linkedTaskId
-                  ? "bg-theme-primary hover:bg-theme-primary-600"
-                  : "bg-theme-brand-tint hover:bg-theme-primary/20"
-              }`}
-              aria-label={
-                w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"
-              }
-              title={
-                w.linkedTaskId
-                  ? "Remove from Tasks tab"
-                  : "Show in Tasks tab"
-              }
-            >
-              <ListChecks
-                className={`h-3 w-3 ${
-                  w.linkedTaskId ? "text-white" : "text-theme-primary"
+            {!hideTaskConvert && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onConvertToTask(w, activeBucket);
+                }}
+                className={`rounded-full p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-theme-primary/40 transition ${
+                  w.linkedTaskId
+                    ? "bg-theme-primary hover:bg-theme-primary-600"
+                    : "bg-theme-brand-tint hover:bg-theme-primary/20"
                 }`}
-              />
-            </button>
+                aria-label={
+                  w.linkedTaskId ? "Remove from Tasks" : "Show in Tasks"
+                }
+                title={
+                  w.linkedTaskId
+                    ? "Remove from Tasks tab"
+                    : "Show in Tasks tab"
+                }
+              >
+                <ListChecks
+                  className={`h-3 w-3 ${
+                    w.linkedTaskId ? "text-white" : "text-theme-primary"
+                  }`}
+                />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -253,7 +256,7 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
           </div>
 
           {/* Linked task section */}
-          {isLinkedTask && (
+          {isLinkedTask && !hideTaskConvert && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm text-theme-text-body">

@@ -27,6 +27,8 @@ export interface WidgetCardEntry {
   getTitle?: (widget: WidgetInstance) => string | null;
   /** Whether to show the "+" increment button. Default: true. */
   showIncrement?: boolean;
+  /** Hide the convert-to-task button and goal-met badge. For informational widgets like family_members. */
+  hideTaskConvert?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1175,7 +1177,7 @@ export const WIDGET_CARD_REGISTRY: Record<string, WidgetCardEntry> = {
   nutrition: { renderBody: renderNutritionBody, showIncrement: false },
   exercise: { renderBody: renderExerciseBody, showIncrement: false },
   home_projects: { renderBody: renderHomeProjectsBody },
-  family_members: { renderBody: renderFamilyMembersBody },
+  family_members: { renderBody: renderFamilyMembersBody, showIncrement: false, hideTaskConvert: true },
   // Metadata-only entries (use default progress bar, but hide "+" button)
   medication: { showIncrement: false },
   water: { showIncrement: false },
