@@ -35,6 +35,7 @@ type TaskEditorOpenOptions = {
   fallbackEndDate?: string;
   fallbackEndHourLabel?: string;
   fallbackAllDay?: boolean;
+  fallbackAssigneeId?: string | null;
 };
 
 type OpenByIdMetadata = {
@@ -150,7 +151,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setStartDate(effectiveDate);
       setFormEndDate(fallbackEndDate);
       setEditTaskId(task?.id?.toString?.() ?? options.fallbackTaskId ?? null);
-      setFormAssignee(task?.assigneeId ?? null);
+      setFormAssignee(task?.assigneeId ?? options.fallbackAssigneeId ?? null);
       setIsSubmitting(false);
       setShowDeleteConfirm(false);
       setIsOpen(true);

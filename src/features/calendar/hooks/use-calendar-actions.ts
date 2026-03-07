@@ -204,6 +204,7 @@ export function useCalendarActions({
         fallbackEndDate: event.endDate ?? event.startDate ?? targetDate,
         fallbackEndHourLabel: event.isRangeEnd ? fallbackHour : undefined,
         fallbackAllDay: event.allDay,
+        fallbackAssigneeId: event.assigneeId,
       });
     },
     [currentDate, resolveTaskById, setSelectedModalDate, taskEditorRef],
