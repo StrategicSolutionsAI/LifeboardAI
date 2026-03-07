@@ -28,7 +28,7 @@ export const ChatMessage = React.memo(function ChatMessage({
       {shouldShowDivider(messages, i) && m.timestamp && (
         <div className="flex items-center gap-2 my-2">
           <div className="flex-1 h-px bg-theme-neutral-200" />
-          <span className="text-[10px] text-theme-text-tertiary font-medium">{formatDayDivider(m.timestamp)}</span>
+          <span className="text-xs text-theme-text-tertiary font-medium">{formatDayDivider(m.timestamp)}</span>
           <div className="flex-1 h-px bg-theme-neutral-200" />
         </div>
       )}
@@ -79,7 +79,7 @@ export const ChatMessage = React.memo(function ChatMessage({
         </div>
         {/* Timestamp + Copy + Retry for assistant messages */}
         {m.role === 'assistant' && (
-          <div className="flex items-center gap-1 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-0.5 touch-reveal opacity-0 group-hover:opacity-100 transition-opacity">
             {m.timestamp && (
               <span className="text-[10px] text-theme-text-tertiary mr-1">{formatMessageTime(m.timestamp)}</span>
             )}

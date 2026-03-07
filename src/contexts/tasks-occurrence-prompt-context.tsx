@@ -109,7 +109,7 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
           className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-theme-neutral-300"
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="px-6 pt-6">
+          <div className="px-4 sm:px-6 pt-4 sm:pt-6">
             <h2 id="occurrence-prompt-title" className="text-lg font-semibold text-theme-text-primary">
               {title}
             </h2>
@@ -120,7 +120,7 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
               Would you like to apply this change to only this occurrence on the selected date or to the entire series?
             </p>
           </div>
-          <div className="px-6 pt-4 pb-6 flex flex-col gap-3">
+          <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6 flex flex-col gap-3">
             {allowSingle && (
               <button
                 type="button"

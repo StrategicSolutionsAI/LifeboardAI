@@ -239,7 +239,7 @@ export const StickerPalette = ({
   return createPortal(
     <div
       ref={paletteRef}
-      className="fixed z-[1200] max-h-[80vh] w-[300px] overflow-hidden rounded-2xl p-4"
+      className="fixed z-[1200] max-h-[80dvh] w-[min(300px,calc(100vw-2rem))] overflow-hidden rounded-2xl p-3 sm:p-4"
       style={{
         top: position.top,
         left: position.left,

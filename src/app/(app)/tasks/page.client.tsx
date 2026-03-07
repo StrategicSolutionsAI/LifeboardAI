@@ -654,7 +654,7 @@ function TasksBoardShell() {
   const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.dueDateRange !== null;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 pb-3 sm:pb-5">
+    <div className="flex h-[calc(100dvh-64px)] md:h-[calc(100dvh-64px)] w-full flex-col gap-3 sm:gap-4 pb-3 sm:pb-5">
       {/* ── Header Row: Progress ring + Title + Stats + Search ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-5">

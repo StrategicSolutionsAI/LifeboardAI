@@ -490,6 +490,13 @@
   }
 }
 
+/* Make hover-revealed actions always visible on touch devices */
+@media (hover: none) {
+  .touch-reveal {
+    opacity: 1 !important;
+  }
+}
+
 /* PWA standalone mode adjustments */
 @media (display-mode: standalone) {
   /* Remove extra bottom padding that accounts for browser chrome */

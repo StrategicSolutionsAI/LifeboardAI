@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MessageSquare, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
+import { useVisualViewport } from "@/hooks/use-visual-viewport"
 import type { Message } from "./chat/chat-types"
 import {
   getFollowUpChips,
@@ -18,6 +19,7 @@ import { ChatInput } from "./chat/chat-input"
 import { ChatSettingsPanel } from "./chat/chat-settings-panel"
 
 export function ChatBar() {
+  const vvHeight = useVisualViewport()
   const [messages, _setMessagesRaw] = useState<Message[]>(loadStoredMessages)
   /** Wrapper around setState that auto-assigns missing IDs. */
   const setMessages: typeof _setMessagesRaw = useCallback(
@@ -1651,7 +1653,8 @@ export function ChatBar() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col h-[min(70vh,480px)] md:h-[420px] relative pb-[env(safe-area-inset-bottom)]"
+          className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col md:h-[420px] relative pb-[env(safe-area-inset-bottom)]"
+          style={{ height: vvHeight ? `min(${vvHeight * 0.7}px, 480px)` : undefined }}
         >
           <ChatHeader
             isVoiceMode={isVoiceMode}

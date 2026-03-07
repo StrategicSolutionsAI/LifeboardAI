@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { format, parseISO } from "date-fns";
 import { X, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -75,6 +76,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
   ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {}, familyMembers = [] }, ref) => {
     const { allTasks, createTask, batchUpdateTasks, deleteTask, refetch } = useTasksContext();
     const { toast } = useToast();
+    const vvHeight = useVisualViewport();
 
     const [isOpen, setIsOpen] = useState(false);
     const [formContent, setFormContent] = useState("");
@@ -427,11 +429,12 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         {/* Centered modal */}
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <div
-            className="w-full max-w-[520px] max-h-[90vh] bg-white rounded-2xl shadow-[0px_16px_48px_rgba(0,0,0,0.12)] animate-in fade-in zoom-in-95 duration-200 ease-out flex flex-col"
+            className="w-full max-w-[520px] bg-white rounded-2xl shadow-[0px_16px_48px_rgba(0,0,0,0.12)] animate-in fade-in zoom-in-95 duration-200 ease-out flex flex-col"
+            style={{ maxHeight: vvHeight ? `${vvHeight * 0.9}px` : '90vh' }}
             onClick={(e) => e.stopPropagation()}
           >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-theme-neutral-300/50 shrink-0">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-theme-neutral-300/50 shrink-0">
             <div className="min-w-0">
               <h3 className="text-[16px] font-semibold text-theme-text-primary">
                 {editTaskId ? "Edit Task" : "New Task"}
@@ -448,7 +451,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           </div>
 
           {/* Form Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
             {/* Task Name */}
             <div>
               <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
@@ -661,7 +664,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {editTaskId && (

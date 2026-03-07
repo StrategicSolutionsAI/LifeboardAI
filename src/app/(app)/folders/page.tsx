@@ -239,7 +239,7 @@ function FolderEditModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Edit ${folderName}`}
-        className="w-full max-w-sm rounded-2xl border border-theme-neutral-300 bg-white p-6 shadow-xl"
+        className="w-full max-w-sm rounded-2xl border border-theme-neutral-300 bg-white p-4 sm:p-6 shadow-xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
@@ -566,7 +566,7 @@ export default function FoldersPage() {
             role="dialog"
             aria-modal="true"
             aria-label="Add Folder"
-            className="w-full max-w-sm rounded-2xl border border-theme-neutral-300 bg-white p-6 shadow-xl"
+            className="w-full max-w-sm rounded-2xl border border-theme-neutral-300 bg-white p-4 sm:p-6 shadow-xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-5">

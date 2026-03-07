@@ -171,7 +171,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   )
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-x-hidden md:flex md:h-screen md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="relative min-h-[100dvh] flex flex-col overflow-x-hidden md:flex md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
@@ -180,13 +180,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </a>
 
       {/* Sidebar - Floating Panel */}
-      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-theme-neutral-300 py-3 w-[92px] h-[calc(100vh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
+      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-theme-neutral-300 py-3 w-[92px] h-[calc(100dvh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
         {/* Logo */}
         <div className="flex flex-col items-center gap-1 px-2 pb-3 mb-1 border-b border-theme-neutral-300/50">
           <div className="w-9 h-9 bg-theme-primary rounded-xl flex items-center justify-center shadow-sm">
             <span className="text-white text-sm font-bold">L</span>
           </div>
-          <span className="section-label text-[8px] tracking-[0.5px]">Lifeboard</span>
+          <span className="section-label text-[10px] tracking-[0.5px]">Lifeboard</span>
         </div>
 
         <nav className="w-full px-2 space-y-1 pt-1">
@@ -329,7 +329,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                   {...getPrefetchHandlers(href)}
                   aria-label={label}
                   aria-current={isActiveRoute(href) ? "page" : undefined}
-                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium ${interactive.transitionFast} ${activeOrNav ? "text-theme-text-primary bg-[rgba(183,148,106,0.1)]" : "text-theme-text-subtle"
+                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} ${activeOrNav ? "text-theme-text-primary bg-[rgba(183,148,106,0.1)]" : "text-theme-text-subtle"
                     }`}
                 >
                   {activeOrNav && <span className={nav.bottomIndicator} aria-hidden="true" />}
@@ -343,7 +343,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             <button
               onClick={() => setSheetOpen(true)}
               aria-label="More navigation options"
-              className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[10px] font-medium ${interactive.transitionFast} text-theme-text-subtle`}
+              className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} text-theme-text-subtle`}
             >
               <MoreHorizontal className="mb-0.5 h-5 w-5 text-theme-text-tertiary" />
               More

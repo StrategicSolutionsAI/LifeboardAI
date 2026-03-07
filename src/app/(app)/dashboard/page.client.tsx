@@ -26,7 +26,7 @@ const TaskBoardDashboard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-screen flex items-center justify-center bg-theme-surface-alt">
+      <div className="h-[100dvh] flex items-center justify-center bg-theme-surface-alt">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-warm-500 mx-auto mb-4" />
           <p className="text-theme-text-tertiary">Loading your dashboard...</p>
@@ -42,7 +42,7 @@ function DashboardContent() {
 
 function LoadingDashboard() {
   return (
-    <div className="h-screen flex items-center justify-center bg-theme-surface-sunken">
+    <div className="h-[100dvh] flex items-center justify-center bg-theme-surface-sunken">
       <div className="text-center">
         <Loader2 className="h-8 w-8 animate-spin text-warm-500 mx-auto mb-4" />
         <p className="text-theme-text-tertiary">Loading your dashboard...</p>

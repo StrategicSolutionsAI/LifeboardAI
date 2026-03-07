@@ -77,7 +77,7 @@ export function TaskBoardTabs({
           align="end"
           side="bottom"
           sideOffset={8}
-          className="w-auto max-h-[calc(100vh-200px)] overflow-y-auto p-4 bg-white border border-theme-neutral-300/80 rounded-xl shadow-warm-lg z-50"
+          className="w-auto max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-200px)] overflow-y-auto p-3 sm:p-4 bg-white border border-theme-neutral-300/80 rounded-xl shadow-warm-lg z-50"
         >
           <TaskFilterPanel
             filters={filters}

@@ -263,7 +263,7 @@ const widgetShowcase = [
 
 export default function Page() {
   return (
-    <main className="min-h-screen bg-[#FDFCF8] text-theme-text-primary selection:bg-warm-600 selection:text-white overflow-x-hidden">
+    <main className="min-h-[100dvh] bg-[#FDFCF8] text-theme-text-primary selection:bg-warm-600 selection:text-white overflow-x-hidden">
       <LandingNav />
       <ScrollReveal />
 

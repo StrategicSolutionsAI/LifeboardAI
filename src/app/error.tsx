@@ -17,7 +17,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#F6F6FC] flex flex-col items-center justify-center p-4">
+    <div className="min-h-[100dvh] bg-[#F6F6FC] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-xl shadow-sm p-8 text-center">
         <div className="flex justify-center mb-4">
           <div className="rounded-full bg-red-50 p-3">

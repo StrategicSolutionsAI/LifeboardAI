@@ -13,7 +13,7 @@ export function ConfirmDialog({ state, onCancel, onConfirm }: ConfirmDialogProps
         role="dialog"
         aria-modal="true"
         aria-label={state.title}
-        className="w-full max-w-md rounded-xl border border-theme-neutral-300 bg-white p-5 shadow-xl"
+        className="w-full max-w-md rounded-xl border border-theme-neutral-300 bg-white p-4 sm:p-5 shadow-xl"
       >
         <h3 className="text-base font-semibold text-theme-text-primary">{state.title}</h3>
         <p className="mt-2 text-sm text-theme-text-subtle">{state.description}</p>

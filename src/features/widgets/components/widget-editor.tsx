@@ -2,6 +2,7 @@
 
 import { WidgetInstance } from "@/types/widgets";
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,7 @@ export default function WidgetEditorSheet({
   selectedDate,
   bucketColor,
 }: WidgetEditorProps) {
+  const vvHeight = useVisualViewport();
   const [draft, setDraft] = useState<WidgetInstance | null>(widget);
   const [isFitbitConnected, setIsFitbitConnected] = useState(false);
   const [isGoogleFitConnected, setIsGoogleFitConnected] = useState(false);
@@ -361,7 +363,7 @@ export default function WidgetEditorSheet({
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full max-h-[95vh] sm:max-h-full p-0 sm:w-[min(560px,95vw)]">
+      <SheetContent side="right" className="w-full sm:max-h-full p-0 sm:w-[min(560px,95vw)]" style={{ maxHeight: vvHeight ? `${vvHeight * 0.95}px` : '95vh' }}>
         <div className="flex h-full flex-col bg-gradient-to-b from-white via-white to-theme-surface-alt/80">
           <SheetHeader className="border-b border-theme-neutral-300 bg-white px-4 py-4 pr-12 sm:px-6">
             <SheetTitle className="text-xl font-semibold text-theme-text-primary">

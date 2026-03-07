@@ -181,7 +181,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
                 Add Medication
               </Button>
             </SheetTrigger>
-            <SheetContent className="max-w-md">
+            <SheetContent className="w-full max-w-md">
               <SheetHeader>
                 <SheetTitle>Add New Medication</SheetTitle>
                 <SheetDescription>

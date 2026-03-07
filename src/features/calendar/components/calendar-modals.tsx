@@ -47,11 +47,11 @@ export function EventDetailsModal({ selectedModalDate, events, bucketColors, onC
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg w-96 max-w-[90%] p-6"
+        className="bg-white rounded-lg w-full max-w-96 p-4 sm:p-6"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -126,11 +126,11 @@ interface DeleteConfirmModalProps {
 export function DeleteConfirmModal({ task, onClose, onConfirm }: DeleteConfirmModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg w-96 max-w-[90%] p-6 shadow-xl"
+        className="bg-white rounded-lg w-full max-w-96 p-4 sm:p-6 shadow-xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -192,11 +192,11 @@ interface CalendarUploadModalProps {
 export function CalendarUploadModal({ CalendarFileUploadComponent, onUploadComplete, onClose }: CalendarUploadModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
       <div
-        className="max-w-4xl w-full mx-4"
+        className="max-w-4xl w-full max-h-[90dvh] overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-label="Upload calendar file"

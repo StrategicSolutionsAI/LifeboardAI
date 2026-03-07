@@ -159,7 +159,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
               Add Medication
             </Button>
           </SheetTrigger>
-          <SheetContent>
+          <SheetContent className="w-full">
             <SheetHeader>
               <SheetTitle>Add New Medication</SheetTitle>
               <SheetDescription>

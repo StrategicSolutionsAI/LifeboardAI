@@ -157,7 +157,7 @@ const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
                 Needed by {item.neededBy}
               </span>
             )}
-            <span className="flex items-center gap-1 text-[10px] font-medium text-theme-text-tertiary">
+            <span className="flex items-center gap-1 text-[11px] font-medium text-theme-text-tertiary">
               <span
                 className="inline-flex h-1.5 w-1.5 rounded-full"
                 style={{ backgroundColor: color }}
@@ -184,7 +184,7 @@ const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+      <div className="flex items-center gap-0.5 touch-reveal sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <button
           type="button"
           className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
@@ -247,7 +247,7 @@ const PurchasedItemCard = React.memo(function PurchasedItemCard({
           </p>
           <div className="mt-0.5 flex items-center gap-2">
             {item.quantity && (
-              <span className="text-[10px] font-medium text-theme-text-tertiary">Qty: {item.quantity}</span>
+              <span className="text-[11px] font-medium text-theme-text-tertiary">Qty: {item.quantity}</span>
             )}
             <Badge
               className="border-0 text-xs font-medium"
@@ -258,7 +258,7 @@ const PurchasedItemCard = React.memo(function PurchasedItemCard({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+      <div className="flex items-center gap-0.5 touch-reveal sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <button
           type="button"
           className="rounded-lg p-1.5 text-theme-text-tertiary hover:bg-theme-brand-tint-light hover:text-theme-text-primary transition-colors duration-150"
