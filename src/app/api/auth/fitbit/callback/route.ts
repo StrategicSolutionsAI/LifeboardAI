@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeFitbitCodeForToken } from '@/lib/fitbit/client';
 import { supabaseServer } from '@/utils/supabase/server';
+import { sanitizeRedirectUrl } from '@/lib/url-utils';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   if (state) {
     try {
       const s = JSON.parse(decodeURIComponent(state));
-      if (s.redirectUrl) redirectUrl = s.redirectUrl;
+      if (s.redirectUrl) redirectUrl = sanitizeRedirectUrl(s.redirectUrl);
       if (s.userId) userIdFromState = s.userId;
     } catch (e) {
       console.error('Failed to parse state param', e);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOAuth2Client } from '@/lib/google/client';
 import { supabaseServer } from '@/utils/supabase/server';
 import { PostgrestError } from '@supabase/supabase-js';
+import { sanitizeRedirectUrl } from '@/lib/url-utils';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (state) {
     try {
       const stateObj = JSON.parse(decodeURIComponent(state));
-      if (stateObj.redirectUrl) redirectUrl = stateObj.redirectUrl;
+      if (stateObj.redirectUrl) redirectUrl = sanitizeRedirectUrl(stateObj.redirectUrl);
       if (stateObj.userId) userId = stateObj.userId;
     } catch (e) {
       console.error('Error parsing state:', e);

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getGoogleFitAuthUrl } from '@/lib/googlefit/client'
 import { supabaseServer } from '@/utils/supabase/server'
+import { sanitizeRedirectUrl } from '@/lib/url-utils'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const redirectUrl = searchParams.get('redirectUrl') || '/onboarding/3'
+  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirectUrl'), '/onboarding/3')
 
   const supabase = supabaseServer()
   const {
