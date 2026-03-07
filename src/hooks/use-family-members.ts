@@ -9,18 +9,43 @@ export interface FamilyMemberOption {
 }
 
 /**
- * Lightweight hook that loads family members from the Family Members widget
- * stored in user_preferences.widgets_by_bucket. Designed to be used on any page
- * that renders a TaskEditorModal so the "Assign to" picker always appears.
- *
- * Caches at module level so multiple mounts don't re-fetch.
+ * Lightweight hook that loads family members from the Family Members widget.
+ * Checks both Supabase (via API) and localStorage (for data not yet flushed).
+ * Designed to be used on any page that renders a TaskEditorModal.
  */
 
 let _cache: { data: FamilyMemberOption[]; ts: number } | null = null
 const CACHE_TTL = 15_000 // 15s
 
+function extractFamilyMembers(widgetsByBucket: Record<string, WidgetInstance[]>): FamilyMemberOption[] {
+  const allWidgets = Object.values(widgetsByBucket).flat()
+  const fmWidget = allWidgets.find((w) => w.id === 'family_members')
+  const raw = fmWidget?.familyMembersData?.members
+  if (!Array.isArray(raw) || raw.length === 0) return []
+  return raw.map((m) => ({
+    id: m.id,
+    name: m.name,
+    avatarColor: m.avatarColor,
+    relationship: m.relationship,
+  }))
+}
+
+function tryLocalStorage(): FamilyMemberOption[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem('widgets_by_bucket')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    // localStorage format: { widgets: Record<string, WidgetInstance[]>, savedAt: string }
+    const widgets: Record<string, WidgetInstance[]> = parsed.widgets || parsed
+    return extractFamilyMembers(widgets)
+  } catch {
+    return []
+  }
+}
+
 export function useFamilyMembers(): FamilyMemberOption[] {
-  const [members, setMembers] = useState<FamilyMemberOption[]>(_cache?.data ?? [])
+  const [members, setMembers] = useState<FamilyMemberOption[]>(() => _cache?.data ?? tryLocalStorage())
 
   useEffect(() => {
     if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
@@ -28,31 +53,30 @@ export function useFamilyMembers(): FamilyMemberOption[] {
       return
     }
 
+    // Immediately check localStorage for fresh data
+    const lsMembers = tryLocalStorage()
+    if (lsMembers.length > 0) {
+      _cache = { data: lsMembers, ts: Date.now() }
+      setMembers(lsMembers)
+    }
+
     let cancelled = false
 
+    // Also fetch from API (source of truth) in background
     ;(async () => {
       try {
         const res = await fetch('/api/user/preferences', { credentials: 'same-origin' })
         if (!res.ok || cancelled) return
         const json = await res.json()
         const widgetsByBucket: Record<string, WidgetInstance[]> = json?.widgets_by_bucket ?? {}
-        const allWidgets = Object.values(widgetsByBucket).flat()
-        const fmWidget = allWidgets.find((w) => w.id === 'family_members')
-        const raw = fmWidget?.familyMembersData?.members
-        if (!Array.isArray(raw) || cancelled) {
-          _cache = { data: [], ts: Date.now() }
-          return
+        const result = extractFamilyMembers(widgetsByBucket)
+        // Prefer API result if it has data; otherwise keep localStorage result
+        if (result.length > 0 || lsMembers.length === 0) {
+          _cache = { data: result, ts: Date.now() }
+          if (!cancelled) setMembers(result)
         }
-        const result: FamilyMemberOption[] = raw.map((m) => ({
-          id: m.id,
-          name: m.name,
-          avatarColor: m.avatarColor,
-          relationship: m.relationship,
-        }))
-        _cache = { data: result, ts: Date.now() }
-        if (!cancelled) setMembers(result)
       } catch {
-        // silently fail — picker just won't show
+        // silently fail — localStorage data already applied
       }
     })()
 

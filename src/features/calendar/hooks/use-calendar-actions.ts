@@ -96,6 +96,7 @@ export function useCalendarActions({
     if (selectedBucketFilters.includes("all")) return "All Categories";
     if (selectedBucketFilters.length === 1) {
       const filter = selectedBucketFilters[0];
+      if (filter.startsWith("assignee:")) return "1 person";
       return filter === "google"
         ? "Google Calendar"
         : filter === "uploaded"

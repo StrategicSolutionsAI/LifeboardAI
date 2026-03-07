@@ -22,6 +22,7 @@ export interface DayEvent {
   duration?: number;
   repeatRule?: RepeatOption;
   bucket?: string;
+  assigneeId?: string | null;
   location?: string;
   eventId?: string;
   startDate?: string;

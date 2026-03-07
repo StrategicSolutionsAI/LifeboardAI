@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('calendar_imports')
-      .select('id, name, file_name, event_count, created_at, updated_at, default_bucket')
+      .select('id, name, file_name, event_count, created_at, updated_at, default_bucket, default_assignee')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -139,6 +139,9 @@ export async function PATCH(request: NextRequest) {
     const importId = typeof body.importId === 'string' ? body.importId : null;
     const rawBucket = typeof body.bucket === 'string' ? body.bucket.trim() : null;
     const normalizedBucket = rawBucket && rawBucket.length > 0 ? rawBucket : null;
+    const hasAssigneeField = 'assigneeId' in body;
+    const rawAssignee = typeof body.assigneeId === 'string' ? body.assigneeId.trim() : null;
+    const normalizedAssignee = rawAssignee && rawAssignee.length > 0 ? rawAssignee : null;
 
     if (!importId) {
       return NextResponse.json({ error: 'importId required' }, { status: 400 });
@@ -182,17 +185,22 @@ export async function PATCH(request: NextRequest) {
 
     const timestamp = new Date().toISOString();
 
+    const importUpdate: Record<string, unknown> = {
+      default_bucket: normalizedBucket,
+      updated_at: timestamp,
+    };
+    if (hasAssigneeField) {
+      importUpdate.default_assignee = normalizedAssignee;
+    }
+
     const { error: updateImportError } = await supabase
       .from('calendar_imports')
-      .update({
-        default_bucket: normalizedBucket,
-        updated_at: timestamp,
-      })
+      .update(importUpdate)
       .eq('id', importId)
       .eq('user_id', user.id);
 
     if (updateImportError) {
-      console.error('Failed to update calendar import record with bucket', updateImportError);
+      console.error('Failed to update calendar import record', updateImportError);
       return NextResponse.json({ error: 'Failed to update calendar import' }, { status: 500 });
     }
 
@@ -215,22 +223,27 @@ export async function PATCH(request: NextRequest) {
       .filter((value): value is string => typeof value === 'string' && value.length > 0);
 
     if (taskIds.length > 0) {
+      const taskUpdate: Record<string, unknown> = {
+        bucket: normalizedBucket,
+        updated_at: timestamp,
+      };
+      if (hasAssigneeField) {
+        taskUpdate.assignee_id = normalizedAssignee;
+      }
+
       const { error: updateTasksError } = await supabase
         .from('lifeboard_tasks')
-        .update({
-          bucket: normalizedBucket,
-          updated_at: timestamp,
-        })
+        .update(taskUpdate)
         .eq('user_id', user.id)
         .in('id', taskIds);
 
       if (updateTasksError) {
-        console.error('Failed to update tasks bucket after calendar import change', updateTasksError);
+        console.error('Failed to update tasks after calendar import change', updateTasksError);
         return NextResponse.json({ error: 'Failed to update linked tasks' }, { status: 500 });
       }
     }
 
-    return NextResponse.json({ ok: true, bucket: normalizedBucket });
+    return NextResponse.json({ ok: true, bucket: normalizedBucket, assigneeId: hasAssigneeField ? normalizedAssignee : undefined });
   } catch (error) {
     console.error('PATCH /api/calendar/imports error', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

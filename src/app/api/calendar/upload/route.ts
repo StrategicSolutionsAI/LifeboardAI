@@ -689,7 +689,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ events: normalizedEvents });
+    // Attach default_assignee from calendar_imports so the client can color events
+    const { data: importRows } = await supabase
+      .from('calendar_imports')
+      .select('id, default_assignee')
+      .eq('user_id', user.id);
+
+    const assigneeByImport = new Map<string, string>();
+    if (Array.isArray(importRows)) {
+      for (const row of importRows) {
+        if (row.default_assignee) {
+          assigneeByImport.set(row.id, row.default_assignee);
+        }
+      }
+    }
+
+    const eventsWithAssignee = normalizedEvents.map((ev) => {
+      const importAssignee = ev.import_id ? assigneeByImport.get(ev.import_id) : undefined;
+      return importAssignee ? { ...ev, default_assignee: importAssignee } : ev;
+    });
+
+    return NextResponse.json({ events: eventsWithAssignee });
 
   } catch (error) {
     console.error('Calendar fetch error:', error);

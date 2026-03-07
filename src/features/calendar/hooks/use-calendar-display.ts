@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { addDays, isSameDay } from "date-fns";
 import type { CalendarView, DayEvent } from "@/features/calendar/types";
 import { toDayKey, getBucketEventStyles } from "@/features/calendar/types";
+import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
 /* ─── Options ─── */
 
@@ -13,6 +14,7 @@ export interface UseCalendarDisplayOptions {
   eventsByDate: Record<string, DayEvent[]>;
   rows: Date[][];
   bucketColors: Record<string, string>;
+  familyMembers?: FamilyMemberOption[];
   // Mobile view auto-switch
   handleViewChange: (v: CalendarView) => void;
   hasUserChosenMobileView: React.MutableRefObject<boolean>;
@@ -28,6 +30,7 @@ export function useCalendarDisplay({
   eventsByDate,
   rows,
   bucketColors,
+  familyMembers,
   handleViewChange,
   hasUserChosenMobileView,
 }: UseCalendarDisplayOptions) {
@@ -213,6 +216,14 @@ export function useCalendarDisplay({
       ? "w-full"
       : "min-w-[600px]";
 
+  // ── Family member lookup for assignee colors ──
+  const familyMemberMap = useMemo(() => {
+    if (!familyMembers?.length) return null;
+    const map = new Map<string, FamilyMemberOption>();
+    for (const m of familyMembers) map.set(m.id, m);
+    return map;
+  }, [familyMembers]);
+
   // ── Event style resolution ──
   const resolveEventStyles = useCallback(
     (source: DayEvent["source"], ev?: DayEvent) => {
@@ -238,8 +249,21 @@ export function useCalendarDisplay({
             dot: "bg-pink-400",
             badge: "text-pink-600",
           };
-        case "lifeboard":
-          return getBucketEventStyles(ev?.bucket, bucketColors);
+        case "lifeboard": {
+          const baseStyles = getBucketEventStyles(ev?.bucket, bucketColors);
+          // Override dot color with assignee's avatar color
+          if (ev?.assigneeId && familyMemberMap) {
+            const member = familyMemberMap.get(ev.assigneeId);
+            if (member) {
+              return {
+                ...baseStyles,
+                dot: '', // clear class-based dot color
+                customColor: member.avatarColor,
+              };
+            }
+          }
+          return baseStyles;
+        }
         default:
           return {
             container: "border border-theme-neutral-300 bg-theme-surface-alt/90 text-theme-text-primary shadow-sm hover:bg-theme-surface-alt",
@@ -249,7 +273,7 @@ export function useCalendarDisplay({
           };
       }
     },
-    [bucketColors],
+    [bucketColors, familyMemberMap],
   );
 
   return {

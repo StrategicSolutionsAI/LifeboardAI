@@ -9,6 +9,7 @@ import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-d
 import SectionLoadTimer from '@/components/section-load-timer'
 import { CalendarFileUpload, type UploadResult } from '@/features/calendar/components/calendar-file-upload'
 import { useBuckets } from '@/hooks/use-buckets'
+import { useFamilyMembers } from '@/hooks/use-family-members'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }
 interface Integration { id: string; name: string; description: string; icon: string; status?: IntegrationStatus; authUrl?: string }
@@ -21,6 +22,7 @@ interface CalendarImport {
   created_at?: string;
   updated_at?: string;
   default_bucket?: string | null;
+  default_assignee?: string | null;
 }
 
 const integrations: Integration[] = [
@@ -121,7 +123,10 @@ export default function IntegrationsPageClient() {
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
   const [updatingBucketId, setUpdatingBucketId] = useState<string | null>(null)
   const [bucketSelections, setBucketSelections] = useState<Record<string, string>>({})
+  const [assigneeSelections, setAssigneeSelections] = useState<Record<string, string>>({})
+  const [updatingAssigneeId, setUpdatingAssigneeId] = useState<string | null>(null)
   const { buckets } = useBuckets()
+  const familyMembers = useFamilyMembers()
 
   const fetchIntegrationStatuses = useCallback(async ({ invalidateCache = false, initial = false }: { invalidateCache?: boolean; initial?: boolean } = {}) => {
     if (initial) {
@@ -163,11 +168,14 @@ export default function IntegrationsPageClient() {
       const data = await response.json()
       const imports = Array.isArray(data?.imports) ? data.imports : []
       setCalendarImports(imports)
-      const nextSelections: Record<string, string> = {}
+      const nextBucketSelections: Record<string, string> = {}
+      const nextAssigneeSelections: Record<string, string> = {}
       imports.forEach((importRow: CalendarImport) => {
-        nextSelections[importRow.id] = importRow.default_bucket ?? ''
+        nextBucketSelections[importRow.id] = importRow.default_bucket ?? ''
+        nextAssigneeSelections[importRow.id] = importRow.default_assignee ?? ''
       })
-      setBucketSelections(nextSelections)
+      setBucketSelections(nextBucketSelections)
+      setAssigneeSelections(nextAssigneeSelections)
     } catch (error) {
       console.error('Failed to load calendar imports', error)
       setCalendarError('Unable to load uploaded calendars. Please try again.')
@@ -259,6 +267,46 @@ export default function IntegrationsPageClient() {
       setUpdatingBucketId(null)
     }
   }, [fetchCalendarImports])
+
+  const handleUpdateImportAssignee = useCallback(async (importId: string, assigneeValue: string, previousAssignee: string) => {
+    if (!importId) return
+    setUpdatingAssigneeId(importId)
+    setCalendarMessage(null)
+    setCalendarError(null)
+    try {
+      const response = await fetch('/api/calendar/imports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId, assigneeId: assigneeValue }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || `HTTP ${response.status}`)
+      }
+
+      invalidateTaskCaches()
+      invalidateIntegrationCaches('calendar')
+
+      const memberName = familyMembers.find(m => m.id === assigneeValue)?.name
+      setCalendarMessage(
+        memberName
+          ? `Assigned imported events to ${memberName}.`
+          : 'Removed assignee from imported events.'
+      )
+
+      await fetchCalendarImports()
+    } catch (error) {
+      console.error('Failed to update calendar import assignee', error)
+      setCalendarError('Failed to update assignee for imported events. Please try again.')
+      setAssigneeSelections((prev) => ({
+        ...prev,
+        [importId]: previousAssignee,
+      }))
+    } finally {
+      setUpdatingAssigneeId(null)
+    }
+  }, [fetchCalendarImports, familyMembers])
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
@@ -433,7 +481,10 @@ export default function IntegrationsPageClient() {
                   const timestamp = calendar.updated_at || calendar.created_at;
                   const eventCount = typeof calendar.event_count === 'number' ? calendar.event_count : 0;
                   const currentBucket = bucketSelections[calendar.id] ?? '';
+                  const currentAssignee = assigneeSelections[calendar.id] ?? '';
                   const isUpdatingBucket = updatingBucketId === calendar.id;
+                  const isUpdatingAssignee = updatingAssigneeId === calendar.id;
+                  const assigneeMember = familyMembers.find(m => m.id === currentAssignee);
                   const bucketOptions = Array.from(
                     new Set([
                       ...(Array.isArray(buckets) ? buckets : []),
@@ -490,6 +541,46 @@ export default function IntegrationsPageClient() {
                             )}
                           </div>
                         </div>
+                        {familyMembers.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <label htmlFor={`calendar-assignee-${calendar.id}`} className="text-xs font-medium text-theme-text-subtle">
+                              Assignee
+                            </label>
+                            <div className="relative flex items-center gap-1.5">
+                              {assigneeMember && (
+                                <span
+                                  className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: assigneeMember.avatarColor }}
+                                />
+                              )}
+                              <select
+                                id={`calendar-assignee-${calendar.id}`}
+                                value={currentAssignee}
+                                onChange={(event) => {
+                                  const nextValue = event.target.value;
+                                  const previousValue = currentAssignee;
+                                  setAssigneeSelections((prev) => ({
+                                    ...prev,
+                                    [calendar.id]: nextValue,
+                                  }));
+                                  void handleUpdateImportAssignee(calendar.id, nextValue, previousValue);
+                                }}
+                                disabled={isUpdatingAssignee || deletingImportId === calendar.id}
+                                className="text-xs border border-theme-neutral-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-theme-secondary min-w-[140px]"
+                              >
+                                <option value="">None</option>
+                                {familyMembers.map((member) => (
+                                  <option key={member.id} value={member.id}>
+                                    {member.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {isUpdatingAssignee && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground absolute right-[-18px] top-1/2 -translate-y-1/2" />
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <Button
                           variant="destructive"
                           size="sm"

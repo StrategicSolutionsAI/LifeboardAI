@@ -151,7 +151,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     agendaDays, multiDayMinWidth, resolveEventStyles,
   } = useCalendarDisplay({
     currentDate, currentDateKey, view, today,
-    eventsByDate, rows, bucketColors,
+    eventsByDate, rows, bucketColors, familyMembers,
     handleViewChange, hasUserChosenMobileView,
   });
 
@@ -215,7 +215,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <div className="flex items-center gap-3">
           {/* View Mode Toggle */}
           <div className="flex items-center rounded-lg border border-theme-neutral-300 overflow-hidden">
-            {(['month', 'week', 'day'] as CalendarView[]).map((viewOption) => (
+            {(['agenda', 'month', 'week', 'day'] as CalendarView[]).map((viewOption) => (
               <button
                 type="button"
                 key={viewOption}
@@ -323,6 +323,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         <span className="text-xs text-theme-text-secondary">Uploaded Calendar</span>
                       </label>
                     )}
+                    {familyMembers.length > 0 && (
+                      <>
+                        <div className="my-1 border-t border-theme-neutral-300/40" />
+                        <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-theme-text-quaternary">People</div>
+                        {familyMembers.map((member) => (
+                          <label key={member.id} className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
+                            <input type="checkbox" checked={selectedBucketFilters.includes(`assignee:${member.id}`)} onChange={() => toggleBucketFilter(`assignee:${member.id}`)} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
+                            <span className="mr-1.5 w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: member.avatarColor }} />
+                            <span className="text-xs text-theme-text-secondary">{member.name}</span>
+                          </label>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -341,10 +354,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               <div key={dateStr}>
                 {/* Day header */}
                 <div className="flex items-center gap-3 py-3 sticky top-0 bg-theme-surface-raised/95 backdrop-blur-sm z-10">
-                  <div className={`flex flex-col items-center w-11 shrink-0 ${isToday ? 'text-red-500' : 'text-theme-text-tertiary'}`}>
+                  <div className={`flex flex-col items-center w-11 shrink-0 ${isToday ? 'text-theme-primary' : 'text-theme-text-tertiary'}`}>
                     <span className="text-[12px] sm:text-[10px] font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
                     <span className={`text-lg font-bold leading-none mt-0.5 ${
-                      isToday ? 'bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center' : ''
+                      isToday ? 'bg-theme-primary text-white w-8 h-8 rounded-full flex items-center justify-center' : ''
                     }`}>{format(date, 'd')}</span>
                   </div>
                   <div className="flex-1 border-t border-theme-neutral-300/40" />
@@ -354,9 +367,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 {isToday && (
                   <div className="ml-11 pl-3 mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                      <div className="flex-1 h-px bg-red-500" />
-                      <span className="text-[12px] sm:text-[10px] font-medium text-red-500 tabular-nums">{format(new Date(), 'h:mm a')}</span>
+                      <div className="w-2 h-2 rounded-full bg-theme-primary shrink-0" />
+                      <div className="flex-1 h-px bg-theme-primary" />
+                      <span className="text-[12px] sm:text-[10px] font-medium text-theme-primary tabular-nums">{format(new Date(), 'h:mm a')}</span>
                     </div>
                   </div>
                 )}

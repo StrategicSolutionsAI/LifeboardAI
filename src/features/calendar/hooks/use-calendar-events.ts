@@ -143,6 +143,8 @@ export function useCalendarEvents({
     const rEndMs = rangeEnd.getTime();
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const filterAll = selectedBucketFilters.includes('all');
+    const assigneeFilters = selectedBucketFilters.filter(f => f.startsWith('assignee:')).map(f => f.slice(9));
+    const hasAssigneeFilters = assigneeFilters.length > 0;
     // Pre-compute range boundary strings once instead of per-task
     const rangeStartStr = format(rangeStart, 'yyyy-MM-dd');
     const rangeEndStr = format(rangeEnd, 'yyyy-MM-dd');
@@ -158,7 +160,9 @@ export function useCalendarEvents({
 
       if (!filterAll) {
         const taskBucket = adjustedTask.bucket || 'unassigned';
-        if (!selectedBucketFilters.includes(taskBucket)) return;
+        const matchesBucket = selectedBucketFilters.includes(taskBucket);
+        const matchesAssignee = hasAssigneeFilters && assigneeFilters.includes(adjustedTask.assigneeId ?? '');
+        if (!matchesBucket && !matchesAssignee) return;
       }
 
       const repeatRule = adjustedTask.repeatRule ? (adjustedTask.repeatRule as RepeatOption) : undefined;
@@ -175,6 +179,7 @@ export function useCalendarEvents({
         taskId: adjustedTask.id,
         repeatRule,
         bucket: adjustedTask.bucket,
+        assigneeId: adjustedTask.assigneeId,
         startDate: adjStart ?? undefined,
         endDate: adjEnd ?? undefined,
         isRangeStart,
@@ -435,8 +440,15 @@ export function useCalendarEvents({
     const rangeStart = startOfDay(new Date(rangeStartMs));
     const rangeEnd = startOfDay(new Date(rangeEndMs));
 
+    const assigneeFiltersExt = selectedBucketFilters.filter(f => f.startsWith('assignee:')).map(f => f.slice(9));
+    const hasAssigneeFiltersExt = assigneeFiltersExt.length > 0;
+
     uploadedEvents.forEach((ev: any) => {
-      if (!selectedBucketFilters.includes('all') && !selectedBucketFilters.includes('uploaded')) return;
+      if (!selectedBucketFilters.includes('all') && !selectedBucketFilters.includes('uploaded')) {
+        // Still show if event matches an active assignee filter
+        const evAssignee = ev.default_assignee ?? undefined;
+        if (!hasAssigneeFiltersExt || !evAssignee || !assigneeFiltersExt.includes(evAssignee)) return;
+      }
 
       const startDateStr = ev.start_date || (ev.start_time ? ev.start_time.slice(0, 10) : undefined);
       if (!startDateStr) return;
@@ -502,6 +514,9 @@ export function useCalendarEvents({
             }
           }
 
+          // Resolve assignee: matched task takes priority, then import-level default
+          const resolvedAssigneeId = matchedTask?.assigneeId ?? ev.default_assignee ?? undefined;
+
           bucket.push({
             source: resolvedTaskId ? 'lifeboard' : 'uploaded',
             title: ev.title ?? 'Uploaded Event',
@@ -510,6 +525,7 @@ export function useCalendarEvents({
             location: ev.location ?? undefined,
             taskId: resolvedTaskId,
             bucket: resolvedBucket,
+            assigneeId: resolvedAssigneeId,
             repeatRule: resolvedRepeatRule,
             eventId: ev.id,
             startDate: startDateStr,

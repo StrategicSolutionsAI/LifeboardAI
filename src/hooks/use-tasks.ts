@@ -1114,6 +1114,11 @@ export function useTasks(selectedDate?: Date) {
       return source === 'todoist';
     });
 
+    // Invalidate shared fetch cache so that any subsequent refetch() gets fresh data
+    // (prevents sharedResultRef dedup from returning stale pre-update data)
+    sharedFetchRef.current = null
+    sharedResultRef.current = null
+
     // Send batch update to server (soft-fail if API unreachable)
     try {
       // Update Supabase tasks
@@ -1126,7 +1131,7 @@ export function useTasks(selectedDate?: Date) {
         })
         if (!res.ok) console.warn('Supabase batch update failed')
       }
-      
+
       // Update Todoist tasks
       if (todoistUpdates.length === 0) {
         return;
