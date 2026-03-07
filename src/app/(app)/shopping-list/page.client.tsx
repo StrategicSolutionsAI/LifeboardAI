@@ -863,6 +863,7 @@ function ShoppingListLayout() {
   const [itemNotes, setItemNotes] = useState("");
   const [itemBucket, setItemBucket] = useState<string>("");
   const [itemNeededBy, setItemNeededBy] = useState("");
+  const [itemAssigneeId, setItemAssigneeId] = useState<string>("");
   const [isConverting, setIsConverting] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [archiveLoaded, setArchiveLoaded] = useState(false);
@@ -1295,6 +1296,7 @@ function ShoppingListLayout() {
     setItemNotes(convertItem.notes ?? "");
     setItemBucket(convertItem.bucket ?? "");
     setItemNeededBy(convertItem.neededBy ?? "");
+    setItemAssigneeId(convertItem.assigneeId ?? "");
     setWidgetName(`Buy ${convertItem.name}`);
     setWidgetBucket(convertItem.widgetBucket ?? fallbackBucket);
     setEventBucket(fallbackBucket);
@@ -1371,6 +1373,11 @@ function ShoppingListLayout() {
     const currentNeededBy = convertItem.neededBy ?? null;
     if ((neededByValue || null) !== currentNeededBy) {
       itemUpdates.neededBy = neededByValue ? neededByValue : null;
+    }
+    const currentAssigneeId = convertItem.assigneeId ?? null;
+    const newAssigneeId = itemAssigneeId || null;
+    if (newAssigneeId !== currentAssigneeId) {
+      itemUpdates.assigneeId = newAssigneeId;
     }
 
     const wantsEvent = convertCreateEvent || Boolean(convertItem.calendarEventId);
@@ -2100,17 +2107,36 @@ function ShoppingListLayout() {
                       ))}
                   </select>
                 </div>
-                <div>
-                  <label className={cn(form.label, "mb-1 block")}>
-                    Notes
-                  </label>
-                  <textarea
-                    value={itemNotes}
-                    onChange={(e) => setItemNotes(e.target.value)}
-                    rows={3}
-                    className={form.textarea}
-                    placeholder="Optional details or reminders"
-                  />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={cn(form.label, "mb-1 block")}>
+                      Assign to
+                    </label>
+                    <select
+                      value={itemAssigneeId}
+                      onChange={(e) => setItemAssigneeId(e.target.value)}
+                      className={form.select}
+                    >
+                      <option value="">Unassigned</option>
+                      {familyMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={cn(form.label, "mb-1 block")}>
+                      Notes
+                    </label>
+                    <textarea
+                      value={itemNotes}
+                      onChange={(e) => setItemNotes(e.target.value)}
+                      rows={3}
+                      className={form.textarea}
+                      placeholder="Optional details or reminders"
+                    />
+                  </div>
                 </div>
               </div>
               <div className="space-y-2">

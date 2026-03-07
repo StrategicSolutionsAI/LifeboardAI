@@ -184,6 +184,12 @@ export const PATCH = withAuthAndBody(updateShoppingItemSchema, async (req, { sup
       typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
   }
 
+  if ("assigneeId" in body) {
+    const value = body.assigneeId;
+    updates.assignee_id =
+      typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "no updates provided" }, { status: 400 });
   }

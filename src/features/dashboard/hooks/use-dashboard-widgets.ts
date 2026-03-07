@@ -804,8 +804,17 @@ export function useDashboardWidgets({
         const currentBuckets = new Set(bucketsRef.current);
         let removedStaleBuckets = false;
         if (currentBuckets.size > 0) {
+          const fallbackBucket = bucketsRef.current[0] ?? "General";
           for (const key of Object.keys(migratedMerged)) {
             if (!currentBuckets.has(key)) {
+              // Rescue orphaned widgets into fallback bucket instead of deleting
+              const orphaned = migratedMerged[key] ?? [];
+              if (orphaned.length > 0) {
+                if (!migratedMerged[fallbackBucket]) {
+                  migratedMerged[fallbackBucket] = [];
+                }
+                migratedMerged[fallbackBucket].push(...orphaned);
+              }
               delete migratedMerged[key];
               removedStaleBuckets = true;
             }
