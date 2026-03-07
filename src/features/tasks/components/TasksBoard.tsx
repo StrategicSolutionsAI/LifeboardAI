@@ -38,6 +38,7 @@ export type Task = {
     datetime?: string;
     is_recurring?: boolean;
   } | null;
+  assigneeId?: string | null;
 };
 
 type BucketSummary = {
@@ -46,6 +47,12 @@ type BucketSummary = {
 };
 
 export type TasksBoardViewMode = "open" | "completed";
+
+export interface BoardFamilyMember {
+  id: string;
+  name: string;
+  avatarColor: string;
+}
 
 type TasksBoardProps = {
   buckets?: Bucket[];
@@ -57,6 +64,7 @@ type TasksBoardProps = {
   viewMode?: TasksBoardViewMode;
   loadingTasks?: Set<string>;
   onTaskOpen?: (taskId: string) => void;
+  familyMembers?: BoardFamilyMember[];
 };
 
 /* ─── Calidora color helpers ─── */
@@ -191,6 +199,7 @@ function TaskCard({
   onBucketChange,
   isLoading = false,
   onOpen,
+  familyMembers,
 }: {
   task: Task;
   index: number;
@@ -199,11 +208,13 @@ function TaskCard({
   onBucketChange?: (taskId: string, newBucketId: string) => void;
   isLoading?: boolean;
   onOpen?: (taskId: string) => void;
+  familyMembers?: BoardFamilyMember[];
 }) {
   const dateBadge = useMemo(
     () => formatTaskDateBadge(task),
     [task.dueDate, task.startDate, task.endDate]
   );
+  const assignee = useMemo(() => task.assigneeId ? familyMembers?.find((m) => m.id === task.assigneeId) ?? null : null, [task.assigneeId, familyMembers]);
   const [justCompleted, setJustCompleted] = useState(false);
   const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -271,8 +282,8 @@ function TaskCard({
                 {task.title}
               </button>
 
-              {/* Date Badge + Tags */}
-              {(dateBadge || !!task.tags?.length) && (
+              {/* Date Badge + Tags + Assignee */}
+              {(dateBadge || !!task.tags?.length || assignee) && (
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                   {dateBadge && (
                     <span
@@ -295,6 +306,15 @@ function TaskCard({
                       {tag}
                     </span>
                   ))}
+                  {assignee && (
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0 ml-auto"
+                      style={{ backgroundColor: assignee.avatarColor }}
+                      title={assignee.name}
+                    >
+                      {assignee.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -366,6 +386,7 @@ function BucketColumn({
   loadingTasks = new Set(),
   onTaskOpen,
   justDroppedId,
+  familyMembers,
 }: {
   bucket: Bucket;
   summary: BucketSummary;
@@ -377,6 +398,7 @@ function BucketColumn({
   loadingTasks?: Set<string>;
   onTaskOpen?: (taskId: string) => void;
   justDroppedId?: string | null;
+  familyMembers?: BoardFamilyMember[];
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -496,6 +518,7 @@ function BucketColumn({
                     onBucketChange={onBucketChange}
                     isLoading={loadingTasks.has(task.id)}
                     onOpen={onTaskOpen}
+                    familyMembers={familyMembers}
                   />
                 </div>
               ))}
@@ -560,6 +583,7 @@ function TasksBoard({
   onTaskOpen,
   viewMode = "open",
   loadingTasks = new Set(),
+  familyMembers,
 }: TasksBoardProps) {
   const buckets = bucketsProp ?? [];
   const tasks = tasksProp ?? [];
@@ -615,6 +639,7 @@ function TasksBoard({
                   loadingTasks={loadingTasks}
                   onTaskOpen={onTaskOpen}
                   justDroppedId={justDroppedId}
+                  familyMembers={familyMembers}
                 />
               </div>
             ))}

@@ -191,6 +191,11 @@ function TasksBoardShell() {
       );
     }
 
+    // Assignee filter
+    if (filters.assignees.length > 0) {
+      result = result.filter((t) => t.assigneeId && filters.assignees.includes(t.assigneeId));
+    }
+
     // Due date filter
     if (filters.dueDateRange) {
       result = result.filter((t) =>
@@ -275,6 +280,7 @@ function TasksBoardShell() {
       endDate: t.endDate ?? null,
       createdAt: t.created_at ?? null,
       due: t.due,
+      assigneeId: t.assigneeId ?? null,
     }));
   }, [boardFilteredTasks]);
 
@@ -331,6 +337,7 @@ function TasksBoardShell() {
       isRecurring: t.due?.is_recurring ?? false,
       kanbanStatus: t.kanbanStatus ?? (t.completed ? "done" : "todo") as KanbanStatus,
       completed: t.completed,
+      assigneeId: t.assigneeId ?? null,
     }));
   }, [filteredTasks]);
 
@@ -652,7 +659,7 @@ function TasksBoardShell() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSelectMode, clearSelection, openNewTaskModal]);
 
-  const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.dueDateRange !== null;
+  const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.assignees.length > 0 || filters.dueDateRange !== null;
 
   return (
     <div className="flex h-[calc(100dvh-64px)] md:h-[calc(100dvh-64px)] w-full flex-col gap-3 sm:gap-4 pb-3 sm:pb-5">
@@ -848,6 +855,7 @@ function TasksBoardShell() {
           onFiltersChange={setFilters}
           bucketOptions={buckets}
           bucketColors={bucketColors}
+          familyMembers={familyMembers}
         />
 
         {/* Active filter indicator */}
@@ -946,6 +954,7 @@ function TasksBoardShell() {
                 onTaskOpen={(taskId) => {
                   taskEditorRef.current?.openByTaskId(taskId);
                 }}
+                familyMembers={familyMembers}
               />
             )}
 
@@ -959,6 +968,7 @@ function TasksBoardShell() {
                 }}
                 bucketColors={bucketColors}
                 loadingTasks={loadingTasks}
+                familyMembers={familyMembers}
               />
             )}
           </div>

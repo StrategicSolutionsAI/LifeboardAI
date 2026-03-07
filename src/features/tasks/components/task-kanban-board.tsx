@@ -39,6 +39,13 @@ export interface KanbanTask {
   isRecurring: boolean;
   kanbanStatus: KanbanStatus;
   completed: boolean;
+  assigneeId?: string | null;
+}
+
+export interface KanbanFamilyMember {
+  id: string;
+  name: string;
+  avatarColor: string;
 }
 
 interface TaskKanbanBoardProps {
@@ -48,6 +55,7 @@ interface TaskKanbanBoardProps {
   onTaskOpen?: (taskId: string) => void;
   bucketColors?: Record<string, string>;
   loadingTasks?: Set<string>;
+  familyMembers?: KanbanFamilyMember[];
 }
 
 /* ─── Column Config ─── */
@@ -86,6 +94,7 @@ const KanbanCard = React.memo(function KanbanCard({
   isLoading,
   onOpen,
   onStatusChange,
+  familyMembers,
 }: {
   task: KanbanTask;
   index: number;
@@ -94,9 +103,11 @@ const KanbanCard = React.memo(function KanbanCard({
   isLoading?: boolean;
   onOpen?: (id: string) => void;
   onStatusChange?: (taskId: string, newStatus: KanbanStatus) => void;
+  familyMembers?: KanbanFamilyMember[];
 }) {
   const dateBadge = useMemo(() => formatDue(task.dueDate, task.isRecurring), [task.dueDate, task.isRecurring]);
   const bucketColor = task.bucket ? (bucketColors?.[task.bucket] ?? "#bb9e7b") : null;
+  const assignee = useMemo(() => task.assigneeId ? familyMembers?.find((m) => m.id === task.assigneeId) ?? null : null, [task.assigneeId, familyMembers]);
   const isDone = task.kanbanStatus === "done";
   const [justCompleted, setJustCompleted] = useState(false);
   const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -174,8 +185,8 @@ const KanbanCard = React.memo(function KanbanCard({
                 {task.title}
               </button>
 
-              {/* Bucket dot + Date badge */}
-              {(bucketColor || dateBadge) && (
+              {/* Bucket dot + Date badge + Assignee */}
+              {(bucketColor || dateBadge || assignee) && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2">
                   {bucketColor && task.bucket && (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[rgba(0,0,0,0.03)]">
@@ -199,6 +210,15 @@ const KanbanCard = React.memo(function KanbanCard({
                       {dateBadge.label}
                     </span>
                   )}
+                  {assignee && (
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0 ml-auto"
+                      style={{ backgroundColor: assignee.avatarColor }}
+                      title={assignee.name}
+                    >
+                      {assignee.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -220,6 +240,7 @@ function KanbanColumn({
   bucketColors,
   loadingTasks,
   justDroppedId,
+  familyMembers,
 }: {
   column: (typeof COLUMNS)[number];
   tasks: KanbanTask[];
@@ -229,6 +250,7 @@ function KanbanColumn({
   bucketColors?: Record<string, string>;
   loadingTasks?: Set<string>;
   justDroppedId?: string | null;
+  familyMembers?: KanbanFamilyMember[];
 }) {
   const [draft, setDraft] = useState("");
   const [isAdding, setIsAdding] = useState(false);
@@ -322,6 +344,7 @@ function KanbanColumn({
                     isLoading={loadingTasks?.has(task.id)}
                     onOpen={onTaskOpen}
                     onStatusChange={onStatusChange}
+                    familyMembers={familyMembers}
                   />
                 </div>
               ))}
@@ -385,6 +408,7 @@ export function TaskKanbanBoard({
   onTaskOpen,
   bucketColors,
   loadingTasks,
+  familyMembers,
 }: TaskKanbanBoardProps) {
   const [justDroppedId, setJustDroppedId] = useState<string | null>(null);
 
@@ -428,6 +452,7 @@ export function TaskKanbanBoard({
             bucketColors={bucketColors}
             loadingTasks={loadingTasks}
             justDroppedId={justDroppedId}
+            familyMembers={familyMembers}
           />
         ))}
       </div>

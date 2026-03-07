@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { type Bucket as BoardBucket, type Task as BoardTask } from "@/features/tasks/components/TasksBoard";
 import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
+import { useFamilyMembers } from "@/hooks/use-family-members";
 import { Button } from "@/components/ui/button";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
@@ -28,6 +29,7 @@ function normalizeBucketId(name?: string | null) {
 function BoardContent() {
   const { allTasks, toggleTaskCompletion, createTask } = useTasksContext();
   const { buckets: availableBuckets } = useBuckets();
+  const familyMembers = useFamilyMembers();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -56,6 +58,7 @@ function BoardContent() {
       dueDate: t.due?.date ?? null,
       startDate: t.startDate ?? null,
       endDate: t.endDate ?? null,
+      assigneeId: t.assigneeId ?? null,
     }))
   ), [openTasks]);
 
@@ -87,6 +90,7 @@ function BoardContent() {
             const resolvedBucket = bucketId === UNASSIGNED_BUCKET_ID ? undefined : bucketId;
             void createTask(title, null, undefined, resolvedBucket);
           }}
+          familyMembers={familyMembers}
         />
       </div>
     </div>
