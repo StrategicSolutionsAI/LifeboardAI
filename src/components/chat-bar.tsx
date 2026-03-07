@@ -1684,7 +1684,7 @@ export function ChatBar() {
                     <button
                       key={prompt}
                       onClick={() => handleQuickPrompt(prompt)}
-                      className="px-2 py-1 rounded-full bg-white text-[#5a4a3a] border border-theme-neutral-300 hover:bg-theme-surface-selected transition"
+                      className="px-2 py-1 rounded-full bg-white text-theme-text-body border border-theme-neutral-300 hover:bg-theme-surface-selected transition"
                     >
                       {prompt}
                     </button>
@@ -1711,7 +1711,7 @@ export function ChatBar() {
                   <button
                     key={chip}
                     onClick={() => handleQuickPrompt(chip)}
-                    className="px-2 py-1 rounded-full text-[11px] bg-theme-primary-50 text-[#5a4a3a] border border-theme-neutral-200 hover:bg-theme-surface-selected transition"
+                    className="px-2 py-1 rounded-full text-[11px] bg-theme-primary-50 text-theme-text-body border border-theme-neutral-200 hover:bg-theme-surface-selected transition"
                   >
                     {chip}
                   </button>

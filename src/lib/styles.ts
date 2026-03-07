@@ -1,3 +1,5 @@
+import type React from 'react'
+
 /**
  * =============================================================================
  * LifeboardAI Style Library
@@ -10,6 +12,14 @@
  * USAGE:
  *   import { card, text, surface, elevation, layout } from '@/lib/styles'
  *   <div className={cn(card.base, layout.padding.standard)}>
+ *
+ * ---------------------------------------------------------------------------
+ * NOTE ON SHADOW COLORS
+ * ---------------------------------------------------------------------------
+ * Shadows use rgba(163,133,96,…) — intentionally different from the brand
+ * primary (#B1916A / rgb(177,145,106)). The darker, desaturated tone produces
+ * muted, natural shadows that don't tint surfaces. This is a design decision,
+ * not an inconsistency.
  *
  * ---------------------------------------------------------------------------
  * STYLE GUIDE — Design Decisions
@@ -82,7 +92,11 @@ export const text = {
     lg: 'text-base font-normal leading-relaxed',
     md: 'text-sm font-normal leading-normal',
     sm: 'text-xs font-normal leading-normal',
+    xs: 'text-2xs font-normal leading-normal',
   },
+
+  // Link preset (color + hover + underline)
+  link: 'text-theme-primary-600 hover:text-theme-primary-700 underline',
 
   // Composed presets (size + weight + color — ready to use as-is)
   pageTitle: 'text-[24px] font-semibold tracking-tight text-theme-text-primary',
@@ -111,6 +125,12 @@ export const surface = {
   progressTrack: 'bg-theme-progress-track',
   selected: 'bg-theme-surface-selected',
   page: 'bg-theme-surface-alt',
+
+  /** Inline style for the warm page background gradient used across layout shells.
+   *  Uses CSS var so it adapts to light/dark mode automatically. */
+  pageBgStyle: {
+    backgroundImage: 'linear-gradient(90deg, var(--theme-surface-warm-70) 0%, var(--theme-surface-warm-70) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)',
+  } as React.CSSProperties,
 
   // Warm-tint opacity scale (for backgrounds with warm paper-like feel)
   warm30: 'bg-theme-surface-warm-30',
@@ -209,6 +229,7 @@ export const form = {
   textarea: 'w-full rounded-lg border border-theme-neutral-300 bg-theme-surface-raised px-3 py-2.5 text-sm text-theme-text-primary shadow-warm-sm transition focus:border-theme-secondary focus:outline-none focus:ring-2 focus:ring-theme-primary/40 min-h-[88px] resize-y',
   label: 'text-[11px] font-semibold uppercase tracking-wide text-theme-text-subtle',
   select: 'w-full rounded-lg border border-theme-neutral-300 bg-theme-surface-raised px-3 py-2.5 text-sm text-theme-text-primary transition focus:border-theme-secondary focus:outline-none focus:ring-2 focus:ring-theme-primary/40',
+  authInput: "w-full border border-theme-neutral-300 rounded-lg px-3 py-2 text-sm text-theme-text-primary placeholder:text-theme-text-tertiary bg-theme-surface-raised/95 focus:outline-none focus:ring-2 focus:ring-theme-primary/50 focus:border-theme-primary",
 } as const
 
 // -----------------------------------------------------------------------------
@@ -229,6 +250,8 @@ export const interactive = {
   widgetHover: 'hover:shadow-warm-lg hover:scale-[1.02] hover:-translate-y-0.5',
   widgetActive: 'active:scale-[0.98] active:translate-y-0',
   clickable: 'cursor-pointer transition-all duration-200 ease-out hover:bg-theme-brand-tint-light active:scale-[0.98]',
+  disabled: 'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
+  disabledSubtle: 'disabled:opacity-40 disabled:cursor-not-allowed',
 } as const
 
 // -----------------------------------------------------------------------------

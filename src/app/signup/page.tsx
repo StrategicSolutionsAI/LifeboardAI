@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { emailSignUp, emailLogin, signInWithGoogle, signUpWithGoogle } from '@/app/login/actions'
 import SectionLoadTimer from '@/components/section-load-timer'
+import { surface, form } from '@/lib/styles'
 
-const inputClass = "w-full px-3 py-2 border border-[#dee4ee] rounded-[11px] text-sm font-['Manrope',sans-serif] text-theme-text-primary placeholder:text-[#8796af] bg-[rgba(255,255,255,0.92)] focus:outline-none focus:ring-2 focus:ring-theme-primary/50 focus:border-theme-primary"
+const inputClass = `${form.authInput} font-['Manrope',sans-serif]`
 
 function SignUpContent() {
   const [isLogin, setIsLogin] = useState(false)
@@ -17,7 +18,7 @@ function SignUpContent() {
   const error = searchParams.get('error')
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={surface.pageBgStyle}>
       <Card className="w-full max-w-md p-8 border-theme-neutral-300 shadow-warm-lg">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-theme-text-primary">

@@ -29,7 +29,7 @@ const SheetContent = dynamic(() => import("@/components/ui/sheet").then(m => m.S
 const SheetHeader = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetHeader), { ssr: false })
 const SheetTitle = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTitle), { ssr: false })
 const SheetTrigger = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTrigger), { ssr: false })
-import { nav, interactive } from "@/lib/styles"
+import { nav, interactive, surface } from "@/lib/styles"
 
 interface SidebarLayoutProps {
   children: ReactNode
@@ -171,7 +171,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   )
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col overflow-x-hidden md:flex md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="relative min-h-[100dvh] flex flex-col overflow-x-hidden md:flex md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={surface.pageBgStyle}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
@@ -257,7 +257,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
-              <button className={`p-2 rounded-lg hover:bg-theme-brand-tint-light active:bg-[rgba(183,148,106,0.14)] ${interactive.transitionFast}`} aria-label="Open quick actions">
+              <button className={`p-2 rounded-lg hover:bg-theme-brand-tint-light active:bg-theme-active ${interactive.transitionFast}`} aria-label="Open quick actions">
                 <Menu className="h-5 w-5 text-theme-text-primary" />
               </button>
             </SheetTrigger>
@@ -329,7 +329,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                   {...getPrefetchHandlers(href)}
                   aria-label={label}
                   aria-current={isActiveRoute(href) ? "page" : undefined}
-                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} ${activeOrNav ? "text-theme-text-primary bg-[rgba(183,148,106,0.1)]" : "text-theme-text-subtle"
+                  className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} ${activeOrNav ? "text-theme-text-primary bg-theme-brand-tint" : "text-theme-text-subtle"
                     }`}
                 >
                   {activeOrNav && <span className={nav.bottomIndicator} aria-hidden="true" />}

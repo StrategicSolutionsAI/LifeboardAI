@@ -21,6 +21,10 @@ const config = {
       fontFamily: {
         sans: ['var(--font-dm-sans)', 'var(--font-inter)', '"DM Sans"', 'Inter', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
+      fontSize: {
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],   // 10px / 14px
+        '3xs': ['0.5625rem', { lineHeight: '0.75rem' }],   // 9px / 12px
+      },
       boxShadow: {
         'micro': '0px 1px 2px rgba(163, 133, 96, 0.04)',
         'xs': '0px 2px 6px rgba(163, 133, 96, 0.05)',
@@ -194,6 +198,7 @@ const config = {
           light: 'var(--theme-brand-tint-light)',
           DEFAULT: 'var(--theme-brand-tint)',
           strong: 'var(--theme-brand-tint-strong)',
+          muted: 'var(--theme-brand-tint-muted)',
         },
         
         // Interactive states

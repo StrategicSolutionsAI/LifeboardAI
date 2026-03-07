@@ -55,9 +55,9 @@ function renderInline(text: string): React.ReactNode[] {
     } else if (match[3]) {
       parts.push(<em key={match.index}>{match[3]}</em>)
     } else if (match[4] && match[5]) {
-      parts.push(<a key={match.index} href={match[5]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[4]}</a>)
+      parts.push(<a key={match.index} href={match[5]} target="_blank" rel="noopener noreferrer" className="underline text-theme-primary-600">{match[4]}</a>)
     } else if (match[6]) {
-      parts.push(<a key={match.index} href={match[6]} target="_blank" rel="noopener noreferrer" className="underline text-[#9a7b5a]">{match[6]}</a>)
+      parts.push(<a key={match.index} href={match[6]} target="_blank" rel="noopener noreferrer" className="underline text-theme-primary-600">{match[6]}</a>)
     }
     lastIndex = match.index + match[0].length
   }

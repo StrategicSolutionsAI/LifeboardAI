@@ -85,7 +85,7 @@ export const ChatMessage = React.memo(function ChatMessage({
             )}
             <button
               onClick={() => onCopy(m.content, i)}
-              className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
+              className="p-0.5 text-theme-text-tertiary hover:text-theme-text-body"
               title="Copy"
               aria-label="Copy message"
             >
@@ -94,7 +94,7 @@ export const ChatMessage = React.memo(function ChatMessage({
             {m.isError && (
               <button
                 onClick={onRetry}
-                className="p-0.5 text-[#8e99a8] hover:text-[#4a5568]"
+                className="p-0.5 text-theme-text-tertiary hover:text-theme-text-body"
                 title="Retry"
                 aria-label="Retry message"
               >

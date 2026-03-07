@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { surface } from "@/lib/styles"
 
 interface OnboardingLayoutProps {
   step: number
@@ -32,7 +33,7 @@ export function OnboardingLayout({
   const progressPercent = Math.round((boundedStep / totalSteps) * 100)
 
   return (
-    <div className="min-h-screen flex flex-col items-center" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="min-h-screen flex flex-col items-center" style={surface.pageBgStyle}>
       {/* Navbar */}
       <div className="w-full h-[84px] bg-white border-b border-theme-neutral-300 shadow-warm-sm">
         <div className="w-full h-full px-4 sm:px-10 flex items-center">

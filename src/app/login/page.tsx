@@ -2,12 +2,13 @@ import { signInWithGoogle, emailLogin } from './actions'
 import { Button } from '@/components/ui/button'
 import SectionLoadTimer from '@/components/section-load-timer'
 import Link from 'next/link'
+import { surface, form } from '@/lib/styles'
 
 export const dynamic = 'force-dynamic' // avoid static build for auth
 
 export default function Login() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7) 0%, rgba(252,250,248,0.7) 100%), linear-gradient(90deg, #fff 0%, #fff 100%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={surface.pageBgStyle}>
       <SectionLoadTimer name="/login" />
       <div className="w-full max-w-md bg-white shadow-warm-lg rounded-2xl p-8 space-y-6 border border-theme-neutral-300">
         <h1 className="text-2xl font-bold text-center text-theme-text-primary">Sign in to Lifeboard</h1>
@@ -34,14 +35,14 @@ export default function Login() {
             type="email"
             required
             placeholder="Email"
-            className="w-full border border-[#dee4ee] rounded-[11px] px-3 py-2 text-sm font-['Manrope',sans-serif] text-theme-text-primary placeholder:text-[#8796af] bg-[rgba(255,255,255,0.92)] focus:outline-none focus:ring-2 focus:ring-theme-primary/50 focus:border-theme-primary"
+            className={`${form.authInput} font-['Manrope',sans-serif]`}
           />
           <input
             name="password"
             type="password"
             required
             placeholder="Password"
-            className="w-full border border-[#dee4ee] rounded-[11px] px-3 py-2 text-sm font-['Manrope',sans-serif] text-theme-text-primary placeholder:text-[#8796af] bg-[rgba(255,255,255,0.92)] focus:outline-none focus:ring-2 focus:ring-theme-primary/50 focus:border-theme-primary"
+            className={`${form.authInput} font-['Manrope',sans-serif]`}
           />
           <Button type="submit" className="w-full text-white bg-theme-primary hover:bg-theme-primary-600">
             Continue

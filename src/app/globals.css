@@ -144,6 +144,7 @@
 
     --theme-brand-tint-subtle: rgba(177, 145, 106, 0.04);
     --theme-brand-tint-light: rgba(177, 145, 106, 0.08);
+    --theme-brand-tint-muted: rgba(177, 145, 106, 0.06);
     --theme-brand-tint: rgba(177, 145, 106, 0.12);
     --theme-brand-tint-strong: rgba(177, 145, 106, 0.15);
 
@@ -227,6 +228,7 @@
 
     --theme-brand-tint-subtle: rgba(177, 145, 106, 0.06);
     --theme-brand-tint-light: rgba(177, 145, 106, 0.1);
+    --theme-brand-tint-muted: rgba(177, 145, 106, 0.08);
     --theme-brand-tint: rgba(177, 145, 106, 0.16);
     --theme-brand-tint-strong: rgba(177, 145, 106, 0.2);
 

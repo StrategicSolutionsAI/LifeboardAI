@@ -42,7 +42,7 @@ export const ChatHeader = React.memo(function ChatHeader({
       </div>
       <div className="flex items-center gap-1">
         {hasMessages && (
-          <button onClick={onClearChat} aria-label="Clear chat" title="Clear chat" className="text-[#8e99a8] hover:text-[#4a5568]">
+          <button onClick={onClearChat} aria-label="Clear chat" title="Clear chat" className="text-theme-text-tertiary hover:text-theme-text-body">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
