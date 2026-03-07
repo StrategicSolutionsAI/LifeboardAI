@@ -68,13 +68,14 @@ function getRandomColor(): string {
 function getBirthdayCountdown(birthday: string): { daysUntil: number; age: number } {
   const now = new Date()
   const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const bd = new Date(birthday)
-  const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate())
+  // Parse manually to avoid UTC interpretation of date-only strings
+  const [bdYear, bdMonth, bdDay] = birthday.split('-').map(Number)
+  const thisYear = new Date(now.getFullYear(), bdMonth - 1, bdDay)
   const next = thisYear < todayDate
-    ? new Date(now.getFullYear() + 1, bd.getMonth(), bd.getDate())
+    ? new Date(now.getFullYear() + 1, bdMonth - 1, bdDay)
     : thisYear
   const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / 86400000)
-  const age = now.getFullYear() - bd.getFullYear() - (todayDate < thisYear ? 1 : 0)
+  const age = now.getFullYear() - bdYear - (todayDate < thisYear ? 1 : 0)
   return { daysUntil, age }
 }
 

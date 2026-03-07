@@ -54,29 +54,23 @@ const NutritionSummaryWidget = dynamic(
 
 function renderBirthdayBody({ widget: w }: CardBodyRenderProps) {
   if (w.birthdayData && w.birthdayData.birthDate) {
-    const birthDate = new Date(w.birthdayData.birthDate);
+    // Parse manually to avoid UTC interpretation of date-only strings
+    const [, bdMonth, bdDay] = w.birthdayData.birthDate.split('-').map(Number);
     const today = new Date();
     const currentYear = today.getFullYear();
-    const thisYearBirthday = new Date(
-      currentYear,
-      birthDate.getMonth(),
-      birthDate.getDate()
-    );
+    const todayDate = new Date(currentYear, today.getMonth(), today.getDate());
+    const thisYearBirthday = new Date(currentYear, bdMonth - 1, bdDay);
     const nextBirthday =
-      thisYearBirthday < today
-        ? new Date(
-            currentYear + 1,
-            birthDate.getMonth(),
-            birthDate.getDate()
-          )
+      thisYearBirthday < todayDate
+        ? new Date(currentYear + 1, bdMonth - 1, bdDay)
         : thisYearBirthday;
-    const daysUntil = Math.ceil(
-      (nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    const daysUntil = Math.round(
+      (nextBirthday.getTime() - todayDate.getTime()) / 86400000
     );
     return (
       <div className="mt-2">
         <div className="text-xs text-theme-text-tertiary">
-          {birthDate.toLocaleDateString("en-US", {
+          {new Date(currentYear, bdMonth - 1, bdDay).toLocaleDateString("en-US", {
             month: "long",
             day: "numeric",
           })}
@@ -1080,19 +1074,12 @@ function renderFamilyMembersBody({ widget: w }: CardBodyRenderProps) {
   const membersWithBirthday = members
     .filter((m) => m.birthday)
     .map((m) => {
-      const bd = new Date(m.birthday!);
-      const thisYear = new Date(
-        now.getFullYear(),
-        bd.getMonth(),
-        bd.getDate()
-      );
+      // Parse manually to avoid UTC interpretation of date-only strings
+      const [, bdMonth, bdDay] = m.birthday!.split('-').map(Number);
+      const thisYear = new Date(now.getFullYear(), bdMonth - 1, bdDay);
       const next =
         thisYear < todayDate
-          ? new Date(
-              now.getFullYear() + 1,
-              bd.getMonth(),
-              bd.getDate()
-            )
+          ? new Date(now.getFullYear() + 1, bdMonth - 1, bdDay)
           : thisYear;
       return {
         ...m,
