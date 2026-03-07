@@ -1,30 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
-import { createClient } from '@supabase/supabase-js'
+import { handleApiError } from '@/lib/api-error-handler'
 
 export async function POST(request: NextRequest) {
   try {
     const { provider } = await request.json()
-    
+
     if (!provider) {
       return NextResponse.json({ error: 'Provider is required' }, { status: 400 })
     }
 
     const supabase = supabaseServer()
-    
-    // Get session first
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-    
-    const user = session.user
-    if (!user) {
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // First check if integration exists
+    // Check if integration exists
     const { data: existingIntegration, error: checkError } = await supabase
       .from('user_integrations')
       .select('id, provider')
@@ -41,49 +34,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: `${provider} was not connected` })
     }
 
-    // Delete the integration using service role to bypass RLS
-    // This is a temporary workaround until the DELETE policy is added to the database
-    const serviceRoleClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
-
-    const { data: deleteData, error: deleteError } = await serviceRoleClient
+    // Delete the integration using the standard RLS client
+    // (DELETE policy was added in migration 20250724_add_delete_policy_user_integrations.sql)
+    const { error: deleteError } = await supabase
       .from('user_integrations')
       .delete()
       .eq('user_id', user.id)
       .eq('provider', provider)
-      .select()
 
     if (deleteError) {
       console.error('Failed to disconnect integration:', deleteError)
       return NextResponse.json({ error: 'Failed to disconnect integration' }, { status: 500 })
     }
 
-    // Verify deletion
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('user_integrations')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('provider', provider)
-      .maybeSingle()
-
-    return NextResponse.json({ 
-      success: true, 
-      message: `${provider} disconnected successfully`,
-      debug: {
-        deletedRows: deleteData?.length || 0,
-        stillExists: !!verifyData
-      }
+    return NextResponse.json({
+      success: true,
+      message: `${provider} disconnected successfully`
     })
   } catch (error) {
-    console.error('Disconnect API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/integrations/disconnect')
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { handleApiError } from '@/lib/api-error-handler'
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,8 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(formattedFavorites)
   } catch (error) {
-    console.error('Error in favorites GET API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/nutrition/favorites')
   }
 }
 
@@ -53,73 +53,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Check if favorite already exists
-    const { data: existing, error: checkError } = await supabase
+    // First get current count (if exists) so we can increment
+    const { data: existing } = await supabase
       .from('favorite_foods')
-      .select('*')
+      .select('added_count')
       .eq('user_id', user.id)
       .eq('food_id', food_id)
-      .single()
+      .maybeSingle()
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking existing favorite:', checkError)
-      return NextResponse.json({ error: 'Failed to check favorite' }, { status: 500 })
-    }
+    const newCount = (existing?.added_count ?? 0) + 1
 
-    if (existing) {
-      // Update existing favorite
-      const { data: updated, error: updateError } = await supabase
-        .from('favorite_foods')
-        .update({
-          added_count: existing.added_count + 1,
-          last_added: new Date().toISOString()
-        })
-        .eq('id', existing.id)
-        .select()
-        .single()
-
-      if (updateError) {
-        console.error('Error updating favorite:', updateError)
-        return NextResponse.json({ error: 'Failed to update favorite' }, { status: 500 })
-      }
-
-      return NextResponse.json({
-        id: updated.food_id,
-        food_name: updated.food_name,
-        serving: updated.serving_data,
-        added_count: updated.added_count,
-        last_added: updated.last_added
-      })
-    } else {
-      // Create new favorite
-      const { data: newFavorite, error: insertError } = await supabase
-        .from('favorite_foods')
-        .insert({
+    const { data: result, error: upsertError } = await supabase
+      .from('favorite_foods')
+      .upsert(
+        {
           user_id: user.id,
           food_id,
           food_name,
           serving_data: serving,
-          added_count: 1,
+          added_count: newCount,
           last_added: new Date().toISOString()
-        })
-        .select()
-        .single()
+        },
+        { onConflict: 'user_id,food_id' }
+      )
+      .select()
+      .single()
 
-      if (insertError) {
-        console.error('Error creating favorite:', insertError)
-        return NextResponse.json({ error: 'Failed to create favorite' }, { status: 500 })
-      }
-
-      return NextResponse.json({
-        id: newFavorite.food_id,
-        food_name: newFavorite.food_name,
-        serving: newFavorite.serving_data,
-        added_count: newFavorite.added_count,
-        last_added: newFavorite.last_added
-      })
+    if (upsertError) {
+      console.error('Error upserting favorite:', upsertError)
+      return NextResponse.json({ error: 'Failed to save favorite' }, { status: 500 })
     }
+
+    return NextResponse.json({
+      id: result.food_id,
+      food_name: result.food_name,
+      serving: result.serving_data,
+      added_count: result.added_count,
+      last_added: result.last_added
+    })
   } catch (error) {
-    console.error('Error in favorites POST API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/nutrition/favorites')
   }
 }

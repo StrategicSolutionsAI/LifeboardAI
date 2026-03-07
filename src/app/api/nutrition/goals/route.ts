@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { handleApiError } from '@/lib/api-error-handler'
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,8 +39,7 @@ export async function GET(request: NextRequest) {
       fat: goals.fat
     })
   } catch (error) {
-    console.error('Error in nutrition goals GET API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/nutrition/goals')
   }
 }
 
@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       fat: goals.fat
     })
   } catch (error) {
-    console.error('Error in nutrition goals POST API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/nutrition/goals')
   }
 }

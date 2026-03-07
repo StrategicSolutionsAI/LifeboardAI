@@ -21,14 +21,25 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
 
-    const { error: calendarError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .eq('task_id', taskId)
-      .eq('user_id', user.id)
+    // Clean up associated calendar events and task occurrence exceptions
+    const [calendarResult, exceptionsResult] = await Promise.all([
+      supabase
+        .from('calendar_events')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', user.id),
+      supabase
+        .from('task_occurrence_exceptions')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', user.id),
+    ])
 
-    if (calendarError) {
-      console.error('Failed to delete associated calendar event', { taskId, calendarError })
+    if (calendarResult.error) {
+      console.error('Failed to delete associated calendar event', { taskId, error: calendarResult.error })
+    }
+    if (exceptionsResult.error) {
+      console.error('Failed to delete associated task occurrence exceptions', { taskId, error: exceptionsResult.error })
     }
 
     return NextResponse.json({ ok: true })
