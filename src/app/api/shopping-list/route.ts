@@ -36,7 +36,9 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   }
 
   const items = (data ?? []).map(mapRowToItem);
-  return NextResponse.json({ items });
+  const res = NextResponse.json({ items });
+  res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+  return res;
 }, "GET /api/shopping-list");
 
 export const POST = withAuthAndBody(createShoppingItemSchema, async (req, { supabase, user, body }) => {

@@ -19,7 +19,9 @@ async function getHandler(request: NextRequest) {
     .maybeSingle()
 
   if (!membership) {
-    return NextResponse.json({ household: null, members: [] })
+    const res = NextResponse.json({ household: null, members: [] })
+    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+    return res
   }
 
   const [householdResult, membersResult] = await Promise.all([
@@ -35,10 +37,12 @@ async function getHandler(request: NextRequest) {
       .order('invited_at', { ascending: true }),
   ])
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     household: householdResult.data,
     members: membersResult.data || [],
   })
+  res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+  return res
 }
 
 // POST — Create a household, auto-add creator as admin

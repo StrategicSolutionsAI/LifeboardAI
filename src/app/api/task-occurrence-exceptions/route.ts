@@ -50,9 +50,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       exceptions: (data || []).map(mapRow),
     });
+    res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    return res;
   } catch (error) {
     console.error('GET /api/task-occurrence-exceptions error', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -24,20 +24,24 @@ export async function GET(request: NextRequest) {
 
     // Return default goals if none exist
     if (!goals) {
-      return NextResponse.json({
+      const res = NextResponse.json({
         calories: 2000,
         protein: 150,
         carbs: 250,
         fat: 65
       })
+      res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+      return res
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       calories: goals.calories,
       protein: goals.protein,
       carbs: goals.carbs,
       fat: goals.fat
     })
+    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+    return res
   } catch (error) {
     return handleApiError(error, 'GET /api/nutrition/goals')
   }

@@ -15,7 +15,7 @@ import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
 import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { useCalendarEvents } from "@/features/calendar/hooks/use-calendar-events";
@@ -91,7 +91,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   });
 
   // Get tasks from context
-  const { allTasks, deleteTask, refetch, getTaskForOccurrence, createTask } = useTasksContext();
+  const { allTasks } = useTaskData();
+  const { deleteTask, refetch, getTaskForOccurrence, createTask } = useTaskActions();
 
   // Calendar events pipeline: data fetching, event building, dedup
   const {

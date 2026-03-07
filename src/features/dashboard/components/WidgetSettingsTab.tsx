@@ -3,7 +3,8 @@
 import { Settings2, Plus, LayoutDashboard } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import WidgetSelector from "@/features/widgets/components/widget-selector"
-import { getIconComponent, getWidgetColorStyles } from "@/lib/dashboard-utils"
+import { getIconComponent } from "@/lib/dashboard-icons"
+import { getWidgetColorStyles } from "@/lib/dashboard-utils"
 import type { WidgetInstance } from "@/types/widgets"
 
 interface WidgetSettingsTabProps {

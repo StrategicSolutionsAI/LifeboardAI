@@ -24,7 +24,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to load uploaded calendars' }, { status: 500 });
     }
 
-    return NextResponse.json({ imports: Array.isArray(data) ? data : [] });
+    const res = NextResponse.json({ imports: Array.isArray(data) ? data : [] });
+    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
+    return res;
   } catch (error) {
     console.error('GET /api/calendar/imports error', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

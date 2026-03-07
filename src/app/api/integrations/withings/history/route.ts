@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
         change: weights.length > 1 ? weights[0] - weights[weights.length - 1] : null,
       }
 
-      return NextResponse.json({
+      const res = NextResponse.json({
         measurements: apiMeasurements,
         stats,
         period: {
@@ -176,6 +176,8 @@ export async function GET(request: NextRequest) {
         },
         source: 'withings_api',
       })
+      res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+      return res
     }
 
     const rows: MeasurementRow[] = (measurements || []) as unknown as MeasurementRow[]
@@ -190,7 +192,7 @@ export async function GET(request: NextRequest) {
 
       if (apiMeasurements.length > 0) {
         const weights = apiMeasurements.map((m) => m.weightKg)
-        return NextResponse.json({
+        const res = NextResponse.json({
           measurements: apiMeasurements,
           stats: {
             count: apiMeasurements.length,
@@ -208,6 +210,8 @@ export async function GET(request: NextRequest) {
           },
           source: 'withings_api',
         })
+        res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+        return res
       }
     }
 
@@ -232,7 +236,7 @@ export async function GET(request: NextRequest) {
       change: weights.length > 1 ? weights[0] - weights[weights.length - 1] : null,
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       measurements: formattedData,
       stats,
       period: {
@@ -242,6 +246,8 @@ export async function GET(request: NextRequest) {
       },
       source: 'database',
     })
+    res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+    return res
   } catch (error) {
     console.error('Error in weight history endpoint:', error)
     return NextResponse.json(

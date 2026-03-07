@@ -4,7 +4,7 @@ import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { CalendarHeaderSkeleton, CalendarMonthSkeleton, TaskListSkeleton } from "@/features/calendar/components/calendar-loading-skeleton";
 import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/features/calendar/components/calendar-performance-monitor";
 import { useDragDropHandler } from "@/features/calendar/hooks/use-drag-drop-handler";
@@ -51,7 +51,8 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
-  const { batchUpdateTasks, allTasks } = useTasksContext();
+  const { allTasks } = useTaskData();
+  const { batchUpdateTasks } = useTaskActions();
   const selectedDateStr = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   useComponentLoadTime('CalendarContent');
 

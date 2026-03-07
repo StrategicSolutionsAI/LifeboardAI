@@ -4,7 +4,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
 import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
@@ -167,10 +167,12 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     allTasks,
     upcomingTasks,
     loading,
+  } = useTaskData();
+  const {
     createTask,
     toggleTaskCompletion,
     batchUpdateTasks,
-  } = useTasksContext();
+  } = useTaskActions();
 
   // Enhanced state management for upcoming tasks view
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());

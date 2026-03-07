@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { type Bucket as BoardBucket, type Task as BoardTask } from "@/features/tasks/components/TasksBoard";
-import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
+import { TasksProvider, useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useFamilyMembers } from "@/hooks/use-family-members";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,8 @@ function normalizeBucketId(name?: string | null) {
 }
 
 function BoardContent() {
-  const { allTasks, toggleTaskCompletion, createTask } = useTasksContext();
+  const { allTasks } = useTaskData();
+  const { toggleTaskCompletion, createTask } = useTaskActions();
   const { buckets: availableBuckets } = useBuckets();
   const familyMembers = useFamilyMembers();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});

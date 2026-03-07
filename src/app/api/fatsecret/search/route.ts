@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     // Search for foods
     const searchResults = await searchFoods(tokenResponse.access_token, query, pageNumber, maxResults)
 
-    return NextResponse.json(searchResults)
+    const res = NextResponse.json(searchResults)
+    res.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200')
+    return res
 
   } catch (error) {
     console.error('FatSecret search error:', error)

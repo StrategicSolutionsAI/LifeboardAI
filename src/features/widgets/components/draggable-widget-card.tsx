@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import {
   X,
@@ -11,11 +11,8 @@ import {
 } from "lucide-react";
 import type { WidgetInstance } from "@/types/widgets";
 import type { ProgressEntry } from "@/features/dashboard/types";
-import {
-  getIconComponent,
-  getWidgetColorStyles,
-  todayStrGlobal,
-} from "@/lib/dashboard-utils";
+import { getIconComponent } from "@/lib/dashboard-icons";
+import { getWidgetColorStyles, todayStrGlobal } from "@/lib/dashboard-utils";
 import { Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -63,7 +60,8 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
   const linkedTaskCompleted = Boolean(linkedTaskData?.completed);
   const linkedTaskContent =
     linkedTaskData?.content ?? w.linkedTaskTitle ?? w.name;
-  const linkedTaskDueDisplay = (() => {
+
+  const linkedTaskDueDisplay = useMemo(() => {
     const linkedTaskDueRaw = linkedTaskData?.dueDate ?? null;
     if (!linkedTaskDueRaw) return null;
     try {
@@ -75,38 +73,40 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
     } catch {
       return null;
     }
-  })();
+  }, [linkedTaskData?.dueDate]);
 
-  // Today's progress value
-  let todayVal = 0;
-  if (isLinkedTask) {
-    todayVal = linkedTaskCompleted ? (w.target || 1) : 0;
-  } else if (integrationValue !== undefined) {
-    todayVal = integrationValue;
-  } else if (w.id === "water" && w.waterData?.entries?.length) {
+  // Memoized progress calculation — avoids .filter().reduce() on every render
+  const todayVal = useMemo(() => {
+    if (isLinkedTask) {
+      return linkedTaskCompleted ? (w.target || 1) : 0;
+    }
+    if (integrationValue !== undefined) {
+      return integrationValue;
+    }
     const today = todayStrGlobal;
-    todayVal = w.waterData.entries
-      .filter((e: { date: string; amount: number }) => e.date === today)
-      .reduce((sum: number, e: { date: string; amount: number }) => sum + e.amount, 0);
-  } else if (w.id === "steps" && w.stepsData?.entries?.length) {
-    const today = todayStrGlobal;
-    todayVal = w.stepsData.entries
-      .filter((e: { date: string; steps: number }) => e.date === today)
-      .reduce((sum: number, e: { date: string; steps: number }) => sum + e.steps, 0);
-  } else if (w.id === "heartrate" && w.heartRateData?.entries?.length) {
-    const today = todayStrGlobal;
-    const todayReadings = w.heartRateData.entries.filter((e: { date: string }) => e.date === today);
-    todayVal = todayReadings.length > 0 ? 1 : 0; // target is 1 reading per day
-  } else if (w.id === "caffeine" && w.caffeineData?.entries?.length) {
-    const today = todayStrGlobal;
-    todayVal = w.caffeineData.entries
-      .filter((e: { date: string; cups: number }) => e.date === today)
-      .reduce((sum: number, e: { date: string; cups: number }) => sum + e.cups, 0);
-  } else if (w.id === "cycle_tracking" && w.cycleData?.entries?.length) {
-    todayVal = w.cycleData.entries.some((e) => e.date === todayStrGlobal) ? 1 : 0;
-  } else {
-    todayVal = progressEntry && progressEntry.date === todayStrGlobal ? progressEntry.value : 0;
-  }
+    if (w.id === "water" && w.waterData?.entries?.length) {
+      return w.waterData.entries
+        .filter((e: { date: string; amount: number }) => e.date === today)
+        .reduce((sum: number, e: { date: string; amount: number }) => sum + e.amount, 0);
+    }
+    if (w.id === "steps" && w.stepsData?.entries?.length) {
+      return w.stepsData.entries
+        .filter((e: { date: string; steps: number }) => e.date === today)
+        .reduce((sum: number, e: { date: string; steps: number }) => sum + e.steps, 0);
+    }
+    if (w.id === "heartrate" && w.heartRateData?.entries?.length) {
+      return w.heartRateData.entries.some((e: { date: string }) => e.date === today) ? 1 : 0;
+    }
+    if (w.id === "caffeine" && w.caffeineData?.entries?.length) {
+      return w.caffeineData.entries
+        .filter((e: { date: string; cups: number }) => e.date === today)
+        .reduce((sum: number, e: { date: string; cups: number }) => sum + e.cups, 0);
+    }
+    if (w.id === "cycle_tracking" && w.cycleData?.entries?.length) {
+      return w.cycleData.entries.some((e) => e.date === today) ? 1 : 0;
+    }
+    return progressEntry && progressEntry.date === today ? progressEntry.value : 0;
+  }, [w.id, w.target, w.waterData?.entries, w.stepsData?.entries, w.heartRateData?.entries, w.caffeineData?.entries, w.cycleData?.entries, isLinkedTask, linkedTaskCompleted, integrationValue, progressEntry]);
 
   const normalizedTarget = w.target && w.target > 0 ? w.target : 1;
   const pct = isLinkedTask

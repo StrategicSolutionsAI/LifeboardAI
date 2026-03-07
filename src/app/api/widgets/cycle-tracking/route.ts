@@ -25,7 +25,9 @@ async function getHandler(request: Request) {
     throw createApiError('Failed to fetch cycle data', 500, 'DB_FETCH_ERROR', error);
   }
 
-  return NextResponse.json({ entries: data || [] });
+  const res = NextResponse.json({ entries: data || [] });
+  res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+  return res;
 }
 
 async function postHandler(request: Request) {

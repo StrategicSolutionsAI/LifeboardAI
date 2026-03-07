@@ -67,12 +67,7 @@ export function useIntegrations({
   const [newDailyTask, setNewDailyTask] = useState('');
   const [newOpenTask, setNewOpenTask] = useState('');
 
-  // Collapse states
-  const [isPlannerCollapsed, setIsPlannerCollapsed] = useState(false);
-  const [isNext7DaysCollapsed, setIsNext7DaysCollapsed] = useState(false);
-  const [isNext2WeeksCollapsed, setIsNext2WeeksCollapsed] = useState(false);
-  const [isLaterCollapsed, setIsLaterCollapsed] = useState(false);
-  const [isNoDueDateCollapsed, setIsNoDueDateCollapsed] = useState(true);
+  // Collapse states are now in use-collapse-states.ts (extracted to reduce re-render scope)
 
   // ------------------------------------------------------------------
   // Refs
@@ -852,13 +847,6 @@ export function useIntegrations({
     // Task input
     newDailyTask, setNewDailyTask,
     newOpenTask, setNewOpenTask,
-
-    // Collapse states
-    isPlannerCollapsed, setIsPlannerCollapsed,
-    isNext7DaysCollapsed, setIsNext7DaysCollapsed,
-    isNext2WeeksCollapsed, setIsNext2WeeksCollapsed,
-    isLaterCollapsed, setIsLaterCollapsed,
-    isNoDueDateCollapsed, setIsNoDueDateCollapsed,
 
     // Computed
     selectedDateStr,

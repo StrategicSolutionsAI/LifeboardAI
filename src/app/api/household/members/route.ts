@@ -19,7 +19,9 @@ async function getHandler(request: NextRequest) {
     .maybeSingle()
 
   if (!membership) {
-    return NextResponse.json({ members: [] })
+    const res = NextResponse.json({ members: [] })
+    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+    return res
   }
 
   const { data: members, error } = await supabase
@@ -30,7 +32,9 @@ async function getHandler(request: NextRequest) {
 
   if (error) throw createApiError('Failed to fetch members', 500, 'DB_ERROR', error)
 
-  return NextResponse.json({ members: members || [] })
+  const res = NextResponse.json({ members: members || [] })
+  res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+  return res
 }
 
 // PATCH — Update a member (role, display_name)

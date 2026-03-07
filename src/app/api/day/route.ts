@@ -94,5 +94,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   })
 
-  return NextResponse.json({ items })
+  const res = NextResponse.json({ items })
+  res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
+  return res
 }, 'GET /api/day')

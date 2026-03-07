@@ -61,7 +61,9 @@ async function handler(request: Request) {
     htmlLink: event.htmlLink,
   })) || [];
 
-  return NextResponse.json({ events });
+  const res = NextResponse.json({ events });
+  res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+  return res;
 }
 
 export const GET = withErrorHandling(handler, 'integrations/google/calendar/events')

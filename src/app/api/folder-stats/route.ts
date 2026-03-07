@@ -68,5 +68,7 @@ export const GET = withAuth(async (_req, { supabase, user }) => {
     }
   }
 
-  return NextResponse.json({ stats })
+  const res = NextResponse.json({ stats })
+  res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
+  return res
 }, 'GET /api/folder-stats')

@@ -3,19 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, ListChecks, LayoutGrid, ShoppingCart, Calendar, Plus, Trash2, X } from "lucide-react"
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd"
 import { CSSFolder } from "@/features/folders/components/css-folder"
 import { useBuckets } from "@/hooks/use-buckets"
 import { getBucketColorSync, BUCKET_COLOR_PALETTE } from "@/lib/bucket-colors"
@@ -128,6 +120,7 @@ function ColorGrid({
 /* ── Sortable folder item ── */
 function SortableFolder({
   name,
+  index,
   color,
   empty,
   onEdit,
@@ -135,45 +128,37 @@ function SortableFolder({
   visibleStatTypes,
 }: {
   name: string
+  index: number
   color: string
   empty: boolean
   onEdit: () => void
   stats?: BucketStatsData
   visibleStatTypes?: Set<keyof BucketStatsData>
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: name })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 50 : undefined,
-  }
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="flex flex-col items-center cursor-grab active:cursor-grabbing w-[140px] sm:w-[170px] lg:w-[200px]"
-    >
-      <CSSFolder
-        label={name}
-        color={color}
-        empty={empty}
-        onClick={onEdit}
-        stats={stats}
-        visibleStatTypes={visibleStatTypes}
-      />
-    </div>
+    <Draggable draggableId={name} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          style={{
+            ...provided.draggableProps.style,
+            opacity: snapshot.isDragging ? 0.4 : 1,
+          }}
+          className="flex flex-col items-center cursor-grab active:cursor-grabbing w-[140px] sm:w-[170px] lg:w-[200px]"
+        >
+          <CSSFolder
+            label={name}
+            color={color}
+            empty={empty}
+            onClick={onEdit}
+            stats={stats}
+            visibleStatTypes={visibleStatTypes}
+          />
+        </div>
+      )}
+    </Draggable>
   )
 }
 
@@ -390,10 +375,7 @@ export default function FoldersPage() {
   // Per-bucket stats (tasks, widgets, shopping, calendar)
   const [bucketStats, setBucketStats] = useState<Record<string, BucketStatsData>>({})
 
-  // Require 8px movement before activating drag — prevents accidental drags on click
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  )
+  // DnD drag handler
 
   // Sync local order when buckets load from hook
   useEffect(() => {
@@ -447,14 +429,12 @@ export default function FoldersPage() {
     await saveBucketColors(updated, nextColors)
   }
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = async (result: DropResult) => {
     setEditingFolder(null)
-    const { active, over } = event
-    if (!over || active.id === over.id) return
+    if (!result.destination || result.source.index === result.destination.index) return
 
-    const oldIndex = localBuckets.indexOf(active.id as string)
-    const newIndex = localBuckets.indexOf(over.id as string)
-    if (oldIndex === -1 || newIndex === -1) return
+    const oldIndex = result.source.index
+    const newIndex = result.destination.index
 
     const reordered = Array.from(localBuckets)
     const [moved] = reordered.splice(oldIndex, 1)
@@ -684,27 +664,31 @@ export default function FoldersPage() {
             </button>
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={localBuckets} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6">
-                {localBuckets.map((name) => (
-                  <SortableFolder
-                    key={name}
-                    name={name}
-                    color={getBucketColorSync(name, bucketColors)}
-                    empty={isBucketEmpty(name)}
-                    stats={bucketStats[name] ?? { tasks: 0, widgets: 0, shopping: 0, calendar: 0 }}
-                    visibleStatTypes={visibleStatTypes}
-                    onEdit={() => setEditingFolder(name)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="folders" direction="horizontal">
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6"
+                >
+                  {localBuckets.map((name, index) => (
+                    <SortableFolder
+                      key={name}
+                      name={name}
+                      index={index}
+                      color={getBucketColorSync(name, bucketColors)}
+                      empty={isBucketEmpty(name)}
+                      stats={bucketStats[name] ?? { tasks: 0, widgets: 0, shopping: 0, calendar: 0 }}
+                      visibleStatTypes={visibleStatTypes}
+                      onEdit={() => setEditingFolder(name)}
+                    />
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         )}
       </div>
     </div>

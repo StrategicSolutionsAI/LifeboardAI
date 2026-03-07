@@ -14,7 +14,9 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 
-  return NextResponse.json({ profile: data ?? null })
+  const res = NextResponse.json({ profile: data ?? null })
+  res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+  return res
 }, 'GET /api/user/profile')
 
 const patchSchema = z.object({

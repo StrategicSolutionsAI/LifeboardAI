@@ -5,7 +5,7 @@
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { format } from "date-fns";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { X, Plus } from "lucide-react";
 import {
   Droppable,
@@ -140,12 +140,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   isMobile = false,
   familyMembers = [],
 }, ref) => {
+  const { scheduledTasks } = useTaskData();
   const {
-    scheduledTasks,
     batchUpdateTasks,
     deleteTask,
     createTask,
-  } = useTasksContext();
+  } = useTaskActions();
 
   const activePlannerDate = useMemo(() => {
     if (plannerDate && plannerDate.trim().length > 0) {

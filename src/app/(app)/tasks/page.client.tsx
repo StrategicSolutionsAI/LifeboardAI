@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { TasksProvider, useTasksContext } from "@/contexts/tasks-context";
+import { TasksProvider, useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import type { Bucket as BoardBucket, Task as BoardTask } from "@/features/tasks/components/TasksBoard";
 import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
@@ -127,8 +127,8 @@ function matchesDateFilter(
 }
 
 function TasksBoardShell() {
-  const { allTasks, toggleTaskCompletion, createTask, batchUpdateTasks, deleteTask } =
-    useTasksContext();
+  const { allTasks } = useTaskData();
+  const { toggleTaskCompletion, createTask, batchUpdateTasks, deleteTask } = useTaskActions();
   const { buckets } = useBuckets();
   const familyMembers = useFamilyMembers();
   const { toast } = useToast();

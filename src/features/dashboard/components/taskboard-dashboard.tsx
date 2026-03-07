@@ -10,6 +10,7 @@ import { useHourlyPlanner } from "@/features/dashboard/hooks/use-hourly-planner"
 import { useDailyReset } from "@/features/dashboard/hooks/use-daily-reset";
 import { useDashboardWidgets } from "@/features/dashboard/hooks/use-dashboard-widgets";
 import { useIntegrations } from "@/features/dashboard/hooks/use-integrations";
+import { useCollapseStates } from "@/features/dashboard/hooks/use-collapse-states";
 import { useWidgetLogs } from "@/features/dashboard/hooks/use-widget-logs";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UndoToast } from "./UndoToast";
@@ -49,7 +50,7 @@ const WidgetLibrary = dynamic(
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
-import { TasksProvider, useTasksContext } from '@/contexts/tasks-context';
+import { TasksProvider, useTaskData, useTaskActions } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useFamilyMembers } from "@/hooks/use-family-members";
@@ -104,7 +105,8 @@ const WidgetCardSkeleton = dynamic(
 // Inner component that uses TasksContext
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
   // Access tasks context for all task operations
-  const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, batchUpdateTasks, deleteTask, createTask: contextCreateTask, allTasks, toggleTaskCompletion: toggleTaskCompletionContext } = useTasksContext();
+  const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, allTasks } = useTaskData();
+  const { batchUpdateTasks, deleteTask, createTask: contextCreateTask, toggleTaskCompletion: toggleTaskCompletionContext } = useTaskActions();
 
   // Auth: user, greeting, sign out — onBeforeSignOut flushes debounced saves
   const flushRef = useRef<(() => void) | null>(null);
@@ -309,16 +311,18 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     isCompletingTask, setIsCompletingTask,
     newDailyTask, setNewDailyTask,
     newOpenTask, setNewOpenTask,
-    isPlannerCollapsed, setIsPlannerCollapsed,
-    isNext7DaysCollapsed, setIsNext7DaysCollapsed,
-    isNext2WeeksCollapsed, setIsNext2WeeksCollapsed,
-    isLaterCollapsed, setIsLaterCollapsed,
-    isNoDueDateCollapsed, setIsNoDueDateCollapsed,
     selectedDateStr, openTasksToShow, upcomingTaskGroups,
     fetchIntegrationsData, fetchAllTodoistTasks,
     updateTaskDueDate, updateTaskDuration,
     handleDragEnd,
   } = integrationsHook;
+  const {
+    isPlannerCollapsed, setIsPlannerCollapsed,
+    isNext7DaysCollapsed, setIsNext7DaysCollapsed,
+    isNext2WeeksCollapsed, setIsNext2WeeksCollapsed,
+    isLaterCollapsed, setIsLaterCollapsed,
+    isNoDueDateCollapsed, setIsNoDueDateCollapsed,
+  } = useCollapseStates();
 
   // Dashboard inner subtabs (left panel)
   const [activeSubTab, setActiveSubTab] = useState<'Overview' | 'Trends' | 'Logs' | 'Tasks' | 'Settings'>('Overview');
@@ -472,7 +476,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <section className="flex items-center justify-between mb-6">
           <div>
             <h1 className=" text-[24px] text-theme-text-primary tracking-tight">
-              Welcome back, <span className="text-theme-primary font-bold">{greetingName || 'there'}</span>
+              Welcome back, {greetingName || 'there'}
             </h1>
             <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>

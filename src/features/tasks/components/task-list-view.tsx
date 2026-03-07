@@ -460,12 +460,16 @@ function TaskSection({
   onToggleSelection,
   familyMembers,
 }: TaskSectionProps) {
+  const PAGE_SIZE = 30;
   const config = STATUS_CONFIG[sectionStatus];
   const count = tasks.length;
   const isDone = sectionStatus === "done";
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isExpanded, setIsExpanded] = useState(!isDone);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleTasks = count > PAGE_SIZE ? tasks.slice(0, visibleCount) : tasks;
+  const hasMore = visibleCount < count;
 
   const handleSubmitNew = () => {
     const trimmed = newTaskTitle.trim();
@@ -616,12 +620,12 @@ function TaskSection({
             <Droppable droppableId={sectionStatus} type="TASK">
               {(provided) => (
                 <tbody ref={provided.innerRef} {...provided.droppableProps}>
-                  {tasks.map((task, index) => (
+                  {visibleTasks.map((task, index) => (
                     <TaskTableRow
                       key={task.id}
                       task={task}
                       index={index}
-                      isLast={index === tasks.length - 1}
+                      isLast={index === visibleTasks.length - 1 && !hasMore}
                       isDoneSection={isDone}
                       onToggleTask={onToggleTask}
                       onDeleteTask={onDeleteTask}
@@ -644,6 +648,15 @@ function TaskSection({
               )}
             </Droppable>
           </table>
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+              className="w-full py-2.5 text-xs font-medium text-theme-text-secondary hover:text-theme-primary hover:bg-theme-brand-tint-subtle transition-colors border-t border-[rgba(219,214,207,0.4)]"
+            >
+              Show {Math.min(PAGE_SIZE, count - visibleCount)} more of {count} tasks
+            </button>
+          )}
         </div>
       )}
 

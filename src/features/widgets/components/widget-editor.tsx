@@ -6,7 +6,7 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { WidgetPreview } from "./widget-preview";
 import { Button } from "@/components/ui/button";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/types/tasks";
 import { format } from "date-fns";
 import { card, form } from "@/lib/styles";
@@ -131,7 +131,7 @@ export default function WidgetEditorSheet({
   const [isWithingsConnected, setIsWithingsConnected] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { createTask, batchUpdateTasks, deleteTask } = useTasksContext();
+  const { createTask, batchUpdateTasks, deleteTask } = useTaskActions();
 
   // Session cache: only fetch integration status once per editor mount
   const connectionStatusChecked = useRef(false);

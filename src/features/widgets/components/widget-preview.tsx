@@ -2,7 +2,7 @@
 
 import { WidgetInstance } from "@/types/widgets";
 import React from "react";
-import { iconMap } from "@/lib/dashboard-utils";
+import { iconMap } from "@/lib/dashboard-icons";
 
 // Local colour utility (same as widget-library)
 const colorClassMap: Record<string, string> = {

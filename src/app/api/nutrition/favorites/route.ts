@@ -31,7 +31,9 @@ export async function GET(request: NextRequest) {
       last_added: fav.last_added
     })) || []
 
-    return NextResponse.json(formattedFavorites)
+    const res = NextResponse.json(formattedFavorites)
+    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
+    return res
   } catch (error) {
     return handleApiError(error, 'GET /api/nutrition/favorites')
   }

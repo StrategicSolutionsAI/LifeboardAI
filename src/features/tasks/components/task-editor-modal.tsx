@@ -12,7 +12,7 @@ import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { format, parseISO } from "date-fns";
 import { X, Trash2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
 import {
   deriveRepeatOption,
@@ -75,7 +75,8 @@ const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
   ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {}, familyMembers = [] }, ref) => {
-    const { allTasks, createTask, batchUpdateTasks, deleteTask, refetch } = useTasksContext();
+    const { allTasks } = useTaskData();
+    const { createTask, batchUpdateTasks, deleteTask, refetch } = useTaskActions();
     const { toast } = useToast();
     const vvHeight = useVisualViewport();
 

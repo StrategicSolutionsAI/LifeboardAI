@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import Link from "next/link";
 import {
   differenceInCalendarDays,
@@ -10,7 +11,7 @@ import {
   parseISO,
 } from "date-fns";
 import type { Task } from "@/types/tasks";
-import { useTasksContext } from "@/contexts/tasks-context";
+import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { useToast } from "@/components/ui/use-toast";
 import { TasksQuickActions, type TasksQuickActionFilter } from "./tasks-quick-actions";
 import { TasksGroupedList } from "./tasks-grouped-list";
@@ -22,6 +23,65 @@ interface FamilyMemberOption {
   name: string;
   avatarColor: string;
   relationship: string;
+}
+
+/* ─── VirtualizedTaskList ─── */
+const VIRTUAL_THRESHOLD = 30;
+const ESTIMATED_ROW_HEIGHT = 56;
+
+function VirtualizedTaskList({
+  tasks,
+  renderTask,
+}: {
+  tasks: Task[];
+  renderTask: (task: Task) => React.ReactNode;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: tasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  // For small lists, render directly — no virtualization overhead
+  if (tasks.length <= VIRTUAL_THRESHOLD) {
+    return (
+      <div className="divide-y divide-theme-neutral-300/60">
+        {tasks.map((task) => (
+          <div key={task.id}>{renderTask(task)}</div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={parentRef}
+      className="max-h-[600px] overflow-y-auto"
+    >
+      <div
+        className="relative w-full"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const task = tasks[virtualRow.index];
+          return (
+            <div
+              key={task.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute left-0 w-full border-b border-theme-neutral-300/60"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+            >
+              {renderTask(task)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface EnhancedTasksViewProps {
@@ -100,7 +160,8 @@ export function EnhancedTasksView({
   assigneeFilter,
   onAssigneeFilterChange,
 }: EnhancedTasksViewProps) {
-  const { allTasks, createTask, toggleTaskCompletion } = useTasksContext();
+  const { allTasks } = useTaskData();
+  const { createTask, toggleTaskCompletion } = useTaskActions();
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState("open");
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
@@ -113,53 +174,57 @@ export function EnhancedTasksView({
     return map;
   }, [familyMembers]);
 
-  const bucketTasks = useMemo(() => {
+  // Single-pass partition: dedup + bucket filter → open/completed + counts
+  const { openTasks, completedTasks, taskCounts, completionStats, bucketTaskCount } = useMemo(() => {
     const tasks = Array.isArray(allTasks) ? allTasks : [];
     const seen = new Set<string>();
     const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
     const activeBucketKey = normalize(activeBucket);
 
-    return tasks.filter((task) => {
-      if (seen.has(task.id)) {
-        return false;
-      }
-      if (activeBucketKey) {
-        const taskBucketKey = normalize(task.bucket);
-        if (taskBucketKey !== activeBucketKey) {
-          return false;
-        }
-      }
-      seen.add(task.id);
-      return true;
-    });
-  }, [allTasks, activeBucket]);
-
-  const openTasks = useMemo(
-    () => bucketTasks.filter((task) => !task.completed),
-    [bucketTasks],
-  );
-
-  const completedTasks = useMemo(
-    () => bucketTasks.filter((task) => task.completed),
-    [bucketTasks],
-  );
-
-  const taskCounts = useMemo(() => {
+    const open: Task[] = [];
+    const completed: Task[] = [];
     let dueSoon = 0;
     let overdue = 0;
 
-    openTasks.forEach((task) => {
-      if (isDueSoonTask(task)) dueSoon += 1;
-      if (isOverdueTask(task)) overdue += 1;
-    });
+    for (const task of tasks) {
+      if (seen.has(task.id)) continue;
+      if (activeBucketKey && normalize(task.bucket) !== activeBucketKey) continue;
+      seen.add(task.id);
+
+      if (task.completed) {
+        completed.push(task);
+      } else {
+        open.push(task);
+        if (isDueSoonTask(task)) dueSoon += 1;
+        if (isOverdueTask(task)) overdue += 1;
+      }
+    }
+
+    // Compute completionStats in same pass
+    let completedToday = 0;
+    let totalToday = 0;
+    for (const task of open) {
+      const dueDate = parseDueDate(task);
+      if (dueDate && isToday(dueDate)) {
+        totalToday += 1;
+      }
+    }
+    for (const task of completed) {
+      const dueDate = parseDueDate(task);
+      if (dueDate && isToday(dueDate)) {
+        totalToday += 1;
+        completedToday += 1;
+      }
+    }
 
     return {
-      open: openTasks.length,
-      completed: completedTasks.length,
-      dueSoon,
-      overdue,
+      openTasks: open,
+      completedTasks: completed,
+      taskCounts: { open: open.length, completed: completed.length, dueSoon, overdue },
+      completionStats: { completed: completedToday, total: totalToday },
+      bucketTaskCount: open.length + completed.length,
     };
-  }, [openTasks, completedTasks]);
+  }, [allTasks, activeBucket]);
 
   const quickFilters = useMemo<TasksQuickActionFilter[]>(
     () => [
@@ -182,22 +247,7 @@ export function EnhancedTasksView({
     [taskCounts, activeFilter],
   );
 
-  const completionStats = useMemo(() => {
-    let completedToday = 0;
-    let totalToday = 0;
-
-    bucketTasks.forEach((task) => {
-      const dueDate = parseDueDate(task);
-      if (dueDate && isToday(dueDate)) {
-        totalToday += 1;
-        if (task.completed) {
-          completedToday += 1;
-        }
-      }
-    });
-
-    return { completed: completedToday, total: totalToday };
-  }, [bucketTasks]);
+  // completionStats computed in partition memo above
 
   const filteredTasks = useMemo(() => {
     const base = (() => {
@@ -396,7 +446,7 @@ export function EnhancedTasksView({
   };
 
   const bucketLabel = activeBucket || "Life";
-  const showMarketingEmpty = bucketTasks.length === 0;
+  const showMarketingEmpty = bucketTaskCount === 0;
   const hasOpenTasks = openTasks.length > 0;
   const hasCompletedTasks = completedTasks.length > 0;
 
@@ -568,11 +618,7 @@ export function EnhancedTasksView({
               <TasksGroupedList tasks={filteredTasks} renderTask={renderTask} />
             </div>
           ) : (
-            <div className="divide-y divide-theme-neutral-300/60">
-              {filteredTasks.map((task) => (
-                <div key={task.id}>{renderTask(task)}</div>
-              ))}
-            </div>
+            <VirtualizedTaskList tasks={filteredTasks} renderTask={renderTask} />
           )}
         </div>
       )}

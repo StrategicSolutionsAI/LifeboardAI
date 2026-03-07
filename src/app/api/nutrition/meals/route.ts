@@ -52,7 +52,9 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(groupedMeals)
+    const res = NextResponse.json(groupedMeals)
+    res.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
+    return res
   } catch (error) {
     return handleApiError(error, 'GET /api/nutrition/meals')
   }

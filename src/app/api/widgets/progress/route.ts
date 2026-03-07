@@ -18,7 +18,9 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 
-  return NextResponse.json({ logs: data ?? [] })
+  const res = NextResponse.json({ logs: data ?? [] })
+  res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120')
+  return res
 }, 'GET /api/widgets/progress')
 
 const upsertSchema = z.object({

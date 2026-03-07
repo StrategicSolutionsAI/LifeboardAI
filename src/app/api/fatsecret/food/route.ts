@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
     // Get food details
     const foodDetails = await getFoodDetails(tokenResponse.access_token, foodId)
 
-    return NextResponse.json(foodDetails)
+    const res = NextResponse.json(foodDetails)
+    res.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200')
+    return res
 
   } catch (error) {
     console.error('FatSecret food details error:', error)

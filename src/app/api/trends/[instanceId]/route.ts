@@ -83,5 +83,7 @@ export async function GET(_req: Request, { params }: { params: { instanceId: str
     const row = (data ?? []).find((r: Record<string, unknown>) => (r.date as string).slice(0, 10) === ds);
     result.push({ date: ds, value: row?.value ?? 0 });
   }
-  return NextResponse.json({ data: result });
-} 
+  const res = NextResponse.json({ data: result });
+  res.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
+  return res;
+}
