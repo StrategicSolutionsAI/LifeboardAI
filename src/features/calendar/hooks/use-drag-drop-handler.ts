@@ -227,6 +227,12 @@ export function useDragDropHandler({
         return;
       }
 
+      // ── hour → hourly-planner-drop (fallback: keep current slot) ──
+      if (src.type === "hour" && dst.type === "hourly-planner-drop") {
+        // Dropped on the planner area but not a specific slot — no-op to avoid snap-back
+        return;
+      }
+
       // ── calendar-day → calendar-day (move between days) ──
       if (src.type === "calendar-day" && dst.type === "calendar-day") {
         if (src.dateStr === dst.dateStr) return;

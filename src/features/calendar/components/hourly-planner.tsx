@@ -587,7 +587,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   const addTaskModal = addModalSlot ? (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-3" onClick={handleCancelCreation}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
+        className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
@@ -727,6 +727,8 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
             <Droppable droppableId={`hour-${timeSlot}`}>
               {(provided, snapshot) => (
                 <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
                   className={`relative flex items-start gap-3 transition-colors group ${
                     isMainHour
                       ? 'border-t border-theme-neutral-300/30 h-[28px] sm:h-[18px]'
@@ -738,7 +740,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                       ? 'opacity-40'
                       : ''
                   }`}
-                  style={{ minHeight: SLOT_HEIGHT }}
+                  style={{ minHeight: SLOT_HEIGHT, ...(hasTask ? { zIndex: 2 } : {}) }}
                   onMouseEnter={() => handleSlotHover(timeSlot, true)}
                   onMouseLeave={() => handleSlotHover(timeSlot, false)}
                 >
@@ -755,9 +757,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                     )}
                   </div>
 
-                  <ul
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
+                  <div
                     className="flex-1 relative overflow-visible min-h-[28px] sm:min-h-[15px]"
                     style={{ minHeight: SLOT_HEIGHT }}
                   >
@@ -815,6 +815,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                           <li
                             ref={prov.innerRef}
                             {...prov.draggableProps}
+                            {...prov.dragHandleProps}
                             style={{
                               ...(prov.draggableProps.style || {}),
                               height: `${Math.max(32, (taskDuration / 60) * HOUR_HEIGHT)}px`,
@@ -850,7 +851,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               rounded-xl transition-all duration-200
                               cursor-grab active:cursor-grabbing
                               hover:border-theme-primary-300 hover:bg-theme-surface-alt
-                              overflow-hidden
+                              overflow-visible
                               ${isDraggingNow ? 'shadow-warm-lg rotate-1 scale-105 border-theme-primary-300 cursor-grabbing' : ''}
                               ${resizingTask?.taskId === t.id ? 'ring-2 ring-theme-neutral-300' : ''}
                             `}
@@ -863,29 +864,6 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
 
                             <div
                               className="flex items-start gap-2.5 w-full h-full min-h-[28px] pl-1"
-                              {...(() => {
-                                const handleProps = prov.dragHandleProps ?? {};
-                                const { onMouseDown, onTouchStart, ...rest } = handleProps as any;
-                                return {
-                                  ...rest,
-                                  onMouseDown: (event: React.MouseEvent<any, MouseEvent>) => {
-                                    if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      return;
-                                    }
-                                    onMouseDown?.(event);
-                                  },
-                                  onTouchStart: (event: React.TouchEvent<any>) => {
-                                    if ((event.target as HTMLElement).closest('[data-no-drag="true"]')) {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      return;
-                                    }
-                                    onTouchStart?.(event);
-                                  },
-                                };
-                              })()}
                             >
                               <div className="flex flex-col w-full justify-center min-w-0">
                                 {/* Conditional layout based on task height */}
@@ -1028,20 +1006,21 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               </button>
                             </div>
 
-                            {/* Resize handle */}
+                            {/* Resize handle — uses <button> so @hello-pangea/dnd auto-excludes it from drag */}
                             {allowResize && !isMobile && (
                               <div className="absolute -bottom-1 left-3 right-3 flex justify-center">
-                                <div
+                                <button
+                                  type="button"
                                   onMouseDown={(e) => startResize(e, timeSlot, t.id)}
                                   className="h-2.5 w-8 cursor-ns-resize
                                     bg-theme-neutral-300/60 hover:bg-theme-primary-400
                                     rounded-full transition-all duration-150
                                     opacity-0 group-hover:opacity-100 hover:scale-110
-                                    flex items-center justify-center"
-                                  data-no-drag="true"
+                                    flex items-center justify-center
+                                    border-none outline-none p-0"
                                 >
                                   <div className="w-3 h-px bg-theme-text-quaternary rounded-full" />
-                                </div>
+                                </button>
                               </div>
                             )}
                             {isResizing && (
@@ -1055,8 +1034,8 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                       </Draggable>
                       );
                     })}
-                    {provided.placeholder}
-                  </ul>
+                  </div>
+                  {provided.placeholder}
 
                   {/* Current-time "now" line */}
                   {showTimeIndicator && isCurrentSlot && (
