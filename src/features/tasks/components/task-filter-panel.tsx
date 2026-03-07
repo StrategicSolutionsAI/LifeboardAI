@@ -1,12 +1,14 @@
 "use client";
 
 import { ArrowUp, ArrowDown, X } from "lucide-react";
+import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
 export type DueDatePreset = "overdue" | "today" | "this-week" | "this-month";
 export type TaskSortOption = "manual" | "dueDate" | "bucket" | "name";
 
 export interface TaskFilterState {
   buckets: string[];
+  assignees: string[];
   dueDateRange: DueDatePreset | null;
   sortBy: TaskSortOption;
   sortDirection: "asc" | "desc";
@@ -15,6 +17,7 @@ export interface TaskFilterState {
 
 export const defaultTaskFilters: TaskFilterState = {
   buckets: [],
+  assignees: [],
   dueDateRange: null,
   sortBy: "manual",
   sortDirection: "asc",
@@ -24,6 +27,7 @@ export const defaultTaskFilters: TaskFilterState = {
 export function activeFilterCount(f: TaskFilterState): number {
   let count = 0;
   if (f.buckets.length > 0) count++;
+  if (f.assignees.length > 0) count++;
   if (f.dueDateRange !== null) count++;
   if (f.status !== "all") count++;
   if (f.sortBy !== defaultTaskFilters.sortBy || f.sortDirection !== defaultTaskFilters.sortDirection) count++;
@@ -55,6 +59,7 @@ interface TaskFilterPanelProps {
   onChange: (next: TaskFilterState) => void;
   bucketOptions: string[];
   bucketColors?: Record<string, string>;
+  familyMembers?: FamilyMemberOption[];
 }
 
 export function TaskFilterPanel({
@@ -62,6 +67,7 @@ export function TaskFilterPanel({
   onChange,
   bucketOptions,
   bucketColors = {},
+  familyMembers = [],
 }: TaskFilterPanelProps) {
   const toggleBucket = (bucket: string) => {
     const has = filters.buckets.includes(bucket);
@@ -97,6 +103,16 @@ export function TaskFilterPanel({
     } else {
       onChange({ ...filters, sortBy: opt, sortDirection: "asc" });
     }
+  };
+
+  const toggleAssignee = (id: string) => {
+    const has = filters.assignees.includes(id);
+    onChange({
+      ...filters,
+      assignees: has
+        ? filters.assignees.filter((x) => x !== id)
+        : [...filters.assignees, id],
+    });
   };
 
   const clearAll = () => onChange(defaultTaskFilters);
@@ -170,6 +186,36 @@ export function TaskFilterPanel({
                     style={{ backgroundColor: color }}
                   />
                   {bucket}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* Assignee */}
+      {familyMembers.length > 0 && (
+        <Section label="Assignee">
+          <div className="flex flex-wrap gap-2">
+            {familyMembers.map((member) => {
+              const active = filters.assignees.includes(member.id);
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => toggleAssignee(member.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition-colors ${
+                    active
+                      ? "bg-theme-brand-tint border-theme-primary/35 text-theme-text-primary"
+                      : "bg-white border-[#e2e8f0] text-theme-text-secondary hover:border-[#cbd5e1]"
+                  }`}
+                >
+                  <span
+                    className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ backgroundColor: member.avatarColor }}
+                  >
+                    {member.name.charAt(0).toUpperCase()}
+                  </span>
+                  {member.name}
                 </button>
               );
             })}

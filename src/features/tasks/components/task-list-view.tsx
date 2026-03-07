@@ -605,6 +605,9 @@ function TaskSection({
                   <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Bucket</span>
                 </th>
                 <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[100px]">
+                  <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Assignee</span>
+                </th>
+                <th className="text-left py-2.5 px-4 border-l border-[rgba(219,214,207,0.4)] min-w-[100px]">
                   <span className="text-[11px] font-medium tracking-[0.6px] uppercase text-theme-text-tertiary">Due</span>
                 </th>
                 <th className="w-12 border-l border-[rgba(219,214,207,0.4)]" />
@@ -846,25 +849,6 @@ const TaskTableRow = React.memo(function TaskTableRow({
               >
                 <HighlightText text={task.title} query={searchQuery} />
               </button>
-              {task.assigneeId && (() => {
-                const member = familyMembers?.find((m) => m.id === task.assigneeId);
-                if (!member) return null;
-                const initials = member.name
-                  .split(" ")
-                  .map((w) => w[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2);
-                return (
-                  <span
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
-                    style={{ backgroundColor: member.avatarColor }}
-                    title={member.name}
-                  >
-                    {initials}
-                  </span>
-                );
-              })()}
             </div>
           </td>
 
@@ -883,6 +867,26 @@ const TaskTableRow = React.memo(function TaskTableRow({
               bucketColors={bucketColors}
               onBucketChange={onBucketChange}
             />
+          </td>
+
+          {/* Assignee */}
+          <td className="py-3 px-4 border-l border-[rgba(219,214,207,0.3)]">
+            {task.assigneeId && (() => {
+              const member = familyMembers?.find((m) => m.id === task.assigneeId);
+              if (!member) return null;
+              const initials = member.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+              return (
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
+                    style={{ backgroundColor: member.avatarColor }}
+                  >
+                    {initials}
+                  </span>
+                  <span className="text-xs text-theme-text-secondary truncate">{member.name}</span>
+                </div>
+              );
+            })()}
           </td>
 
           {/* Due */}

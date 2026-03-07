@@ -3,6 +3,7 @@
 import { List, LayoutGrid, Columns3, Filter } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { TaskFilterPanel, type TaskFilterState, activeFilterCount } from "@/features/tasks/components/task-filter-panel";
+import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
 export type TaskTabId = "lists" | "board" | "kanban";
 
@@ -13,6 +14,7 @@ interface TaskBoardTabsProps {
   onFiltersChange: (f: TaskFilterState) => void;
   bucketOptions: string[];
   bucketColors?: Record<string, string>;
+  familyMembers?: FamilyMemberOption[];
 }
 
 const tabs: { id: TaskTabId; label: string; icon: React.ReactNode }[] = [
@@ -28,6 +30,7 @@ export function TaskBoardTabs({
   onFiltersChange,
   bucketOptions,
   bucketColors,
+  familyMembers,
 }: TaskBoardTabsProps) {
   const count = activeFilterCount(filters);
 
@@ -84,6 +87,7 @@ export function TaskBoardTabs({
             onChange={onFiltersChange}
             bucketOptions={bucketOptions}
             bucketColors={bucketColors}
+            familyMembers={familyMembers}
           />
         </PopoverContent>
       </Popover>
