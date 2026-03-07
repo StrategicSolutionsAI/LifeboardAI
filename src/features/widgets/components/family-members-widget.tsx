@@ -67,15 +67,28 @@ function getRandomColor(): string {
 
 function getBirthdayCountdown(birthday: string): { daysUntil: number; age: number } {
   const now = new Date()
-  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  // Parse manually to avoid UTC interpretation of date-only strings
+  // Compare month/day directly to avoid DST edge cases
+  const todayM = now.getMonth()
+  const todayD = now.getDate()
   const [bdYear, bdMonth, bdDay] = birthday.split('-').map(Number)
-  const thisYear = new Date(now.getFullYear(), bdMonth - 1, bdDay)
-  const next = thisYear < todayDate
-    ? new Date(now.getFullYear() + 1, bdMonth - 1, bdDay)
-    : thisYear
-  const daysUntil = Math.round((next.getTime() - todayDate.getTime()) / 86400000)
-  const age = now.getFullYear() - bdYear - (todayDate < thisYear ? 1 : 0)
+  const bdM = bdMonth - 1 // 0-indexed month
+
+  const isTodayBirthday = todayM === bdM && todayD === bdDay
+  const birthdayPassedThisYear =
+    todayM > bdM || (todayM === bdM && todayD > bdDay)
+
+  let daysUntil: number
+  if (isTodayBirthday) {
+    daysUntil = 0
+  } else {
+    const todayDate = new Date(now.getFullYear(), todayM, todayD)
+    const nextYear = birthdayPassedThisYear ? now.getFullYear() + 1 : now.getFullYear()
+    const next = new Date(nextYear, bdM, bdDay)
+    // Use Math.round to handle DST hour shifts
+    daysUntil = Math.round((next.getTime() - todayDate.getTime()) / 86400000)
+  }
+
+  const age = now.getFullYear() - bdYear - (birthdayPassedThisYear ? 0 : isTodayBirthday ? 0 : 1)
   return { daysUntil, age }
 }
 
