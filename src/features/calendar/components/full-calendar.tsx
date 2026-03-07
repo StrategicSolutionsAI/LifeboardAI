@@ -393,7 +393,10 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           type="button"
                           onClick={() => openCalendarEvent(ev, dateStr)}
                           className="w-full text-left flex items-start gap-3 rounded-xl px-3 py-2.5 bg-theme-surface-raised border border-theme-neutral-300/40 shadow-sm transition-all active:scale-[0.98]"
-                          style={bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}}
+                          style={(() => {
+                            const accentColor = (styles as any).customColor || bucketColor;
+                            return accentColor ? { borderLeftColor: accentColor, borderLeftWidth: 3 } : {};
+                          })()}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-theme-text-primary truncate">{ev.title}</p>
@@ -544,13 +547,15 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     <div className="flex flex-wrap gap-1.5">
                       {dayViewStats.allDayEvents.map((event, idx) => {
                         const bucketColor = event.bucket ? getBucketColorSync(event.bucket, bucketColors) : null;
+                        const alldayStyles = resolveEventStyles(event.source, event);
+                        const alldayAccent = (alldayStyles as any).customColor || bucketColor;
                         const draggableTaskId = event.taskId;
                         if (!draggableTaskId) {
                           return (
                             <span
                               key={`allday-${idx}`}
                               className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-theme-text-secondary bg-theme-surface-alt border border-theme-neutral-300/40 shadow-sm"
-                              style={bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}}
+                              style={alldayAccent ? { borderLeftColor: alldayAccent, borderLeftWidth: 3 } : {}}
                               title={event.title}
                             >
                               <span className="truncate max-w-[180px]">{event.title}</span>
@@ -573,7 +578,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 }`}
                                 style={{
                                   ...(dragProv.draggableProps.style || {}),
-                                  ...(bucketColor ? { borderLeftColor: bucketColor, borderLeftWidth: 3 } : {}),
+                                  ...(alldayAccent ? { borderLeftColor: alldayAccent, borderLeftWidth: 3 } : {}),
                                 }}
                                 title={`${event.title} — drag to a time slot to schedule`}
                               >
@@ -674,6 +679,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       onTaskOpen={openTaskEditorById}
                       bucketColors={bucketColors}
                       isMobile={isCompactBreakpoint}
+                      familyMembers={familyMembers}
                     />
                     {provided.placeholder}
                   </div>

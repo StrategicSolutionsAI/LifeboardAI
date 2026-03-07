@@ -62,6 +62,11 @@ export const POST = withAuthAndBody(createShoppingItemSchema, async (req, { supa
       ? body.neededBy.trim()
       : null;
 
+  const assigneeId =
+    typeof body.assigneeId === "string" && body.assigneeId.trim().length > 0
+      ? body.assigneeId.trim()
+      : null;
+
   const insert = {
     user_id: user.id,
     bucket,
@@ -69,6 +74,7 @@ export const POST = withAuthAndBody(createShoppingItemSchema, async (req, { supa
     quantity,
     notes,
     needed_by: neededBy,
+    assignee_id: assigneeId,
     is_purchased: false,
   };
 

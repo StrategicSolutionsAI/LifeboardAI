@@ -15,6 +15,7 @@ export const SHOPPING_LIST_SELECT_COLUMNS =
     'widget_bucket',
     'task_id',
     'task_created_at',
+    'assignee_id',
     'created_at',
     'updated_at',
   ].join(', ')
@@ -35,6 +36,7 @@ export function mapRowToItem(row: any) {
     widgetBucket: row.widget_bucket ?? null,
     taskId: row.task_id ?? null,
     taskCreatedAt: row.task_created_at ?? null,
+    assigneeId: row.assignee_id ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   }

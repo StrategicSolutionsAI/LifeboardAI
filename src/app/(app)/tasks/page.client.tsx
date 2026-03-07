@@ -317,6 +317,7 @@ function TasksBoardShell() {
       isRecurring: t.due?.is_recurring ?? false,
       position: typeof t.position === "number" ? t.position : null,
       kanbanStatus: (t.kanbanStatus ?? (t.completed ? "done" : "todo")) as "todo" | "in_progress" | "done",
+      assigneeId: t.assigneeId ?? null,
     }));
   }, [filteredTasks]);
 
@@ -917,6 +918,7 @@ function TasksBoardShell() {
                 isSelectMode={isSelectMode}
                 selectedTasks={selectedTasks}
                 onToggleSelection={toggleSelection}
+                familyMembers={familyMembers}
                 onReorder={async (reorderedIds) => {
                   const updates = reorderedIds.map((id, index) => ({
                     taskId: id,

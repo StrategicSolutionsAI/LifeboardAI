@@ -14,6 +14,7 @@ import {
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import type { RepeatOption } from "@/types/tasks";
 import { getBucketColorSync } from "@/lib/bucket-colors";
+import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -27,6 +28,8 @@ interface PlannerItem {
   duration?: number;
   /** Bucket name for color-coding */
   bucket?: string;
+  /** Assigned family member ID */
+  assigneeId?: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -115,6 +118,8 @@ interface HourlyPlannerProps {
   bucketColors?: Record<string, string>;
   /** When true, applies mobile-optimised layout (always-visible affordances, no resize) */
   isMobile?: boolean;
+  /** Family members for assignee color lookup */
+  familyMembers?: FamilyMemberOption[];
 }
 
 export interface HourlyPlannerHandle {
@@ -133,6 +138,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   bucketColors: propBucketColors,
   onTaskOpen,
   isMobile = false,
+  familyMembers = [],
 }, ref) => {
   const {
     scheduledTasks,
@@ -147,6 +153,12 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     }
     return format(new Date(), 'yyyy-MM-dd');
   }, [plannerDate]);
+
+  const memberMap = useMemo(() => {
+    const map = new Map<string, FamilyMemberOption>();
+    familyMembers.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [familyMembers]);
 
   const shouldShowTaskForDate = useCallback((task: any, dateStr: string): boolean => {
     if (!task || task.completed) return false;
@@ -378,6 +390,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
         content: t.content,
         duration: t.duration ?? 60,
         bucket: t.bucket,
+        assigneeId: t.assigneeId ?? null,
       });
     });
     
@@ -797,6 +810,8 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                       const taskWidth = taskCount > 1 ? `${Math.floor(100 / taskCount) - 2}%` : '100%';
                       const leftOffset = taskCount > 1 ? `${(index * Math.floor(100 / taskCount)) + 1}%` : '0%';
                       const bucketColor = t.bucket ? getBucketColorSync(t.bucket, propBucketColors) : null;
+                      const assigneeMember = t.assigneeId ? memberMap.get(t.assigneeId) : undefined;
+                      const accentColor = assigneeMember?.avatarColor || bucketColor;
 
                       return (
                       <Draggable
@@ -856,10 +871,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               ${resizingTask?.taskId === t.id ? 'ring-2 ring-theme-neutral-300' : ''}
                             `}
                           >
-                            {/* Bucket color accent bar */}
+                            {/* Accent bar: assignee color > bucket color > default */}
                             <div
                               className="w-1 self-stretch rounded-l-xl shrink-0"
-                              style={{ backgroundColor: bucketColor || 'var(--theme-primary-300)' }}
+                              style={{ backgroundColor: accentColor || 'var(--theme-primary-300)' }}
                             />
 
                             <div

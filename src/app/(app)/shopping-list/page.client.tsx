@@ -35,6 +35,7 @@ import { useWidgets } from "@/hooks/use-widgets";
 import { hexToRgba } from "@/lib/dashboard-utils";
 import { card, form, interactive, surface, text } from "@/lib/styles";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useFamilyMembers, type FamilyMemberOption } from "@/hooks/use-family-members";
 
 const UNSORTED_LABEL = "Unsorted";
 
@@ -94,6 +95,7 @@ interface ShoppingListItemCardProps {
   onTogglePurchased: (item: ShoppingListItem) => void;
   onOpenConvert: (item: ShoppingListItem) => void;
   onDelete: (item: ShoppingListItem) => void;
+  familyMembers?: FamilyMemberOption[];
 }
 
 const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
@@ -104,6 +106,7 @@ const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
   onTogglePurchased,
   onOpenConvert,
   onDelete,
+  familyMembers,
 }: ShoppingListItemCardProps) {
   const color = getBucketColorSync(item.bucket ?? UNASSIGNED_BUCKET_ID, bucketColors);
   const conversionComplete = Boolean(item.calendarEventId) && Boolean(item.widgetInstanceId);
@@ -139,6 +142,25 @@ const ShoppingListItemCard = React.memo(function ShoppingListItemCard({
             )}>
               {item.name}
             </p>
+            {item.assigneeId && (() => {
+              const member = familyMembers?.find((m) => m.id === item.assigneeId);
+              if (!member) return null;
+              const initials = member.name
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2);
+              return (
+                <span
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
+                  style={{ backgroundColor: member.avatarColor }}
+                  title={member.name}
+                >
+                  {initials}
+                </span>
+              );
+            })()}
             <Badge
               className="border-0 text-xs font-medium"
               style={{ backgroundColor: hexToRgba(badgeColor, 0.15), color: badgeColor }}
@@ -282,9 +304,527 @@ const PurchasedItemCard = React.memo(function PurchasedItemCard({
   );
 });
 
+/* ─── Add Item Modal ─── */
+
+interface AddItemSheetInput {
+  name: string;
+  bucket: string | null;
+  quantity: string | null;
+  neededBy: string | null;
+  assigneeId: string | null;
+  notes: string | null;
+  createEvent: boolean;
+  eventBucket: string;
+  eventDate: string;
+  eventTime: string;
+  eventAllDay: boolean;
+  eventDuration: string;
+  createWidget: boolean;
+  widgetName: string;
+  widgetBucket: string;
+  widgetTarget: number;
+  widgetColor: string;
+  widgetSchedule: boolean[];
+  mirrorAsTask: boolean;
+}
+
+interface AddItemDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  availableBuckets: string[];
+  familyMembers: FamilyMemberOption[];
+  widgetBucketOptions: string[];
+  isCreating: boolean;
+  onSubmit: (input: AddItemSheetInput) => void;
+}
+
+function AddItemDialog({
+  open,
+  onOpenChange,
+  availableBuckets,
+  familyMembers,
+  widgetBucketOptions,
+  isCreating,
+  onSubmit,
+}: AddItemDialogProps) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [bucket, setBucket] = useState<string>("");
+  const [quantity, setQuantity] = useState("");
+  const [neededBy, setNeededBy] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string>("");
+  const [notes, setNotes] = useState("");
+
+  // Quick action state
+  const [qaCreateEvent, setQaCreateEvent] = useState(false);
+  const [qaEventBucket, setQaEventBucket] = useState("");
+  const [qaEventDate, setQaEventDate] = useState("");
+  const [qaEventTime, setQaEventTime] = useState("");
+  const [qaEventAllDay, setQaEventAllDay] = useState(true);
+  const [qaEventDuration, setQaEventDuration] = useState("60");
+  const [qaCreateWidget, setQaCreateWidget] = useState(false);
+  const [qaWidgetName, setQaWidgetName] = useState("");
+  const [qaWidgetBucket, setQaWidgetBucket] = useState("");
+  const [qaWidgetTarget, setQaWidgetTarget] = useState(1);
+  const [qaWidgetColor, setQaWidgetColor] = useState<(typeof WIDGET_COLOR_OPTIONS)[number]>("indigo");
+  const [qaWidgetSchedule, setQaWidgetSchedule] = useState([true, true, true, true, true, true, true]);
+  const [qaMirrorAsTask, setQaMirrorAsTask] = useState(false);
+
+  // Reset fields when modal opens
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setBucket("");
+      setQuantity("");
+      setNeededBy("");
+      setAssigneeId("");
+      setNotes("");
+      // Reset quick actions
+      setQaCreateEvent(false);
+      setQaEventBucket(widgetBucketOptions[0] ?? "");
+      setQaEventDate(new Date().toISOString().split("T")[0]);
+      setQaEventTime("");
+      setQaEventAllDay(true);
+      setQaEventDuration("60");
+      setQaCreateWidget(false);
+      setQaWidgetName("");
+      setQaWidgetBucket(widgetBucketOptions[0] ?? "");
+      setQaWidgetTarget(1);
+      setQaWidgetColor("indigo");
+      setQaWidgetSchedule([true, true, true, true, true, true, true]);
+      setQaMirrorAsTask(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast({
+        title: "Item name required",
+        description: "Please add an item description before saving.",
+        type: "warning",
+      });
+      return;
+    }
+    if (qaCreateEvent && !qaEventDate) {
+      toast({
+        title: "Date required",
+        description: "Set a date for the calendar event.",
+        type: "warning",
+      });
+      return;
+    }
+    if (qaCreateEvent && !qaEventAllDay && !qaEventTime) {
+      toast({
+        title: "Time required",
+        description: "Add a time or mark the event as all-day.",
+        type: "warning",
+      });
+      return;
+    }
+    if (qaCreateWidget && !qaWidgetBucket) {
+      toast({
+        title: "Bucket required",
+        description: "Pick a dashboard bucket for the widget.",
+        type: "warning",
+      });
+      return;
+    }
+    if (qaCreateWidget && qaWidgetSchedule.every((day) => !day)) {
+      toast({
+        title: "Schedule required",
+        description: "Select at least one day for the widget schedule.",
+        type: "warning",
+      });
+      return;
+    }
+    onSubmit({
+      name: trimmed,
+      bucket: bucket || null,
+      quantity: quantity.trim() || null,
+      neededBy: neededBy || null,
+      assigneeId: assigneeId || null,
+      notes: notes.trim() || null,
+      createEvent: qaCreateEvent,
+      eventBucket: qaEventBucket,
+      eventDate: qaEventDate,
+      eventTime: qaEventTime,
+      eventAllDay: qaEventAllDay,
+      eventDuration: qaEventDuration,
+      createWidget: qaCreateWidget,
+      widgetName: qaWidgetName,
+      widgetBucket: qaWidgetBucket,
+      widgetTarget: qaWidgetTarget,
+      widgetColor: qaWidgetColor,
+      widgetSchedule: qaWidgetSchedule,
+      mirrorAsTask: qaMirrorAsTask,
+    });
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:w-[520px] overflow-y-auto flex flex-col">
+        <SheetHeader>
+          <SheetTitle className={text.primary}>Add Item</SheetTitle>
+          <SheetDescription className={text.tertiary}>
+            Add a new item to your shopping list.
+          </SheetDescription>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-1 flex-col space-y-4">
+          <div className={cn(card.inset, "space-y-3 p-4")}>
+            <div>
+              <label className={cn(form.label, "mb-1 block")}>
+                Item name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="What do you need to pick up?"
+                className={form.input}
+                autoFocus
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={cn(form.label, "mb-1 block")}>
+                  Category
+                </label>
+                <select
+                  value={bucket}
+                  onChange={(e) => setBucket(e.target.value)}
+                  className={form.select}
+                >
+                  <option value="">Unsorted</option>
+                  {availableBuckets.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={cn(form.label, "mb-1 block")}>
+                  Quantity
+                </label>
+                <Input
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="e.g. 3 packs"
+                  className={form.input}
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={cn(form.label, "mb-1 block")}>
+                  Needed by
+                </label>
+                <Input
+                  type="date"
+                  value={neededBy}
+                  onChange={(e) => setNeededBy(e.target.value)}
+                  className={form.input}
+                />
+              </div>
+              <div>
+                <label className={cn(form.label, "mb-1 block")}>
+                  Assign to
+                </label>
+                <select
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  className={form.select}
+                >
+                  <option value="">Unassigned</option>
+                  {familyMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={cn(form.label, "mb-1 block")}>
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional details or reminders"
+                rows={2}
+                className={form.textarea}
+              />
+            </div>
+          </div>
+
+          {/* ── Quick Actions ── */}
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-theme-neutral-300" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-theme-text-secondary">
+              Quick Actions
+            </span>
+            <div className="h-px flex-1 bg-theme-neutral-300" />
+          </div>
+
+          {/* Toggle 1 — Calendar Event */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="add-event"
+                checked={qaCreateEvent}
+                onCheckedChange={(checked) => setQaCreateEvent(Boolean(checked))}
+              />
+              <CalendarPlus className="h-4 w-4 text-theme-text-tertiary" />
+              <label htmlFor="add-event" className={cn("text-sm font-medium", text.primary)}>
+                Create calendar event
+              </label>
+            </div>
+            {qaCreateEvent && (
+              <div className={cn(card.inset, "space-y-3 p-4")}>
+                <div>
+                  <label className={cn(form.label, "mb-1 block")}>Bucket</label>
+                  <select
+                    value={qaEventBucket}
+                    onChange={(e) => setQaEventBucket(e.target.value)}
+                    className={form.select}
+                  >
+                    {widgetBucketOptions.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={cn(form.label, "mb-1 block")}>Date</label>
+                    <Input
+                      type="date"
+                      value={qaEventDate}
+                      onChange={(e) => setQaEventDate(e.target.value)}
+                      className={form.input}
+                    />
+                  </div>
+                  <div>
+                    <label className={cn(form.label, "mb-1 block")}>Time</label>
+                    <Input
+                      type="time"
+                      value={qaEventTime}
+                      onChange={(e) => {
+                        setQaEventTime(e.target.value);
+                        if (e.target.value) setQaEventAllDay(false);
+                      }}
+                      disabled={qaEventAllDay}
+                      className={form.input}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="add-event-all-day"
+                    checked={qaEventAllDay}
+                    onCheckedChange={(checked) => {
+                      const next = Boolean(checked);
+                      setQaEventAllDay(next);
+                      if (next) setQaEventTime("");
+                    }}
+                  />
+                  <label htmlFor="add-event-all-day" className={cn(text.size.md, text.body)}>
+                    Treat as all-day event
+                  </label>
+                </div>
+                {!qaEventAllDay && (
+                  <div>
+                    <label className={cn(form.label, "mb-1 block")}>Duration (minutes)</label>
+                    <Input
+                      type="number"
+                      min={5}
+                      step={5}
+                      value={qaEventDuration}
+                      onChange={(e) => setQaEventDuration(e.target.value)}
+                      className={form.input}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Toggle 2 — Dashboard Widget */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="add-widget"
+                checked={qaCreateWidget}
+                onCheckedChange={(checked) => setQaCreateWidget(Boolean(checked))}
+              />
+              <LayoutGrid className="h-4 w-4 text-theme-text-tertiary" />
+              <label htmlFor="add-widget" className={cn("text-sm font-medium", text.primary)}>
+                Create dashboard widget
+              </label>
+            </div>
+            {qaCreateWidget && (
+              <div className={cn(card.inset, "space-y-3 p-4")}>
+                <div>
+                  <label className={cn(form.label, "mb-1 block")}>Widget name</label>
+                  <Input
+                    value={qaWidgetName}
+                    onChange={(e) => setQaWidgetName(e.target.value)}
+                    placeholder={`Buy ${name || "item"}`}
+                    className={form.input}
+                  />
+                </div>
+                <div>
+                  <label className={cn(form.label, "mb-1 block")}>Bucket</label>
+                  <select
+                    value={qaWidgetBucket}
+                    onChange={(e) => setQaWidgetBucket(e.target.value)}
+                    className={form.select}
+                  >
+                    {widgetBucketOptions.length === 0 ? (
+                      <option value="">No buckets available</option>
+                    ) : (
+                      widgetBucketOptions.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className={cn(form.label, "mb-1 block")}>Daily target</label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10"
+                      onClick={() => setQaWidgetTarget((prev) => Math.max(1, prev - 1))}
+                      aria-label="Decrease target"
+                    >
+                      -
+                    </Button>
+                    <div className={cn("flex items-center gap-2", text.size.md, text.body)}>
+                      <span className={cn("min-w-[24px] text-center", text.heading.sm)}>
+                        {qaWidgetTarget}
+                      </span>
+                      <span>item{qaWidgetTarget !== 1 ? "s" : ""}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10"
+                      onClick={() => setQaWidgetTarget((prev) => prev + 1)}
+                      aria-label="Increase target"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className={cn(form.label, "mb-2 block")}>Colour</label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {WIDGET_COLOR_OPTIONS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        aria-label={color}
+                        onClick={() => setQaWidgetColor(color)}
+                        className={cn(
+                          "h-8 w-8 rounded-full border-2 transition",
+                          WIDGET_COLOR_CLASS[color],
+                          qaWidgetColor === color
+                            ? "ring-2 ring-offset-2 ring-warm-500 border-white"
+                            : "border-white",
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className={cn(form.label, "mb-2 block")}>Schedule</label>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAY_LABELS.map((day, index) => (
+                      <button
+                        key={day + index}
+                        type="button"
+                        onClick={() =>
+                          setQaWidgetSchedule((prev) =>
+                            prev.map((value, idx) => (idx === index ? !value : value)),
+                          )
+                        }
+                        className={cn(
+                          "h-8 w-8 rounded-full border text-xs font-semibold",
+                          interactive.transitionFast,
+                          qaWidgetSchedule[index]
+                            ? "bg-warm-500 text-white border-warm-500"
+                            : cn(surface.raised, "text-theme-text-subtle border-theme-neutral-300"),
+                        )}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Toggle 3 — Mirror as Task */}
+          <div className={cn(card.inset, "space-y-3 p-4")}>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="add-task"
+                checked={qaMirrorAsTask}
+                onCheckedChange={(checked) => setQaMirrorAsTask(Boolean(checked))}
+              />
+              <div>
+                <label htmlFor="add-task" className={cn("text-sm font-medium", text.primary)}>
+                  Mirror as task
+                </label>
+                <p className={cn(text.size.sm, text.tertiary)}>
+                  Adds this item to your Tasks view and keeps it in sync with widget updates.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky footer */}
+          <div className="sticky bottom-0 mt-auto pt-4 pb-2 bg-white border-t border-theme-neutral-300">
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isCreating}
+                className="bg-theme-primary text-white hover:bg-theme-primary-600"
+              >
+                {isCreating ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <Plus size={15} className="mr-1.5" />
+                )}
+                Add Item
+              </Button>
+            </div>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function ShoppingListLayout() {
   const { toast } = useToast();
   const { buckets } = useBuckets();
+  const familyMembers = useFamilyMembers();
   const {
     items,
     purchasedItems,
@@ -299,11 +839,9 @@ function ShoppingListLayout() {
   } = useShoppingList();
   const { addWidget, updateWidget, removeWidget, widgetsByBucket } = useWidgets();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemQuantity, setNewItemQuantity] = useState("");
-  const [newItemBucket, setNewItemBucket] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<string>("all");
+  const [addModalOpen, setAddModalOpen] = useState(false);
 
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertItem, setConvertItem] = useState<ShoppingListItem | null>(null);
@@ -340,16 +878,6 @@ function ShoppingListLayout() {
       return diff >= 0 && diff <= 7 * 86_400_000;
     }).length;
   }, [items]);
-
-  useEffect(() => {
-    if (!newItemBucket) {
-      if (buckets.length > 0) {
-        setNewItemBucket(buckets[0]);
-      } else {
-        setNewItemBucket(null);
-      }
-    }
-  }, [buckets, newItemBucket]);
 
   useEffect(() => {
     async function loadBucketColors() {
@@ -450,38 +978,180 @@ function ShoppingListLayout() {
 
   const totalOpen = items.length;
 
-  const handleCreateItem = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmed = newItemName.trim();
-    if (!trimmed) {
-      toast({
-        title: "Item name required",
-        description: "Please add an item description before saving.",
-        type: "warning",
-      });
-      return;
-    }
-
+  const handleCreateItem = async (input: AddItemSheetInput) => {
     setIsCreating(true);
     try {
       const created = await createItem({
-        name: trimmed,
-        bucket: newItemBucket || null,
-        quantity: newItemQuantity.trim() || null,
+        name: input.name,
+        bucket: input.bucket,
+        quantity: input.quantity,
+        neededBy: input.neededBy,
+        assigneeId: input.assigneeId,
+        notes: input.notes,
       });
       if (created?.id) {
         setLastCreatedId(created.id);
         setTimeout(() => setLastCreatedId(null), 300);
       }
-      setNewItemName("");
-      setNewItemQuantity("");
-      toast({
-        title: "Item added",
-        description: `${trimmed} added to ${
-          newItemBucket ?? UNSORTED_LABEL
-        }.`,
-        type: "success",
-      });
+
+      const itemId = created?.id;
+      const hasQuickActions = input.createEvent || input.createWidget || input.mirrorAsTask;
+
+      if (itemId && hasQuickActions) {
+        const updates: Record<string, string | null> = {};
+        const summary: string[] = [];
+        const nowIso = new Date().toISOString();
+        const headers = { "Content-Type": "application/json" };
+
+        const fallbackBucket = input.bucket || input.eventBucket || input.widgetBucket || "Shopping";
+        const eventBucketFinal = input.eventBucket || fallbackBucket;
+        const bucketForWidget = input.widgetBucket || fallbackBucket;
+        const taskBucket = eventBucketFinal || bucketForWidget || input.bucket || null;
+        const taskDueDate = input.eventDate || input.neededBy || null;
+        const durationMinutes = Number.parseInt(input.eventDuration || "0", 10);
+        const normalizedDuration =
+          !input.eventAllDay && Number.isFinite(durationMinutes) && durationMinutes > 0
+            ? durationMinutes
+            : null;
+        const taskAllDay = input.eventAllDay || !input.eventTime;
+        const taskHourSlot = !taskAllDay && input.eventTime ? input.eventTime : null;
+
+        let taskId: string | null = null;
+
+        // Create task first so widget can reference it
+        if (input.mirrorAsTask) {
+          const taskPayload = {
+            content: input.name,
+            bucket: taskBucket,
+            due_date: taskDueDate,
+            all_day: taskAllDay,
+            hour_slot: taskHourSlot,
+            repeat_rule: "none",
+          };
+          const response = await fetch("/api/tasks", {
+            method: "POST",
+            credentials: "same-origin",
+            headers,
+            body: JSON.stringify(taskPayload),
+          });
+          if (response.ok) {
+            const json = await response.json();
+            taskId = json?.task?.id ?? null;
+            if (taskId) {
+              updates.taskId = taskId;
+              updates.taskCreatedAt = nowIso;
+              summary.push("task");
+            }
+          }
+        }
+
+        // Create calendar event
+        if (input.createEvent) {
+          const descriptionParts: string[] = [];
+          if (input.quantity) descriptionParts.push(`Qty: ${input.quantity}`);
+          if (input.notes) descriptionParts.push(input.notes);
+
+          const response = await fetch("/api/calendar/events", {
+            method: "POST",
+            credentials: "same-origin",
+            headers,
+            body: JSON.stringify({
+              title: input.name,
+              description: descriptionParts.length > 0 ? descriptionParts.join(" \u2022 ") : null,
+              date: input.eventDate,
+              time: input.eventAllDay ? null : input.eventTime,
+              durationMinutes: normalizedDuration,
+              allDay: taskAllDay,
+              bucket: eventBucketFinal ?? null,
+              source: "shopping_list",
+              externalId: `shopping-item-${itemId}`,
+            }),
+          });
+          if (response.ok) {
+            const json = await response.json();
+            const eventId = json?.event?.id as string | undefined;
+            if (eventId) {
+              updates.calendarEventId = eventId;
+              updates.calendarEventCreatedAt = nowIso;
+              summary.push("calendar event");
+            }
+          }
+        }
+
+        // Create dashboard widget
+        if (input.createWidget) {
+          const widgetTitle = input.widgetName.trim() || input.name;
+          const description = input.quantity
+            ? `Quantity: ${input.quantity}`
+            : input.notes || "Auto-created from shopping list";
+
+          const linkedTaskConfig = input.mirrorAsTask
+            ? {
+                enabled: true,
+                title: input.name,
+                bucket: taskBucket ?? undefined,
+                dueDate: taskDueDate ?? undefined,
+                allDay: taskAllDay,
+                startTime: taskHourSlot ?? "",
+                endTime: "",
+                repeat: "none" as const,
+              }
+            : { enabled: false };
+
+          const instanceId =
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? `shopping-${itemId}-${crypto.randomUUID()}`
+              : `shopping-${itemId}-${Math.random().toString(36).slice(2)}`;
+
+          const widgetInstance: WidgetInstance = {
+            id: "shopping-item",
+            name: widgetTitle,
+            description,
+            icon: ShoppingCart,
+            category: "shopping",
+            unit: "item",
+            units: ["item", "items"],
+            defaultTarget: input.widgetTarget,
+            target: input.widgetTarget,
+            schedule: [...input.widgetSchedule],
+            color: input.widgetColor,
+            dataSource: "manual",
+            createdAt: nowIso,
+            instanceId,
+            linkedTaskId: input.mirrorAsTask && taskId ? taskId : undefined,
+            linkedTaskSource: taskId ? "supabase" : undefined,
+            linkedTaskAutoCreated: input.mirrorAsTask,
+            linkedTaskTitle: input.name,
+            linkedTaskConfig,
+          };
+
+          addWidget(bucketForWidget, widgetInstance);
+          updates.widgetInstanceId = instanceId;
+          updates.widgetCreatedAt = nowIso;
+          updates.widgetBucket = bucketForWidget;
+          summary.push("dashboard widget");
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await updateItem(itemId, updates);
+        }
+
+        setAddModalOpen(false);
+        toast({
+          title: "Item added",
+          description: summary.length > 0
+            ? `${input.name} added with ${summary.join(" and ")}.`
+            : `${input.name} added to ${input.bucket ?? UNSORTED_LABEL}.`,
+          type: "success",
+        });
+      } else {
+        setAddModalOpen(false);
+        toast({
+          title: "Item added",
+          description: `${input.name} added to ${input.bucket ?? UNSORTED_LABEL}.`,
+          type: "success",
+        });
+      }
     } catch (err) {
       console.error("Failed to create shopping list item", err);
       toast({
@@ -1085,10 +1755,7 @@ function ShoppingListLayout() {
 
           <button
             type="button"
-            onClick={() => {
-              const input = document.getElementById("shopping-quick-input");
-              if (input) input.focus();
-            }}
+            onClick={() => setAddModalOpen(true)}
             className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
           >
             <Plus size={15} />
@@ -1162,67 +1829,11 @@ function ShoppingListLayout() {
           </div>
         </div>
 
-        {/* ── Quick Add Row ── */}
-        <form
-          onSubmit={handleCreateItem}
-          className="flex flex-col sm:flex-row gap-2.5"
-        >
-          <Input
-            id="shopping-quick-input"
-            placeholder="What do you need to pick up?"
-            value={newItemName}
-            onChange={(event) => setNewItemName(event.target.value)}
-            disabled={isCreating}
-            className="h-9 flex-1 rounded-lg border border-theme-neutral-300 bg-white px-3 text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
-          />
-          <div className="flex gap-2.5">
-            <select
-              value={newItemBucket ?? ""}
-              onChange={(event) =>
-                setNewItemBucket(
-                  event.target.value === "" ? null : event.target.value,
-                )
-              }
-              className="h-9 rounded-lg border border-theme-neutral-300 bg-white px-2.5 text-[13px] text-theme-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
-              disabled={isCreating}
-            >
-              <option value="">Unsorted</option>
-              {availableWidgetBuckets.map((bucket) => (
-                <option key={bucket} value={bucket}>
-                  {bucket}
-                </option>
-              ))}
-            </select>
-            <Input
-              placeholder="Qty"
-              value={newItemQuantity}
-              onChange={(event) =>
-                setNewItemQuantity(event.target.value)
-              }
-              disabled={isCreating}
-              className="h-9 w-20 rounded-lg border border-theme-neutral-300 bg-white px-2.5 text-[13px] text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary/40 focus-visible:border-theme-secondary transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCreating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Plus size={15} />
-                  <span className="hidden sm:inline">Add</span>
-                </>
-              )}
-            </button>
-          </div>
-          {error && (
-            <p className="text-[13px] text-red-600">
-              Couldn&apos;t load your list. Try refreshing.
-            </p>
-          )}
-        </form>
+        {error && (
+          <p className="text-[13px] text-red-600">
+            Couldn&apos;t load your list. Try refreshing.
+          </p>
+        )}
 
         {/* ── Bucket Filter Chips ── */}
         <div className="flex flex-wrap items-center gap-2">
@@ -1324,6 +1935,7 @@ function ShoppingListLayout() {
                         onTogglePurchased={handleTogglePurchased}
                         onOpenConvert={handleOpenConvert}
                         onDelete={handleDelete}
+                        familyMembers={familyMembers}
                       />
                     </div>
                   </div>
@@ -1406,13 +2018,23 @@ function ShoppingListLayout() {
         )}
       </div>
 
+      <AddItemDialog
+        open={addModalOpen}
+        onOpenChange={setAddModalOpen}
+        availableBuckets={availableWidgetBuckets}
+        familyMembers={familyMembers}
+        widgetBucketOptions={widgetBucketOptions}
+        isCreating={isCreating}
+        onSubmit={handleCreateItem}
+      />
+
       <Sheet open={convertOpen} onOpenChange={(open) => {
         setConvertOpen(open);
         if (!open) {
           setConvertItem(null);
         }
       }}>
-        <SheetContent className="w-full sm:w-[520px]">
+        <SheetContent className="w-full sm:w-[520px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               {convertItem ? `Convert "${convertItem.name}"` : "Convert item"}
@@ -1793,5 +2415,8 @@ function ShoppingListLayout() {
 }
 
 export default function ShoppingListPageClient() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   return <ShoppingListLayout />;
 }

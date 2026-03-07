@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { differenceInCalendarDays, parseISO, isValid, format, addDays, nextMonday } from "date-fns";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -42,6 +43,7 @@ export interface ListTask {
   isRecurring?: boolean;
   position?: number | null;
   kanbanStatus?: TaskStatus;
+  assigneeId?: string | null;
 }
 
 interface TaskListViewProps {
@@ -61,6 +63,7 @@ interface TaskListViewProps {
   selectedTasks?: Set<string>;
   onToggleSelection?: (taskId: string) => void;
   onReorder?: (reorderedIds: string[]) => void;
+  familyMembers?: FamilyMemberOption[];
 }
 
 const STATUS_CONFIG = {
@@ -359,6 +362,7 @@ export function TaskListView({
   selectedTasks = new Set(),
   onToggleSelection,
   onReorder,
+  familyMembers,
 }: TaskListViewProps) {
   const todoTasks = useMemo(() => tasks.filter((t) => getTaskStatus(t) === "todo"), [tasks]);
   const inProgressTasks = useMemo(() => tasks.filter((t) => getTaskStatus(t) === "in_progress"), [tasks]);
@@ -401,6 +405,7 @@ export function TaskListView({
     isSelectMode,
     selectedTasks,
     onToggleSelection,
+    familyMembers,
   };
 
   return (
@@ -433,6 +438,7 @@ interface TaskSectionProps {
   isSelectMode?: boolean;
   selectedTasks?: Set<string>;
   onToggleSelection?: (taskId: string) => void;
+  familyMembers?: FamilyMemberOption[];
 }
 
 function TaskSection({
@@ -452,6 +458,7 @@ function TaskSection({
   isSelectMode = false,
   selectedTasks = new Set(),
   onToggleSelection,
+  familyMembers,
 }: TaskSectionProps) {
   const config = STATUS_CONFIG[sectionStatus];
   const count = tasks.length;
@@ -626,6 +633,7 @@ function TaskSection({
                       isSelectMode={isSelectMode}
                       isSelected={selectedTasks.has(task.id)}
                       onToggleSelection={onToggleSelection}
+                      familyMembers={familyMembers}
                     />
                   ))}
                   {provided.placeholder}
@@ -707,6 +715,7 @@ const TaskTableRow = React.memo(function TaskTableRow({
   isSelectMode = false,
   isSelected = false,
   onToggleSelection,
+  familyMembers,
 }: {
   task: ListTask;
   index: number;
@@ -725,6 +734,7 @@ const TaskTableRow = React.memo(function TaskTableRow({
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelection?: (taskId: string) => void;
+  familyMembers?: FamilyMemberOption[];
 }) {
   const dateBadge = useMemo(() => formatDue(task.dueDate, task.isRecurring), [task.dueDate, task.isRecurring]);
   const bucketColor = task.bucket ? (bucketColors[task.bucket] ?? "#bb9e7b") : "#bb9e7b";
@@ -836,6 +846,25 @@ const TaskTableRow = React.memo(function TaskTableRow({
               >
                 <HighlightText text={task.title} query={searchQuery} />
               </button>
+              {task.assigneeId && (() => {
+                const member = familyMembers?.find((m) => m.id === task.assigneeId);
+                if (!member) return null;
+                const initials = member.name
+                  .split(" ")
+                  .map((w) => w[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
+                return (
+                  <span
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
+                    style={{ backgroundColor: member.avatarColor }}
+                    title={member.name}
+                  >
+                    {initials}
+                  </span>
+                );
+              })()}
             </div>
           </td>
 

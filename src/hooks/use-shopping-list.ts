@@ -26,6 +26,7 @@ interface CreateItemInput {
   quantity?: string | null;
   notes?: string | null;
   neededBy?: string | null;
+  assigneeId?: string | null;
 }
 
 type UpdateItemInput = Partial<Omit<CreateItemInput, "name">> & {
@@ -105,6 +106,7 @@ export function useShoppingList() {
         quantity: input.quantity ?? null,
         notes: input.notes ?? null,
         neededBy: input.neededBy ?? null,
+        assigneeId: input.assigneeId ?? null,
       };
 
       const response = await fetch("/api/shopping-list", {
