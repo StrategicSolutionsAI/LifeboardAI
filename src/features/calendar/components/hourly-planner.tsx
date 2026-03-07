@@ -782,7 +782,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                           style={{ zIndex: 0 }}
                         />
                         <div
-                          className="pointer-events-none absolute right-2 top-0.5 text-[10px] font-semibold text-theme-primary-500/70"
+                          className="pointer-events-none absolute right-2 top-0.5 text-2xs font-semibold text-theme-primary-500/70"
                           style={{ zIndex: 0 }}
                         >
                           {timeSlot}
@@ -798,7 +798,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                         className={`absolute inset-0 flex items-center transition-opacity z-[1] cursor-pointer pl-1 ${isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         aria-label={`Add task at ${timeSlot}`}
                       >
-                        <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-theme-neutral-300/60 bg-theme-surface-alt/40 px-2 py-0.5 text-[10px] font-medium text-theme-text-quaternary hover:text-theme-text-secondary hover:bg-theme-brand-tint-subtle hover:border-theme-primary-300/40 transition-colors">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-theme-neutral-300/60 bg-theme-surface-alt/40 px-2 py-0.5 text-2xs font-medium text-theme-text-quaternary hover:text-theme-text-secondary hover:bg-theme-brand-tint-subtle hover:border-theme-primary-300/40 transition-colors">
                           <Plus size={10} />
                           Add task
                         </span>
@@ -891,7 +891,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                       <span className="text-theme-text-tertiary tabular-nums">{endTime}</span>
                                       {t.bucket && (
                                         <span
-                                          className="ml-1 rounded px-1.5 py-px text-[10px] font-medium"
+                                          className="ml-1 rounded px-1.5 py-px text-2xs font-medium"
                                           style={{
                                             backgroundColor: bucketColor ? bucketColor + '18' : undefined,
                                             color: bucketColor || undefined,
@@ -1039,7 +1039,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               </div>
                             )}
                             {isResizing && (
-                              <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded-md bg-theme-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow-warm-lg tabular-nums">
+                              <div className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded-md bg-theme-primary px-2 py-0.5 text-2xs font-semibold text-white shadow-warm-lg tabular-nums">
                                 {endTime}
                               </div>
                             )}

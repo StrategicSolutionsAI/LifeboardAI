@@ -151,7 +151,7 @@ function HeartBeatVisualization({
           >
             {hasReading ? bpm : "--"}
           </span>
-          <span className="text-[10px] text-theme-text-tertiary">BPM</span>
+          <span className="text-2xs text-theme-text-tertiary">BPM</span>
         </div>
       </motion.div>
       {hasReading && (
@@ -427,7 +427,7 @@ export function HeartRateWidget({
               }`}
             >
               <Icon className="h-4 w-4" />
-              <span className="text-[10px]">{ctx.label}</span>
+              <span className="text-2xs">{ctx.label}</span>
             </button>
           )
         })}
@@ -490,7 +490,7 @@ export function HeartRateWidget({
                     <span className="text-sm font-semibold text-theme-text-primary">
                       {e.bpm} bpm
                     </span>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-2xs">
                       {getContextLabel(e.context)}
                     </Badge>
                   </div>
@@ -533,7 +533,7 @@ export function HeartRateWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {latestToday ? latestToday.bpm : "--"}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Latest
             </p>
           </div>
@@ -541,7 +541,7 @@ export function HeartRateWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {data.weeklyAverage || "--"}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Weekly Avg
             </p>
           </div>
@@ -552,7 +552,7 @@ export function HeartRateWidget({
                 {data.lowestRecorded ?? "--"}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Lowest
             </p>
           </div>
@@ -563,7 +563,7 @@ export function HeartRateWidget({
                 {data.highestRecorded ?? "--"}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Highest
             </p>
           </div>
@@ -574,7 +574,7 @@ export function HeartRateWidget({
                 {data.currentStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Current Streak
             </p>
           </div>
@@ -585,7 +585,7 @@ export function HeartRateWidget({
                 {data.bestStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Best Streak
             </p>
           </div>

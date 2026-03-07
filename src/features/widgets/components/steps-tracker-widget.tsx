@@ -522,7 +522,7 @@ export function StepsTrackerWidget({
                   <span className="text-sm font-medium">
                     {e.steps.toLocaleString()} steps
                   </span>
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="text-2xs">
                     {getActivityLabel(e.source)}
                   </Badge>
                 </div>
@@ -564,7 +564,7 @@ export function StepsTrackerWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {todayTotal.toLocaleString()}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Today
             </p>
           </div>
@@ -572,7 +572,7 @@ export function StepsTrackerWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {(data.weeklyAverage ?? 0).toLocaleString()}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Weekly Avg
             </p>
           </div>
@@ -583,7 +583,7 @@ export function StepsTrackerWidget({
                 {data.currentStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Current Streak
             </p>
           </div>
@@ -594,7 +594,7 @@ export function StepsTrackerWidget({
                 {data.bestStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Best Streak
             </p>
           </div>

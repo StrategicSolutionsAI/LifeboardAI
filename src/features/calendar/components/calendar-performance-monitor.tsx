@@ -141,7 +141,7 @@ export function CalendarPerformanceMonitor() {
         </div>
       </div>
       
-      <div className="mt-2 pt-2 border-t border-theme-text-body text-[10px] text-theme-text-tertiary">
+      <div className="mt-2 pt-2 border-t border-theme-text-body text-2xs text-theme-text-tertiary">
         Press Ctrl+Shift+P to toggle
       </div>
     </div>

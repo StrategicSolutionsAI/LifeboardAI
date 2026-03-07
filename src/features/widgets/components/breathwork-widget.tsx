@@ -224,7 +224,7 @@ function PatternSelector({
             <div className="text-sm font-semibold text-theme-text-primary">
               {pattern.name}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary mt-0.5">{pattern.description}</div>
+            <div className="text-2xs text-theme-text-tertiary mt-0.5">{pattern.description}</div>
             <div className="text-xs mt-1 font-mono text-theme-text-subtle">
               {key}
             </div>
@@ -519,25 +519,25 @@ export function BreathworkWidget({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{totalSessions}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Sessions
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{totalMinutes}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Total Minutes
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{currentStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Current Streak
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{bestStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Best Streak
             </div>
           </div>
@@ -596,7 +596,7 @@ export function BreathworkWidget({
                         {sessions.map((s, i) => (
                           <span
                             key={i}
-                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-theme-text-primary text-[10px] font-medium"
+                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-theme-text-primary text-2xs font-medium"
                           >
                             {patternDisplayName[s.pattern] || s.pattern} &middot; {s.cycles} cycles
                           </span>

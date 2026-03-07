@@ -374,7 +374,7 @@ export function MoodTrackerWidget({
                   }
                 >
                   <span className="text-3xl">{opt.emoji}</span>
-                  <span className="text-[10px] font-medium text-theme-text-secondary">
+                  <span className="text-2xs font-medium text-theme-text-secondary">
                     {opt.label}
                   </span>
                 </motion.button>
@@ -484,7 +484,7 @@ export function MoodTrackerWidget({
                 "---"
               )}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Today
             </div>
           </div>
@@ -499,7 +499,7 @@ export function MoodTrackerWidget({
                 "---"
               )}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Weekly Avg
             </div>
           </div>
@@ -507,7 +507,7 @@ export function MoodTrackerWidget({
             <div className="text-xl font-bold text-theme-text-primary">
               {currentStreak}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Current Streak
             </div>
           </div>
@@ -515,7 +515,7 @@ export function MoodTrackerWidget({
             <div className="text-xl font-bold text-theme-text-primary">
               {bestStreak}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Best Streak
             </div>
           </div>

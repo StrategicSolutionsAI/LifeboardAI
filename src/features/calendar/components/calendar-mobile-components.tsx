@@ -110,7 +110,7 @@ export function MobileOverflowMenu({
             <>
               <div className="border-t border-theme-neutral-300/40 my-1" />
               <div className="px-3 py-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-theme-text-quaternary mb-1">Filter</p>
+                <p className="text-2xs font-semibold uppercase tracking-wider text-theme-text-quaternary mb-1">Filter</p>
                 <label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">All Categories</span></label>
                 {filterableBuckets.map((bucket) => (<label key={bucket} className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">{bucket}</span></label>))}
                 {filterableBuckets.length > 0 && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Unassigned</span></label>)}

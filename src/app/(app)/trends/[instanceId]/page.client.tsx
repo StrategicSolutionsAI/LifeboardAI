@@ -21,7 +21,7 @@ function FullTooltip({ active, payload, isWeight, unit }: any) {
   const formatted = new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   return (
     <div className="rounded-xl bg-theme-surface-overlay/95 border border-theme-neutral-300 shadow-[0px_8px_24px_rgba(163,133,96,0.12)] backdrop-blur-sm px-4 py-3 min-w-[140px]">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-theme-text-subtle">{formatted}</p>
+      <p className="text-2xs font-semibold uppercase tracking-widest text-theme-text-subtle">{formatted}</p>
       <div className="w-8 h-[2px] rounded-full bg-warm-400/40 my-1.5" />
       <p className="text-2xl font-black tracking-tight text-theme-text-primary leading-none">
         {value}
@@ -47,7 +47,7 @@ function StatCard({ icon: Icon, iconBg, label, value, subtitle, delay = 0 }: {
         <p className="text-[11px] font-semibold uppercase tracking-widest text-theme-text-subtle">{label}</p>
       </div>
       <div className="text-2xl font-black leading-none tracking-tight text-theme-text-primary">{value}</div>
-      <p className="text-[10px] font-medium text-theme-text-tertiary mt-1.5">{subtitle}</p>
+      <p className="text-2xs font-medium text-theme-text-tertiary mt-1.5">{subtitle}</p>
     </div>
   );
 }

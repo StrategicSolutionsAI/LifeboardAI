@@ -70,7 +70,7 @@ export function TaskBoardTabs({
             <Filter size={14} />
             <span>Filter</span>
             {count > 0 && (
-              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-theme-primary text-white text-[9px] font-bold leading-none">
+              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-theme-primary text-white text-3xs font-bold leading-none">
                 {count}
               </span>
             )}

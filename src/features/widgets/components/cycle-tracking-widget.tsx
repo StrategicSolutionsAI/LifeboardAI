@@ -235,7 +235,7 @@ function CycleCalendar({ entries }: { entries: CycleEntry[] }) {
     <div>
       <div className="grid grid-cols-7 gap-1.5 mb-1.5">
         {dayLabels.map((l, i) => (
-          <div key={i} className="text-[9px] text-center text-theme-text-tertiary font-semibold">
+          <div key={i} className="text-3xs text-center text-theme-text-tertiary font-semibold">
             {l}
           </div>
         ))}
@@ -260,7 +260,7 @@ function CycleCalendar({ entries }: { entries: CycleEntry[] }) {
                 title={`${day.date}${flow && flow !== "none" ? ` \u2014 ${flow} flow` : ""}`}
               >
                 {(flow && flow !== "none") || day.isToday ? (
-                  <span className="text-[9px] font-semibold">{day.dayNum}</span>
+                  <span className="text-3xs font-semibold">{day.dayNum}</span>
                 ) : null}
               </div>
             )
@@ -271,7 +271,7 @@ function CycleCalendar({ entries }: { entries: CycleEntry[] }) {
         {FLOW_OPTIONS.filter((f) => f.value !== "none").map((f) => (
           <div key={f.value} className="flex items-center gap-1.5">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: f.color }} />
-            <span className="text-[10px] text-theme-text-tertiary font-medium">{f.label}</span>
+            <span className="text-2xs text-theme-text-tertiary font-medium">{f.label}</span>
           </div>
         ))}
       </div>
@@ -536,7 +536,7 @@ export function CycleTrackingWidget({
           {/* Cycle Day Ring */}
           <div className="flex flex-col items-center">
             <CycleDayRing day={currentCycleDay} total={avgCycleLength} />
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide mt-1">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide mt-1">
               Cycle Day
             </div>
           </div>
@@ -550,11 +550,11 @@ export function CycleTrackingWidget({
                 <span className="text-base font-medium text-pink-400">--</span>
               )}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide mt-1">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide mt-1">
               Avg Length
             </div>
             {!avgCycleLength && (
-              <div className="text-[9px] text-pink-400 mt-0.5">Needs 2+ cycles</div>
+              <div className="text-3xs text-pink-400 mt-0.5">Needs 2+ cycles</div>
             )}
           </div>
 
@@ -567,16 +567,16 @@ export function CycleTrackingWidget({
                 <span className="text-base font-medium text-pink-400">--</span>
               )}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide mt-1">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide mt-1">
               {daysUntilNext !== null ? "Days Until" : "Next Period"}
             </div>
             {nextPeriod && (
-              <div className="text-[9px] text-pink-500 font-medium mt-0.5">
+              <div className="text-3xs text-pink-500 font-medium mt-0.5">
                 {new Date(nextPeriod + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </div>
             )}
             {!nextPeriod && !avgCycleLength && (
-              <div className="text-[9px] text-pink-400 mt-0.5">Log a period start</div>
+              <div className="text-3xs text-pink-400 mt-0.5">Log a period start</div>
             )}
           </div>
         </div>
@@ -600,7 +600,7 @@ export function CycleTrackingWidget({
               {todayMoodOpt && <span className="text-base" title={todayMoodOpt.label}>{todayMoodOpt.emoji}</span>}
 
               {todayEntry.periodStart && (
-                <span className="text-[10px] font-semibold text-pink-600 bg-pink-100 rounded-full px-2 py-0.5">
+                <span className="text-2xs font-semibold text-pink-600 bg-pink-100 rounded-full px-2 py-0.5">
                   Day 1
                 </span>
               )}
@@ -618,7 +618,7 @@ export function CycleTrackingWidget({
                 {todayEntry.symptoms.map((s) => (
                   <span
                     key={s}
-                    className="rounded-full bg-pink-50 border border-pink-100 px-2 py-0.5 text-[10px] text-pink-700 font-medium"
+                    className="rounded-full bg-pink-50 border border-pink-100 px-2 py-0.5 text-2xs text-pink-700 font-medium"
                   >
                     {s}
                   </span>
@@ -711,7 +711,7 @@ export function CycleTrackingWidget({
                 </div>
                 <div className="text-left">
                   <div className="text-sm font-medium text-theme-text-primary">First day of period</div>
-                  <div className="text-[10px] text-theme-text-tertiary">This helps predict your next cycle</div>
+                  <div className="text-2xs text-theme-text-tertiary">This helps predict your next cycle</div>
                 </div>
               </button>
 
@@ -766,7 +766,7 @@ export function CycleTrackingWidget({
                         <span className={`transition-all ${isSelected ? "text-2xl" : "text-xl"}`}>
                           {opt.emoji}
                         </span>
-                        <span className={`text-[9px] font-medium transition-colors ${
+                        <span className={`text-3xs font-medium transition-colors ${
                           isSelected ? "text-pink-600" : "text-theme-text-tertiary"
                         }`}>
                           {opt.label}
@@ -918,7 +918,7 @@ export function CycleTrackingWidget({
                               </span>
                               {moodOpt && <span className="text-sm">{moodOpt.emoji}</span>}
                               {entry.periodStart && (
-                                <span className="text-[9px] font-semibold text-pink-600 bg-pink-100 rounded-full px-1.5 py-0.5">
+                                <span className="text-3xs font-semibold text-pink-600 bg-pink-100 rounded-full px-1.5 py-0.5">
                                   Day 1
                                 </span>
                               )}
@@ -930,12 +930,12 @@ export function CycleTrackingWidget({
                               </button>
                             </div>
                             {entry.symptoms.length > 0 && (
-                              <div className="text-[10px] text-theme-text-tertiary mt-0.5">
+                              <div className="text-2xs text-theme-text-tertiary mt-0.5">
                                 {entry.symptoms.join(" \u00B7 ")}
                               </div>
                             )}
                             {entry.notes && (
-                              <div className="text-[10px] text-theme-text-tertiary mt-0.5 italic truncate">
+                              <div className="text-2xs text-theme-text-tertiary mt-0.5 italic truncate">
                                 {entry.notes}
                               </div>
                             )}

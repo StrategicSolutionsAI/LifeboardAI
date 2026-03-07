@@ -210,7 +210,7 @@ export function TaskFilterPanel({
                   }`}
                 >
                   <span
-                    className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white"
+                    className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-2xs font-bold text-white"
                     style={{ backgroundColor: member.avatarColor }}
                   >
                     {member.name.charAt(0).toUpperCase()}

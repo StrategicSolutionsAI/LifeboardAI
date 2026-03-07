@@ -103,7 +103,7 @@ export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
           ))}
         </select>
         {micDeviceId && /iphone|continuity/i.test((devices.find(d=>d.deviceId===micDeviceId)?.label)||'') && (
-          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">Selected mic appears to be an iPhone/Continuity device. If you see macOS &quot;Audio Disconnected&quot; alerts, choose a built-in or USB mic.</div>
+          <div className="text-2xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">Selected mic appears to be an iPhone/Continuity device. If you see macOS &quot;Audio Disconnected&quot; alerts, choose a built-in or USB mic.</div>
         )}
       </label>
       <label className="block mb-3">
@@ -152,10 +152,10 @@ export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
       </label>
       {process.env.NODE_ENV === 'development' && (
         <div className="mt-3 border-t pt-2">
-          <div className="text-[10px] text-theme-text-tertiary">Debug</div>
-          <div className="text-[10px] text-theme-text-tertiary">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
+          <div className="text-2xs text-theme-text-tertiary">Debug</div>
+          <div className="text-2xs text-theme-text-tertiary">Realtime: {isRealtimeActive ? 'active' : 'inactive'}</div>
           {isRealtimeActive && (
-            <div className="text-[10px] text-theme-text-tertiary">
+            <div className="text-2xs text-theme-text-tertiary">
               conn:{rtConnState || '\u2014'} ice:{rtIceState || '\u2014'} gather:{rtGatheringState || '\u2014'}
             </div>
           )}

@@ -194,13 +194,13 @@ const KanbanCard = React.memo(function KanbanCard({
                         className="w-2 h-2 rounded-full shrink-0"
                         style={{ backgroundColor: bucketColor }}
                       />
-                      <span className="text-[10px] text-theme-text-secondary font-medium">{task.bucket}</span>
+                      <span className="text-2xs text-theme-text-secondary font-medium">{task.bucket}</span>
                     </span>
                   )}
                   {dateBadge && (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium",
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-2xs font-medium",
                         dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
                         dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
                         dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
@@ -212,7 +212,7 @@ const KanbanCard = React.memo(function KanbanCard({
                   )}
                   {assignee && (
                     <span
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0 ml-auto"
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-3xs font-semibold text-white shrink-0 ml-auto"
                       style={{ backgroundColor: assignee.avatarColor }}
                       title={assignee.name}
                     >

@@ -81,7 +81,7 @@ export const ChatMessage = React.memo(function ChatMessage({
         {m.role === 'assistant' && (
           <div className="flex items-center gap-1 mt-0.5 touch-reveal opacity-0 group-hover:opacity-100 transition-opacity">
             {m.timestamp && (
-              <span className="text-[10px] text-theme-text-tertiary mr-1">{formatMessageTime(m.timestamp)}</span>
+              <span className="text-2xs text-theme-text-tertiary mr-1">{formatMessageTime(m.timestamp)}</span>
             )}
             <button
               onClick={() => onCopy(m.content, i)}
@@ -105,7 +105,7 @@ export const ChatMessage = React.memo(function ChatMessage({
         )}
         {/* User message timestamp */}
         {m.role === 'user' && m.timestamp && (
-          <div className="text-[10px] text-theme-text-tertiary mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="text-2xs text-theme-text-tertiary mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {formatMessageTime(m.timestamp)}
           </div>
         )}

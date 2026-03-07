@@ -174,7 +174,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {WEEKDAY_LABELS.map((label, i) => (
         <div
           key={label}
-          className={`py-2 text-center text-[12px] sm:text-[10px] font-medium tracking-[0.8px] uppercase text-theme-text-tertiary ${
+          className={`py-2 text-center text-[12px] sm:text-2xs font-medium tracking-[0.8px] uppercase text-theme-text-tertiary ${
             i < 6 ? 'border-r border-theme-neutral-300/40' : ''
           }`}
         >
@@ -326,7 +326,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     {familyMembers.length > 0 && (
                       <>
                         <div className="my-1 border-t border-theme-neutral-300/40" />
-                        <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-theme-text-quaternary">People</div>
+                        <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wider text-theme-text-quaternary">People</div>
                         {familyMembers.map((member) => (
                           <label key={member.id} className="flex cursor-pointer items-center px-3 py-1.5 hover:bg-theme-surface-warm-50">
                             <input type="checkbox" checked={selectedBucketFilters.includes(`assignee:${member.id}`)} onChange={() => toggleBucketFilter(`assignee:${member.id}`)} className="mr-2 h-3 w-3 rounded accent-theme-primary" />
@@ -355,7 +355,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 {/* Day header */}
                 <div className="flex items-center gap-3 py-3 sticky top-0 bg-theme-surface-raised/95 backdrop-blur-sm z-10">
                   <div className={`flex flex-col items-center w-11 shrink-0 ${isToday ? 'text-theme-primary' : 'text-theme-text-tertiary'}`}>
-                    <span className="text-[12px] sm:text-[10px] font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
+                    <span className="text-[12px] sm:text-2xs font-semibold uppercase tracking-wider">{format(date, 'EEE')}</span>
                     <span className={`text-lg font-bold leading-none mt-0.5 ${
                       isToday ? 'bg-theme-primary text-white w-8 h-8 rounded-full flex items-center justify-center' : ''
                     }`}>{format(date, 'd')}</span>
@@ -369,7 +369,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-theme-primary shrink-0" />
                       <div className="flex-1 h-px bg-theme-primary" />
-                      <span className="text-[12px] sm:text-[10px] font-medium text-theme-primary tabular-nums">{format(new Date(), 'h:mm a')}</span>
+                      <span className="text-[12px] sm:text-2xs font-medium text-theme-primary tabular-nums">{format(new Date(), 'h:mm a')}</span>
                     </div>
                   </div>
                 )}
@@ -411,13 +411,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                 <span className="text-[11px] text-theme-text-quaternary truncate max-w-[140px]">{ev.location}</span>
                               )}
                               {ev.bucket && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                <span className="text-2xs font-medium px-1.5 py-0.5 rounded-full"
                                   style={bucketColor ? { backgroundColor: bucketColor + '18', color: bucketColor } : {}}>
                                   {ev.bucket}
                                 </span>
                               )}
                               {ev.repeatRule && ev.repeatRule !== 'none' && (
-                                <span className="text-[10px] text-theme-text-quaternary">{getRepeatLabel(ev.repeatRule)}</span>
+                                <span className="text-2xs text-theme-text-quaternary">{getRepeatLabel(ev.repeatRule)}</span>
                               )}
                             </div>
                           </div>
@@ -543,7 +543,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                     className="flex items-center gap-2 mt-3 pt-2.5 border-t border-theme-neutral-300/30"
                     style={dayViewStats.allDayEvents.length === 0 ? { height: 0, overflow: 'hidden', margin: 0, padding: 0, border: 'none' } : undefined}
                   >
-                    <span className="text-[10px] font-semibold uppercase tracking-[1px] text-theme-text-quaternary shrink-0">All day</span>
+                    <span className="text-2xs font-semibold uppercase tracking-[1px] text-theme-text-quaternary shrink-0">All day</span>
                     <div className="flex flex-wrap gap-1.5">
                       {dayViewStats.allDayEvents.map((event, idx) => {
                         const bucketColor = event.bucket ? getBucketColorSync(event.bucket, bucketColors) : null;
@@ -714,7 +714,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                               key={i}
                               className={`py-2 px-1 text-center ${i < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
                             >
-                              <span className={`text-[10px] uppercase tracking-[0.6px] font-medium block ${
+                              <span className={`text-2xs uppercase tracking-[0.6px] font-medium block ${
                                 dayIsToday ? 'text-theme-primary' : 'text-theme-text-tertiary'
                               }`}>
                                 {WEEKDAY_LABELS[i]}
@@ -1057,7 +1057,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                                   event.stopPropagation();
                                   setSelectedModalDate(dayStr);
                                 }}
-                                className="text-[10px] text-theme-text-tertiary pl-1.5 hover:text-theme-text-secondary transition-colors text-left"
+                                className="text-2xs text-theme-text-tertiary pl-1.5 hover:text-theme-text-secondary transition-colors text-left"
                               >
                                 +{dayEvents.length - 3} more
                               </button>

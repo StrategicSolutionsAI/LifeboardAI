@@ -632,7 +632,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                         )}
                       >
                         <span
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-2xs font-semibold text-white shrink-0"
                           style={{ backgroundColor: member.avatarColor }}
                         >
                           {initials}
@@ -728,7 +728,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   {editTaskId
                     ? (isSubmitting ? "Saving..." : "Save")
                     : (isSubmitting ? "Creating..." : "Create")}
-                  <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-normal">
+                  <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-white/20 text-2xs font-normal">
                     {"⌘↵"}
                   </kbd>
                 </button>

@@ -433,8 +433,8 @@ When converting a component to use design tokens:
 - [ ] Replace `bg-[rgba(177,145,106,0.12)]` → `bg-theme-brand-tint`
 - [ ] Replace `bg-[rgba(183,148,106,0.14)]` → `bg-theme-active`
 - [ ] Replace `border-[#dee4ee]` → `border-theme-neutral-300`
-- [ ] Replace `text-[10px]` → `text-2xs` (when line-height matches)
-- [ ] Replace `text-[9px]` → `text-3xs` (when line-height matches)
+- [x] Replace `text-[10px]` → `text-2xs` (when line-height matches)
+- [x] Replace `text-[9px]` → `text-3xs` (when line-height matches)
 - [ ] Replace inline gradient `backgroundImage: "linear-gradient(90deg, rgba(252,250,248,0.7)..."` → `style={surface.pageBgStyle}`
 - [ ] Replace `shadow-[0px_8px_24px_rgba(163,133,96,0.12)]` → use `elevation.popover`
 - [ ] Import from `@/lib/styles` instead of writing raw Tailwind classes for repeated patterns

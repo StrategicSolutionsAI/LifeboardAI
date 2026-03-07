@@ -1111,7 +1111,7 @@ export default function WidgetEditorSheet({
                       </label>
                     )}
                     {!isWithingsConnected && (
-                      <p className="ml-1 text-[10px] text-theme-text-tertiary">Connect Withings to enable automatic sync</p>
+                      <p className="ml-1 text-2xs text-theme-text-tertiary">Connect Withings to enable automatic sync</p>
                     )}
                   </div>
                 </div>

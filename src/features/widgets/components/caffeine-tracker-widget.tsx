@@ -482,7 +482,7 @@ export function CaffeineTrackerWidget({
             >
               <span className="text-lg">{bev.icon}</span>
               <span className="text-[11px] font-medium">{bev.label}</span>
-              <span className="text-[9px] text-theme-text-tertiary">
+              <span className="text-3xs text-theme-text-tertiary">
                 {bev.mgPerCup}mg/cup
               </span>
             </button>
@@ -560,10 +560,10 @@ export function CaffeineTrackerWidget({
                     <span className="text-sm font-medium">
                       {e.cups} {e.cups === 1 ? "cup" : "cups"}
                     </span>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-2xs">
                       {bev.label}
                     </Badge>
-                    <span className="text-[10px] text-theme-text-tertiary">
+                    <span className="text-2xs text-theme-text-tertiary">
                       {e.amount}mg
                     </span>
                   </div>
@@ -609,7 +609,7 @@ export function CaffeineTrackerWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {todayCups}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Today (cups)
             </p>
           </div>
@@ -617,7 +617,7 @@ export function CaffeineTrackerWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {todayMg}mg
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Today (mg)
             </p>
           </div>
@@ -625,7 +625,7 @@ export function CaffeineTrackerWidget({
             <p className="text-xl font-bold text-theme-text-primary">
               {data.weeklyAverage ?? 0}
             </p>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Weekly Avg
             </p>
           </div>
@@ -636,7 +636,7 @@ export function CaffeineTrackerWidget({
                 {Math.round((data.totalCaffeineMg ?? 0) / 1000)}g
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Lifetime
             </p>
           </div>
@@ -647,7 +647,7 @@ export function CaffeineTrackerWidget({
                 {data.currentStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Current Streak
             </p>
           </div>
@@ -658,7 +658,7 @@ export function CaffeineTrackerWidget({
                 {data.bestStreak ?? 0}
               </p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-theme-text-tertiary">
+            <p className="text-2xs uppercase tracking-wider text-theme-text-tertiary">
               Best Streak
             </p>
           </div>

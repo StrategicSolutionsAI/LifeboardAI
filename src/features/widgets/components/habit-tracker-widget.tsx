@@ -277,7 +277,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
               >
                 {day.completed ? <Check className="h-4 w-4" /> : null}
               </div>
-              <span className={`text-[10px] ${day.key === today ? "font-semibold text-theme-text-primary" : "text-theme-neutral-400"}`}>
+              <span className={`text-2xs ${day.key === today ? "font-semibold text-theme-text-primary" : "text-theme-neutral-400"}`}>
                 {day.label}
               </span>
             </div>
@@ -314,7 +314,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
 
         <div className="grid grid-cols-7 gap-1">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-medium text-theme-neutral-400 pb-1">
+            <div key={i} className="text-center text-2xs font-medium text-theme-neutral-400 pb-1">
               {d}
             </div>
           ))}
@@ -365,7 +365,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                     <div className={`font-medium truncate ${m.achieved ? "text-theme-text-primary" : "text-theme-text-tertiary"}`}>
                       {m.label}
                     </div>
-                    <div className="text-[10px] text-theme-neutral-400">
+                    <div className="text-2xs text-theme-neutral-400">
                       {m.achieved
                         ? m.achievedDate
                           ? `Achieved ${new Date(m.achievedDate + "T12:00:00").toLocaleDateString()}`
@@ -389,19 +389,19 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{data.totalCompletions || 0}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">Total Days</div>
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Total Days</div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{completionRate}%</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">Completion Rate</div>
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Completion Rate</div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{currentStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">Current Streak</div>
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Current Streak</div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{bestStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">Best Streak</div>
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Best Streak</div>
           </div>
         </div>
       </div>

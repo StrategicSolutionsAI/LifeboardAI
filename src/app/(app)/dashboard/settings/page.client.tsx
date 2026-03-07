@@ -41,7 +41,7 @@ function PaletteSwatches({ value, onSelect }: { value: string; onSelect: (hex: s
             'w-8 h-8 rounded-full border-2 transition-all hover:scale-110',
             value.toLowerCase() === hex.toLowerCase()
               ? 'border-theme-primary ring-2 ring-theme-primary/30 scale-110'
-              : 'border-theme-neutral-300 hover:border-[#b7946a]'
+              : 'border-theme-neutral-300 hover:border-theme-primary'
           )}
           style={{ backgroundColor: hex }}
         />
@@ -90,7 +90,7 @@ function BucketColorPicker({ value, onChange }: { value: string; onChange: (hex:
                   'w-8 h-8 rounded-full border-2 transition-all hover:scale-110',
                   value.toLowerCase() === hex.toLowerCase()
                     ? 'border-theme-primary ring-2 ring-theme-primary/30 scale-110'
-                    : 'border-theme-neutral-300 hover:border-[#b7946a]'
+                    : 'border-theme-neutral-300 hover:border-theme-primary'
                 )}
                 style={{ backgroundColor: hex }}
               />
@@ -299,7 +299,7 @@ export default function SettingsPageClient() {
                     className={cn(
                       "group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer",
                       theme.id === colorTheme.id
-                        ? "border-theme-primary bg-[rgba(183,148,106,0.06)]"
+                        ? "border-theme-primary bg-theme-brand-tint-muted"
                         : "border-transparent bg-theme-surface-alt hover:border-theme-neutral-300"
                     )}
                   >
@@ -315,7 +315,7 @@ export default function SettingsPageClient() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium text-[#171A1F] truncate">{colorTheme.name}</span>
                         {colorTheme.isCustom && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-100 rounded-full leading-none">Custom</span>
+                          <span className="px-1.5 py-0.5 text-2xs font-medium text-amber-600 bg-amber-100 rounded-full leading-none">Custom</span>
                         )}
                       </div>
                       <p className="text-xs text-theme-text-tertiary truncate">{colorTheme.description}</p>
@@ -349,8 +349,8 @@ export default function SettingsPageClient() {
                 className={cn(
                   "w-full mt-3 p-3 rounded-lg border-2 border-dashed transition-all text-center",
                   showCustomColorForm
-                    ? "border-theme-primary bg-[rgba(183,148,106,0.06)]"
-                    : "border-theme-neutral-300 hover:border-theme-primary bg-theme-surface-alt hover:bg-[rgba(183,148,106,0.06)]"
+                    ? "border-theme-primary bg-theme-brand-tint-muted"
+                    : "border-theme-neutral-300 hover:border-theme-primary bg-theme-surface-alt hover:bg-theme-brand-tint-muted"
                 )}
               >
                 <div className="flex items-center justify-center gap-2 text-sm">

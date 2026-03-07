@@ -306,7 +306,7 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
                 </span>
                 <span className="text-sm font-medium text-theme-text-tertiary">hours</span>
                 {todayEntry.duration >= target && (
-                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-theme-text-primary text-[10px]">
+                  <Badge variant="secondary" className="ml-2 bg-emerald-100 text-theme-text-primary text-2xs">
                     Goal met
                   </Badge>
                 )}
@@ -453,7 +453,7 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{weeklyAverage}h</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Weekly Avg
             </div>
           </div>
@@ -461,19 +461,19 @@ export function SleepTrackerWidget({ widget, onUpdate, onComplete }: SleepTracke
             <div className="text-xl font-bold text-theme-text-primary">
               {sleepDebt > 0 ? `-${sleepDebt}h` : `+${Math.abs(sleepDebt)}h`}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Sleep Debt
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{currentStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Current Streak
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{bestStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Best Streak
             </div>
           </div>

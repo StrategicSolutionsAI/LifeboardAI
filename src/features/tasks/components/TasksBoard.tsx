@@ -288,7 +288,7 @@ function TaskCard({
                   {dateBadge && (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium",
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-2xs font-medium",
                         dateBadge.tone === "destructive" && "bg-red-50 text-red-600",
                         dateBadge.tone === "accent" && "bg-theme-brand-tint-light text-theme-primary-600",
                         dateBadge.tone === "default" && "bg-[#f4f6f8] text-theme-text-secondary"
@@ -301,14 +301,14 @@ function TaskCard({
                   {task.tags?.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-md bg-[#f4f6f8] px-1.5 py-0.5 text-[10px] text-theme-text-tertiary"
+                      className="rounded-md bg-[#f4f6f8] px-1.5 py-0.5 text-2xs text-theme-text-tertiary"
                     >
                       {tag}
                     </span>
                   ))}
                   {assignee && (
                     <span
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0 ml-auto"
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-3xs font-semibold text-white shrink-0 ml-auto"
                       style={{ backgroundColor: assignee.avatarColor }}
                       title={assignee.name}
                     >
@@ -439,7 +439,7 @@ function BucketColumn({
                 {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
               </span>
               {!isCompletedView && dueSoonCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 rounded-md bg-theme-brand-tint-light px-1.5 py-0.5 text-[10px] font-medium text-theme-primary-600">
+                <span className="inline-flex items-center gap-0.5 rounded-md bg-theme-brand-tint-light px-1.5 py-0.5 text-2xs font-medium text-theme-primary-600">
                   <Clock3 className="h-2.5 w-2.5" />
                   {dueSoonCount} due soon
                 </span>

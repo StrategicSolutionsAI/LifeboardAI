@@ -305,7 +305,7 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
                       {member.name}
                     </span>
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded text-[10px] font-medium capitalize',
+                      'px-1.5 py-0.5 rounded text-2xs font-medium capitalize',
                       getRelationshipBadgeColor(member.relationship),
                     )}>
                       {member.relationship}
@@ -402,7 +402,7 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
                     <button
                       aria-label={`Cancel invite for ${m.invited_email || m.display_name}`}
                       onClick={() => removeHouseholdMember(m.id)}
-                      className="text-[10px] text-red-500 hover:text-red-700 dark:hover:text-red-300 px-1.5 py-0.5 rounded font-medium flex-shrink-0 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="text-2xs text-red-500 hover:text-red-700 dark:hover:text-red-300 px-1.5 py-0.5 rounded font-medium flex-shrink-0 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       Cancel
                     </button>
@@ -423,7 +423,7 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
                     <span className="text-xs text-theme-text-secondary truncate">
                       {m.display_name || m.invited_email}
                     </span>
-                    <span className="text-[10px] text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded font-medium ml-auto flex-shrink-0 capitalize">
+                    <span className="text-2xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded font-medium ml-auto flex-shrink-0 capitalize">
                       {m.role}
                     </span>
                   </div>

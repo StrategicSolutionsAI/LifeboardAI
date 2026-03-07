@@ -106,7 +106,7 @@ export const text = {
   metricLg: 'text-4xl font-black leading-none tracking-tight text-theme-text-primary',
   statValue: 'text-[28px] leading-none text-theme-text-primary',
   unit: 'text-sm font-medium text-theme-text-tertiary',
-  caption: 'text-[10px] font-medium text-theme-text-tertiary',
+  caption: 'text-2xs font-medium text-theme-text-tertiary',
   tableHeader: 'text-[11px] font-medium tracking-wide uppercase text-theme-text-tertiary',
 } as const
 
@@ -266,7 +266,7 @@ export const badge = {
   danger: 'bg-red-100 text-red-800 border-red-200',
   info: 'bg-theme-surface-selected text-theme-primary-600 border-theme-neutral-300',
   neutral: 'bg-theme-progress-track text-theme-text-primary border-theme-neutral-300',
-  count: 'flex items-center justify-center w-4 h-4 rounded-full bg-theme-primary text-white text-[9px] font-bold leading-none',
+  count: 'flex items-center justify-center w-4 h-4 rounded-full bg-theme-primary text-white text-3xs font-bold leading-none',
 } as const
 
 // -----------------------------------------------------------------------------

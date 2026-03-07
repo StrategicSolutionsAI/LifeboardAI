@@ -186,7 +186,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           <div className="w-9 h-9 bg-theme-primary rounded-xl flex items-center justify-center shadow-sm">
             <span className="text-white text-sm font-bold">L</span>
           </div>
-          <span className="section-label text-[10px] tracking-[0.5px]">Lifeboard</span>
+          <span className="section-label text-2xs tracking-[0.5px]">Lifeboard</span>
         </div>
 
         <nav className="w-full px-2 space-y-1 pt-1">

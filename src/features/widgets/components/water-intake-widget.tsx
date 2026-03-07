@@ -212,7 +212,7 @@ function WaterFillVisualization({
       {pct >= 1 && (
         <Badge
           variant="secondary"
-          className="mt-1 bg-emerald-100 text-theme-text-primary text-[10px]"
+          className="mt-1 bg-emerald-100 text-theme-text-primary text-2xs"
         >
           Goal met!
         </Badge>
@@ -637,7 +637,7 @@ export function WaterIntakeWidget({
                 ? todayTotal
                 : todayTotal.toFixed(1)}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Today ({unit})
             </div>
           </div>
@@ -645,7 +645,7 @@ export function WaterIntakeWidget({
             <div className="text-xl font-bold text-theme-text-primary">
               {weeklyAverage}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Weekly Avg
             </div>
           </div>
@@ -653,7 +653,7 @@ export function WaterIntakeWidget({
             <div className="text-xl font-bold text-theme-text-primary">
               {currentStreak}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Current Streak
             </div>
           </div>
@@ -661,7 +661,7 @@ export function WaterIntakeWidget({
             <div className="text-xl font-bold text-theme-text-primary">
               {bestStreak}
             </div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Best Streak
             </div>
           </div>
@@ -725,7 +725,7 @@ export function WaterIntakeWidget({
                           {metGoal && (
                             <Badge
                               variant="secondary"
-                              className="bg-emerald-100 text-theme-text-primary text-[9px] px-1.5 py-0"
+                              className="bg-emerald-100 text-theme-text-primary text-3xs px-1.5 py-0"
                             >
                               Goal
                             </Badge>

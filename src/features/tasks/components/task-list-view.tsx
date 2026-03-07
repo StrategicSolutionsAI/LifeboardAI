@@ -878,7 +878,7 @@ const TaskTableRow = React.memo(function TaskTableRow({
               return (
                 <div className="flex items-center gap-1.5">
                   <span
-                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-semibold text-white shrink-0"
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full text-3xs font-semibold text-white shrink-0"
                     style={{ backgroundColor: member.avatarColor }}
                   >
                     {initials}

@@ -26,7 +26,7 @@ function ChartTooltip({ active, payload, isWeight, unit }: any) {
   const formatted = new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return (
     <div className="rounded-xl bg-theme-surface-overlay/95 border border-theme-neutral-300 shadow-[0px_8px_24px_rgba(163,133,96,0.12)] backdrop-blur-sm px-3 py-2">
-      <p className="text-[10px] font-medium text-theme-text-tertiary uppercase tracking-wide">{formatted}</p>
+      <p className="text-2xs font-medium text-theme-text-tertiary uppercase tracking-wide">{formatted}</p>
       <p className="text-lg font-black tracking-tight text-theme-text-primary leading-none mt-0.5">
         {value}{isWeight ? <span className="text-xs font-medium text-theme-text-tertiary ml-1">{unit || 'lbs'}</span> : ''}
       </p>
@@ -278,7 +278,7 @@ export default function WidgetTrendChart({
         {isWithingsWeight && (
           <span className="text-sm font-medium text-theme-text-tertiary mb-0.5">{unit || 'lbs'}</span>
         )}
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ml-auto ${tc.bg} ${tc.color} ${tc.border}`}>
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-2xs font-semibold border ml-auto ${tc.bg} ${tc.color} ${tc.border}`}>
           <TrendIcon className="w-2.5 h-2.5 mr-0.5" />
           {tc.text}
         </span>
@@ -358,7 +358,7 @@ export default function WidgetTrendChart({
       </div>
 
       {/* Footer */}
-      <p className="text-[10px] font-medium text-theme-text-tertiary mt-2">
+      <p className="text-2xs font-medium text-theme-text-tertiary mt-2">
         {isWithingsWeight ? `Avg over ${rangeDays}d` : `Last ${rangeDays} days`}
       </p>
     </motion.div>

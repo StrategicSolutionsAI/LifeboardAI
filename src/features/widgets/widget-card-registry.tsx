@@ -591,7 +591,7 @@ function renderHabitTrackerBody({
         </div>
         <div className="flex items-center justify-between">
           {nextMilestone && (
-            <div className="text-[10px] text-theme-text-tertiary">
+            <div className="text-2xs text-theme-text-tertiary">
               {nextMilestone.emoji} {nextMilestone.label} in{" "}
               {nextMilestone.days - streak} days
             </div>
@@ -656,7 +656,7 @@ function renderSleepBody({ widget: w, styles: wStyles }: CardBodyRenderProps) {
         <div className="text-xs text-theme-text-primary">{stars}</div>
         {w.sleepData?.currentStreak && w.sleepData.currentStreak >= 2 && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium text-theme-text-primary"
             style={{ backgroundColor: wStyles.tint }}
           >
             {"\uD83D\uDD25"} {w.sleepData.currentStreak} day streak
@@ -724,7 +724,7 @@ function renderMeditationBody({
         </div>
         {data?.currentStreak && data.currentStreak >= 2 && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium text-theme-text-primary"
             style={{ backgroundColor: wStyles.tint }}
           >
             {"\uD83D\uDD25"} {data.currentStreak}
@@ -801,7 +801,7 @@ function renderBreathworkBody({
         </div>
         {data.currentStreak && data.currentStreak >= 2 && (
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-theme-text-primary"
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium text-theme-text-primary"
             style={{ backgroundColor: wStyles.tint }}
           >
             {"\uD83D\uDD25"} {data.currentStreak}
@@ -889,17 +889,17 @@ function renderCycleTrackingBody({
               : `${todayEntry.flowIntensity} flow`}
           </span>
           {todayEntry.periodStart && (
-            <span className="text-[9px] font-medium text-pink-600 bg-pink-100 rounded-full px-1.5 py-0.5">
+            <span className="text-3xs font-medium text-pink-600 bg-pink-100 rounded-full px-1.5 py-0.5">
               Start
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-theme-text-tertiary">
+        <div className="flex items-center gap-3 text-2xs text-theme-text-tertiary">
           {cycleDay && <span>Day {cycleDay}</span>}
           {nextPeriodLabel && <span>Next: {nextPeriodLabel}</span>}
         </div>
         {todayEntry.symptoms.length > 0 && (
-          <div className="text-[10px] text-theme-text-tertiary truncate">
+          <div className="text-2xs text-theme-text-tertiary truncate">
             {todayEntry.symptoms.slice(0, 3).join(", ")}
             {todayEntry.symptoms.length > 3 &&
               ` +${todayEntry.symptoms.length - 3}`}

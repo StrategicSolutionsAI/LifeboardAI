@@ -239,7 +239,7 @@ export default function OnboardingStep4() {
                     {integration.name}
                   </h3>
                   {integration.comingSoon && (
-                    <span className="ml-2 px-2 py-0.5 text-[10px] font-medium text-[#6B7280] bg-[#F3F4F6] rounded-full">
+                    <span className="ml-2 px-2 py-0.5 text-2xs font-medium text-[#6B7280] bg-[#F3F4F6] rounded-full">
                       Coming Soon
                     </span>
                   )}

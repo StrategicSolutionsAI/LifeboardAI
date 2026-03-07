@@ -62,7 +62,7 @@ export function FolderStats({
             title={`${count} ${label}`}
           >
             <Icon className="w-2.5 h-2.5 sm:w-[13px] sm:h-[13px]" strokeWidth={2.2} />
-            <span className="text-[10px] sm:text-[11px] font-semibold leading-none">
+            <span className="text-2xs sm:text-[11px] font-semibold leading-none">
               {count > 99 ? "99+" : count}
             </span>
           </div>

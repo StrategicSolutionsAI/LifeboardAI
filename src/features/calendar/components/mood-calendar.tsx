@@ -381,7 +381,7 @@ export default function MoodCalendar({ compact = false }: MoodCalendarProps) {
               >
                 {d && (
                   <>
-                    <span className="text-[10px]">{d.getDate()}</span>
+                    <span className="text-2xs">{d.getDate()}</span>
                     {opt ? (
                       <span className="text-sm" aria-hidden>
                         {MOODS.find((m) => m.key === mood)!.emoji}

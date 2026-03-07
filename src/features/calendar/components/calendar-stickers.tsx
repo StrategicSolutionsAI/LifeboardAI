@@ -257,7 +257,7 @@ export const StickerPalette = ({
           <span className="text-[11px] font-bold uppercase tracking-widest text-stone-400">
             Sticker Sheet
           </span>
-          <span className="text-[10px] font-medium text-stone-500">
+          <span className="text-2xs font-medium text-stone-500">
             {new Date(dayStr + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
           </span>
         </div>
@@ -313,13 +313,13 @@ export const StickerPalette = ({
               >
                 <Icon size={20} strokeWidth={2.2} color="white" />
               </span>
-              <span className="text-[9px] font-semibold text-stone-500 leading-tight mt-0.5">
+              <span className="text-3xs font-semibold text-stone-500 leading-tight mt-0.5">
                 {option.label}
               </span>
               {/* "Peeled off" checkmark */}
               {isSelected && (
                 <span
-                  className="absolute -right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  className="absolute -right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-3xs font-bold text-white"
                   style={{
                     background: option.colorDark,
                     boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
@@ -335,7 +335,7 @@ export const StickerPalette = ({
 
       {/* Footer */}
       <div className="mt-3 flex flex-col gap-2">
-        <span className="text-[10px] font-medium text-stone-400 text-center">
+        <span className="text-2xs font-medium text-stone-400 text-center">
           {dayStickers.length}/{maxStickersPerDay} placed
         </span>
         <button
@@ -441,7 +441,7 @@ export const StickerRow = ({
               }}
             >
               <Icon size={14} strokeWidth={2.5} color="white" />
-              <span className="text-[10px] font-bold text-white/90 drop-shadow-sm">
+              <span className="text-2xs font-bold text-white/90 drop-shadow-sm">
                 {option.label}
               </span>
             </button>

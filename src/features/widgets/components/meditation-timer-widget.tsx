@@ -533,25 +533,25 @@ export function MeditationTimerWidget({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{totalMinutes}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Total Minutes
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{totalSessions}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Sessions
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{currentStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Current Streak
             </div>
           </div>
           <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
             <div className="text-xl font-bold text-theme-text-primary">{bestStreak}</div>
-            <div className="text-[10px] text-theme-text-tertiary uppercase tracking-wide">
+            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">
               Best Streak
             </div>
           </div>
