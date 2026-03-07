@@ -39,50 +39,6 @@ import { useFamilyMembers, type FamilyMemberOption } from "@/hooks/use-family-me
 
 const UNSORTED_LABEL = "Unsorted";
 
-const WIDGET_COLOR_OPTIONS = [
-  "blue",
-  "green",
-  "red",
-  "orange",
-  "purple",
-  "indigo",
-  "amber",
-  "teal",
-  "rose",
-  "cyan",
-  "yellow",
-  "sky",
-  "emerald",
-  "violet",
-  "lime",
-  "fuchsia",
-  "gray",
-  "slate",
-  "stone",
-] as const;
-
-const WIDGET_COLOR_CLASS: Record<(typeof WIDGET_COLOR_OPTIONS)[number], string> = {
-  blue: "bg-blue-500",
-  green: "bg-green-500",
-  red: "bg-red-500",
-  orange: "bg-orange-500",
-  purple: "bg-amber-500",
-  indigo: "bg-warm-500",
-  amber: "bg-amber-500",
-  teal: "bg-teal-500",
-  rose: "bg-rose-500",
-  cyan: "bg-cyan-500",
-  yellow: "bg-yellow-500",
-  sky: "bg-sky-500",
-  emerald: "bg-emerald-500",
-  violet: "bg-violet-500",
-  lime: "bg-lime-500",
-  fuchsia: "bg-fuchsia-500",
-  gray: "bg-theme-surface-alt0",
-  slate: "bg-slate-500",
-  stone: "bg-stone-500",
-};
-
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
 /* ─── Extracted Shopping Item Cards ─── */
@@ -323,7 +279,6 @@ interface AddItemSheetInput {
   widgetName: string;
   widgetBucket: string;
   widgetTarget: number;
-  widgetColor: string;
   widgetSchedule: boolean[];
   mirrorAsTask: boolean;
 }
@@ -366,7 +321,6 @@ function AddItemDialog({
   const [qaWidgetName, setQaWidgetName] = useState("");
   const [qaWidgetBucket, setQaWidgetBucket] = useState("");
   const [qaWidgetTarget, setQaWidgetTarget] = useState(1);
-  const [qaWidgetColor, setQaWidgetColor] = useState<(typeof WIDGET_COLOR_OPTIONS)[number]>("indigo");
   const [qaWidgetSchedule, setQaWidgetSchedule] = useState([true, true, true, true, true, true, true]);
   const [qaMirrorAsTask, setQaMirrorAsTask] = useState(false);
 
@@ -390,7 +344,6 @@ function AddItemDialog({
       setQaWidgetName("");
       setQaWidgetBucket(widgetBucketOptions[0] ?? "");
       setQaWidgetTarget(1);
-      setQaWidgetColor("indigo");
       setQaWidgetSchedule([true, true, true, true, true, true, true]);
       setQaMirrorAsTask(false);
     }
@@ -457,7 +410,6 @@ function AddItemDialog({
       widgetName: qaWidgetName,
       widgetBucket: qaWidgetBucket,
       widgetTarget: qaWidgetTarget,
-      widgetColor: qaWidgetColor,
       widgetSchedule: qaWidgetSchedule,
       mirrorAsTask: qaMirrorAsTask,
     });
@@ -723,26 +675,6 @@ function AddItemDialog({
                   </div>
                 </div>
                 <div>
-                  <label className={cn(form.label, "mb-2 block")}>Colour</label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {WIDGET_COLOR_OPTIONS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        aria-label={color}
-                        onClick={() => setQaWidgetColor(color)}
-                        className={cn(
-                          "h-8 w-8 rounded-full border-2 transition",
-                          WIDGET_COLOR_CLASS[color],
-                          qaWidgetColor === color
-                            ? "ring-2 ring-offset-2 ring-warm-500 border-white"
-                            : "border-white",
-                        )}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div>
                   <label className={cn(form.label, "mb-2 block")}>Schedule</label>
                   <div className="flex flex-wrap gap-2">
                     {WEEKDAY_LABELS.map((day, index) => (
@@ -855,7 +787,6 @@ function ShoppingListLayout() {
   const [widgetBucket, setWidgetBucket] = useState<string>("");
   const [eventBucket, setEventBucket] = useState<string>("");
   const [widgetTarget, setWidgetTarget] = useState<number>(1);
-  const [widgetColor, setWidgetColor] = useState<(typeof WIDGET_COLOR_OPTIONS)[number]>("indigo");
   const [widgetSchedule, setWidgetSchedule] = useState<boolean[]>([true, true, true, true, true, true, true]);
   const [taskEnabled, setTaskEnabled] = useState(false);
   const [itemName, setItemName] = useState("");
@@ -1115,7 +1046,7 @@ function ShoppingListLayout() {
             defaultTarget: input.widgetTarget,
             target: input.widgetTarget,
             schedule: [...input.widgetSchedule],
-            color: input.widgetColor,
+            color: "indigo",
             dataSource: "manual",
             createdAt: nowIso,
             instanceId,
@@ -1301,7 +1232,6 @@ function ShoppingListLayout() {
     setWidgetBucket(convertItem.widgetBucket ?? fallbackBucket);
     setEventBucket(fallbackBucket);
     setWidgetTarget(Number.isFinite(numericQuantity) && numericQuantity > 0 ? numericQuantity : 1);
-    setWidgetColor("indigo");
     setWidgetSchedule([true, true, true, true, true, true, true]);
     setTaskEnabled(Boolean(convertItem.taskId) || !convertItem.widgetInstanceId);
 
@@ -1328,11 +1258,6 @@ function ShoppingListLayout() {
       if (detectedWidget) {
         setWidgetName(detectedWidget.name ?? `Buy ${convertItem.name}`);
         setWidgetTarget(detectedWidget.target ?? 1);
-        setWidgetColor(
-          (WIDGET_COLOR_OPTIONS as readonly string[]).includes(detectedWidget.color as string)
-            ? (detectedWidget.color as (typeof WIDGET_COLOR_OPTIONS)[number])
-            : "indigo",
-        );
         if (Array.isArray(detectedWidget.schedule) && detectedWidget.schedule.length === 7) {
           setWidgetSchedule([...detectedWidget.schedule]);
         }
@@ -1581,7 +1506,7 @@ function ShoppingListLayout() {
           defaultTarget: widgetTarget,
           target: widgetTarget,
           schedule: [...widgetSchedule],
-          color: widgetColor,
+          color: "indigo",
           dataSource: "manual",
           createdAt: convertItem.widgetCreatedAt ?? nowIso,
           instanceId,
@@ -1624,7 +1549,7 @@ function ShoppingListLayout() {
             description,
             target: widgetTarget,
             schedule: [...widgetSchedule],
-            color: widgetColor,
+            color: "indigo",
             linkedTaskId: taskEnabled && taskId ? taskId : undefined,
             linkedTaskAutoCreated: taskEnabled,
             linkedTaskTitle: trimmedItemName,
@@ -2331,28 +2256,6 @@ function ShoppingListLayout() {
                         >
                           +
                         </Button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className={cn(form.label, "mb-2 block")}>
-                        Colour
-                      </label>
-                      <div className="grid grid-cols-6 gap-2">
-                        {WIDGET_COLOR_OPTIONS.map((color) => (
-                          <button
-                            key={color}
-                            type="button"
-                            aria-label={color}
-                            onClick={() => setWidgetColor(color)}
-                            className={cn(
-                              "h-8 w-8 rounded-full border-2 transition",
-                              WIDGET_COLOR_CLASS[color],
-                              widgetColor === color
-                                ? "ring-2 ring-offset-2 ring-warm-500 border-white"
-                                : "border-white",
-                            )}
-                          />
-                        ))}
                       </div>
                     </div>
                     <div>
