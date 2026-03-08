@@ -103,7 +103,7 @@ const normalizeTaskConfig = (
   const base = widgetInstance.linkedTaskConfig ?? {};
   return {
     enabled: base.enabled ?? Boolean(widgetInstance.linkedTaskId),
-    title: base.title ?? widgetInstance.linkedTaskTitle ?? widgetInstance.name,
+    title: base.title ?? widgetInstance.linkedTaskTitle ?? (widgetInstance.id === 'habit_tracker' ? widgetInstance.habitTrackerData?.habitName : undefined) ?? widgetInstance.name,
     bucket: base.bucket ?? defaults.bucket ?? "",
     dueDate: base.dueDate ?? defaults.dueDate,
     startTime: base.startTime ?? "",
@@ -176,7 +176,7 @@ export default function WidgetEditorSheet({
     setDraft(prev => {
       if (!prev) return prev;
       const normalized = normalizeTaskConfig(prev, {
-        title: prev.linkedTaskTitle ?? prev.name,
+        title: prev.linkedTaskTitle ?? (prev.id === 'habit_tracker' ? prev.habitTrackerData?.habitName : undefined) ?? prev.name,
         bucket: defaultBucket,
         dueDate: defaultDueDate,
       });
@@ -208,7 +208,7 @@ export default function WidgetEditorSheet({
       if (!prev) return prev;
       const merged = {
         ...normalizeTaskConfig(prev, {
-          title: prev.linkedTaskTitle ?? prev.name,
+          title: prev.linkedTaskTitle ?? (prev.id === 'habit_tracker' ? prev.habitTrackerData?.habitName : undefined) ?? prev.name,
           bucket: defaultBucket,
           dueDate: defaultDueDate,
         }),
@@ -228,18 +228,29 @@ export default function WidgetEditorSheet({
 
     let updatedDraft: WidgetInstance = { ...draft };
     const config = normalizeTaskConfig(updatedDraft, {
-      title: updatedDraft.linkedTaskTitle ?? updatedDraft.name,
+      title: updatedDraft.linkedTaskTitle ?? (updatedDraft.id === 'habit_tracker' ? updatedDraft.habitTrackerData?.habitName : undefined) ?? updatedDraft.name,
       bucket: defaultBucket,
       dueDate: defaultDueDate,
     });
     const enabled = config.enabled ?? false;
     const content = (config.title || updatedDraft.name || "Widget Task").trim();
     const bucketName = config.bucket?.trim() || undefined;
-    const dueDate = config.dueDate?.trim() || null;
-    const repeatRule: RepeatOption = config.repeat ?? "none";
-    const hourSlot = config.allDay ? undefined : timeToHourSlot(config.startTime);
-    const endHourSlot = config.allDay ? undefined : timeToHourSlot(config.endTime);
-    const allDay = config.allDay ?? true;
+    const isHabit = updatedDraft.id === 'habit_tracker';
+
+    // For habit_tracker: derive repeat from schedule, force allDay, clear dueDate
+    const dueDate = isHabit ? null : (config.dueDate?.trim() || null);
+    const allDay = isHabit ? true : (config.allDay ?? true);
+    let repeatRule: RepeatOption;
+    if (isHabit) {
+      const sched = updatedDraft.schedule || [];
+      const allSelected = sched.every(Boolean);
+      const weekdaysOnly = sched.length >= 7 && !sched[0] && sched[1] && sched[2] && sched[3] && sched[4] && sched[5] && !sched[6];
+      repeatRule = allSelected ? "daily" : weekdaysOnly ? "weekdays" : "daily";
+    } else {
+      repeatRule = config.repeat ?? "none";
+    }
+    const hourSlot = allDay ? undefined : timeToHourSlot(config.startTime);
+    const endHourSlot = allDay ? undefined : timeToHourSlot(config.endTime);
 
     try {
       if (enabled) {
@@ -735,84 +746,89 @@ export default function WidgetEditorSheet({
               </div>
             ) : draft.id === 'habit_tracker' ? (
               <div className={card.panel}>
+                {/* Habit Name */}
                 <div className="space-y-2">
                   <p className={form.label}>Habit Name</p>
                   <input
                     type="text"
                     value={draft.habitTrackerData?.habitName || ''}
-                    onChange={e => setDraft(p => p ? {
-                      ...p,
-                      habitTrackerData: {
-                        habitName: e.target.value,
-                        habitDescription: p.habitTrackerData?.habitDescription || '',
-                        startDate: p.habitTrackerData?.startDate || new Date().toISOString().split('T')[0],
-                        bestStreak: p.habitTrackerData?.bestStreak || 0,
-                        totalCompletions: p.habitTrackerData?.totalCompletions || 0,
-                        completionHistory: p.habitTrackerData?.completionHistory || [],
-                        milestones: p.habitTrackerData?.milestones || [
-                          { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
-                          { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
-                          { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
-                          { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
-                          { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
-                          { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
-                          { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
-                          { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
-                        ],
-                      }
-                    } : p)}
+                    onChange={e => {
+                      const name = e.target.value;
+                      setDraft(p => p ? {
+                        ...p,
+                        habitTrackerData: {
+                          habitName: name,
+                          habitDescription: p.habitTrackerData?.habitDescription || '',
+                          startDate: p.habitTrackerData?.startDate || new Date().toISOString().split('T')[0],
+                          bestStreak: p.habitTrackerData?.bestStreak || 0,
+                          totalCompletions: p.habitTrackerData?.totalCompletions || 0,
+                          completionHistory: p.habitTrackerData?.completionHistory || [],
+                          milestones: p.habitTrackerData?.milestones || [
+                            { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
+                            { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
+                            { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
+                            { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
+                            { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
+                            { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
+                            { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
+                            { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
+                          ],
+                        },
+                        linkedTaskConfig: p.linkedTaskConfig ? {
+                          ...p.linkedTaskConfig,
+                          title: name || p.linkedTaskConfig.title,
+                        } : p.linkedTaskConfig,
+                      } : p);
+                    }}
                     placeholder="e.g., Read 30 minutes, Meditate, Exercise"
                     className={form.input}
                   />
                 </div>
 
+                {/* Tracking Days */}
                 <div className="space-y-2">
-                  <p className={form.label}>Description (Optional)</p>
-                  <textarea
-                    value={draft.habitTrackerData?.habitDescription || ''}
-                    onChange={e => setDraft(p => p ? {
-                      ...p,
-                      habitTrackerData: {
-                        ...p.habitTrackerData!,
-                        habitDescription: e.target.value,
-                      }
-                    } : p)}
-                    placeholder="Why is this habit important to you?"
-                    className={`${form.textarea} min-h-[4rem]`}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <p className={form.label}>Start Date</p>
-                  <input
-                    type="date"
-                    value={draft.habitTrackerData?.startDate || new Date().toISOString().split('T')[0]}
-                    onChange={e => setDraft(p => p ? {
-                      ...p,
-                      habitTrackerData: {
-                        ...p.habitTrackerData!,
-                        startDate: e.target.value,
-                      }
-                    } : p)}
-                    className={form.input}
-                  />
-                </div>
-
-                {draft.habitTrackerData?.habitName && (
-                  <div className="rounded-lg border border-theme-neutral-300 bg-theme-surface-alt p-3 text-xs text-theme-text-subtle">
-                    <div className="font-medium mb-1">Preview:</div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{"\uD83C\uDFAF"}</span>
-                      <span className="font-medium text-theme-text-body">{draft.habitTrackerData.habitName}</span>
-                    </div>
-                    {draft.habitTrackerData.habitDescription && (
-                      <div className="text-theme-text-tertiary mt-1">{draft.habitTrackerData.habitDescription}</div>
-                    )}
-                    <div className="mt-1">
-                      {"\uD83D\uDD25"} 0 day streak {"\u2022"} Click widget card to start tracking
-                    </div>
+                  <p className={form.label}>Tracking Days</p>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAYS.map((d, idx) => (
+                      <button
+                        key={d}
+                        className={`h-9 w-9 rounded-full border text-[11px] font-semibold transition ${draft.schedule[idx] ? "border-theme-primary bg-theme-primary text-white shadow-sm" : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"}`}
+                        onClick={() => setDraft(p => p ? { ...p, schedule: p.schedule.map((v, i) => i === idx ? !v : v) as boolean[] } : p)}
+                      >
+                        {d.charAt(0)}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+
+                {/* Add to Tasks */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className={form.label}>Add to Tasks</p>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(taskConfig.enabled)}
+                      onChange={e => updateTaskConfig({ enabled: e.target.checked })}
+                      className={CHECKBOX_CONTROL_CLASS}
+                    />
+                  </div>
+
+                  {taskConfig.enabled && (
+                    <div className="space-y-2">
+                      <p className={form.label}>Bucket</p>
+                      <select
+                        value={taskConfig.bucket ?? ""}
+                        onChange={e => updateTaskConfig({ bucket: e.target.value })}
+                        className={form.input}
+                      >
+                        <option value="">Select bucket</option>
+                        {derivedBuckets.map(bucket => (
+                          <option key={bucket} value={bucket}>{bucket}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : draft.id === 'quit_habit' ? (
               <div className={card.panel}>
@@ -1283,8 +1299,8 @@ export default function WidgetEditorSheet({
 
 
 
-            {/* Task / Event Details */}
-            <div className={card.panel}>
+            {/* Task / Event Details (hidden for habit_tracker — handled in consolidated panel) */}
+            {draft.id !== 'habit_tracker' && <div className={card.panel}>
               <div className="flex items-center justify-between">
                 <p className={form.label}>Task &amp; Event</p>
                 <label className="inline-flex items-center gap-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-alt px-3 py-1.5 text-xs text-theme-text-body">
@@ -1393,10 +1409,10 @@ export default function WidgetEditorSheet({
                   )}
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Schedule */}
-            {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'nutrition'].includes(draft.id) && (
+            {draft.schedule && !['birthdays', 'social_events', 'holidays', 'mood', 'journal', 'gratitude', 'quit_habit', 'nutrition', 'habit_tracker'].includes(draft.id) && (
               <div className={card.panel}>
                 <p className={form.label}>Schedule</p>
                 <div className="flex flex-wrap gap-2">

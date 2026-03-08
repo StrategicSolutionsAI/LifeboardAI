@@ -1,6 +1,6 @@
 export default function LoadingTasks() {
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5 animate-pulse">
+    <div className="flex h-[calc(100dvh-64px)] w-full flex-col gap-3 sm:gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5 animate-pulse">
       {/* Header skeleton */}
       <div className="flex flex-col gap-5">
         {/* Title row */}

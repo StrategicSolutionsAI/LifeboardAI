@@ -535,74 +535,89 @@ function renderHabitTrackerBody({
     const last7Days = getLast7Days();
     const last7 = last7Days.map((key) => completionSet.has(key));
 
-    // Next milestone
-    const milestones = habitData.milestones || [];
-    const nextMilestone = milestones.find(
-      (m) => !m.achieved && streak < m.days
-    );
+    // Determine which days of the week are scheduled
+    const schedule = w.schedule as boolean[] | undefined;
+
+    const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
 
     return (
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-sm">{"\uD83C\uDFAF"}</span>
-          <span className="font-medium text-theme-text-body">
-            {habitData.habitName}
-          </span>
+      <div className="mt-2 space-y-2">
+        {/* Streak / zero-state */}
+        {streak === 0 ? (
+          <div className="flex items-baseline gap-1">
+            <span className="text-sm font-medium text-theme-text-secondary">
+              {(habitData.totalCompletions || 0) > 0
+                ? "Ready to restart"
+                : "Start your streak"}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-bold text-theme-text-primary">
+              {streak}
+            </span>
+            <span className="text-sm font-medium text-theme-text-primary">
+              day streak
+            </span>
+            <span className="text-sm">{"\uD83D\uDD25"}</span>
+          </div>
+        )}
+
+        {/* 7-day dots with day labels */}
+        <div className="flex gap-1.5">
+          {last7Days.map((key, i) => {
+            const done = last7[i];
+            const dayOfWeek = new Date(key + "T12:00:00").getDay();
+            const isScheduled = !schedule || schedule[dayOfWeek];
+            return (
+              <div key={i} className="flex flex-col items-center gap-0.5">
+                <div
+                  className={`h-3.5 w-3.5 rounded-full ${
+                    done
+                      ? ""
+                      : isScheduled
+                        ? "bg-theme-progress-track"
+                        : "bg-theme-neutral-200 opacity-40"
+                  }`}
+                  style={done ? { backgroundColor: wStyles.solid } : undefined}
+                />
+                <span className="text-3xs text-theme-text-tertiary leading-none">
+                  {dayLabels[dayOfWeek]}
+                </span>
+              </div>
+            );
+          })}
         </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-theme-text-primary">
-            {streak}
-          </span>
-          <span className="text-sm font-medium text-theme-text-primary">
-            day streak
-          </span>
-          {streak > 0 && <span className="text-sm">{"\uD83D\uDD25"}</span>}
-        </div>
-        <div className="flex gap-1">
-          {last7.map((done, i) => (
-            <div
-              key={i}
-              className={`h-2.5 w-2.5 rounded-full ${done ? "" : "bg-theme-progress-track"}`}
-              style={done ? { backgroundColor: wStyles.solid } : undefined}
-            />
-          ))}
-        </div>
-        <div className="flex items-center justify-between">
-          {nextMilestone && (
-            <div className="text-2xs text-theme-text-tertiary">
-              {nextMilestone.emoji} {nextMilestone.label} in{" "}
-              {nextMilestone.days - streak} days
-            </div>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onHabitToggle(w, isCompletedToday);
-            }}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors ${
-              isCompletedToday
-                ? ""
-                : "bg-theme-surface-alt text-theme-text-subtle hover:bg-theme-brand-tint-light"
-            }`}
-            style={
-              isCompletedToday
-                ? { backgroundColor: wStyles.tint }
-                : undefined
-            }
-          >
-            {isCompletedToday ? "\u2714" : "\u25CB"}{" "}
-            {isCompletedToday ? "Done" : "Log"}
-          </button>
-        </div>
+
+        {/* Full-width Log/Done button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onHabitToggle(w, isCompletedToday);
+          }}
+          className={`w-full flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-full transition-colors ${
+            isCompletedToday
+              ? ""
+              : "bg-theme-surface-alt text-theme-text-subtle hover:bg-theme-brand-tint-light"
+          }`}
+          style={
+            isCompletedToday
+              ? { backgroundColor: wStyles.tint }
+              : undefined
+          }
+        >
+          {isCompletedToday ? "\u2714" : "\u25CB"}{" "}
+          {isCompletedToday ? "Done" : "Log"}
+        </button>
       </div>
     );
   }
   return (
-    <div className="mt-3 text-center">
+    <div className="mt-2 text-center">
       <div className="text-2xl mb-2">{"\uD83C\uDFAF"}</div>
       <div className="text-xs text-theme-text-subtle mb-1">No habit set</div>
       <div className="text-xs text-theme-text-tertiary italic">
-        Tap to build a new habit
+        Tap to set up a habit
       </div>
     </div>
   );
@@ -1145,7 +1160,12 @@ export const WIDGET_CARD_REGISTRY: Record<string, WidgetCardEntry> = {
     renderBody: renderQuitHabitBody,
     getTitle: (w) => w.quitHabitData?.habitName || null,
   },
-  habit_tracker: { renderBody: renderHabitTrackerBody, showIncrement: false },
+  habit_tracker: {
+    renderBody: renderHabitTrackerBody,
+    getTitle: (w) => w.habitTrackerData?.habitName || null,
+    showIncrement: false,
+    hideTaskConvert: true,
+  },
   // Health widgets
   sleep: { renderBody: renderSleepBody, showIncrement: false },
   meditation: { renderBody: renderMeditationBody, showIncrement: false },

@@ -103,17 +103,25 @@ function HabitRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function HabitChecklistPanel() {
+export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
   const { widgetsByBucket, updateWidget, loading } = useWidgets()
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set())
 
-  // Derive habit widgets grouped by bucket
+  // Derive habit widgets grouped by bucket, filtered by schedule for selected day
   const habitsByBucket: HabitsByBucket[] = useMemo(() => {
+    const dayOfWeek = (selectedDate ?? new Date()).getDay() // 0=Sun, 1=Mon, ..., 6=Sat
     const groups: HabitsByBucket[] = []
     for (const [bucketName, widgets] of Object.entries(widgetsByBucket)) {
-      const habits = widgets.filter(
-        (w) => w.id === "habit_tracker" && w.habitTrackerData?.habitName
-      )
+      const habits = widgets.filter((w) => {
+        if (w.id !== "habit_tracker" || !w.habitTrackerData?.habitName) return false
+        // If schedule exists, only show habit on scheduled days
+        const schedule = w.schedule as boolean[] | undefined
+        if (schedule && schedule.length >= 7) {
+          return schedule[dayOfWeek]
+        }
+        // No schedule set (or all days) → always show
+        return true
+      })
       if (habits.length > 0) {
         groups.push({ bucketName, habits })
       }
@@ -121,7 +129,7 @@ export function HabitChecklistPanel() {
     // Sort buckets alphabetically for stable ordering
     groups.sort((a, b) => a.bucketName.localeCompare(b.bucketName))
     return groups
-  }, [widgetsByBucket])
+  }, [widgetsByBucket, selectedDate])
 
   const toggleBucketCollapse = useCallback((bucket: string) => {
     setCollapsedBuckets((prev) => {

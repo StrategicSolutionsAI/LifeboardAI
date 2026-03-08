@@ -1,6 +1,6 @@
 // LifeboardAI Service Worker — lightweight, hand-written
-const CACHE_NAME = 'lifeboard-v1';
-const STATIC_ASSETS = ['/manifest.json'];
+const CACHE_NAME = 'lifeboard-v2';
+const STATIC_ASSETS = ['/manifest.json', '/offline.html'];
 
 // Install: pre-cache manifest
 self.addEventListener('install', (event) => {
@@ -65,7 +65,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('/offline.html')))
     );
     return;
   }

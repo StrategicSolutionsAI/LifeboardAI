@@ -507,6 +507,12 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Prevent pull-to-refresh in standalone mode */
+  .pwa-standalone-bottom,
+  body {
+    overscroll-behavior: none;
+  }
+
   /* Tighten bottom nav since browser chrome is gone */
   .pwa-standalone-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);

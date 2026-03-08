@@ -527,7 +527,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     return (
       <>
         {taskView === 'Habits' && (
-          <HabitChecklistPanel />
+          <HabitChecklistPanel selectedDate={selectedDate} />
         )}
 
         {/* Enhanced Upcoming view */}

@@ -1,6 +1,6 @@
 export default function LoadingDashboard() {
   return (
-    <div className="flex h-[calc(100vh-64px)] w-full flex-col gap-5 px-8 py-6 animate-pulse">
+    <div className="flex h-[calc(100dvh-64px)] w-full flex-col gap-5 px-8 py-6 animate-pulse">
       {/* Bucket tabs skeleton */}
       <div className="flex items-center gap-2">
         {Array.from({ length: 4 }).map((_, i) => (

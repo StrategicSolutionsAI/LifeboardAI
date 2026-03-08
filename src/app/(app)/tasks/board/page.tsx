@@ -3,7 +3,7 @@ import dynamic from "next/dynamic"
 const TasksBoardPageClient = dynamic(() => import("./page.client"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[calc(100vh-64px)] w-full flex-col px-4 py-4 gap-3">
+    <div className="flex h-[calc(100dvh-64px)] w-full flex-col px-4 py-4 gap-3">
       <div className="flex items-center justify-between">
         <div className="h-5 w-24 animate-pulse rounded bg-theme-skeleton" />
         <div className="h-8 w-32 animate-pulse rounded bg-theme-skeleton" />
