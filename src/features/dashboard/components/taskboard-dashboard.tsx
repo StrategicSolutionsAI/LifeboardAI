@@ -52,12 +52,8 @@ const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.Dr
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTaskData, useTaskActions } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
-import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useFamilyMembers } from "@/hooks/use-family-members";
-const TaskEditorModal = dynamic(
-  () => import("@/features/tasks/components/task-editor-modal"),
-  { ssr: false, loading: () => null }
-);
 const WidgetModalsContainer = dynamic(
   () => import("./WidgetModalsContainer").then(m => m.WidgetModalsContainer),
   { ssr: false, loading: () => null }
