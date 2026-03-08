@@ -60,12 +60,12 @@ export function WidgetModalsContainer({
 
   return (
     <Sheet open={!!entry} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-[600px] md:w-[700px] overflow-y-auto">
+      <SheetContent side="right" className={`${entry?.sheetWidth || 'w-full sm:w-[600px] md:w-[700px]'} overflow-y-auto`}>
         {entry && (
           <>
             <SheetHeader>
               <SheetTitle className="text-theme-text-primary">
-                {entry.title}
+                {entry.getTitle?.(activeWidget) ?? entry.title}
               </SheetTitle>
             </SheetHeader>
             <div className={entry.contentMargin || 'mt-2'}>

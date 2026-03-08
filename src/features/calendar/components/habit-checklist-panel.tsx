@@ -1,10 +1,18 @@
 "use client"
 
 import { useMemo, useState, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { Check, ChevronRight, Flame, Target } from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useWidgets } from "@/hooks/use-widgets"
 import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload } from "@/lib/habit-utils"
 import type { WidgetInstance } from "@/types/widgets"
+
+const HabitTrackerWidget = dynamic(
+  () => import("@/features/widgets/components/habit-tracker-widget").then((m) => m.HabitTrackerWidget),
+  { ssr: false, loading: () => <Skeleton className="h-32 w-full" /> },
+)
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,10 +54,12 @@ function HabitRow({
   widget,
   bucketName,
   onToggle,
+  onOpen,
 }: {
   widget: WidgetInstance
   bucketName: string
   onToggle: (bucketName: string, widget: WidgetInstance, isCompletedToday: boolean) => void
+  onOpen: (bucketName: string, widget: WidgetInstance) => void
 }) {
   const data = widget.habitTrackerData
   if (!data || !data.habitName) return null
@@ -60,10 +70,16 @@ function HabitRow({
   const streak = calculateStreak(data.completionHistory || [])
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm">
+    <div
+      className="flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer"
+      onClick={() => onOpen(bucketName, widget)}
+    >
       {/* Check circle toggle */}
       <button
-        onClick={() => onToggle(bucketName, widget, isCompletedToday)}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle(bucketName, widget, isCompletedToday)
+        }}
         className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 ${
           isCompletedToday
             ? "border-theme-secondary bg-theme-secondary text-white"
@@ -106,6 +122,7 @@ function HabitRow({
 export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
   const { widgetsByBucket, updateWidget, loading } = useWidgets()
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set())
+  const [openHabit, setOpenHabit] = useState<{ bucket: string; widget: WidgetInstance } | null>(null)
 
   // Derive habit widgets grouped by bucket, filtered by schedule for selected day
   const habitsByBucket: HabitsByBucket[] = useMemo(() => {
@@ -151,6 +168,23 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
       }
     },
     [updateWidget]
+  )
+
+  const handleOpen = useCallback(
+    (bucket: string, widget: WidgetInstance) => {
+      setOpenHabit({ bucket, widget })
+    },
+    []
+  )
+
+  const handleSheetUpdate = useCallback(
+    (updates: Partial<WidgetInstance>) => {
+      if (!openHabit) return
+      const merged = { ...openHabit.widget, ...updates }
+      setOpenHabit({ bucket: openHabit.bucket, widget: merged })
+      updateWidget(openHabit.bucket, openHabit.widget.instanceId, updates)
+    },
+    [openHabit, updateWidget]
   )
 
   // Loading state
@@ -235,12 +269,34 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
                   widget={widget}
                   bucketName={bucketName}
                   onToggle={handleToggle}
+                  onOpen={handleOpen}
                 />
               ))}
             </div>
           </div>
         )
       })}
+
+      {/* Habit detail sheet */}
+      <Sheet open={!!openHabit} onOpenChange={(open) => { if (!open) setOpenHabit(null) }}>
+        <SheetContent side="right" className="w-full sm:w-[480px] overflow-y-auto">
+          {openHabit && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="text-theme-text-primary">
+                  {openHabit.widget.habitTrackerData?.habitName || "Habit Tracker"}
+                </SheetTitle>
+              </SheetHeader>
+              <HabitTrackerWidget
+                widget={openHabit.widget}
+                onUpdate={handleSheetUpdate}
+                progress={{ value: 0, streak: 0, isToday: false }}
+                onComplete={() => {}}
+              />
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

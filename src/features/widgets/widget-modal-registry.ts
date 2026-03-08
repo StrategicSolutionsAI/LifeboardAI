@@ -17,12 +17,16 @@ export interface ModalRenderProps {
 
 export interface WidgetModalEntry {
   title: string
+  /** Dynamic title based on widget data (overrides `title` when present) */
+  getTitle?: (widget: WidgetInstance | null) => string
   /** Render function receives common props, returns the modal content */
   render: (props: ModalRenderProps) => React.ReactNode
   /** Custom side-effect to run when the modal closes */
   onCloseEffect?: () => void
   /** Top margin for the content area (default 'mt-2') */
   contentMargin?: string
+  /** Sheet width classes (default 'w-full sm:w-[600px] md:w-[700px]') */
+  sheetWidth?: string
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -166,6 +170,8 @@ export const WIDGET_MODAL_REGISTRY: Record<string, WidgetModalEntry> = {
   },
   habit_tracker: {
     title: 'Habit Tracker',
+    getTitle: (w) => w?.habitTrackerData?.habitName || 'Habit Tracker',
+    sheetWidth: 'w-full sm:w-[480px]',
     render: statefulRender(HabitTrackerWidget),
   },
   sleep: {

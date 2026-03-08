@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Flame,
   Award,
-  TrendingUp,
   Calendar,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
@@ -124,6 +123,8 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
     ...m,
     achieved: m.achieved || currentStreak >= m.days,
   }))
+  const achievedCount = milestones.filter((m) => m.achieved).length
+  const nextMilestone = milestones.find((m) => !m.achieved)
 
   const monthLabel = new Date(calendarMonth.year, calendarMonth.month).toLocaleDateString("en-US", {
     month: "long",
@@ -153,37 +154,24 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
   }
 
   return (
-    <div className="mt-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-theme-brand-tint-light">
-          <Target className="h-5 w-5 text-theme-secondary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-base font-semibold text-theme-text-primary truncate">{data.habitName}</h3>
-          {data.habitDescription && (
-            <p className="text-xs text-theme-text-tertiary mt-0.5 line-clamp-2">{data.habitDescription}</p>
-          )}
-          <p className="text-xs text-theme-neutral-400 mt-0.5">
+    <div className="mt-2 space-y-5">
+      {/* Subtitle — description + tracking since */}
+      {(data.habitDescription || startDate) && (
+        <div className="text-xs text-theme-text-tertiary space-y-0.5">
+          {data.habitDescription && <p className="line-clamp-2">{data.habitDescription}</p>}
+          <p className="text-theme-neutral-400">
             Tracking since {new Date(startDate + "T12:00:00").toLocaleDateString()}
           </p>
         </div>
-      </div>
+      )}
 
-      {/* Streak + Today's Check-In */}
+      {/* Streak card — streak + button + inline stats */}
       <div className="rounded-xl border border-theme-neutral-300 bg-theme-surface-alt p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-bold text-theme-text-primary">{currentStreak}</span>
-              <span className="text-sm font-medium text-theme-text-tertiary">day streak</span>
-              {currentStreak > 0 && <Flame className="h-5 w-5 text-orange-500" />}
-            </div>
-            {bestStreak > currentStreak && (
-              <p className="text-xs text-theme-neutral-400 mt-0.5">
-                Best: {bestStreak} day{bestStreak !== 1 ? "s" : ""}
-              </p>
-            )}
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-3xl font-bold text-theme-text-primary">{currentStreak}</span>
+            <span className="text-sm font-medium text-theme-text-tertiary">day streak</span>
+            {currentStreak > 0 && <Flame className="h-5 w-5 text-orange-500" />}
           </div>
           <Button
             onClick={handleToggleToday}
@@ -197,6 +185,23 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
             <Check className="h-4 w-4" />
             {isCompletedToday ? "Completed" : "Complete Today"}
           </Button>
+        </div>
+        {/* Inline stats row */}
+        <div className="mt-3 pt-3 border-t border-theme-neutral-300 flex items-center justify-between text-xs text-theme-text-tertiary">
+          <div className="text-center flex-1">
+            <span className="font-semibold text-theme-text-primary">{bestStreak}</span>
+            <span className="ml-1">Best</span>
+          </div>
+          <div className="w-px h-3 bg-theme-neutral-300" />
+          <div className="text-center flex-1">
+            <span className="font-semibold text-theme-text-primary">{data.totalCompletions || 0}</span>
+            <span className="ml-1">Total</span>
+          </div>
+          <div className="w-px h-3 bg-theme-neutral-300" />
+          <div className="text-center flex-1">
+            <span className="font-semibold text-theme-text-primary">{completionRate}%</span>
+            <span className="ml-1">Rate</span>
+          </div>
         </div>
       </div>
 
@@ -225,7 +230,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
         </div>
       </div>
 
-      {/* Calendar Heat Map */}
+      {/* Calendar Heat Map — compact cells */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary flex items-center gap-1.5">
@@ -252,16 +257,16 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5">
           {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <div key={i} className="text-center text-2xs font-medium text-theme-neutral-400 pb-1">
+            <div key={i} className="text-center text-2xs font-medium text-theme-neutral-400 pb-0.5">
               {d}
             </div>
           ))}
           {calendarDays.map((cell) => (
             <div
               key={cell.key}
-              className={`aspect-square rounded-md flex items-center justify-center text-xs transition-colors ${
+              className={`h-7 w-7 mx-auto rounded-md flex items-center justify-center text-2xs transition-colors ${
                 cell.day === null
                   ? ""
                   : cell.completed
@@ -279,70 +284,34 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
         </div>
       </div>
 
-      {/* Milestones */}
+      {/* Compact Milestones */}
       <div>
         <h4 className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary mb-2 flex items-center gap-1.5">
           <Award className="h-3.5 w-3.5" />
           Milestones
         </h4>
-        <div className="grid grid-cols-2 gap-2">
-          {milestones.map((m) => {
-            const daysRemaining = m.days - currentStreak
-            return (
-              <div
-                key={m.days}
-                className={`rounded-lg border p-2.5 text-xs transition-colors ${
-                  m.achieved
-                    ? "border-theme-secondary/30 bg-theme-brand-tint-subtle"
-                    : "border-theme-neutral-300 bg-white opacity-60"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={`text-lg ${m.achieved ? "" : "grayscale opacity-40"}`}>
-                    {m.emoji}
-                  </span>
-                  <div className="min-w-0">
-                    <div className={`font-medium truncate ${m.achieved ? "text-theme-text-primary" : "text-theme-text-tertiary"}`}>
-                      {m.label}
-                    </div>
-                    <div className="text-2xs text-theme-neutral-400">
-                      {m.achieved
-                        ? m.achievedDate
-                          ? `Achieved ${new Date(m.achievedDate + "T12:00:00").toLocaleDateString()}`
-                          : "Achieved"
-                        : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} to go`}
-                    </div>
-                  </div>
+        <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 flex items-center justify-between">
+          {nextMilestone ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg">{nextMilestone.emoji}</span>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-theme-text-primary truncate">
+                  Next: {nextMilestone.label}
+                </div>
+                <div className="text-2xs text-theme-neutral-400">
+                  {nextMilestone.days - currentStreak} day{nextMilestone.days - currentStreak !== 1 ? "s" : ""} to go
                 </div>
               </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary mb-2 flex items-center gap-1.5">
-          <TrendingUp className="h-3.5 w-3.5" />
-          Stats
-        </h4>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
-            <div className="text-xl font-bold text-theme-text-primary">{data.totalCompletions || 0}</div>
-            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Total Days</div>
-          </div>
-          <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
-            <div className="text-xl font-bold text-theme-text-primary">{completionRate}%</div>
-            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Completion Rate</div>
-          </div>
-          <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
-            <div className="text-xl font-bold text-theme-text-primary">{currentStreak}</div>
-            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Current Streak</div>
-          </div>
-          <div className="rounded-lg border border-theme-neutral-300 bg-white p-3 text-center">
-            <div className="text-xl font-bold text-theme-text-primary">{bestStreak}</div>
-            <div className="text-2xs text-theme-text-tertiary uppercase tracking-wide">Best Streak</div>
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🏆</span>
+              <span className="text-sm font-medium text-theme-text-primary">All milestones achieved!</span>
+            </div>
+          )}
+          <span className="text-xs text-theme-text-tertiary whitespace-nowrap ml-3">
+            {achievedCount}/{milestones.length} achieved
+          </span>
         </div>
       </div>
     </div>
