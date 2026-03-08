@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -602,11 +602,48 @@ export function useCalendarEvents({
     return map;
   }, [externalEventMap, lifeboardEventMap]);
 
-  // Apply optimistic patch on top of computed base.
-  // Patch is cleared automatically when the base changes (data re-fetched).
+  // Auto-clear optimistic patch when the base data changes (e.g. after
+  // batchUpdateTasks optimistically updates allTasks → lifeboardEventMap
+  // recomputes → computedEventsByDate already reflects the change).
+  // Without this, the stale patch re-applies on top of the updated base,
+  // causing duplicate events at the destination date.
+  useEffect(() => {
+    setOptimisticPatch(null);
+  }, [computedEventsByDate]);
+
+  // Apply optimistic patch on top of computed base, then dedup by taskId
+  // within each date to prevent duplicates from overlapping update paths.
   const finalEventsByDate = useMemo(() => {
-    if (!optimisticPatch) return computedEventsByDate;
-    return optimisticPatch(computedEventsByDate);
+    const base = optimisticPatch ? optimisticPatch(computedEventsByDate) : computedEventsByDate;
+
+    // Dedup: keep only the first event per taskId per date
+    let needsDedup = false;
+    for (const dateStr of Object.keys(base)) {
+      const events = base[dateStr];
+      const seen = new Set<string>();
+      for (const event of events) {
+        if (!event.taskId) continue;
+        const key = event.taskId.toString();
+        if (seen.has(key)) { needsDedup = true; break; }
+        seen.add(key);
+      }
+      if (needsDedup) break;
+    }
+
+    if (!needsDedup) return base;
+
+    const result: Record<string, DayEvent[]> = {};
+    for (const dateStr of Object.keys(base)) {
+      const seen = new Set<string>();
+      result[dateStr] = base[dateStr].filter(event => {
+        if (!event.taskId) return true;
+        const key = event.taskId.toString();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    return result;
   }, [computedEventsByDate, optimisticPatch]);
 
   // setEventsByDate: accepts a function (prev => next) for optimistic updates.

@@ -7,9 +7,11 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Flame,
   Award,
   Calendar,
+  Settings,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
 import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload } from "@/lib/habit-utils"
@@ -60,6 +62,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
     const now = new Date()
     return { year: now.getFullYear(), month: now.getMonth() }
   })
+  const [showSettings, setShowSettings] = useState(false)
 
   // All hooks must be called before any early return
   const completionSet = useMemo(
@@ -313,6 +316,89 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
             {achievedCount}/{milestones.length} achieved
           </span>
         </div>
+      </div>
+
+      {/* Settings */}
+      <div>
+        <button
+          onClick={() => setShowSettings(prev => !prev)}
+          className="w-full flex items-center justify-between py-2 text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Settings className="h-3.5 w-3.5" />
+            Settings
+          </span>
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showSettings ? "rotate-180" : ""}`} />
+        </button>
+        {showSettings && (
+          <div className="space-y-4 pt-1 pb-1">
+            {/* Habit Name */}
+            <div>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-1.5">
+                Habit Name
+              </label>
+              <input
+                type="text"
+                className="w-full border border-theme-neutral-300 rounded-lg px-3 py-2 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
+                value={data.habitName}
+                onChange={(e) => {
+                  const name = e.target.value
+                  onUpdate({
+                    habitTrackerData: { ...data, habitName: name },
+                    linkedTaskTitle: name || data.habitName,
+                  })
+                }}
+                placeholder="e.g., Read 30 minutes, Meditate, Exercise"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-1.5">
+                Description
+              </label>
+              <input
+                type="text"
+                className="w-full border border-theme-neutral-300 rounded-lg px-3 py-2 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
+                value={data.habitDescription || ""}
+                onChange={(e) => {
+                  onUpdate({
+                    habitTrackerData: { ...data, habitDescription: e.target.value },
+                  })
+                }}
+                placeholder="Optional description"
+              />
+            </div>
+
+            {/* Tracking Days */}
+            <div>
+              <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
+                Tracking Days
+              </label>
+              <div className="flex gap-1.5">
+                {["S", "M", "T", "W", "T", "F", "S"].map((label, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const newSchedule = (widget.schedule || [true, true, true, true, true, true, true]).map(
+                        (v: boolean, i: number) => i === idx ? !v : v
+                      )
+                      onUpdate({ schedule: newSchedule })
+                    }}
+                    className={`h-8 w-8 rounded-full border text-[11px] font-semibold transition-colors ${
+                      (widget.schedule || [])[idx]
+                        ? "border-purple-500 bg-purple-500 text-white shadow-sm"
+                        : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

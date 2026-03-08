@@ -58,6 +58,42 @@ const HOURS = Array.from({ length: 15 }, (_, i) => {
 const RESIZE_INCREMENT = 15; // minutes
 const MIN_DURATION = 15; // minutes
 
+// ── Two-part time picker helpers (matches task-editor-modal pattern) ──
+const PICKER_HOURS = Array.from({ length: 15 }, (_, i) => {
+  const h = 7 + i; // 7AM → 9PM
+  const display = h % 12 || 12;
+  const suffix = h < 12 ? "AM" : "PM";
+  return `${display}${suffix}`;
+});
+const PICKER_MINUTES = ["00", "15", "30", "45"];
+
+/** Compose "2PM" + "15" → "2:15PM"; "2PM" + "00" → "2PM" */
+const composeTimeLabel = (hour: string, minute: string): string => {
+  if (!hour) return "";
+  if (!minute || minute === "00") return hour;
+  const m = hour.match(/^(\d{1,2})(AM|PM)$/);
+  if (!m) return hour;
+  return `${m[1]}:${minute}${m[2]}`;
+};
+
+/** Decompose "2:15PM" → { hour: "2PM", minute: "15" } */
+const decomposeTimeLabel = (label: string): { hour: string; minute: string } => {
+  if (!label) return { hour: "", minute: "00" };
+  const m = label.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
+  if (!m) return { hour: "", minute: "00" };
+  return { hour: `${m[1]}${m[3]}`, minute: m[2] || "00" };
+};
+
+const DURATION_OPTIONS = [
+  { value: 15, label: "15m" },
+  { value: 30, label: "30m" },
+  { value: 45, label: "45m" },
+  { value: 60, label: "1h" },
+  { value: 90, label: "1.5h" },
+  { value: 120, label: "2h" },
+  { value: 180, label: "3h" },
+  { value: 240, label: "4h" },
+];
 
 const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
   { value: 'none', label: 'Do not repeat' },
@@ -307,7 +343,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
       const normalizedEndSlot = endLabel ? ensureHourPrefix(endLabel) : undefined;
       const repeatRule = newTaskRepeat ?? 'none';
 
-      const newTask = await createTask(
+      await createTask(
         resolvedContent,
         dateStr,
         normalizedStartSlot,
@@ -317,23 +353,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           endDate: dateStr,
           endHourSlot: normalizedEndSlot,
           allDay: false,
+          duration: newTaskDuration,
         }
       );
-
-      if (newTask) {
-        await batchUpdateTasks([
-          {
-            taskId: newTask.id,
-            updates: {
-              hourSlot: normalizedStartSlot,
-              endHourSlot: normalizedEndSlot ?? null,
-              duration: newTaskDuration,
-              allDay: false,
-            },
-            occurrenceDate: dateStr,
-          },
-        ]);
-      }
 
       setNewTaskContent('');
       setNewTaskDuration(60);
@@ -626,61 +648,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           }}
           className="space-y-3"
         >
-          <label className="block text-xs text-theme-text-subtle font-medium">
-            <span className="block mb-1 uppercase tracking-wide">Start time</span>
-            <select
-              value={newTaskStart || addModalSlot || ''}
-              onChange={(e) => setNewTaskStart(e.target.value)}
-              className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
-            >
-              {TIME_SLOTS.map((slot) => (
-                <option key={slot} value={slot}>{slot}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            {availableBuckets.length > 0 && (
-              <label className="flex-1 text-xs text-theme-text-subtle font-medium">
-                <span className="block mb-1 uppercase tracking-wide">Bucket</span>
-                <select
-                  value={taskBucket}
-                  onChange={(e) => setTaskBucket(e.target.value)}
-                  className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
-                >
-                  {availableBuckets.map((bucket) => (
-                    <option key={bucket} value={bucket}>{bucket}</option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label className="w-full sm:w-40 text-xs text-theme-text-subtle font-medium">
-              <span className="block mb-1 uppercase tracking-wide">Duration</span>
-              <select
-                value={newTaskDuration}
-                onChange={(e) => setNewTaskDuration(parseInt(e.target.value, 10))}
-                className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
-              >
-                {[15, 30, 45, 60, 90, 120].map((minutes) => (
-                  <option key={minutes} value={minutes}>{minutes} min</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="block text-xs text-theme-text-subtle font-medium">
-            <span className="block mb-1 uppercase tracking-wide">Repeat</span>
-            <select
-              value={newTaskRepeat}
-              onChange={(e) => setNewTaskRepeat(e.target.value as RepeatOption)}
-              className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
-            >
-              {REPEAT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-
+          {/* Task name first — most important field */}
           <label className="block text-xs text-theme-text-subtle font-medium">
             <span className="block mb-1 uppercase tracking-wide">Task</span>
             <input
@@ -698,6 +666,86 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
               className="w-full rounded border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-secondary focus:outline-none"
             />
           </label>
+
+          {/* Time + Duration row */}
+          <div className="flex items-end gap-3">
+            <div className="flex-1 text-xs text-theme-text-subtle font-medium">
+              <span className="block mb-1 uppercase tracking-wide">Time</span>
+              <div className="flex items-center gap-1">
+                <select
+                  className="w-[62px] rounded border border-theme-neutral-300 px-1.5 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
+                  value={decomposeTimeLabel(newTaskStart || addModalSlot || '').hour}
+                  onChange={(e) => {
+                    const h = e.target.value;
+                    if (!h) { setNewTaskStart(''); return; }
+                    const { minute } = decomposeTimeLabel(newTaskStart || addModalSlot || '');
+                    setNewTaskStart(composeTimeLabel(h, minute));
+                  }}
+                >
+                  {PICKER_HOURS.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-theme-text-tertiary">:</span>
+                <select
+                  className="w-[50px] rounded border border-theme-neutral-300 px-1.5 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
+                  value={decomposeTimeLabel(newTaskStart || addModalSlot || '').minute}
+                  onChange={(e) => {
+                    const { hour } = decomposeTimeLabel(newTaskStart || addModalSlot || '');
+                    if (!hour) return;
+                    setNewTaskStart(composeTimeLabel(hour, e.target.value));
+                  }}
+                >
+                  {PICKER_MINUTES.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="text-xs text-theme-text-subtle font-medium">
+              <span className="block mb-1 uppercase tracking-wide">Duration</span>
+              <select
+                value={newTaskDuration}
+                onChange={(e) => setNewTaskDuration(parseInt(e.target.value, 10))}
+                className="w-[72px] rounded border border-theme-neutral-300 px-1.5 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
+              >
+                {DURATION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Bucket + Repeat row */}
+          <div className="flex items-end gap-3">
+            {availableBuckets.length > 0 && (
+              <label className="flex-1 text-xs text-theme-text-subtle font-medium">
+                <span className="block mb-1 uppercase tracking-wide">Bucket</span>
+                <select
+                  value={taskBucket}
+                  onChange={(e) => setTaskBucket(e.target.value)}
+                  className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
+                >
+                  {availableBuckets.map((bucket) => (
+                    <option key={bucket} value={bucket}>{bucket}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="flex-1 text-xs text-theme-text-subtle font-medium">
+              <span className="block mb-1 uppercase tracking-wide">Repeat</span>
+              <select
+                value={newTaskRepeat}
+                onChange={(e) => setNewTaskRepeat(e.target.value as RepeatOption)}
+                className="w-full rounded border border-theme-neutral-300 px-2 py-1.5 text-sm focus:border-theme-secondary focus:outline-none"
+              >
+                {REPEAT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button

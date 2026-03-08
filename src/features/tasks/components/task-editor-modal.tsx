@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { format, parseISO } from "date-fns";
-import { X, Trash2, ShoppingCart } from "lucide-react";
+import { X, Trash2, ShoppingCart, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
@@ -88,7 +88,6 @@ interface TaskEditorModalProps {
   availableBuckets?: string[];
   selectedBucket?: string | null;
   getDefaultDate?: () => string;
-  onSubmitSuccess?: (result: { action: "create" | "update"; taskId?: string | null; date: string }) => void;
   bucketColors?: Record<string, string>;
   familyMembers?: FamilyMemberOption[];
 }
@@ -101,7 +100,7 @@ const toHourSlot = (label: string): string | null => {
 const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
-  ({ availableBuckets = [], selectedBucket, getDefaultDate, onSubmitSuccess, bucketColors = {}, familyMembers = [] }, ref) => {
+  ({ availableBuckets = [], selectedBucket, getDefaultDate, bucketColors = {}, familyMembers = [] }, ref) => {
     const { allTasks } = useTaskData();
     const { createTask, batchUpdateTasks, deleteTask, refetch } = useTaskActions();
     const { toast } = useToast();
@@ -121,6 +120,10 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [shoppingItemId, setShoppingItemId] = useState<string | null>(null);
     const [isShoppingBusy, setIsShoppingBusy] = useState(false);
+    const [habitWidgetId, setHabitWidgetId] = useState<string | null>(null);
+    const [habitWidgetBucket, setHabitWidgetBucket] = useState<string | null>(null);
+    const [isHabitBusy, setIsHabitBusy] = useState(false);
+    const [habitSchedule, setHabitSchedule] = useState<boolean[]>([true, true, true, true, true, true, true]);
     const [formAssignee, setFormAssignee] = useState<string | null>(null);
 
     const resolveDefaultDate = useCallback(() => {
@@ -146,6 +149,10 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setShowDeleteConfirm(false);
       setShoppingItemId(null);
       setIsShoppingBusy(false);
+      setHabitWidgetId(null);
+      setHabitWidgetBucket(null);
+      setIsHabitBusy(false);
+      setHabitSchedule([true, true, true, true, true, true, true]);
       setFormAssignee(null);
     }, [evaluateBucketDefault]);
 
@@ -233,6 +240,40 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       return () => { cancelled = true; };
     }, [isOpen, editTaskId]);
 
+    // Detect linked habit widget when modal opens in edit mode
+    useEffect(() => {
+      if (!isOpen || !editTaskId) {
+        setHabitWidgetId(null);
+        setHabitWidgetBucket(null);
+        return;
+      }
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await fetch("/api/user/preferences", { credentials: "same-origin" });
+          if (!res.ok || cancelled) return;
+          const prefs = await res.json();
+          const widgetsByBucket: Record<string, any[]> = prefs.widgets_by_bucket || {};
+          for (const [bucket, widgets] of Object.entries(widgetsByBucket)) {
+            const match = (widgets || []).find(
+              (w: any) => w.id === "habit_tracker" && w.linkedTaskId === editTaskId
+            );
+            if (match && !cancelled) {
+              setHabitWidgetId(match.instanceId);
+              setHabitWidgetBucket(bucket);
+              if (Array.isArray(match.schedule) && match.schedule.length === 7) {
+                setHabitSchedule(match.schedule);
+              }
+              return;
+            }
+          }
+        } catch {
+          // silently ignore — button defaults to "add" mode
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [isOpen, editTaskId]);
+
     useEffect(() => {
       if (!startDate) {
         return;
@@ -294,11 +335,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           } catch (error) {
             console.error("Failed to refresh tasks after creation", error);
           }
-          onSubmitSuccess?.({
-            action: "create",
-            taskId: task?.id ?? null,
-            date: resolvedStartDate,
-          });
         } else {
           const updates: any = {
             content: formContent.trim(),
@@ -327,11 +363,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           } catch (error) {
             console.error("Failed to refresh tasks after update", error);
           }
-          onSubmitSuccess?.({
-            action: "update",
-            taskId: editTaskId,
-            date: resolvedStartDate,
-          });
         }
       } finally {
         setIsSubmitting(false);
@@ -353,7 +384,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       createTask,
       resetState,
       refetch,
-      onSubmitSuccess,
       batchUpdateTasks,
     ]);
 
@@ -423,6 +453,131 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         setIsShoppingBusy(false);
       }
     }, [editTaskId, isShoppingBusy, shoppingItemId, formContent, formBucket, startDate, toast]);
+
+    const handleToggleHabit = useCallback(async () => {
+      if (!editTaskId || isHabitBusy) return;
+      setIsHabitBusy(true);
+      try {
+        // Fetch current preferences
+        const prefsRes = await fetch("/api/user/preferences", { credentials: "same-origin" });
+        if (!prefsRes.ok) throw new Error("Failed to fetch preferences");
+        const prefs = await prefsRes.json();
+        const widgetsByBucket: Record<string, any[]> = { ...(prefs.widgets_by_bucket || {}) };
+
+        if (habitWidgetId && habitWidgetBucket) {
+          // Remove the habit widget
+          const bucketWidgets = widgetsByBucket[habitWidgetBucket] || [];
+          widgetsByBucket[habitWidgetBucket] = bucketWidgets.filter(
+            (w: any) => w.instanceId !== habitWidgetId
+          );
+
+          const saveRes = await fetch("/api/user/preferences", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
+          });
+          if (!saveRes.ok) throw new Error("Failed to save preferences");
+          setHabitWidgetId(null);
+          setHabitWidgetBucket(null);
+          toast({ title: "Removed from habits" });
+        } else {
+          // Create a new habit widget linked to this task
+          const targetBucket = formBucket || availableBuckets[0] || "General";
+          const now = new Date();
+          const todayStr = format(now, "yyyy-MM-dd");
+          const newWidget = {
+            id: "habit_tracker",
+            instanceId: `habit_tracker-${Date.now()}`,
+            name: "Habit Tracker",
+            description: "Build daily habits with streak tracking and milestones",
+            icon: "Target",
+            category: "wellness",
+            color: "purple",
+            defaultTarget: 1,
+            target: 1,
+            unit: "day",
+            units: ["day"],
+            dataSource: "manual",
+            schedule: [...habitSchedule],
+            createdAt: now.toISOString(),
+            linkedTaskId: editTaskId,
+            linkedTaskSource: "supabase" as const,
+            linkedTaskAutoCreated: false,
+            linkedTaskTitle: formContent.trim() || "Untitled",
+            habitTrackerData: {
+              habitName: formContent.trim() || "Untitled",
+              habitDescription: "",
+              startDate: todayStr,
+              bestStreak: 0,
+              totalCompletions: 0,
+              completionHistory: [],
+              milestones: [
+                { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
+                { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
+                { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
+                { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
+                { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
+                { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
+                { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
+                { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
+              ],
+            },
+          };
+
+          const existingBucketWidgets = widgetsByBucket[targetBucket] || [];
+          widgetsByBucket[targetBucket] = [...existingBucketWidgets, newWidget];
+
+          const saveRes = await fetch("/api/user/preferences", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
+          });
+          if (!saveRes.ok) throw new Error("Failed to save preferences");
+          setHabitWidgetId(newWidget.instanceId);
+          setHabitWidgetBucket(targetBucket);
+          toast({ title: "Added as a habit" });
+        }
+      } catch (err) {
+        console.error("Failed to update habit:", err);
+        toast({ title: "Failed to update habit" });
+      } finally {
+        setIsHabitBusy(false);
+      }
+    }, [editTaskId, isHabitBusy, habitWidgetId, habitWidgetBucket, habitSchedule, formContent, formBucket, availableBuckets, toast]);
+
+    // Save schedule changes to an existing linked habit widget (debounced via submit)
+    const saveHabitSchedule = useCallback(async (newSchedule: boolean[]) => {
+      if (!habitWidgetId || !habitWidgetBucket) return;
+      try {
+        const prefsRes = await fetch("/api/user/preferences", { credentials: "same-origin" });
+        if (!prefsRes.ok) return;
+        const prefs = await prefsRes.json();
+        const widgetsByBucket: Record<string, any[]> = { ...(prefs.widgets_by_bucket || {}) };
+        const bucketWidgets = widgetsByBucket[habitWidgetBucket] || [];
+        widgetsByBucket[habitWidgetBucket] = bucketWidgets.map((w: any) =>
+          w.instanceId === habitWidgetId ? { ...w, schedule: newSchedule } : w
+        );
+        await fetch("/api/user/preferences", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
+        });
+      } catch {
+        // silent — schedule will persist on next full save
+      }
+    }, [habitWidgetId, habitWidgetBucket]);
+
+    const handleToggleHabitDay = useCallback((dayIndex: number) => {
+      setHabitSchedule(prev => {
+        const next = prev.map((v, i) => i === dayIndex ? !v : v);
+        // If habit already exists, persist the schedule change
+        if (habitWidgetId) saveHabitSchedule(next);
+        return next;
+      });
+    }, [habitWidgetId, saveHabitSchedule]);
 
     // Keyboard shortcuts: Cmd+Enter to save, Escape to close
     useEffect(() => {
@@ -738,7 +893,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           </div>
 
           {/* Footer */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0 space-y-3">
+            {/* Action toggles row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {editTaskId && (
@@ -782,6 +938,21 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                           ? (shoppingItemId ? "Removing..." : "Adding...")
                           : (shoppingItemId ? "On shopping list" : "Shopping list")}
                       </button>
+                      <button
+                        onClick={handleToggleHabit}
+                        disabled={isHabitBusy}
+                        className={cn(
+                          "flex items-center gap-1.5 text-[13px] transition-colors disabled:opacity-50",
+                          habitWidgetId
+                            ? "text-purple-600 hover:text-red-500"
+                            : "text-theme-text-tertiary hover:text-purple-600"
+                        )}
+                      >
+                        <Activity size={14} />
+                        {isHabitBusy
+                          ? (habitWidgetId ? "Removing..." : "Adding...")
+                          : (habitWidgetId ? "Tracked as habit" : "Track as habit")}
+                      </button>
                     </>
                   )
                 )}
@@ -807,6 +978,32 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                 </button>
               </div>
             </div>
+
+            {/* Habit day picker — shown when habit toggle is active */}
+            {habitWidgetId && editTaskId && !showDeleteConfirm && (
+              <div className="pt-2 border-t border-theme-neutral-300/50">
+                <span className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
+                  Tracking Days
+                </span>
+                <div className="flex gap-1.5">
+                  {["S","M","T","W","T","F","S"].map((label, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleToggleHabitDay(idx)}
+                      className={cn(
+                        "h-8 w-8 rounded-full border text-[11px] font-semibold transition-colors",
+                        habitSchedule[idx]
+                          ? "border-purple-500 bg-purple-500 text-white shadow-sm"
+                          : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         </div>

@@ -60,6 +60,7 @@ export function useTaskMutations(
       endHourSlot?: number | string | null
       allDay?: boolean | null
       assigneeId?: string | null
+      duration?: number | null
     }
   ) => {
     const trimmed = content.trim()
@@ -67,7 +68,7 @@ export function useTaskMutations(
       return;
     }
     const repeatRule = repeat !== 'none' ? repeat : undefined
-    const { endDate: explicitEndDate, endHourSlot, allDay } = options ?? {}
+    const { endDate: explicitEndDate, endHourSlot, allDay, duration: explicitDuration } = options ?? {}
 
     const normalizeHourSlot = (value?: number | string | null): string | undefined => {
       if (typeof value === 'number' && Number.isFinite(value)) {
@@ -132,6 +133,7 @@ export function useTaskMutations(
           endDate: resolvedEndDate ?? undefined,
           hourSlot: normalizedHourSlot,
           endHourSlot: normalizedEndHourSlot,
+          duration: explicitDuration ?? undefined,
           assigneeId: options?.assigneeId ?? null,
           bucket: bucket || undefined,
           position: undefined,
@@ -164,7 +166,7 @@ export function useTaskMutations(
       bucket,
       repeat_rule: repeatRule,
       allDay: resolvedAllDay,
-      duration: options && 'duration' in options ? (options as any).duration : undefined,
+      duration: explicitDuration ?? undefined,
       assignee_id: options?.assigneeId ?? null,
     }
 
