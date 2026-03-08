@@ -38,11 +38,18 @@ export function getLast7Days(): string[] {
 /**
  * Walks backwards from today (or yesterday if today isn't completed)
  * counting consecutive completed days.
+ * Filters out future dates to handle legacy UTC-stored entries.
  */
 export function calculateStreak(completionHistory: string[]): number {
-  const unique = Array.from(new Set(completionHistory)).sort().reverse()
   const today = getDateKey(new Date())
-  const yesterday = getDateKey(new Date(Date.now() - 86400000))
+  const yd = new Date(); yd.setDate(yd.getDate() - 1)
+  const yesterday = getDateKey(yd)
+
+  // Filter out dates after today (can happen from legacy UTC storage)
+  const unique = Array.from(new Set(completionHistory))
+    .filter(d => d <= today)
+    .sort()
+    .reverse()
 
   if (!unique.length || (unique[0] !== today && unique[0] !== yesterday)) return 0
 

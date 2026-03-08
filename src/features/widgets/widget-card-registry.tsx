@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetInstance } from "@/types/widgets";
 import type { ProgressEntry } from "@/features/dashboard/types";
 import { getWidgetColorStyles, todayStrGlobal } from "@/lib/dashboard-utils";
+import { getDateKey, calculateStreak, getLast7Days } from "@/lib/habit-utils";
 import { progress as progressStyles } from "@/lib/styles";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -525,37 +526,14 @@ function renderHabitTrackerBody({
   const habitData = w.habitTrackerData;
   if (habitData && habitData.habitName) {
     const completionSet = new Set(habitData.completionHistory || []);
-    const todayKey = new Date().toISOString().split("T")[0];
+    const todayKey = getDateKey(new Date());
     const isCompletedToday = completionSet.has(todayKey);
 
-    // Calculate streak
-    const sorted = Array.from(new Set(habitData.completionHistory || []))
-      .sort()
-      .reverse();
-    const yesterdayKey = new Date(Date.now() - 86400000)
-      .toISOString()
-      .split("T")[0];
-    let streak = 0;
-    if (
-      sorted.length &&
-      (sorted[0] === todayKey || sorted[0] === yesterdayKey)
-    ) {
-      let expected = sorted[0];
-      for (const date of sorted) {
-        if (date === expected) {
-          streak++;
-          const d = new Date(expected + "T12:00:00");
-          d.setDate(d.getDate() - 1);
-          expected = d.toISOString().split("T")[0];
-        } else break;
-      }
-    }
+    const streak = calculateStreak(habitData.completionHistory || []);
 
     // Last 7 day dots
-    const last7 = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(Date.now() - (6 - i) * 86400000);
-      return completionSet.has(d.toISOString().split("T")[0]);
-    });
+    const last7Days = getLast7Days();
+    const last7 = last7Days.map((key) => completionSet.has(key));
 
     // Next milestone
     const milestones = habitData.milestones || [];

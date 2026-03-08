@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Target,
   Check,
@@ -14,7 +13,7 @@ import {
   Calendar,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
-import { getDateKey, calculateStreak } from "@/lib/habit-utils"
+import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload } from "@/lib/habit-utils"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,18 +69,15 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
   )
 
   const last7Days = useMemo(() => {
-    const days: { key: string; label: string; completed: boolean }[] = []
     const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 86400000)
-      const key = getDateKey(d)
-      days.push({
+    return getLast7Days().map((key) => {
+      const d = new Date(key + "T12:00:00")
+      return {
         key,
         label: dayLabels[d.getDay()],
         completed: completionSet.has(key),
-      })
-    }
-    return days
+      }
+    })
   }, [completionSet])
 
   const calendarDays = useMemo(() => {
@@ -95,10 +91,11 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-      cells.push({ day: d, key, completed: completionSet.has(key) })
+      // Filter out future-date completions (legacy UTC entries)
+      cells.push({ day: d, key, completed: completionSet.has(key) && key <= today })
     }
     return cells
-  }, [calendarMonth, completionSet])
+  }, [calendarMonth, completionSet, today])
 
   if (!data || !data.habitName) {
     return (
@@ -139,42 +136,10 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
 
   // Toggle completion for today
   function handleToggleToday() {
-    if (!data) return
-    const history = [...(data.completionHistory || [])]
-    let totalCompletions = data.totalCompletions || 0
-
-    if (isCompletedToday) {
-      // Undo: remove today
-      const idx = history.lastIndexOf(today)
-      if (idx !== -1) history.splice(idx, 1)
-      totalCompletions = Math.max(0, totalCompletions - 1)
-    } else {
-      // Complete today
-      history.push(today)
-      totalCompletions++
-      onComplete()
-    }
-
-    const newStreak = calculateStreak(history)
-    const newBestStreak = Math.max(data.bestStreak || 0, newStreak)
-
-    // Check milestones
-    const updatedMilestones = (data.milestones || DEFAULT_MILESTONES).map((m) => {
-      if (!m.achieved && newStreak >= m.days) {
-        return { ...m, achieved: true, achievedDate: today }
-      }
-      return m
-    })
-
-    onUpdate({
-      habitTrackerData: {
-        ...data,
-        completionHistory: history,
-        totalCompletions,
-        bestStreak: newBestStreak,
-        milestones: updatedMilestones,
-      },
-    })
+    const payload = buildTogglePayload(widget, isCompletedToday)
+    if (!payload) return
+    if (!isCompletedToday) onComplete()
+    onUpdate(payload)
   }
 
   function navigateMonth(delta: number) {
@@ -191,8 +156,8 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
     <div className="mt-4 space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-          <Target className="h-5 w-5 text-purple-600" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-theme-brand-tint-light">
+          <Target className="h-5 w-5 text-theme-secondary" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-theme-text-primary truncate">{data.habitName}</h3>
@@ -216,7 +181,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
             </div>
             {bestStreak > currentStreak && (
               <p className="text-xs text-theme-neutral-400 mt-0.5">
-                Best: {bestStreak} days
+                Best: {bestStreak} day{bestStreak !== 1 ? "s" : ""}
               </p>
             )}
           </div>
@@ -225,8 +190,8 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
             variant={isCompletedToday ? "default" : "outline"}
             className={
               isCompletedToday
-                ? "bg-green-600 hover:bg-green-700 text-white gap-1.5"
-                : "border-theme-neutral-300 text-theme-text-subtle hover:bg-green-50 hover:text-theme-text-primary hover:border-green-300 gap-1.5"
+                ? "bg-theme-secondary hover:bg-theme-secondary/90 text-white gap-1.5"
+                : "border-theme-neutral-300 text-theme-text-subtle hover:bg-theme-brand-tint-subtle hover:text-theme-text-primary hover:border-theme-secondary/40 gap-1.5"
             }
           >
             <Check className="h-4 w-4" />
@@ -244,7 +209,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
               <div
                 className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
                   day.completed
-                    ? "bg-green-500 text-white"
+                    ? "bg-theme-secondary text-white"
                     : day.key === today
                       ? "border-2 border-dashed border-theme-neutral-300 text-theme-neutral-400"
                       : "bg-theme-neutral-100 text-theme-neutral-400"
@@ -300,7 +265,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                 cell.day === null
                   ? ""
                   : cell.completed
-                    ? "bg-green-500 text-white font-medium"
+                    ? "bg-theme-secondary text-white font-medium"
                     : cell.key === today
                       ? "border border-dashed border-theme-neutral-400 text-theme-text-subtle"
                       : cell.key < today && cell.key >= startDate
@@ -328,7 +293,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                 key={m.days}
                 className={`rounded-lg border p-2.5 text-xs transition-colors ${
                   m.achieved
-                    ? "border-green-200 bg-green-50"
+                    ? "border-theme-secondary/30 bg-theme-brand-tint-subtle"
                     : "border-theme-neutral-300 bg-white opacity-60"
                 }`}
               >
