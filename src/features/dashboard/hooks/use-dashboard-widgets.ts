@@ -8,6 +8,7 @@ import type { ProgressEntry } from "@/features/dashboard/types";
 import type { DestructiveConfirmState } from "@/lib/dashboard-utils";
 import { MODAL_WIDGET_IDS } from "@/features/dashboard/constants";
 import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences";
+import { buildTogglePayload } from "@/lib/habit-utils";
 import { todayStrGlobal, yesterdayStrGlobal, debounce, migrateWidgetsToTemplates } from "@/lib/dashboard-utils";
 import { ListChecks } from "lucide-react";
 import type { DropResult } from "@hello-pangea/dnd";
@@ -323,46 +324,12 @@ export function useDashboardWidgets({
 
   // ── Habit toggle ──────────────────────────────────────────────────────
   const handleHabitToggle = useCallback((widget: WidgetInstance, isCompletedToday: boolean) => {
-    const habitData = widget.habitTrackerData;
-    if (!habitData) return;
+    const updatedData = buildTogglePayload(widget, isCompletedToday);
+    if (!updatedData) return;
 
-    const history = [...(habitData.completionHistory || [])];
-    let total = habitData.totalCompletions || 0;
-    const todayKey = new Date().toISOString().split('T')[0];
-
-    const sorted = Array.from(new Set(habitData.completionHistory || [])).sort().reverse();
-    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    let streak = 0;
-    if (sorted.length && (sorted[0] === todayKey || sorted[0] === yesterdayKey)) {
-      let expected = sorted[0];
-      for (const date of sorted) {
-        if (date === expected) {
-          streak++;
-          const d = new Date(expected + 'T12:00:00');
-          d.setDate(d.getDate() - 1);
-          expected = d.toISOString().split('T')[0];
-        } else break;
-      }
-    }
-
-    if (isCompletedToday) {
-      const idx = history.lastIndexOf(todayKey);
-      if (idx !== -1) history.splice(idx, 1);
-      total = Math.max(0, total - 1);
-    } else {
-      history.push(todayKey);
-      total++;
+    if (!isCompletedToday) {
       incrementProgress(widget);
     }
-
-    const updatedData = {
-      habitTrackerData: {
-        ...habitData,
-        completionHistory: history,
-        totalCompletions: total,
-        bestStreak: Math.max(habitData.bestStreak || 0, streak + (isCompletedToday ? 0 : 1)),
-      },
-    };
 
     isDirtyRef.current = true;
     setWidgetsByBucket(prev => {

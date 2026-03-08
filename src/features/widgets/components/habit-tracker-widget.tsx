@@ -14,6 +14,7 @@ import {
   Calendar,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { getDateKey, calculateStreak } from "@/lib/habit-utils"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,32 +41,6 @@ const DEFAULT_MILESTONES = [
   { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
   { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
 ]
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
-
-function calculateStreak(completionHistory: string[]): number {
-  const unique = Array.from(new Set(completionHistory)).sort().reverse()
-  const today = getDateKey(new Date())
-  const yesterday = getDateKey(new Date(Date.now() - 86400000))
-
-  if (!unique.length || (unique[0] !== today && unique[0] !== yesterday)) return 0
-
-  let streak = 0
-  let expected = unique[0]
-  for (const date of unique) {
-    if (date === expected) {
-      streak++
-      const d = new Date(expected + "T12:00:00")
-      d.setDate(d.getDate() - 1)
-      expected = getDateKey(d)
-    } else {
-      break
-    }
-  }
-  return streak
-}
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate()
