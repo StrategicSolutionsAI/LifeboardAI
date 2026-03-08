@@ -23,8 +23,35 @@ import {
 import { cn } from "@/lib/utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 
-const START_TIMES = ["7AM","8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM"];
-const END_TIMES = ["8AM","9AM","10AM","11AM","12PM","1PM","2PM","3PM","4PM","5PM","6PM","7PM","8PM","9PM","10PM"];
+function generateHourLabels(startHour: number, endHour: number): string[] {
+  const labels: string[] = [];
+  for (let h = startHour; h <= endHour; h++) {
+    const display = h % 12 || 12;
+    const suffix = h < 12 ? "AM" : "PM";
+    labels.push(`${display}${suffix}`);
+  }
+  return labels;
+}
+const START_HOURS = generateHourLabels(7, 21);  // 7AM – 9PM
+const END_HOURS = generateHourLabels(7, 22);    // 7AM – 10PM
+const MINUTE_OPTIONS = ["00", "15", "30", "45"];
+
+/** Compose "2PM" + "15" → "2:15PM"; "2PM" + "00" → "2PM" */
+const composeTimeLabel = (hour: string, minute: string): string => {
+  if (!hour) return "";
+  if (!minute || minute === "00") return hour;
+  const match = hour.match(/^(\d{1,2})(AM|PM)$/);
+  if (!match) return hour;
+  return `${match[1]}:${minute}${match[2]}`;
+};
+
+/** Decompose "2:15PM" → { hour: "2PM", minute: "15" }; "2PM" → { hour: "2PM", minute: "00" } */
+const decomposeTimeLabel = (label: string): { hour: string; minute: string } => {
+  if (!label) return { hour: "", minute: "00" };
+  const match = label.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
+  if (!match) return { hour: "", minute: "00" };
+  return { hour: `${match[1]}${match[3]}`, minute: match[2] || "00" };
+};
 
 type TaskEditorOpenOptions = {
   fallbackTitle?: string;
@@ -223,13 +250,14 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
       const toHourNumber = (label: string): number | undefined => {
         if (!label) return undefined;
-        const match = label.match(/^(\d{1,2})(AM|PM)$/);
+        const match = label.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/);
         if (!match) return undefined;
         let hours = parseInt(match[1], 10);
-        const period = match[2];
+        const minutes = match[2] ? parseInt(match[2], 10) : 0;
+        const period = match[3];
         if (period === "PM" && hours !== 12) hours += 12;
         if (period === "AM" && hours === 12) hours = 0;
-        return hours;
+        return hours + minutes / 60;
       };
 
       const hourNum = toHourNumber(formTime);
@@ -487,17 +515,39 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   </div>
                   <div className="p-3 border-l border-theme-neutral-300/50">
                     <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Time</span>
-                    <select
-                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
-                      value={formTime}
-                      onChange={(e) => setFormTime(e.target.value)}
-                      disabled={formAllDay}
-                    >
-                      <option value="">--</option>
-                      {START_TIMES.map((time) => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="w-[58px] text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
+                        value={decomposeTimeLabel(formTime).hour}
+                        onChange={(e) => {
+                          const h = e.target.value;
+                          if (!h) { setFormTime(""); return; }
+                          const { minute } = decomposeTimeLabel(formTime);
+                          setFormTime(composeTimeLabel(h, minute));
+                        }}
+                        disabled={formAllDay}
+                      >
+                        <option value="">--</option>
+                        {START_HOURS.map((h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span className="text-[13px] text-theme-text-tertiary">:</span>
+                      <select
+                        className="w-[44px] text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
+                        value={decomposeTimeLabel(formTime).minute}
+                        onChange={(e) => {
+                          const { hour } = decomposeTimeLabel(formTime);
+                          if (!hour) return;
+                          setFormTime(composeTimeLabel(hour, e.target.value));
+                        }}
+                        disabled={formAllDay || !decomposeTimeLabel(formTime).hour}
+                      >
+                        {MINUTE_OPTIONS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
                 {/* End row */}
@@ -514,17 +564,39 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                   </div>
                   <div className="p-3 border-l border-theme-neutral-300/50">
                     <span className="text-[11px] text-theme-text-tertiary mb-1.5 block">Time</span>
-                    <select
-                      className="w-full text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
-                      value={formEndTime}
-                      onChange={(e) => setFormEndTime(e.target.value)}
-                      disabled={formAllDay}
-                    >
-                      <option value="">--</option>
-                      {END_TIMES.map((time) => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="w-[58px] text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
+                        value={decomposeTimeLabel(formEndTime).hour}
+                        onChange={(e) => {
+                          const h = e.target.value;
+                          if (!h) { setFormEndTime(""); return; }
+                          const { minute } = decomposeTimeLabel(formEndTime);
+                          setFormEndTime(composeTimeLabel(h, minute));
+                        }}
+                        disabled={formAllDay}
+                      >
+                        <option value="">--</option>
+                        {END_HOURS.map((h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span className="text-[13px] text-theme-text-tertiary">:</span>
+                      <select
+                        className="w-[44px] text-[13px] text-theme-text-primary bg-transparent focus:outline-none disabled:text-theme-neutral-400"
+                        value={decomposeTimeLabel(formEndTime).minute}
+                        onChange={(e) => {
+                          const { hour } = decomposeTimeLabel(formEndTime);
+                          if (!hour) return;
+                          setFormEndTime(composeTimeLabel(hour, e.target.value));
+                        }}
+                        disabled={formAllDay || !decomposeTimeLabel(formEndTime).hour}
+                      >
+                        {MINUTE_OPTIONS.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
                 {/* All day toggle */}

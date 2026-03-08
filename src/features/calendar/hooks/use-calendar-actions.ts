@@ -231,10 +231,10 @@ export function useCalendarActions({
           const hourSlot = calendarEvent.time ? isoToHourLabel(calendarEvent.time) : null;
           const hourNumber = hourSlot
             ? (() => {
-                const match = hourSlot.match(/(\d{1,2})(AM|PM)/i);
+                const match = hourSlot.match(/(\d{1,2})(?::(\d{2}))?(AM|PM)/i);
                 if (!match) return null;
                 let hours = parseInt(match[1], 10);
-                const period = match[2].toUpperCase();
+                const period = match[3].toUpperCase();
                 if (period === "PM" && hours !== 12) hours += 12;
                 if (period === "AM" && hours === 12) hours = 0;
                 return hours;

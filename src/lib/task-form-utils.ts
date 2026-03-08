@@ -19,7 +19,10 @@ export const extractHourLabel = (hourSlot?: string | null) => {
 export const isoToHourLabel = (iso?: string | null) => {
   if (!iso) return "";
   try {
-    return format(new Date(iso), "h a").replace(" ", "");
+    const d = new Date(iso);
+    const minutes = d.getMinutes();
+    const fmt = minutes > 0 ? "h:mm a" : "h a";
+    return format(d, fmt).replace(" ", "");
   } catch (error) {
     console.error("Failed to parse ISO time for label", error);
     return "";
