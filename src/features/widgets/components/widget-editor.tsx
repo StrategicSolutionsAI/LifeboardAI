@@ -10,6 +10,7 @@ import { useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/types/tasks";
 import { format } from "date-fns";
 import { card, form } from "@/lib/styles";
+import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
 
 // Calidora-aligned colour palette
 const COLORS = [
@@ -763,16 +764,7 @@ export default function WidgetEditorSheet({
                           bestStreak: p.habitTrackerData?.bestStreak || 0,
                           totalCompletions: p.habitTrackerData?.totalCompletions || 0,
                           completionHistory: p.habitTrackerData?.completionHistory || [],
-                          milestones: p.habitTrackerData?.milestones || [
-                            { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
-                            { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
-                            { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
-                            { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
-                            { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
-                            { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
-                            { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
-                            { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
-                          ],
+                          milestones: p.habitTrackerData?.milestones || DEFAULT_MILESTONES,
                         },
                         linkedTaskConfig: p.linkedTaskConfig ? {
                           ...p.linkedTaskConfig,
@@ -781,6 +773,27 @@ export default function WidgetEditorSheet({
                       } : p);
                     }}
                     placeholder="e.g., Read 30 minutes, Meditate, Exercise"
+                    className={form.input}
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <p className={form.label}>Description</p>
+                  <input
+                    type="text"
+                    value={draft.habitTrackerData?.habitDescription || ''}
+                    onChange={e => {
+                      const desc = e.target.value;
+                      setDraft(p => p ? {
+                        ...p,
+                        habitTrackerData: {
+                          ...p.habitTrackerData!,
+                          habitDescription: desc,
+                        },
+                      } : p);
+                    }}
+                    placeholder="Optional description"
                     className={form.input}
                   />
                 </div>

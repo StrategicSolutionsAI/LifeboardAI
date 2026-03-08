@@ -342,6 +342,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
               )}
             </div>
           )}
+
         </div>
       </div>
       )}
@@ -349,8 +350,23 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {/* Calendar Grid */}
       {view === 'agenda' ? (
         // Agenda view: Mobile-optimized scrollable list
-        <div className="flex-1 overflow-y-auto">
-          <div className="px-3 py-2">
+        <div className="flex-1 overflow-y-auto flex flex-col">
+          {/* Agenda Header — Add task button */}
+          <div className={`border-b border-theme-neutral-300/50 bg-gradient-to-b from-theme-surface-alt/60 to-theme-surface-base flex justify-end ${isCompactBreakpoint ? 'px-3 py-2' : 'px-5 py-3'}`}>
+            <button
+              type="button"
+              onClick={() => taskEditorRef.current?.openNew(format(currentDate, 'yyyy-MM-dd'))}
+              className={isCompactBreakpoint
+                ? "flex items-center justify-center rounded-full bg-theme-primary w-8 h-8 text-white shadow-warm-sm active:scale-[0.97] shrink-0"
+                : "flex items-center gap-2 rounded-lg bg-theme-primary px-3.5 py-2 text-xs font-medium text-white shadow-warm-sm transition-all hover:bg-[#a8896a] hover:shadow-warm active:scale-[0.97]"
+              }
+            >
+              <Plus size={isCompactBreakpoint ? 16 : 14} strokeWidth={2.5} />
+              {!isCompactBreakpoint && <span>Add task</span>}
+            </button>
+          </div>
+
+          <div className="px-3 py-2 flex-1 overflow-y-auto">
             {agendaDays.map(({ date, dateStr, events, isToday }) => (
               <div key={dateStr}>
                 {/* Day header */}
@@ -435,15 +451,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
             <div className="h-20" />
           </div>
 
-          {/* FAB - Add task */}
-          <button
-            type="button"
-            onClick={() => taskEditorRef.current?.openNew(format(new Date(), 'yyyy-MM-dd'))}
-            className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-theme-primary text-white shadow-warm-lg flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="Add task"
-          >
-            <Plus size={24} strokeWidth={2.5} />
-          </button>
         </div>
       ) : view === 'day' ? (
         // Day view: Enhanced Calidora-style

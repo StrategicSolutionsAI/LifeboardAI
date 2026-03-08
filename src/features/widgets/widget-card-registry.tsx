@@ -6,6 +6,7 @@ import type { ProgressEntry } from "@/features/dashboard/types";
 import { getWidgetColorStyles, todayStrGlobal } from "@/lib/dashboard-utils";
 import { getDateKey, calculateStreak, getLast7Days } from "@/lib/habit-utils";
 import { progress as progressStyles } from "@/lib/styles";
+import { Flame, Check, Circle } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -520,7 +521,6 @@ function renderQuitHabitBody({ widget: w }: CardBodyRenderProps) {
 
 function renderHabitTrackerBody({
   widget: w,
-  styles: wStyles,
   onHabitToggle,
 }: CardBodyRenderProps) {
   const habitData = w.habitTrackerData;
@@ -529,14 +529,14 @@ function renderHabitTrackerBody({
     const todayKey = getDateKey(new Date());
     const isCompletedToday = completionSet.has(todayKey);
 
-    const streak = calculateStreak(habitData.completionHistory || []);
+    // Determine which days of the week are scheduled
+    const schedule = w.schedule as boolean[] | undefined;
+
+    const streak = calculateStreak(habitData.completionHistory || [], schedule);
 
     // Last 7 day dots
     const last7Days = getLast7Days();
     const last7 = last7Days.map((key) => completionSet.has(key));
-
-    // Determine which days of the week are scheduled
-    const schedule = w.schedule as boolean[] | undefined;
 
     const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -559,7 +559,7 @@ function renderHabitTrackerBody({
             <span className="text-sm font-medium text-theme-text-primary">
               day streak
             </span>
-            <span className="text-sm">{"\uD83D\uDD25"}</span>
+            <Flame className="h-3.5 w-3.5 text-orange-500" />
           </div>
         )}
 
@@ -574,12 +574,11 @@ function renderHabitTrackerBody({
                 <div
                   className={`h-3.5 w-3.5 rounded-full ${
                     done
-                      ? ""
+                      ? "bg-theme-secondary"
                       : isScheduled
                         ? "bg-theme-progress-track"
                         : "bg-theme-neutral-200 opacity-40"
                   }`}
-                  style={done ? { backgroundColor: wStyles.solid } : undefined}
                 />
                 <span className="text-3xs text-theme-text-tertiary leading-none">
                   {dayLabels[dayOfWeek]}
@@ -597,16 +596,11 @@ function renderHabitTrackerBody({
           }}
           className={`w-full flex items-center justify-center gap-1 text-xs font-medium px-2 py-1.5 rounded-full transition-colors ${
             isCompletedToday
-              ? ""
+              ? "bg-theme-secondary/15 text-theme-secondary"
               : "bg-theme-surface-alt text-theme-text-subtle hover:bg-theme-brand-tint-light"
           }`}
-          style={
-            isCompletedToday
-              ? { backgroundColor: wStyles.tint }
-              : undefined
-          }
         >
-          {isCompletedToday ? "\u2714" : "\u25CB"}{" "}
+          {isCompletedToday ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}{" "}
           {isCompletedToday ? "Done" : "Log"}
         </button>
       </div>

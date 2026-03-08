@@ -14,7 +14,14 @@ import {
   Settings,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
-import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload } from "@/lib/habit-utils"
+import {
+  getDateKey,
+  calculateStreak,
+  getLast7Days,
+  buildTogglePayload,
+  countScheduledDaysSince,
+  DEFAULT_MILESTONES,
+} from "@/lib/habit-utils"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,21 +33,6 @@ interface HabitTrackerWidgetProps {
   progress: { value: number; streak: number; isToday: boolean }
   onComplete: () => void
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const DEFAULT_MILESTONES = [
-  { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
-  { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
-  { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
-  { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
-  { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
-  { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
-  { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
-  { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
-]
 
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate()
@@ -70,17 +62,22 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
     [data?.completionHistory]
   )
 
+  const schedule = widget.schedule as boolean[] | undefined
+
   const last7Days = useMemo(() => {
     const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     return getLast7Days().map((key) => {
       const d = new Date(key + "T12:00:00")
+      const dow = d.getDay()
+      const isScheduled = !schedule || schedule.length < 7 || schedule[dow]
       return {
         key,
-        label: dayLabels[d.getDay()],
+        label: dayLabels[dow],
         completed: completionSet.has(key),
+        isScheduled,
       }
     })
-  }, [completionSet])
+  }, [completionSet, schedule])
 
   const calendarDays = useMemo(() => {
     const { year, month } = calendarMonth
@@ -110,16 +107,13 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
   }
 
   const isCompletedToday = completionSet.has(today)
-  const currentStreak = calculateStreak(data.completionHistory || [])
+  const currentStreak = calculateStreak(data.completionHistory || [], schedule)
   const bestStreak = Math.max(data.bestStreak || 0, currentStreak)
 
-  // Stats
+  // Stats — schedule-aware completion rate
   const startDate = data.startDate || today
-  const daysSinceStart = Math.max(
-    1,
-    Math.floor((new Date().getTime() - new Date(startDate + "T00:00:00").getTime()) / 86400000) + 1
-  )
-  const completionRate = Math.round(((data.totalCompletions || 0) / daysSinceStart) * 100)
+  const scheduledDays = countScheduledDaysSince(startDate, schedule)
+  const completionRate = Math.round(((data.totalCompletions || 0) / scheduledDays) * 100)
 
   // Milestones with live check
   const milestones = (data.milestones || DEFAULT_MILESTONES).map((m) => ({
@@ -218,9 +212,11 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                 className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
                   day.completed
                     ? "bg-theme-secondary text-white"
-                    : day.key === today
-                      ? "border-2 border-dashed border-theme-neutral-300 text-theme-neutral-400"
-                      : "bg-theme-neutral-100 text-theme-neutral-400"
+                    : !day.isScheduled
+                      ? "bg-theme-neutral-200 opacity-40"
+                      : day.key === today
+                        ? "border-2 border-dashed border-theme-neutral-300 text-theme-neutral-400"
+                        : "bg-theme-neutral-100 text-theme-neutral-400"
                 }`}
               >
                 {day.completed ? <Check className="h-4 w-4" /> : null}
@@ -277,9 +273,12 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                     : cell.key === today
                       ? "border border-dashed border-theme-neutral-400 text-theme-text-subtle"
                       : cell.key < today && cell.key >= startDate
-                        ? "bg-[#f5f1ec] text-theme-neutral-400"
-                        : "text-[#ccc7c0]"
+                        ? "bg-theme-surface-alt text-theme-neutral-400"
+                        : "text-theme-neutral-300"
               }`}
+              {...(cell.day !== null ? {
+                "aria-label": `${new Date(cell.key + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric" })}, ${cell.completed ? "completed" : "not completed"}`,
+              } : {})}
             >
               {cell.day}
             </div>
@@ -388,7 +387,7 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                     }}
                     className={`h-8 w-8 rounded-full border text-[11px] font-semibold transition-colors ${
                       (widget.schedule || [])[idx]
-                        ? "border-purple-500 bg-purple-500 text-white shadow-sm"
+                        ? "border-theme-primary bg-theme-primary text-white shadow-sm"
                         : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"
                     }`}
                   >

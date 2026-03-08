@@ -6,7 +6,7 @@ import { Check, ChevronRight, Flame, Target } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWidgets } from "@/hooks/use-widgets"
-import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload } from "@/lib/habit-utils"
+import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload, fireConfetti } from "@/lib/habit-utils"
 import type { WidgetInstance } from "@/types/widgets"
 
 const HabitTrackerWidget = dynamic(
@@ -27,25 +27,31 @@ interface HabitsByBucket {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SevenDayDots({ completionHistory }: { completionHistory: string[] }) {
+function SevenDayDots({ completionHistory, schedule }: { completionHistory: string[]; schedule?: boolean[] }) {
   const days = getLast7Days()
   const completionSet = new Set(completionHistory || [])
   const today = getDateKey(new Date())
 
   return (
     <div className="flex gap-1">
-      {days.map((key) => (
-        <div
-          key={key}
-          className={`h-2 w-2 rounded-full transition-colors ${
-            completionSet.has(key)
-              ? "bg-theme-secondary"
-              : key === today
-                ? "border border-dashed border-theme-neutral-300 bg-transparent"
-                : "bg-theme-neutral-100"
-          }`}
-        />
-      ))}
+      {days.map((key) => {
+        const dow = new Date(key + "T12:00:00").getDay()
+        const isScheduled = !schedule || schedule.length < 7 || schedule[dow]
+        return (
+          <div
+            key={key}
+            className={`h-2 w-2 rounded-full transition-colors ${
+              completionSet.has(key)
+                ? "bg-theme-secondary"
+                : !isScheduled
+                  ? "bg-theme-neutral-200 opacity-40"
+                  : key === today
+                    ? "border border-dashed border-theme-neutral-300 bg-transparent"
+                    : "bg-theme-neutral-100"
+            }`}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -67,7 +73,8 @@ function HabitRow({
   const today = getDateKey(new Date())
   const completionSet = new Set(data.completionHistory || [])
   const isCompletedToday = completionSet.has(today)
-  const streak = calculateStreak(data.completionHistory || [])
+  const schedule = widget.schedule as boolean[] | undefined
+  const streak = calculateStreak(data.completionHistory || [], schedule)
 
   return (
     <div
@@ -108,7 +115,7 @@ function HabitRow({
               {streak} day{streak !== 1 ? "s" : ""}
             </span>
           )}
-          <SevenDayDots completionHistory={data.completionHistory || []} />
+          <SevenDayDots completionHistory={data.completionHistory || []} schedule={schedule} />
         </div>
       </div>
     </div>
@@ -125,28 +132,27 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
   const [openHabit, setOpenHabit] = useState<{ bucket: string; widget: WidgetInstance } | null>(null)
 
   // Derive habit widgets grouped by bucket, filtered by schedule for selected day
-  const habitsByBucket: HabitsByBucket[] = useMemo(() => {
-    const dayOfWeek = (selectedDate ?? new Date()).getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const selectedDay = selectedDate ?? new Date()
+  const dayOfWeek = selectedDay.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+
+  const { habitsByBucket, unscheduledCount } = useMemo(() => {
     const groups: HabitsByBucket[] = []
+    let hidden = 0
     for (const [bucketName, widgets] of Object.entries(widgetsByBucket)) {
-      const habits = widgets.filter((w) => {
-        if (w.id !== "habit_tracker" || !w.habitTrackerData?.habitName) return false
-        // If schedule exists, only show habit on scheduled days
-        const schedule = w.schedule as boolean[] | undefined
-        if (schedule && schedule.length >= 7) {
-          return schedule[dayOfWeek]
-        }
-        // No schedule set (or all days) → always show
+      const allHabits = widgets.filter((w) => w.id === "habit_tracker" && !!w.habitTrackerData?.habitName)
+      const scheduled = allHabits.filter((w) => {
+        const sched = w.schedule as boolean[] | undefined
+        if (sched && sched.length >= 7) return sched[dayOfWeek]
         return true
       })
-      if (habits.length > 0) {
-        groups.push({ bucketName, habits })
+      hidden += allHabits.length - scheduled.length
+      if (scheduled.length > 0) {
+        groups.push({ bucketName, habits: scheduled })
       }
     }
-    // Sort buckets alphabetically for stable ordering
     groups.sort((a, b) => a.bucketName.localeCompare(b.bucketName))
-    return groups
-  }, [widgetsByBucket, selectedDate])
+    return { habitsByBucket: groups, unscheduledCount: hidden }
+  }, [widgetsByBucket, dayOfWeek])
 
   const toggleBucketCollapse = useCallback((bucket: string) => {
     setCollapsedBuckets((prev) => {
@@ -165,6 +171,8 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
       const payload = buildTogglePayload(widget, isCompletedToday)
       if (payload) {
         updateWidget(bucketName, widget.instanceId, payload)
+        // Fire confetti when completing (not when un-completing)
+        if (!isCompletedToday) fireConfetti()
       }
     },
     [updateWidget]
@@ -241,6 +249,7 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
             <button
               onClick={() => toggleBucketCollapse(bucketName)}
               className="flex items-center gap-2 w-full group cursor-pointer select-none"
+              aria-expanded={!isCollapsed}
             >
               <div
                 className={`w-5 h-5 rounded-md bg-theme-secondary flex items-center justify-center transition-transform duration-200 ${
@@ -277,6 +286,14 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
         )
       })}
 
+      {/* Unscheduled habits indicator */}
+      {unscheduledCount > 0 && (
+        <p className="text-xs text-theme-text-tertiary text-center">
+          {unscheduledCount} habit{unscheduledCount !== 1 ? "s" : ""} not scheduled for{" "}
+          {selectedDay.toLocaleDateString("en-US", { weekday: "long" })}
+        </p>
+      )}
+
       {/* Habit detail sheet */}
       <Sheet open={!!openHabit} onOpenChange={(open) => { if (!open) setOpenHabit(null) }}>
         <SheetContent side="right" className="w-full sm:w-[480px] overflow-y-auto">
@@ -290,8 +307,15 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
               <HabitTrackerWidget
                 widget={openHabit.widget}
                 onUpdate={handleSheetUpdate}
-                progress={{ value: 0, streak: 0, isToday: false }}
-                onComplete={() => {}}
+                progress={{
+                  value: openHabit.widget.habitTrackerData?.totalCompletions || 0,
+                  streak: calculateStreak(
+                    openHabit.widget.habitTrackerData?.completionHistory || [],
+                    openHabit.widget.schedule as boolean[] | undefined,
+                  ),
+                  isToday: new Set(openHabit.widget.habitTrackerData?.completionHistory || []).has(getDateKey(new Date())),
+                }}
+                onComplete={() => fireConfetti()}
               />
             </>
           )}

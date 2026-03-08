@@ -22,6 +22,7 @@ import {
 } from "@/lib/task-form-utils";
 import { cn } from "@/lib/utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
+import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
 
 function generateHourLabels(startHour: number, endHour: number): string[] {
   const labels: string[] = [];
@@ -512,16 +513,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
               bestStreak: 0,
               totalCompletions: 0,
               completionHistory: [],
-              milestones: [
-                { days: 7, label: "1 Week", emoji: "\u2B50", achieved: false },
-                { days: 14, label: "2 Weeks", emoji: "\uD83C\uDF1F", achieved: false },
-                { days: 21, label: "21 Days", emoji: "\uD83D\uDCAA", achieved: false },
-                { days: 30, label: "1 Month", emoji: "\uD83D\uDD25", achieved: false },
-                { days: 60, label: "2 Months", emoji: "\uD83C\uDFC6", achieved: false },
-                { days: 90, label: "3 Months", emoji: "\uD83D\uDC51", achieved: false },
-                { days: 180, label: "6 Months", emoji: "\uD83D\uDC8E", achieved: false },
-                { days: 365, label: "1 Year", emoji: "\uD83C\uDFAF", achieved: false },
-              ],
+              milestones: DEFAULT_MILESTONES,
             },
           };
 
@@ -994,7 +986,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                       className={cn(
                         "h-8 w-8 rounded-full border text-[11px] font-semibold transition-colors",
                         habitSchedule[idx]
-                          ? "border-purple-500 bg-purple-500 text-white shadow-sm"
+                          ? "border-theme-primary bg-theme-primary text-white shadow-sm"
                           : "border-theme-neutral-300 bg-white text-theme-text-subtle hover:border-theme-neutral-400"
                       )}
                     >

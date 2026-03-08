@@ -36,43 +36,105 @@ export function getLast7Days(): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Walks backwards from today (or yesterday if today isn't completed)
- * counting consecutive completed days.
- * Filters out future dates to handle legacy UTC-stored entries.
+ * Walks backwards from today counting consecutive completed *scheduled* days.
+ * When `schedule` is provided (boolean[7], Sun=0..Sat=6), only scheduled days
+ * are considered — off-days are skipped (they don't break the streak).
+ * Grace period: the most recent scheduled day doesn't need to be completed yet
+ * (mirrors the today/yesterday rule from the non-schedule path).
  */
-export function calculateStreak(completionHistory: string[]): number {
+export function calculateStreak(
+  completionHistory: string[],
+  schedule?: boolean[],
+): number {
   const today = getDateKey(new Date())
-  const yd = new Date(); yd.setDate(yd.getDate() - 1)
-  const yesterday = getDateKey(yd)
 
   // Filter out dates after today (can happen from legacy UTC storage)
-  const unique = Array.from(new Set(completionHistory))
-    .filter(d => d <= today)
-    .sort()
-    .reverse()
+  const completionSet = new Set(
+    completionHistory.filter(d => d <= today)
+  )
 
-  if (!unique.length || (unique[0] !== today && unique[0] !== yesterday)) return 0
+  if (completionSet.size === 0) return 0
 
-  let streak = 0
-  let expected = unique[0]
-  for (const date of unique) {
-    if (date === expected) {
-      streak++
-      const d = new Date(expected + 'T12:00:00')
-      d.setDate(d.getDate() - 1)
-      expected = getDateKey(d)
-    } else {
-      break
-    }
+  // Helper: is this day a scheduled day?
+  const isScheduledDay = (dateKey: string): boolean => {
+    if (!schedule || schedule.length < 7) return true // no schedule = every day
+    const dow = new Date(dateKey + 'T12:00:00').getDay()
+    return schedule[dow]
   }
+
+  // Walk backwards from today, collecting scheduled days
+  let streak = 0
+  let graceUsed = false
+  const cursor = new Date()
+
+  for (let i = 0; i < 400; i++) { // safety limit
+    const key = getDateKey(cursor)
+    if (isScheduledDay(key)) {
+      if (completionSet.has(key)) {
+        streak++
+      } else if (!graceUsed) {
+        // Grace: skip the most recent scheduled day if it's not completed
+        graceUsed = true
+      } else {
+        break
+      }
+    }
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
   return streak
+}
+
+/**
+ * Counts the number of scheduled days elapsed between `startDate` and today
+ * (inclusive). When no schedule is provided, returns total calendar days.
+ */
+export function countScheduledDaysSince(
+  startDate: string,
+  schedule?: boolean[],
+): number {
+  const today = new Date()
+  const start = new Date(startDate + 'T12:00:00')
+  const todayNoon = new Date(
+    today.getFullYear(), today.getMonth(), today.getDate(), 12
+  )
+
+  if (start > todayNoon) return 1 // hasn't started yet
+
+  let count = 0
+  const cursor = new Date(start)
+  while (cursor <= todayNoon) {
+    if (!schedule || schedule.length < 7 || schedule[cursor.getDay()]) {
+      count++
+    }
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return Math.max(1, count)
+}
+
+/**
+ * Fires a burst of confetti. Dynamically imports canvas-confetti to keep
+ * it out of the main bundle.
+ */
+export async function fireConfetti(): Promise<void> {
+  try {
+    const confetti = (await import('canvas-confetti')).default
+    confetti({
+      particleCount: 60,
+      spread: 55,
+      origin: { y: 0.7 },
+      colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+    })
+  } catch {
+    // canvas-confetti not available — silently ignore
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Toggle payload builder
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MILESTONES = [
+export const DEFAULT_MILESTONES = [
   { days: 7, label: '1 Week', emoji: '\u2B50', achieved: false },
   { days: 14, label: '2 Weeks', emoji: '\uD83C\uDF1F', achieved: false },
   { days: 21, label: '21 Days', emoji: '\uD83D\uDCAA', achieved: false },
@@ -112,7 +174,8 @@ export function buildTogglePayload(
     }
   }
 
-  const newStreak = calculateStreak(history)
+  const schedule = widget.schedule as boolean[] | undefined
+  const newStreak = calculateStreak(history, schedule)
   const newBestStreak = Math.max(habitData.bestStreak || 0, newStreak)
 
   const updatedMilestones = (habitData.milestones || DEFAULT_MILESTONES).map((m) => {
