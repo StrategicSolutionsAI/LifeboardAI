@@ -37,16 +37,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=User not authenticated`);
     }
 
-    // Ensure table exists (reuse create-table endpoint)
-    try {
-      const { error: tableError } = await supabase.from('user_integrations').select('id').limit(1);
-      if (tableError && (tableError.code === '42P01' || tableError.message?.includes('does not exist'))) {
-        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/create-table`, { method: 'POST' });
-      }
-    } catch (e) {
-      console.error('Error verifying user_integrations table', e);
-    }
-
     const { error: upsertError } = await supabase
       .from('user_integrations')
       .upsert({

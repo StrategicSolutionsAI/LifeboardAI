@@ -1,24 +1,19 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
+import { supabaseServer } from '@/utils/supabase/server'
+import { handleApiError } from '@/lib/api-error-handler'
 
-export async function POST(request: Request) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+export async function POST() {
   try {
-    // Sign out the user
-    const { error } = await supabase.auth.signOut();
-    
+    const supabase = supabaseServer()
+    const { error } = await supabase.auth.signOut()
+
     if (error) {
-      console.error('API: Error signing out:', error);
-      return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 });
+      console.error('API: Error signing out:', error)
+      return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 })
     }
 
-    return NextResponse.json({ message: 'Logout successful' }, { status: 200 });
-    
+    return NextResponse.json({ message: 'Logout successful' }, { status: 200 })
   } catch (error) {
-    console.error('API: An unexpected error occurred during logout:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    return handleApiError(error, 'POST /api/auth/logout')
   }
 }

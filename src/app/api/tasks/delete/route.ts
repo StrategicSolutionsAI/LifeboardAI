@@ -1,50 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/utils/supabase/server'
+import { NextResponse } from 'next/server'
+import { withAuthAndBody } from '@/lib/api-utils'
+import { z } from 'zod'
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const { taskId } = await request.json()
-    if (!taskId) return NextResponse.json({ error: 'taskId required' }, { status: 400 })
+const schema = z.object({ taskId: z.string().min(1) })
 
-    const supabase = supabaseServer()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+export const DELETE = withAuthAndBody(schema, async (_req, { supabase, user, body }) => {
+  const { error } = await supabase
+    .from('lifeboard_tasks')
+    .delete()
+    .eq('id', body.taskId)
+    .eq('user_id', user.id)
 
-    const { error } = await supabase
-      .from('lifeboard_tasks')
-      .delete()
-      .eq('id', taskId)
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error('Supabase delete task error', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
-    }
-
-    // Clean up associated calendar events and task occurrence exceptions
-    const [calendarResult, exceptionsResult] = await Promise.all([
-      supabase
-        .from('calendar_events')
-        .delete()
-        .eq('task_id', taskId)
-        .eq('user_id', user.id),
-      supabase
-        .from('task_occurrence_exceptions')
-        .delete()
-        .eq('task_id', taskId)
-        .eq('user_id', user.id),
-    ])
-
-    if (calendarResult.error) {
-      console.error('Failed to delete associated calendar event', { taskId, error: calendarResult.error })
-    }
-    if (exceptionsResult.error) {
-      console.error('Failed to delete associated task occurrence exceptions', { taskId, error: exceptionsResult.error })
-    }
-
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    console.error('DELETE /api/tasks/delete error', e)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  if (error) {
+    console.error('Supabase delete task error', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-}
+
+  // Clean up associated calendar events and task occurrence exceptions
+  const [calendarResult, exceptionsResult] = await Promise.all([
+    supabase
+      .from('calendar_events')
+      .delete()
+      .eq('task_id', body.taskId)
+      .eq('user_id', user.id),
+    supabase
+      .from('task_occurrence_exceptions')
+      .delete()
+      .eq('task_id', body.taskId)
+      .eq('user_id', user.id),
+  ])
+
+  if (calendarResult.error) {
+    console.error('Failed to delete associated calendar event', { taskId: body.taskId, error: calendarResult.error })
+  }
+  if (exceptionsResult.error) {
+    console.error('Failed to delete associated task occurrence exceptions', { taskId: body.taskId, error: exceptionsResult.error })
+  }
+
+  return NextResponse.json({ ok: true })
+}, 'DELETE /api/tasks/delete')

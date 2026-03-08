@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Archive,
   CalendarPlus,
+  ChevronDown,
   Clock,
+  Filter,
   LayoutGrid,
   Loader2,
   Plus,
@@ -1767,50 +1769,34 @@ function ShoppingListLayout() {
           </p>
         )}
 
-        {/* ── Bucket Filter Chips ── */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedBucket("all")}
-            className={cn(
-              "h-8 rounded-full px-3.5 text-[13px] font-medium transition-all duration-150",
-              selectedBucket === "all"
-                ? "bg-theme-primary text-white shadow-warm-sm"
-                : "border border-theme-neutral-300 bg-white text-theme-text-body hover:bg-theme-surface-alt",
-            )}
-          >
-            All items
-          </button>
-          {bucketFilters.map((bucket) => {
-            const isUnsorted = bucket === UNASSIGNED_BUCKET_ID;
-            const label = isUnsorted ? UNSORTED_LABEL : bucket;
-            const isActive = selectedBucket === bucket;
-            const color = getBucketColorSync(
-              isUnsorted ? UNASSIGNED_BUCKET_ID : bucket,
-              bucketColors,
-            );
-
-            return (
-              <button
-                key={bucket}
-                type="button"
-                onClick={() => setSelectedBucket(bucket)}
-                className={cn(
-                  "h-8 rounded-full px-3.5 text-[13px] font-medium transition-all duration-150",
-                  isActive
-                    ? "text-white shadow-warm-sm"
-                    : "border border-theme-neutral-300 bg-white hover:bg-theme-surface-alt",
-                )}
-                style={
-                  isActive
-                    ? { backgroundColor: color }
-                    : { color, borderColor: hexToRgba(color, 0.25) }
-                }
-              >
-                {label}
-              </button>
-            );
-          })}
+        {/* ── Bucket Filter Dropdown ── */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Filter size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-theme-text-tertiary" />
+            <select
+              value={selectedBucket}
+              onChange={(e) => setSelectedBucket(e.target.value)}
+              className={cn(
+                "h-9 appearance-none rounded-lg border border-theme-neutral-300 bg-white pl-8 pr-8",
+                "text-[13px] font-medium text-theme-text-primary",
+                "transition-all duration-150 hover:border-theme-neutral-300/80 hover:shadow-warm-sm",
+                "focus:outline-none focus:ring-2 focus:ring-theme-primary/20 focus:border-theme-primary/40",
+                "cursor-pointer",
+              )}
+            >
+              <option value="all">All items</option>
+              {bucketFilters.map((bucket) => {
+                const isUnsorted = bucket === UNASSIGNED_BUCKET_ID;
+                const label = isUnsorted ? UNSORTED_LABEL : bucket;
+                return (
+                  <option key={bucket} value={bucket}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-text-tertiary" />
+          </div>
         </div>
 
         {/* ── Items List (Virtualized) ── */}

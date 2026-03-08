@@ -1,30 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/utils/supabase/server'
+import { NextResponse } from 'next/server'
+import { withAuthAndBody } from '@/lib/api-utils'
+import { z } from 'zod'
 
-export async function POST(request: NextRequest) {
-  try {
-    const { taskId } = await request.json()
-    if (!taskId) return NextResponse.json({ error: 'taskId required' }, { status: 400 })
+const schema = z.object({ taskId: z.string().min(1) })
 
-    const supabase = supabaseServer()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+export const POST = withAuthAndBody(schema, async (_req, { supabase, user, body }) => {
+  const { error } = await supabase
+    .from('lifeboard_tasks')
+    .update({ completed: false, updated_at: new Date().toISOString() })
+    .eq('id', body.taskId)
+    .eq('user_id', user.id)
 
-    const { error } = await supabase
-      .from('lifeboard_tasks')
-      .update({ completed: false, updated_at: new Date().toISOString() })
-      .eq('id', taskId)
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error('Supabase reopen task error', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
-    }
-
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    console.error('POST /api/tasks/reopen error', e)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  if (error) {
+    console.error('Supabase reopen task error', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
-}
 
+  return NextResponse.json({ ok: true })
+}, 'POST /api/tasks/reopen')

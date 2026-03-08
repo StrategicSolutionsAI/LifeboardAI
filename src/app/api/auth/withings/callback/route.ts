@@ -53,16 +53,6 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Ensure table exists - reuse create-table endpoint if needed
-    try {
-      const { error: tableError } = await serviceClient.from('user_integrations').select('id').limit(1)
-      if (tableError && (tableError.code === '42P01' || tableError.message?.includes('does not exist'))) {
-        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/create-table`, { method: 'POST' })
-      }
-    } catch (e) {
-      console.error('Error verifying user_integrations table', e)
-    }
-
     // Delete any existing Withings rows for this user, then insert fresh
     await serviceClient
       .from('user_integrations')

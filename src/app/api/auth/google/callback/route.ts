@@ -60,37 +60,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Try to check if the user_integrations table exists
-    try {
-      // First attempt to access the table to see if it exists
-      const { error: tableError } = await supabase
-        .from('user_integrations')
-        .select('count')
-        .limit(1);
-
-      // If table doesn't exist, call our API to create it
-      if (tableError && (tableError.code === '42P01' || tableError.message?.includes('relation "user_integrations" does not exist'))) {
-        const createTableResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_SITE_URL}/api/integrations/create-table`, 
-          { 
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ''}` 
-            }
-          }
-        );
-        
-        if (!createTableResponse.ok) {
-          console.error('Failed to create table via API');
-          throw new Error('Failed to create integration table');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking or creating table:', error);
-      // Continue anyway - we'll handle insert errors gracefully below
-    }
-
     // Store the tokens in the database, making sure we don't overwrite a valid
     // refresh_token with `null` or `undefined` (Google often omits it on
     // subsequent consent flows). This ensures the Calendar API can refresh

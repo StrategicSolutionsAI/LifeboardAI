@@ -1,54 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/utils/supabase/server';
-import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache';
+import { NextResponse } from 'next/server'
+import { withAuthAndBody } from '@/lib/api-utils'
+import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache'
+import { TODOIST_TASKS_ENDPOINT, getTodoistToken } from '@/lib/todoist/helpers'
+import { z } from 'zod'
 
-const TODOIST_TASK_URL = 'https://api.todoist.com/api/v1/tasks';
+const schema = z.object({ taskId: z.string().min(1) })
 
-export async function POST(request: NextRequest) {
-  try {
-    const { taskId } = await request.json();
+export const POST = withAuthAndBody(schema, async (_req, { supabase, user, body }) => {
+  const tokenResult = await getTodoistToken(supabase, user.id)
+  if ('response' in tokenResult) return tokenResult.response
+  const accessToken = tokenResult.token
 
-    if (!taskId) {
-      return NextResponse.json({ error: 'taskId required' }, { status: 400 });
-    }
+  const res = await fetch(`${TODOIST_TASKS_ENDPOINT}/${body.taskId}/close`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
 
-    const supabase = supabaseServer();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    }
-
-    const { data: integration } = await supabase
-      .from('user_integrations')
-      .select('access_token')
-      .eq('user_id', user.id)
-      .eq('provider', 'todoist')
-      .single();
-
-    if (!integration || !integration.access_token) {
-      return NextResponse.json({ error: 'Todoist not connected' }, { status: 400 });
-    }
-
-    const res = await fetch(`${TODOIST_TASK_URL}/${taskId}/close`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${integration.access_token}`,
-      },
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Todoist close response', text);
-      return NextResponse.json({ error: 'Failed to complete task' }, { status: 500 });
-    }
-
-    invalidateTodoistTaskCache(user.id);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('Complete task error', err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  if (!res.ok) {
+    const text = await res.text()
+    console.error('Todoist close response', text)
+    return NextResponse.json({ error: 'Failed to complete task' }, { status: 500 })
   }
-} 
+
+  invalidateTodoistTaskCache(user.id)
+  return NextResponse.json({ ok: true })
+}, 'POST /api/integrations/todoist/tasks/complete')
