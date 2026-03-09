@@ -8,12 +8,16 @@ directories:
 
 files:
   - electron/dist/**/*
-  - "!node_modules"
+  - node_modules/electron-updater/**/*
+  - "!node_modules/!(electron-updater)"
   - "!src"
   - "!.next"
   - "!.git"
 
 extraResources:
+  # Bundle .env.local so server-side env vars are available at runtime
+  - from: .env.local
+    to: .env.local
   # Bundle the standalone Next.js server
   - from: .next/standalone
     to: standalone

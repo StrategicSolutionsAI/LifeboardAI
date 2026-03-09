@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
     redirectResponse.cookies.set({
       name: cookie.name,
       value: cookie.value,
-      secure: typeof cookie.secure === 'boolean' ? cookie.secure : process.env.NODE_ENV === 'production',
+      secure: typeof cookie.secure === 'boolean' ? cookie.secure : (process.env.NODE_ENV === 'production' && !process.env.ELECTRON_MODE),
       sameSite: cookie.sameSite ?? 'lax',
       httpOnly: cookie.httpOnly ?? cookie.name.includes('auth-token'),
       path: cookie.path || '/',

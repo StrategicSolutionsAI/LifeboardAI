@@ -133,7 +133,8 @@ function getCspTemplate(): string {
     `media-src 'self' blob:`,
     `worker-src 'self' blob:`,
     `manifest-src 'self'`,
-    `upgrade-insecure-requests`,
+    // Skip upgrade-insecure-requests in Electron — the app runs over HTTP on localhost
+    ...(process.env.ELECTRON_MODE ? [] : [`upgrade-insecure-requests`]),
   ]
 
   cachedCspTemplate = directives.join('; ')

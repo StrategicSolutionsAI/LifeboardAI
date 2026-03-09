@@ -69,6 +69,7 @@ export async function startNextServer(): Promise<string> {
       ...process.env,
       PORT: String(port),
       HOSTNAME: '127.0.0.1',
+      ELECTRON_MODE: 'true',
     },
     cwd: standaloneDir,
     stdio: 'pipe',
@@ -88,8 +89,8 @@ export async function startNextServer(): Promise<string> {
   });
 
   await waitForServer(port);
-  console.log(`[next] server ready on http://127.0.0.1:${port}`);
-  return `http://127.0.0.1:${port}`;
+  console.log(`[next] server ready on http://localhost:${port}`);
+  return `http://localhost:${port}`;
 }
 
 /** Stop the Next.js server process. */
