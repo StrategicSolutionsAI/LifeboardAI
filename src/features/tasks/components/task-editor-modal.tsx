@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
+import { invalidateAllPreferencesCaches } from "@/lib/user-preferences";
 
 function generateHourLabels(startHour: number, endHour: number): string[] {
   const labels: string[] = [];
@@ -479,6 +480,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
           });
           if (!saveRes.ok) throw new Error("Failed to save preferences");
+          invalidateAllPreferencesCaches();
           setHabitWidgetId(null);
           setHabitWidgetBucket(null);
           toast({ title: "Removed from habits" });
@@ -527,6 +529,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
           });
           if (!saveRes.ok) throw new Error("Failed to save preferences");
+          invalidateAllPreferencesCaches();
           setHabitWidgetId(newWidget.instanceId);
           setHabitWidgetBucket(targetBucket);
           toast({ title: "Added as a habit" });
@@ -557,6 +560,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ widgets_by_bucket: widgetsByBucket }),
         });
+        invalidateAllPreferencesCaches();
       } catch {
         // silent — schedule will persist on next full save
       }

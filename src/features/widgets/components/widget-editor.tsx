@@ -814,6 +814,17 @@ export default function WidgetEditorSheet({
                   </div>
                 </div>
 
+                {/* Show in Calendar */}
+                <div className="flex items-center justify-between">
+                  <p className={form.label}>Show in Calendar</p>
+                  <input
+                    type="checkbox"
+                    checked={draft.showInCalendar !== false}
+                    onChange={e => setDraft(p => p ? { ...p, showInCalendar: e.target.checked } : p)}
+                    className={CHECKBOX_CONTROL_CLASS}
+                  />
+                </div>
+
                 {/* Add to Tasks */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

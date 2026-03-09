@@ -16,6 +16,7 @@ export interface WidgetInstance extends WidgetTemplate {
   target: number;                // user-selected daily/period target
   schedule: boolean[];           // length 7, Monday-Sunday active flags
   color: string;                 // chosen colour (Tailwind or hex)
+  showInCalendar?: boolean;      // whether this widget appears in the calendar habit panel (default true)
   rewardTimesPerMonth?: number;  // optional: how many successes per month
   rewardDollarPerGoal?: number;  // optional: dollars per achieved goal
   dataSource?: string;           // e.g. "Apple Health", "Manual"

@@ -396,6 +396,19 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                 ))}
               </div>
             </div>
+
+            {/* Show in Calendar */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium">
+                Show in Calendar
+              </span>
+              <input
+                type="checkbox"
+                checked={widget.showInCalendar !== false}
+                onChange={(e) => onUpdate({ showInCalendar: e.target.checked })}
+                className="h-5 w-5 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/40"
+              />
+            </label>
           </div>
         )}
       </div>

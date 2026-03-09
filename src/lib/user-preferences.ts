@@ -1,6 +1,7 @@
 import { supabase } from "@/utils/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { AUTH_CACHE_TTL_MS, PREFS_CACHE_TTL_MS } from "@/lib/cache-config";
+import { getQueryClient } from "@/lib/query-client";
 
 export interface UserPreferences {
   id?: string;
@@ -66,10 +67,19 @@ export function invalidateAuthCache() {
 let _prefsCache: { data: UserPreferences | null; ts: number } | null = null
 let _prefsFlight: Promise<UserPreferences | null> | null = null
 
-/** Invalidate the in-memory preferences cache (call after saves). */
+/** Invalidate the in-memory preferences cache (call before saves). */
 export function invalidatePreferencesCache() {
   _prefsCache = null
   _prefsFlight = null
+}
+
+/** Invalidate both the in-memory AND React Query preferences caches (call after saves). */
+export function invalidateAllPreferencesCaches() {
+  _prefsCache = null
+  _prefsFlight = null
+  if (typeof window !== 'undefined') {
+    getQueryClient().invalidateQueries({ queryKey: ['user-preferences'] })
+  }
 }
 
 export async function getUserPreferencesClient() {
@@ -193,6 +203,10 @@ export async function updateUserPreferenceFields(
       }
     }
 
+    // Invalidate React Query cache AFTER the write succeeds so
+    // any refetch picks up the freshly-saved data.
+    invalidateAllPreferencesCaches()
+
     return true;
   } catch (err) {
     console.error('Exception in updateUserPreferenceFields:', err);
@@ -256,7 +270,8 @@ export async function saveUserPreferences(preferences: UserPreferences) {
       });
       return false;
     }
-    
+
+    invalidateAllPreferencesCaches()
     return true;
   } catch (err) {
     console.error('Exception saving user preferences:', err);

@@ -17,6 +17,7 @@ import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/componen
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
+import { useWidgets } from "@/hooks/use-widgets";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { useCalendarEvents } from "@/features/calendar/hooks/use-calendar-events";
 import { useCalendarNavigation } from "@/features/calendar/hooks/use-calendar-navigation";
@@ -94,6 +95,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const { allTasks } = useTaskData();
   const { deleteTask, refetch, getTaskForOccurrence, createTask } = useTaskActions();
 
+  // Filter out tasks linked to habit widgets where showInCalendar is false
+  const { widgetsByBucket: calWidgets } = useWidgets();
+  const calendarTasks = useMemo(() => {
+    const hiddenTaskIds = new Set<string>();
+    for (const widgets of Object.values(calWidgets)) {
+      for (const w of widgets) {
+        if (w.id === "habit_tracker" && w.showInCalendar === false && w.linkedTaskId) {
+          hiddenTaskIds.add(w.linkedTaskId);
+        }
+      }
+    }
+    if (hiddenTaskIds.size === 0) return allTasks;
+    return allTasks.filter(t => !hiddenTaskIds.has(t.id?.toString?.() ?? ''));
+  }, [allTasks, calWidgets]);
+
   // Calendar events pipeline: data fetching, event building, dedup
   const {
     eventsByDate,
@@ -109,7 +125,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     view,
     selectedBucketFilters,
     uploadRefreshIndex,
-    allTasks,
+    allTasks: calendarTasks,
     getTaskForOccurrence,
   });
 
