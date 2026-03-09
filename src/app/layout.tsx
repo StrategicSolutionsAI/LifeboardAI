@@ -79,7 +79,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
+    <html lang="en" className={`${dmSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         {/* Preconnect to external APIs used during page lifecycle */}
         <link rel="dns-prefetch" href="https://api.openai.com" />
@@ -93,10 +93,10 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href="/splash/iphone-14pro-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" />
         <link rel="apple-touch-startup-image" href="/splash/iphone-15promax-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
         <link rel="apple-touch-startup-image" href="/splash/iphone-16promax-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" />
-        {/* Register service worker for PWA */}
+        {/* Register service worker for PWA (skip in Electron — not needed) */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')})}`
+            __html: `if('serviceWorker' in navigator && !window.electronAPI){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')})}`
           }}
         />
         {/*
@@ -112,7 +112,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <ToastProvider>
             <GlobalErrorHandler />

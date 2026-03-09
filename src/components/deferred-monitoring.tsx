@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { isElectron } from '@/lib/is-electron'
 
 const PerfObserver = dynamic(() => import('@/components/perf-observer'), { ssr: false })
 const SpeedInsights = dynamic(
@@ -14,9 +15,16 @@ const Analytics = dynamic(
 )
 
 export function DeferredMonitoring() {
+  const [inElectron, setInElectron] = useState(false)
+
+  useEffect(() => {
+    setInElectron(isElectron())
+  }, [])
+
   // Lazy-load Sentry Session Replay after hydration to keep the replay
   // bundle (~30 KB) out of the critical shared chunk.
   useEffect(() => {
+    if (inElectron) return
     import('@sentry/nextjs').then(Sentry => {
       const client = Sentry.getClient()
       if (client && !client.getIntegrationByName('Replay')) {
@@ -26,7 +34,12 @@ export function DeferredMonitoring() {
         }))
       }
     })
-  }, [])
+  }, [inElectron])
+
+  // Skip Vercel Analytics and SpeedInsights in Electron — they only work on Vercel
+  if (inElectron) {
+    return <PerfObserver />
+  }
 
   return (
     <>

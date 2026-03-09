@@ -1,0 +1,77 @@
+appId: ai.lifeboard.desktop
+productName: Lifeboard
+copyright: Copyright © 2026 Lifeboard.ai
+
+directories:
+  output: dist-electron
+  buildResources: electron/resources
+
+files:
+  - electron/dist/**/*
+  - "!node_modules"
+  - "!src"
+  - "!.next"
+  - "!.git"
+
+extraResources:
+  # Bundle the standalone Next.js server
+  - from: .next/standalone
+    to: standalone
+    filter:
+      - "**/*"
+  # Bundle static assets (not included in standalone by default)
+  - from: .next/static
+    to: standalone/.next/static
+    filter:
+      - "**/*"
+  # Bundle public directory
+  - from: public
+    to: standalone/public
+    filter:
+      - "**/*"
+
+mac:
+  category: public.app-category.productivity
+  icon: electron/resources/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
+  darkModeSupport: true
+  hardenedRuntime: true
+  entitlements: electron/resources/entitlements.mac.plist
+  entitlementsInherit: electron/resources/entitlements.mac.plist
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+win:
+  icon: electron/resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  icon: electron/resources/icon.png
+  target:
+    - AppImage
+  category: Office
+
+publish:
+  provider: github
+  releaseType: release
