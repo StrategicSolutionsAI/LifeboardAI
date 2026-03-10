@@ -81,22 +81,6 @@ function HabitRow({
       className="flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer"
       onClick={() => onOpen(bucketName, widget)}
     >
-      {/* Check circle toggle */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle(bucketName, widget, isCompletedToday)
-        }}
-        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 ${
-          isCompletedToday
-            ? "border-theme-secondary bg-theme-secondary text-white"
-            : "border-theme-neutral-300 hover:border-theme-secondary"
-        }`}
-        aria-label={isCompletedToday ? `Undo ${data.habitName}` : `Complete ${data.habitName}`}
-      >
-        {isCompletedToday && <Check className="h-3.5 w-3.5" />}
-      </button>
-
       {/* Habit info */}
       <div className="flex-1 min-w-0">
         <p
@@ -118,6 +102,22 @@ function HabitRow({
           <SevenDayDots completionHistory={data.completionHistory || []} schedule={schedule} />
         </div>
       </div>
+
+      {/* Checkbox toggle */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle(bucketName, widget, isCompletedToday)
+        }}
+        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-all duration-200 ${
+          isCompletedToday
+            ? "border-theme-secondary bg-theme-secondary text-white"
+            : "border-theme-neutral-300 hover:border-theme-secondary"
+        }`}
+        aria-label={isCompletedToday ? `Undo ${data.habitName}` : `Complete ${data.habitName}`}
+      >
+        {isCompletedToday && <Check className="h-3 w-3" />}
+      </button>
     </div>
   )
 }
@@ -252,11 +252,11 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
               aria-expanded={!isCollapsed}
             >
               <div
-                className={`w-5 h-5 rounded-md bg-theme-secondary flex items-center justify-center transition-transform duration-200 ${
+                className={`w-5 h-5 rounded-md bg-theme-neutral-200 flex items-center justify-center transition-transform duration-200 ${
                   isCollapsed ? "rotate-0" : "rotate-90"
                 }`}
               >
-                <ChevronRight size={12} className="text-white" />
+                <ChevronRight size={12} className="text-theme-text-tertiary" />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
                 {bucketName}
