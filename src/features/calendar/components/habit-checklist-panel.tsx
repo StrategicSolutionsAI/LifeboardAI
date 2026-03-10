@@ -139,7 +139,7 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
     const groups: HabitsByBucket[] = []
     let hidden = 0
     for (const [bucketName, widgets] of Object.entries(widgetsByBucket)) {
-      const allHabits = widgets.filter((w) => w.id === "habit_tracker" && !!w.habitTrackerData?.habitName && w.showInCalendar !== false)
+      const allHabits = widgets.filter((w) => w.id === "habit_tracker" && !!w.habitTrackerData?.habitName)
       const scheduled = allHabits.filter((w) => {
         const sched = w.schedule as boolean[] | undefined
         if (sched && sched.length >= 7) return sched[dayOfWeek]
