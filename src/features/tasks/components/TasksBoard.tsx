@@ -6,7 +6,7 @@ import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal, GripVertical, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal, GripVertical, ClipboardList, Pencil, Trash2, LayoutDashboard } from "lucide-react";
 import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/components/ui/use-toast";
+import { togglePinToDashboard } from "@/lib/pin-to-dashboard";
 
 export type Bucket = {
   id: string;
@@ -216,8 +218,27 @@ function TaskCard({
     [task.dueDate, task.startDate, task.endDate]
   );
   const assignee = useMemo(() => task.assigneeId ? familyMembers?.find((m) => m.id === task.assigneeId) ?? null : null, [task.assigneeId, familyMembers]);
+  const { toast } = useToast();
   const [justCompleted, setJustCompleted] = useState(false);
   const justCompletedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const handlePinTask = useCallback(async () => {
+    try {
+      const result = await togglePinToDashboard({
+        taskId: task.id,
+        taskTitle: task.title,
+        taskBucket: task.bucketId || undefined,
+        taskDueDate: task.due?.date ?? task.dueDate ?? undefined,
+      });
+      toast({
+        title: result.status === "added"
+          ? `Pinned to ${result.bucket}`
+          : "Unpinned from dashboard",
+      });
+    } catch {
+      toast({ title: "Failed to update pin" });
+    }
+  }, [task, toast]);
 
   const handleToggle = useCallback(() => {
     if (task.status !== "done") {
@@ -335,6 +356,10 @@ function TaskCard({
                 <DropdownMenuItem onClick={() => onOpen?.(task.id)}>
                   <Pencil size={14} />
                   Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handlePinTask}>
+                  <LayoutDashboard size={14} />
+                  Pin to Dashboard
                 </DropdownMenuItem>
                 {availableBuckets.length > 0 && (
                   <>

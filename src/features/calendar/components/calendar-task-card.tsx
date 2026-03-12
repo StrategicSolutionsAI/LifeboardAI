@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { format, addDays, startOfWeek, startOfDay, differenceInDays, parse } from "date-fns";
-import { ChevronRight, Star, Calendar, AlertCircle } from "lucide-react";
+import { ChevronRight, Star, Calendar, AlertCircle, LayoutDashboard } from "lucide-react";
 import { Draggable } from "@hello-pangea/dnd";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { normalizeBucketId, toDayKey } from "@/features/calendar/types";
+import { togglePinToDashboard } from "@/lib/pin-to-dashboard";
+import { useToast } from "@/components/ui/use-toast";
 
 /* ─── Bucket color helpers (shared with calendar-task-list) ─── */
 
@@ -113,9 +115,29 @@ export const EnhancedTaskCard = React.memo(function EnhancedTaskCard({
   bucketColors = {},
   onTaskClick,
 }: EnhancedTaskCardProps) {
+  const { toast } = useToast();
   const dueDateInfo = formatDueDate(task.due);
   const priorityStyles = getPriorityStyles(task.priority);
   const [customRescheduleDate, setCustomRescheduleDate] = useState(task.due?.date ?? '');
+
+  const handlePinTask = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const result = await togglePinToDashboard({
+        taskId: task.id.toString(),
+        taskTitle: task.content || "Untitled",
+        taskBucket: task.bucket || undefined,
+        taskDueDate: task.due?.date ?? undefined,
+      });
+      toast({
+        title: result.status === "added"
+          ? `Pinned to ${result.bucket}`
+          : "Unpinned from dashboard",
+      });
+    } catch {
+      toast({ title: "Failed to update pin" });
+    }
+  };
 
   useEffect(() => {
     if (isRescheduleActive) {
@@ -263,6 +285,18 @@ export const EnhancedTaskCard = React.memo(function EnhancedTaskCard({
                         } group-hover:scale-110`}
                     />
                     Reschedule
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePinTask}
+                    className={rescheduleButtonClasses}
+                  >
+                    <LayoutDashboard
+                      size={14}
+                      className="text-theme-text-tertiary group-hover:text-indigo-600 transition-transform duration-200 group-hover:scale-110"
+                    />
+                    Pin to Dashboard
                   </button>
 
                   {availableBuckets?.length > 0 && (

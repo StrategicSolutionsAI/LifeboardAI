@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  LayoutDashboard,
 } from "lucide-react";
 import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import {
@@ -32,6 +33,8 @@ import { cn } from "@/lib/utils";
 import { differenceInCalendarDays, parseISO, isValid, format, addDays, nextMonday } from "date-fns";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import type { FamilyMemberOption } from "@/hooks/use-family-members";
+import { useToast } from "@/components/ui/use-toast";
+import { togglePinToDashboard } from "@/lib/pin-to-dashboard";
 
 type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -918,7 +921,7 @@ const TaskTableRow = React.memo(function TaskTableRow({
 
           {/* Actions */}
           <td className="py-3 px-2 border-l border-[rgba(219,214,207,0.3)]">
-            <TaskRowDropdown taskId={task.id} onDelete={onDeleteTask} onEdit={onEditTask} />
+            <TaskRowDropdown taskId={task.id} taskTitle={task.title} taskBucket={task.bucket} taskDueDate={task.dueDate} onDelete={onDeleteTask} onEdit={onEditTask} />
           </td>
         </tr>
       )}
@@ -930,13 +933,39 @@ const TaskTableRow = React.memo(function TaskTableRow({
 
 function TaskRowDropdown({
   taskId,
+  taskTitle,
+  taskBucket,
+  taskDueDate,
   onDelete,
   onEdit,
 }: {
   taskId: string;
+  taskTitle?: string;
+  taskBucket?: string | null;
+  taskDueDate?: string | null;
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
 }) {
+  const { toast } = useToast();
+
+  const handlePinTask = async () => {
+    try {
+      const result = await togglePinToDashboard({
+        taskId,
+        taskTitle: taskTitle || "Untitled",
+        taskBucket: taskBucket || undefined,
+        taskDueDate: taskDueDate ?? undefined,
+      });
+      toast({
+        title: result.status === "added"
+          ? `Pinned to ${result.bucket}`
+          : "Unpinned from dashboard",
+      });
+    } catch {
+      toast({ title: "Failed to update pin" });
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -952,6 +981,10 @@ function TaskRowDropdown({
         <DropdownMenuItem onClick={() => onEdit(taskId)}>
           <Pencil size={14} />
           Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handlePinTask}>
+          <LayoutDashboard size={14} />
+          Pin to Dashboard
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => onDelete(taskId)}>

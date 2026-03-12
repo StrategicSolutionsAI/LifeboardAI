@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { format, parseISO } from "date-fns";
-import { X, Trash2, ShoppingCart, Activity } from "lucide-react";
+import { X, Trash2, ShoppingCart, Activity, LayoutDashboard } from "lucide-react";
 import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { useToast } from "@/components/ui/use-toast";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
 import { invalidateAllPreferencesCaches } from "@/lib/user-preferences";
+import { findPinnedWidget, togglePinToDashboard } from "@/lib/pin-to-dashboard";
 
 function generateHourLabels(startHour: number, endHour: number): string[] {
   const labels: string[] = [];
@@ -127,6 +128,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const [habitWidgetBucket, setHabitWidgetBucket] = useState<string | null>(null);
     const [isHabitBusy, setIsHabitBusy] = useState(false);
     const [habitSchedule, setHabitSchedule] = useState<boolean[]>([true, true, true, true, true, true, true]);
+    const [pinnedWidgetId, setPinnedWidgetId] = useState<string | null>(null);
+    const [isPinBusy, setIsPinBusy] = useState(false);
     const [formAssignee, setFormAssignee] = useState<string | null>(null);
 
     const resolveDefaultDate = useCallback(() => {
@@ -274,6 +277,19 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           // silently ignore — button defaults to "add" mode
         }
       })();
+      return () => { cancelled = true; };
+    }, [isOpen, editTaskId]);
+
+    // Detect pinned-to-dashboard widget when modal opens in edit mode
+    useEffect(() => {
+      if (!isOpen || !editTaskId) {
+        setPinnedWidgetId(null);
+        return;
+      }
+      let cancelled = false;
+      findPinnedWidget(editTaskId).then((result) => {
+        if (!cancelled) setPinnedWidgetId(result?.widgetId ?? null);
+      });
       return () => { cancelled = true; };
     }, [isOpen, editTaskId]);
 
@@ -542,6 +558,30 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
         setIsHabitBusy(false);
       }
     }, [editTaskId, isHabitBusy, habitWidgetId, habitWidgetBucket, habitSchedule, formContent, formBucket, availableBuckets, toast]);
+
+    const handleTogglePin = useCallback(async () => {
+      if (!editTaskId || isPinBusy) return;
+      setIsPinBusy(true);
+      try {
+        const result = await togglePinToDashboard({
+          taskId: editTaskId,
+          taskTitle: formContent.trim() || "Untitled",
+          taskBucket: formBucket || availableBuckets[0] || undefined,
+          taskDueDate: startDate ?? undefined,
+        });
+        setPinnedWidgetId(result.widgetId);
+        toast({
+          title: result.status === "added"
+            ? `Pinned to ${result.bucket}`
+            : "Unpinned from dashboard",
+        });
+      } catch (err) {
+        console.error("Failed to toggle pin:", err);
+        toast({ title: "Failed to update pin" });
+      } finally {
+        setIsPinBusy(false);
+      }
+    }, [editTaskId, isPinBusy, formContent, formBucket, availableBuckets, startDate, toast]);
 
     // Save schedule changes to an existing linked habit widget (debounced via submit)
     const saveHabitSchedule = useCallback(async (newSchedule: boolean[]) => {
@@ -898,8 +938,8 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           {/* Footer */}
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-theme-neutral-300/50 bg-[rgba(252,250,248,0.5)] shrink-0 space-y-3">
             {/* Action toggles row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 flex-wrap">
                 {editTaskId && (
                   showDeleteConfirm ? (
                     <div className="flex items-center gap-3">
@@ -955,6 +995,21 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
                         {isHabitBusy
                           ? (habitWidgetId ? "Removing..." : "Adding...")
                           : (habitWidgetId ? "Tracked as habit" : "Track as habit")}
+                      </button>
+                      <button
+                        onClick={handleTogglePin}
+                        disabled={isPinBusy}
+                        className={cn(
+                          "flex items-center gap-1.5 text-[13px] transition-colors disabled:opacity-50",
+                          pinnedWidgetId
+                            ? "text-indigo-600 hover:text-red-500"
+                            : "text-theme-text-tertiary hover:text-indigo-600"
+                        )}
+                      >
+                        <LayoutDashboard size={14} />
+                        {isPinBusy
+                          ? (pinnedWidgetId ? "Unpinning..." : "Pinning...")
+                          : (pinnedWidgetId ? "Pinned to dashboard" : "Pin to dashboard")}
                       </button>
                     </>
                   )

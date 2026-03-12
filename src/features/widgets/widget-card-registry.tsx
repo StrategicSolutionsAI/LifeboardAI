@@ -1125,6 +1125,33 @@ function renderFamilyMembersBody({ widget: w }: CardBodyRenderProps) {
   );
 }
 
+// ── Linked Task Widget ──────────────────────────────────────────────────
+
+function renderLinkedTaskBody({ widget, styles }: CardBodyRenderProps) {
+  const config = widget.linkedTaskConfig as
+    | { dueDate?: string; title?: string }
+    | undefined;
+  const dueDate = config?.dueDate;
+  const dueParts = dueDate ? dueDate.split("-") : null;
+  const dueLabel = dueParts
+    ? `${dueParts[1]}/${dueParts[2]}/${dueParts[0]}`
+    : null;
+
+  return (
+    <div className="flex flex-col gap-1.5 px-1">
+      <div className="flex items-center gap-1.5 text-xs text-theme-text-secondary">
+        <Check size={12} style={{ color: styles.solid }} />
+        <span className="truncate">{widget.linkedTaskTitle || widget.name}</span>
+      </div>
+      {dueLabel && (
+        <div className="text-[11px] text-theme-text-tertiary">
+          Due {dueLabel}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Registry ────────────────────────────────────────────────────────────
 
 export const WIDGET_CARD_REGISTRY: Record<string, WidgetCardEntry> = {
@@ -1170,6 +1197,13 @@ export const WIDGET_CARD_REGISTRY: Record<string, WidgetCardEntry> = {
   exercise: { renderBody: renderExerciseBody, showIncrement: false },
   home_projects: { renderBody: renderHomeProjectsBody },
   family_members: { renderBody: renderFamilyMembersBody, showIncrement: false, hideTaskConvert: true },
+  // Linked task widgets
+  linked_task: {
+    renderBody: renderLinkedTaskBody,
+    getTitle: (w) => w.linkedTaskTitle || null,
+    showIncrement: false,
+    hideTaskConvert: true,
+  },
   // Metadata-only entries (use default progress bar, but hide "+" button)
   medication: { showIncrement: false },
   water: { showIncrement: false },
