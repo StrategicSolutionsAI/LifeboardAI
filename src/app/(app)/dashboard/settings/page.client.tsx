@@ -1,7 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from 'react'
-import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square, ChevronDown, X } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square, ChevronDown, X, Download, Upload, Loader2, CheckCircle2 } from 'lucide-react'
 import { ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
@@ -162,6 +162,14 @@ export default function SettingsPageClient() {
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null)
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({})
 
+  // Data backup state
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const handleCreateCustomTheme = () => {
     if (!customThemeName.trim()) return
     const newTheme = createCustomTheme(customThemeName.trim(), customPrimary, customSecondary, customAccent)
@@ -239,6 +247,77 @@ export default function SettingsPageClient() {
       }
     }
   }
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true)
+    setBackupStatus(null)
+    try {
+      const res = await fetch('/api/data-backup', { credentials: 'include' })
+      if (!res.ok) {
+        const err = await res.text().catch(() => '')
+        console.error('Export failed:', res.status, err)
+        throw new Error('Export failed')
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `lifeboard-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setBackupStatus({ type: 'success', message: 'Backup downloaded successfully' })
+    } catch {
+      setBackupStatus({ type: 'error', message: 'Failed to export data. Please try again.' })
+    } finally {
+      setIsExporting(false)
+    }
+  }, [])
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPendingFile(file)
+    setShowImportConfirm(true)
+    // Reset input so the same file can be re-selected
+    e.target.value = ''
+  }, [])
+
+  const handleImportConfirm = useCallback(async () => {
+    if (!pendingFile) return
+    setIsImporting(true)
+    setShowImportConfirm(false)
+    setBackupStatus(null)
+    try {
+      const text = await pendingFile.text()
+      const json = JSON.parse(text)
+      const res = await fetch('/api/data-backup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(json),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Import failed')
+      }
+      const result = await res.json()
+      const totalImported = Object.values(result.results as Record<string, { imported: number }>)
+        .reduce((sum, r) => sum + r.imported, 0)
+      setBackupStatus({ type: 'success', message: `Restored ${totalImported} records successfully` })
+    } catch (err: any) {
+      setBackupStatus({ type: 'error', message: err.message || 'Failed to import data. Please check the file format.' })
+    } finally {
+      setIsImporting(false)
+      setPendingFile(null)
+    }
+  }, [pendingFile])
+
+  const handleImportCancel = useCallback(() => {
+    setShowImportConfirm(false)
+    setPendingFile(null)
+  }, [])
 
   const getDefaultBucketColor = () => '#6B7280'
 
@@ -467,6 +546,104 @@ export default function SettingsPageClient() {
             </div>
           )}
 
+          {/* ── Data Backup & Restore ──────────────────────── */}
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-warm-sm border border-theme-neutral-300">
+            <div className="flex items-center gap-3 mb-5">
+              <Download className="w-5 h-5 text-theme-text-tertiary" />
+              <div>
+                <h2 className="text-xl font-semibold">Data Backup & Restore</h2>
+                <p className="text-sm text-theme-text-tertiary">Download your data or restore from a previous backup</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* Export */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-theme-surface-alt rounded-lg">
+                <div>
+                  <h3 className="font-medium">Download Backup</h3>
+                  <p className="text-sm text-theme-text-tertiary">Export all your tasks, preferences, calendar events, and tracking data as a JSON file</p>
+                </div>
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-theme-primary hover:bg-theme-secondary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 w-full sm:w-auto"
+                >
+                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  {isExporting ? 'Exporting...' : 'Download'}
+                </button>
+              </div>
+
+              {/* Import */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-theme-surface-alt rounded-lg">
+                <div>
+                  <h3 className="font-medium">Restore from Backup</h3>
+                  <p className="text-sm text-theme-text-tertiary">Upload a previously exported JSON file to restore your data</p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-theme-text-primary border border-theme-neutral-300 bg-theme-surface-raised hover:bg-theme-surface-alt rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 w-full sm:w-auto"
+                >
+                  {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {isImporting ? 'Importing...' : 'Upload Backup'}
+                </button>
+              </div>
+
+              {/* Import confirmation dialog */}
+              {showImportConfirm && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-yellow-800">Confirm Data Restore</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        This will merge the backup data with your existing data. Records with matching IDs will be overwritten.
+                        File: <span className="font-medium">{pendingFile?.name}</span>
+                      </p>
+                      <div className="flex gap-3 mt-3">
+                        <button
+                          onClick={handleImportConfirm}
+                          className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-md transition-colors"
+                        >
+                          Yes, Restore Data
+                        </button>
+                        <button
+                          onClick={handleImportCancel}
+                          className="px-4 py-2 text-sm font-medium text-theme-text-primary border border-theme-neutral-300 hover:bg-white rounded-md transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Status message */}
+              {backupStatus && (
+                <div className={cn(
+                  "flex items-center gap-2 p-3 rounded-lg text-sm",
+                  backupStatus.type === 'success'
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+                )}>
+                  {backupStatus.type === 'success'
+                    ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    : <AlertCircle className="w-4 h-4 shrink-0" />
+                  }
+                  {backupStatus.message}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ── Advanced / Danger Zone ─────────────────────── */}
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-warm-sm border border-theme-neutral-300">
             <h2 className="text-xl font-semibold mb-4">Advanced Settings</h2>
@@ -477,7 +654,6 @@ export default function SettingsPageClient() {
                 <p className="text-sm text-yellow-700 mb-3">These actions are irreversible. Please proceed with caution.</p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-md transition-colors">Delete Account</button>
-                  <button className="px-4 py-2 text-sm font-medium text-theme-text-primary border border-theme-neutral-300 hover:bg-theme-surface-alt rounded-md transition-colors">Export Data</button>
                 </div>
               </div>
             </div>
