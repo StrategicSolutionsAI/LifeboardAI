@@ -499,6 +499,20 @@
   }
 }
 
+/* Emoji Mart picker — warm Calidora theme overrides */
+em-emoji-picker {
+  --rgb-background: 255, 255, 255;
+  --rgb-input: 243, 243, 245;
+  --rgb-color: 49, 65, 88;
+  --color-border: rgba(219, 214, 207, 0.6);
+  --color-border-over: rgba(177, 145, 106, 0.4);
+  --rgb-accent: 177, 145, 106;
+  --font-family: inherit;
+  --shadow: 0 4px 24px rgba(163, 133, 96, 0.12);
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(219, 214, 207, 0.6) !important;
+}
+
 /* PWA standalone mode adjustments */
 @media (display-mode: standalone) {
   /* Remove extra bottom padding that accounts for browser chrome */

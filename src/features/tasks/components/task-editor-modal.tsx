@@ -11,6 +11,7 @@ import {
 import { useVisualViewport } from "@/hooks/use-visual-viewport";
 import { format, parseISO } from "date-fns";
 import { X, Trash2, ShoppingCart, Activity } from "lucide-react";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { useToast } from "@/components/ui/use-toast";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
@@ -638,13 +639,19 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
               <label className="block text-[11px] tracking-[0.6px] uppercase text-theme-text-tertiary font-medium mb-2">
                 Task
               </label>
-              <input
-                autoFocus
-                className="w-full border border-theme-neutral-300 rounded-lg px-3 py-2.5 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
-                placeholder="What needs to be done?"
-                value={formContent}
-                onChange={(e) => setFormContent(e.target.value)}
-              />
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  className="flex-1 border border-theme-neutral-300 rounded-lg px-3 py-2.5 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus:outline-none focus:ring-2 focus:ring-theme-focus/30 focus:border-theme-primary transition-colors"
+                  placeholder="What needs to be done?"
+                  value={formContent}
+                  onChange={(e) => setFormContent(e.target.value)}
+                />
+                <EmojiPickerButton
+                  onEmojiSelect={(emoji) => setFormContent((v) => v + emoji)}
+                  buttonHeight="h-9"
+                />
+              </div>
             </div>
 
             {/* Schedule Section */}

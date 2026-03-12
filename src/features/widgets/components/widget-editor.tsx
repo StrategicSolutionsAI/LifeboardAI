@@ -10,6 +10,7 @@ import { useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption } from "@/types/tasks";
 import { format } from "date-fns";
 import { card, form } from "@/lib/styles";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
 
 // Calidora-aligned colour palette
@@ -397,21 +398,34 @@ export default function WidgetEditorSheet({
             {draft.id === 'birthdays' ? (
               <div className={card.panel}>
                 <div className="space-y-2">
-                  <p className={form.label}>Friend's Name</p>
-                  <input
-                    type="text"
-                    value={draft.birthdayData?.friendName || ''}
-                    onChange={e => setDraft(p => p ? {
-                      ...p,
-                      birthdayData: {
-                        ...p.birthdayData,
-                        friendName: e.target.value,
-                        birthDate: p.birthdayData?.birthDate || ''
-                      }
-                    } : p)}
-                    placeholder="Enter friend's name"
-                    className={form.input}
-                  />
+                  <p className={form.label}>Friend&apos;s Name</p>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={draft.birthdayData?.friendName || ''}
+                      onChange={e => setDraft(p => p ? {
+                        ...p,
+                        birthdayData: {
+                          ...p.birthdayData,
+                          friendName: e.target.value,
+                          birthDate: p.birthdayData?.birthDate || ''
+                        }
+                      } : p)}
+                      placeholder="Enter friend's name"
+                      className={`flex-1 ${form.input}`}
+                    />
+                    <EmojiPickerButton
+                      onEmojiSelect={(emoji) => setDraft(p => p ? {
+                        ...p,
+                        birthdayData: {
+                          ...p.birthdayData,
+                          friendName: (p.birthdayData?.friendName || '') + emoji,
+                          birthDate: p.birthdayData?.birthDate || ''
+                        }
+                      } : p)}
+                      buttonHeight="h-9"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <p className={form.label}>Birth Date</p>

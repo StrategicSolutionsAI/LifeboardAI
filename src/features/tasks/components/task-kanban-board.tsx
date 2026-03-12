@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { differenceInCalendarDays, format, parseISO, isValid } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import type { KanbanStatus } from "@/types/tasks";
 
 /* ─── Calidora color helpers ─── */
@@ -375,6 +376,9 @@ function KanbanColumn({
                 }
               }}
               aria-label={`Add task to ${column.label}`}
+            />
+            <EmojiPickerButton
+              onEmojiSelect={(emoji) => setDraft((v) => v + emoji)}
             />
             <Button
               size="sm"

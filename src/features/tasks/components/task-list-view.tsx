@@ -13,6 +13,7 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -679,6 +680,9 @@ function TaskSection({
                 setNewTaskTitle("");
               }
             }}
+          />
+          <EmojiPickerButton
+            onEmojiSelect={(emoji) => setNewTaskTitle((v) => v + emoji)}
           />
           <Button size="sm" onClick={handleSubmitNew} className="h-7 px-3 text-xs bg-theme-primary hover:bg-theme-primary-600">
             Add

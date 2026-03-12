@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 
 export interface TasksQuickActionFilter {
   key: string;
@@ -60,6 +61,11 @@ export function TasksQuickActions({
           }}
           placeholder={quickAddPlaceholder}
           className="h-8 flex-1 border-theme-neutral-300 text-sm text-theme-text-primary placeholder:text-theme-neutral-400 focus-visible:ring-2 focus-visible:ring-theme-primary/40"
+          disabled={isAdding}
+        />
+        <EmojiPickerButton
+          onEmojiSelect={(emoji) => setQuickAddInput((v) => v + emoji)}
+          buttonHeight="h-8"
           disabled={isAdding}
         />
         <button

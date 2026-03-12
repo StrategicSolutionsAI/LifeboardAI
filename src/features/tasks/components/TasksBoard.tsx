@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Plus, CheckCircle2, CalendarDays, Clock3, MoreHorizontal, GripVertical, ClipboardList, Pencil, Trash2 } from "lucide-react";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
   DropdownMenu,
@@ -549,6 +550,9 @@ function BucketColumn({
                 }
               }}
               aria-label={`Add task in ${bucket.name}`}
+            />
+            <EmojiPickerButton
+              onEmojiSelect={(emoji) => setDraft((v) => v + emoji)}
             />
             <Button
               size="sm"

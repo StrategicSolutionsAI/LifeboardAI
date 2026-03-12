@@ -5,8 +5,10 @@
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { format } from "date-fns";
+import { toDayKey } from "@/features/calendar/types";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { X, Plus } from "lucide-react";
+import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import {
   Droppable,
   Draggable,
@@ -187,7 +189,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     if (plannerDate && plannerDate.trim().length > 0) {
       return plannerDate.trim();
     }
-    return format(new Date(), 'yyyy-MM-dd');
+    return toDayKey(new Date());
   }, [plannerDate]);
 
   const memberMap = useMemo(() => {
@@ -649,23 +651,29 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
           className="space-y-3"
         >
           {/* Task name first — most important field */}
-          <label className="block text-xs text-theme-text-subtle font-medium">
+          <div className="block text-xs text-theme-text-subtle font-medium">
             <span className="block mb-1 uppercase tracking-wide">Task</span>
-            <input
-              type="text"
-              value={newTaskContent}
-              onChange={(e) => setNewTaskContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  handleCancelCreation();
-                }
-              }}
-              autoFocus
-              placeholder="What needs to be done?"
-              className="w-full rounded border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-secondary focus:outline-none"
-            />
-          </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={newTaskContent}
+                onChange={(e) => setNewTaskContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    handleCancelCreation();
+                  }
+                }}
+                autoFocus
+                placeholder="What needs to be done?"
+                className="flex-1 rounded border border-theme-neutral-300 px-3 py-2 text-sm focus:border-theme-secondary focus:outline-none"
+              />
+              <EmojiPickerButton
+                onEmojiSelect={(emoji) => setNewTaskContent((v) => v + emoji)}
+                buttonHeight="h-9"
+              />
+            </div>
+          </div>
 
           {/* Time + Duration row */}
           <div className="flex items-end gap-3">
