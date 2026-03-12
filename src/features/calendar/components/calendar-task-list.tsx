@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getBucketColorSync, UNASSIGNED_BUCKET_ID } from "@/lib/bucket-colors";
 import { getUserPreferencesClient } from "@/lib/user-preferences";
-import { normalizeBucketId } from "@/features/calendar/types";
+import { normalizeBucketId, toDayKey } from "@/features/calendar/types";
 import { EnhancedTaskCard, getCustomBucketStyles } from "@/features/calendar/components/calendar-task-card";
 import { useTaskOrdering } from "@/features/calendar/hooks/use-task-ordering";
 import { HabitChecklistPanel } from "@/features/calendar/components/habit-checklist-panel";
@@ -293,7 +293,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
 
   // Use the selected calendar date for calendar view, real today for dashboard contexts
   const referenceDate = useMemo(() => (dashboardView ? new Date() : selectedDate), [dashboardView, selectedDate]);
-  const todayStr = useMemo(() => format(referenceDate, 'yyyy-MM-dd'), [referenceDate]);
+  const todayStr = useMemo(() => toDayKey(referenceDate), [referenceDate]);
   const todayTasks = useMemo(() => {
     let filtered = allTasks.filter(t => !t.hourSlot && doesTaskOccurOnDate(t, todayStr));
 

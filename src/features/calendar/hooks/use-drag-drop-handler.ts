@@ -1,8 +1,8 @@
 import { useCallback } from "react";
-import { format, addDays } from "date-fns";
+import { addDays } from "date-fns";
 import type { DropResult } from "@hello-pangea/dnd";
 import type { Task, RepeatOption } from "@/types/tasks";
-import { hourSlotToISO } from "@/features/calendar/types";
+import { toDayKey, hourSlotToISO } from "@/features/calendar/types";
 import { reorderChannel, type ReorderEvent } from "@/features/calendar/hooks/calendar-reorder-channel";
 
 /* ─── Types ─── */
@@ -68,11 +68,11 @@ function extractTaskId(draggableId: string): string {
 function resolveUpcomingDate(groupKey: string): string | undefined {
   const today = new Date();
   switch (groupKey) {
-    case "today": return format(today, "yyyy-MM-dd");
-    case "tomorrow": return format(addDays(today, 1), "yyyy-MM-dd");
-    case "thisWeek": return format(addDays(today, 3), "yyyy-MM-dd");
-    case "nextWeek": return format(addDays(today, 7), "yyyy-MM-dd");
-    case "later": return format(addDays(today, 14), "yyyy-MM-dd");
+    case "today": return toDayKey(today);
+    case "tomorrow": return toDayKey(addDays(today, 1));
+    case "thisWeek": return toDayKey(addDays(today, 3));
+    case "nextWeek": return toDayKey(addDays(today, 7));
+    case "later": return toDayKey(addDays(today, 14));
     default: return undefined;
   }
 }
@@ -88,7 +88,7 @@ function buildSidebarUpdates(
         due: { date: selectedDateStr }, startDate: selectedDateStr, endDate: selectedDateStr, allDay: true,
       };
     case "masterTodayTasks": {
-      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const todayStr = toDayKey(new Date());
       return {
         hourSlot: null, endHourSlot: null,
         due: { date: todayStr }, startDate: todayStr, endDate: todayStr, allDay: true,
@@ -248,8 +248,8 @@ export function useDragDropHandler({
           const srcMs = new Date(src.dateStr + "T00:00:00").getTime();
           const dstMs = new Date(dst.dateStr + "T00:00:00").getTime();
           const deltaMs = dstMs - srcMs;
-          updates.startDate = format(new Date(new Date(task.startDate + "T00:00:00").getTime() + deltaMs), "yyyy-MM-dd");
-          updates.endDate = format(new Date(new Date(task.endDate + "T00:00:00").getTime() + deltaMs), "yyyy-MM-dd");
+          updates.startDate = toDayKey(new Date(new Date(task.startDate + "T00:00:00").getTime() + deltaMs));
+          updates.endDate = toDayKey(new Date(new Date(task.endDate + "T00:00:00").getTime() + deltaMs));
         } else {
           updates.startDate = dst.dateStr;
           updates.endDate = dst.dateStr;

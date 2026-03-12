@@ -12,6 +12,7 @@ import {
   Award,
   Calendar,
   Settings,
+  ListTodo,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
 import {
@@ -32,6 +33,7 @@ interface HabitTrackerWidgetProps {
   onUpdate: (updates: Partial<WidgetInstance>) => void
   progress: { value: number; streak: number; isToday: boolean }
   onComplete: () => void
+  onRemove?: () => void
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -46,7 +48,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
 // Component
 // ---------------------------------------------------------------------------
 
-export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: HabitTrackerWidgetProps) {
+export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete, onRemove }: HabitTrackerWidgetProps) {
   const data = widget.habitTrackerData
   const today = getDateKey(new Date())
 
@@ -409,6 +411,23 @@ export function HabitTrackerWidget({ widget, onUpdate, progress, onComplete }: H
                 className="h-5 w-5 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/40"
               />
             </label>
+
+            {/* Convert to Task (stop tracking as habit) */}
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    `Stop tracking "${data.habitName}" as a habit? It will be kept as a regular task.`
+                  )
+                  if (confirmed) onRemove()
+                }}
+                className="flex items-center gap-1.5 text-xs text-theme-text-tertiary hover:text-red-600 transition-colors pt-2"
+              >
+                <ListTodo className="h-3.5 w-3.5" />
+                Convert to Task
+              </button>
+            )}
           </div>
         )}
       </div>

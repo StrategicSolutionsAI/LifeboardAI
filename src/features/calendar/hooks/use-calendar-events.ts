@@ -7,7 +7,6 @@ import {
   startOfDay,
   endOfDay,
   addDays,
-  format,
 } from "date-fns";
 import type { RepeatOption, Task, TaskOccurrenceException } from "@/types/tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
@@ -146,8 +145,8 @@ export function useCalendarEvents({
     const assigneeFilters = selectedBucketFilters.filter(f => f.startsWith('assignee:')).map(f => f.slice(9));
     const hasAssigneeFilters = assigneeFilters.length > 0;
     // Pre-compute range boundary strings once instead of per-task
-    const rangeStartStr = format(rangeStart, 'yyyy-MM-dd');
-    const rangeEndStr = format(rangeEnd, 'yyyy-MM-dd');
+    const rangeStartStr = toDayKey(rangeStart);
+    const rangeEndStr = toDayKey(rangeEnd);
 
     const addEvent = (dateStr: string, event: DayEvent) => {
       const bucket = result[dateStr] ?? (result[dateStr] = []);
@@ -214,7 +213,7 @@ export function useCalendarEvents({
         let cursor = new Date(`${clampedStart}T00:00:00`);
         const end = new Date(`${clampedEnd}T00:00:00`);
         while (cursor <= end) {
-          buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+          buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
           cursor = addDays(cursor, 1);
         }
         return;
@@ -228,7 +227,7 @@ export function useCalendarEvents({
         case 'daily': {
           let cursor = dueMs >= rStartMs ? due : rangeStart;
           while (cursor.getTime() <= rEndMs) {
-            buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+            buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
             cursor = addDays(cursor, 1);
           }
           break;
@@ -238,7 +237,7 @@ export function useCalendarEvents({
           while (cursor.getTime() <= rEndMs) {
             const day = cursor.getDay();
             if (day >= 1 && day <= 5) {
-              buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+              buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
             }
             cursor = addDays(cursor, 1);
           }
@@ -255,7 +254,7 @@ export function useCalendarEvents({
           }
           cursor = addDays(cursor, daysUntilMatch);
           while (cursor.getTime() <= rEndMs) {
-            buildEventForDate(task, format(cursor, 'yyyy-MM-dd'), startRaw, endRaw);
+            buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
             cursor = addDays(cursor, 7);
           }
           break;
@@ -269,7 +268,7 @@ export function useCalendarEvents({
             const targetDateNum = dueDateNum > daysInMonth ? daysInMonth : dueDateNum;
             const candidate = new Date(month.getFullYear(), month.getMonth(), targetDateNum);
             if (candidate.getTime() >= dueMs && candidate.getTime() >= rStartMs && candidate.getTime() <= rEndMs) {
-              buildEventForDate(task, format(candidate, 'yyyy-MM-dd'), startRaw, endRaw);
+              buildEventForDate(task, toDayKey(candidate), startRaw, endRaw);
             }
             month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
           }
@@ -333,8 +332,8 @@ export function useCalendarEvents({
   /* ── Data Fetching: Google Calendar ── */
 
   const googleCacheKey = useMemo(() => {
-    const startKey = format(new Date(rangeStartMs), 'yyyy-MM-dd');
-    const endKey = format(new Date(rangeEndMs), 'yyyy-MM-dd');
+    const startKey = toDayKey(new Date(rangeStartMs));
+    const endKey = toDayKey(new Date(rangeEndMs));
     return `calendar-google-${view}-${startKey}-${endKey}`;
   }, [rangeStartMs, rangeEndMs, view]);
 
@@ -487,7 +486,7 @@ export function useCalendarEvents({
       let cursor = startDateObj;
       while (cursor.getTime() <= endDateObj.getTime()) {
         if (cursor.getTime() >= rangeStart.getTime() && cursor.getTime() <= rangeEnd.getTime()) {
-          const dayKey = format(cursor, 'yyyy-MM-dd');
+          const dayKey = toDayKey(cursor);
           const bucket = map[dayKey] ?? (map[dayKey] = []);
           const taskIdKey = resolvedTaskId ? resolvedTaskId.toString() : undefined;
           const seenKey = taskIdKey ? `${taskIdKey}-${dayKey}` : undefined;

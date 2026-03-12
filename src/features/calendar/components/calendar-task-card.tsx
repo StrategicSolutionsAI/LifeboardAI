@@ -5,7 +5,7 @@ import { format, addDays, startOfWeek, startOfDay, differenceInDays, parse } fro
 import { ChevronRight, Star, Calendar, AlertCircle } from "lucide-react";
 import { Draggable } from "@hello-pangea/dnd";
 import { getBucketColorSync } from "@/lib/bucket-colors";
-import { normalizeBucketId } from "@/features/calendar/types";
+import { normalizeBucketId, toDayKey } from "@/features/calendar/types";
 
 /* ─── Bucket color helpers (shared with calendar-task-list) ─── */
 
@@ -131,10 +131,10 @@ export const EnhancedTaskCard = React.memo(function EnhancedTaskCard({
     const today = new Date();
 
     return [
-      { label: 'Today', value: format(today, 'yyyy-MM-dd') },
-      { label: 'Tomorrow', value: format(addDays(today, 1), 'yyyy-MM-dd') },
-      { label: 'Next Week', value: format(addDays(safeBase, 7), 'yyyy-MM-dd') },
-      { label: 'Next Monday', value: format(startOfWeek(addDays(safeBase, 7), { weekStartsOn: 1 }), 'yyyy-MM-dd') },
+      { label: 'Today', value: toDayKey(today) },
+      { label: 'Tomorrow', value: toDayKey(addDays(today, 1)) },
+      { label: 'Next Week', value: toDayKey(addDays(safeBase, 7)) },
+      { label: 'Next Monday', value: toDayKey(startOfWeek(addDays(safeBase, 7), { weekStartsOn: 1 })) },
       { label: 'Clear due date', value: null as string | null },
     ];
   }, [task.due?.date]);

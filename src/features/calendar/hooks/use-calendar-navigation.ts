@@ -62,7 +62,7 @@ export function useCalendarNavigation({
     (newDate: Date) => {
       setCurrentDate(newDate);
       if (typeof window !== "undefined") {
-        localStorage.setItem("calendar-selected-date", format(newDate, "yyyy-MM-dd"));
+        localStorage.setItem("calendar-selected-date", toDayKey(newDate));
       }
       onDateChange?.(newDate);
     },
@@ -92,7 +92,7 @@ export function useCalendarNavigation({
 
   // ── Keyboard help & jump-to-date ──
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [jumpDateValue, setJumpDateValue] = useState(() => format(currentDate, "yyyy-MM-dd"));
+  const [jumpDateValue, setJumpDateValue] = useState(() => toDayKey(currentDate));
   const jumpDateInputRef = useRef<HTMLInputElement | null>(null);
 
   const jumpToDate = useCallback(() => {
@@ -103,7 +103,7 @@ export function useCalendarNavigation({
   }, [handleDateChange, jumpDateValue]);
 
   // ── Stabilized "today" ──
-  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todayStr = toDayKey(new Date());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const today = useMemo(() => new Date(), [todayStr]);
   const currentDateKey = useMemo(() => toDayKey(currentDate), [currentDate]);

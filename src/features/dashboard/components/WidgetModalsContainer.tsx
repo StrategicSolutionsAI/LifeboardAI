@@ -21,6 +21,8 @@ interface WidgetModalsContainerProps {
   progressEntry: ProgressEntry | undefined
   /** Callback for incrementing progress */
   onIncrementProgress: (widget: WidgetInstance) => void
+  /** Callback to remove/convert a widget (e.g. habit → task) */
+  onRemoveWidget?: (widget: WidgetInstance) => void
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ export function WidgetModalsContainer({
   onWidgetUpdate,
   progressEntry,
   onIncrementProgress,
+  onRemoveWidget,
 }: WidgetModalsContainerProps) {
   const entry = openModalId ? WIDGET_MODAL_REGISTRY[openModalId] : null
   const entryRef = useRef(entry)
@@ -79,6 +82,9 @@ export function WidgetModalsContainer({
                   ? () => onIncrementProgress(activeWidget)
                   : () => {},
                 onClose,
+                onRemove: activeWidget && onRemoveWidget
+                  ? () => { onRemoveWidget(activeWidget); onClose() }
+                  : undefined,
               })}
             </div>
           </>

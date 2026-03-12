@@ -192,7 +192,14 @@ export const getBucketEventStyles = (bucketName?: string | null, bucketColors?: 
   };
 };
 
-export const toDayKey = (date: Date) => format(date, 'yyyy-MM-dd');
+/** Fast yyyy-MM-dd formatter — ~10x faster than date-fns format() by avoiding
+ *  format-string parsing and locale lookups. Used in hot paths (event loops, cell renders). */
+export const toDayKey = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}-${m < 10 ? '0' : ''}${m}-${d < 10 ? '0' : ''}${d}`;
+};
 
 export const normalizeEventTitle = (title?: string) => (
   (title ?? '')

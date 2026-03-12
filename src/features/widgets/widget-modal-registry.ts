@@ -13,6 +13,7 @@ export interface ModalRenderProps {
   progress: { value: number; streak: number; isToday: boolean }
   onComplete: () => void
   onClose: () => void
+  onRemove?: () => void
 }
 
 export interface WidgetModalEntry {
@@ -130,6 +131,7 @@ function statefulRender(
           onUpdate: props.onUpdate,
           progress: props.progress,
           onComplete: props.onComplete,
+          onRemove: props.onRemove,
         })
       : null
   renderer.displayName = `StatefulRender(${Component.displayName || Component.name || 'Widget'})`

@@ -111,7 +111,7 @@ interface StickerChipsProps {
   onRemove?: (dateStr: string, stickerId: string) => void;
 }
 
-export const StickerChips = ({ dayStr, stickersByDate, size = "sm", onRemove }: StickerChipsProps) => {
+export const StickerChips = React.memo(function StickerChips({ dayStr, stickersByDate, size = "sm", onRemove }: StickerChipsProps) {
   const dayStickers = stickersByDate[dayStr] ?? [];
   if (dayStickers.length === 0) return null;
 
@@ -145,7 +145,7 @@ export const StickerChips = ({ dayStr, stickersByDate, size = "sm", onRemove }: 
       })}
     </div>
   );
-};
+});
 
 // ---------------------------------------------------------------------------
 // StickerAddButtonCompact — hover-revealed trigger for month/week headers
@@ -161,7 +161,7 @@ interface StickerAddButtonCompactProps {
   stickerTriggerRef: React.MutableRefObject<HTMLButtonElement | null>;
 }
 
-export const StickerAddButtonCompact = ({
+export const StickerAddButtonCompact = React.memo(function StickerAddButtonCompact({
   dayStr,
   stickersByDate,
   maxStickersPerDay,
@@ -169,7 +169,7 @@ export const StickerAddButtonCompact = ({
   setActiveStickerDay,
   setStickerPalettePosition,
   stickerTriggerRef,
-}: StickerAddButtonCompactProps) => {
+}: StickerAddButtonCompactProps) {
   const dayStickers = stickersByDate[dayStr] ?? [];
   const reachedLimit = dayStickers.length >= maxStickersPerDay;
 
@@ -203,7 +203,7 @@ export const StickerAddButtonCompact = ({
       <Sticker className="h-3.5 w-3.5" />
     </button>
   );
-};
+});
 
 // ---------------------------------------------------------------------------
 // StickerPalette — sticker sheet picker

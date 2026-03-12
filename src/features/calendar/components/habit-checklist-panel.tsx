@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Check, ChevronRight, Flame, Target } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWidgets } from "@/hooks/use-widgets"
+import { useToast } from "@/components/ui/use-toast"
 import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload, fireConfetti } from "@/lib/habit-utils"
 import type { WidgetInstance } from "@/types/widgets"
 
@@ -127,7 +128,8 @@ function HabitRow({
 // ---------------------------------------------------------------------------
 
 export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
-  const { widgetsByBucket, updateWidget, loading } = useWidgets()
+  const { widgetsByBucket, updateWidget, removeWidget, loading } = useWidgets()
+  const { toast } = useToast()
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set())
   const [openHabit, setOpenHabit] = useState<{ bucket: string; widget: WidgetInstance } | null>(null)
 
@@ -194,6 +196,42 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
     },
     [openHabit, updateWidget]
   )
+
+  // Ref to avoid stale closure in the async callback
+  const openHabitRef = useRef(openHabit)
+  openHabitRef.current = openHabit
+
+  const handleRemoveHabit = useCallback(async () => {
+    const habit = openHabitRef.current
+    if (!habit) return
+
+    const widget = habit.widget
+    const bucketName = habit.bucket
+    const habitName = widget.habitTrackerData?.habitName || widget.name || "Habit"
+
+    try {
+      // If no linked task exists, create one so the habit survives as a plain task
+      if (!widget.linkedTaskId) {
+        await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: habitName, bucket: bucketName }),
+        })
+      }
+
+      removeWidget(bucketName, widget.instanceId)
+      setOpenHabit(null)
+      toast({
+        title: widget.linkedTaskId ? "Removed from habits" : "Converted to task",
+        description: widget.linkedTaskId
+          ? `"${habitName}" is no longer tracked as a habit.`
+          : `"${habitName}" has been added as a task in ${bucketName}.`,
+      })
+    } catch (error) {
+      console.error("Failed to convert habit to task:", error)
+      toast({ title: "Failed to convert habit", type: "error" })
+    }
+  }, [removeWidget, toast])
 
   // Loading state
   if (loading) {
@@ -316,6 +354,7 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
                   isToday: new Set(openHabit.widget.habitTrackerData?.completionHistory || []).has(getDateKey(new Date())),
                 }}
                 onComplete={() => fireConfetti()}
+                onRemove={handleRemoveHabit}
               />
             </>
           )}

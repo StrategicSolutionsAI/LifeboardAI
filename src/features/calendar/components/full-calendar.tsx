@@ -4,16 +4,15 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import type { CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import {
-  startOfWeek,
-  endOfWeek,
   isSameDay,
-  isSameMonth,
   format,
 } from "date-fns";
 
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
-import HourlyPlanner, { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
+import type { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
+
+const LazyHourlyPlanner = React.lazy(() => import("@/features/calendar/components/hourly-planner"));
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
@@ -37,12 +36,12 @@ import {
 } from "@/features/calendar/types";
 import { useCalendarStickers, MAX_STICKERS_PER_DAY } from "@/features/calendar/hooks/use-calendar-stickers";
 import {
-  StickerChips,
-  StickerAddButtonCompact,
   StickerPalette,
   StickerRow,
 } from "@/features/calendar/components/calendar-stickers";
-import { MobileViewDropdown, MobileOverflowMenu, EventPill } from "@/features/calendar/components/calendar-mobile-components";
+import { MobileViewDropdown, MobileOverflowMenu } from "@/features/calendar/components/calendar-mobile-components";
+import { MonthDayCell, WeekDayCell } from "@/features/calendar/components/calendar-day-cells";
+import type { CellCallbacks, StickerCallbacks } from "@/features/calendar/components/calendar-day-cells";
 
 
 const CalendarFileUpload = dynamic(
@@ -58,9 +57,13 @@ const CalendarFileUpload = dynamic(
 );
 
 
+// Module-scope constants — stable references prevent unnecessary re-renders
+const EMPTY_BUCKET_COLORS: Record<string, string> = {};
+const EMPTY_EVENTS: DayEvent[] = [];
+
 export default function FullCalendar({ selectedDate: propSelectedDate, onDateChange, availableBuckets = [], selectedBucket, isDragging = false }: FullCalendarProps = {}) {
   // Bucket colors — currently empty; getBucketColorSync has built-in fallbacks
-  const bucketColors: Record<string, string> = {};
+  const bucketColors = EMPTY_BUCKET_COLORS;
   const [selectedBucketFilters, setSelectedBucketFilters] = useState<string[]>(['all']);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -172,10 +175,13 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     handleViewChange, hasUserChosenMobileView,
   });
 
+  // Memoize flattened day array — avoids re-allocation on every render
+  const flatDays = useMemo(() => rows.flat(), [rows]);
+
   // Auto-scroll mobile week view to today's column on mount
   useEffect(() => {
     if (!isCompactBreakpoint || view !== 'week' || !mobileWeekBodyRef.current) return;
-    const weekDays = rows.flat();
+    const weekDays = flatDays;
     const todayIdx = weekDays.findIndex(d => isSameDay(d, today));
     if (todayIdx < 0) return;
     const colWidth = mobileWeekBodyRef.current.scrollWidth / 7;
@@ -185,6 +191,31 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCompactBreakpoint, view]);
+
+  // ── Stable callback / prop bundles for memoized day cells ──
+  const openNewTask = useCallback((dayStr: string) => {
+    setSelectedModalDate(null);
+    taskEditorRef.current?.openNew(dayStr);
+  }, []);
+
+  const cellCallbacks = useMemo<CellCallbacks>(() => ({
+    handleDateChange,
+    handleViewChange: handleViewChange as (view: "day") => void,
+    setSelectedModalDate,
+    openNewTask,
+    getEventsForDisplay,
+    resolveEventStyles,
+    openCalendarEvent,
+  }), [handleDateChange, handleViewChange, openNewTask, getEventsForDisplay, resolveEventStyles, openCalendarEvent]);
+
+  const cellStickers = useMemo<StickerCallbacks>(() => ({
+    stickersByDate,
+    activeStickerDay,
+    setActiveStickerDay,
+    setStickerPalettePosition,
+    stickerTriggerRef,
+    removeStickerFromDate,
+  }), [stickersByDate, activeStickerDay, removeStickerFromDate, setStickerPalettePosition]);
 
   const weekdayHeader = (
     <div className="grid grid-cols-7 border-b border-theme-neutral-300/60">
@@ -371,7 +402,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
           <div className={`border-b border-theme-neutral-300/50 bg-gradient-to-b from-theme-surface-alt/60 to-theme-surface-base flex justify-end ${isCompactBreakpoint ? 'px-3 py-2' : 'px-5 py-3'}`}>
             <button
               type="button"
-              onClick={() => taskEditorRef.current?.openNew(format(currentDate, 'yyyy-MM-dd'))}
+              onClick={() => taskEditorRef.current?.openNew(toDayKey(currentDate))}
               className={isCompactBreakpoint
                 ? "flex items-center justify-center rounded-full bg-theme-primary w-8 h-8 text-white shadow-warm-sm active:scale-[0.97] shrink-0"
                 : "flex items-center gap-2 rounded-lg bg-theme-primary px-3.5 py-2 text-xs font-medium text-white shadow-warm-sm transition-all hover:bg-[#a8896a] hover:shadow-warm active:scale-[0.97]"
@@ -690,21 +721,27 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       snapshot.isDraggingOver ? 'ring-2 ring-theme-primary-300/50' : ''
                     }`}
                   >
-                    <HourlyPlanner
-                      ref={hourlyPlannerRef}
-                      className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
-                      showTimeIndicator={true}
-                      allowResize={true}
-                      availableBuckets={availableBuckets}
-                      selectedBucket={selectedBucket}
-                      isDragging={isDragging}
-                      wrapWithContext={false}
-                      plannerDate={format(currentDate, 'yyyy-MM-dd')}
-                      onTaskOpen={openTaskEditorById}
-                      bucketColors={bucketColors}
-                      isMobile={isCompactBreakpoint}
-                      familyMembers={familyMembers}
-                    />
+                    <React.Suspense fallback={
+                      <div className="flex items-center justify-center py-16 text-sm text-theme-text-tertiary">
+                        Loading planner…
+                      </div>
+                    }>
+                      <LazyHourlyPlanner
+                        ref={hourlyPlannerRef}
+                        className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
+                        showTimeIndicator={true}
+                        allowResize={true}
+                        availableBuckets={availableBuckets}
+                        selectedBucket={selectedBucket}
+                        isDragging={isDragging}
+                        wrapWithContext={false}
+                        plannerDate={toDayKey(currentDate)}
+                        onTaskOpen={openTaskEditorById}
+                        bucketColors={bucketColors}
+                        isMobile={isCompactBreakpoint}
+                        familyMembers={familyMembers}
+                      />
+                    </React.Suspense>
                     {provided.placeholder}
                   </div>
                 )}
@@ -731,7 +768,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         className="grid"
                         style={{ gridTemplateColumns: 'repeat(7, calc((100vw - 1rem) / 3))' }}
                       >
-                        {rows.flat().map((day: Date, i: number) => {
+                        {flatDays.map((day: Date, i: number) => {
                           const dayIsToday = isSameDay(day, today);
                           return (
                             <div
@@ -775,63 +812,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         className="grid h-full"
                         style={{ gridTemplateColumns: 'repeat(7, calc((100vw - 1rem) / 3))' }}
                       >
-                        {rows.flat().map((day: Date, idx: number) => {
-                          const dayStr = toDayKey(day);
-                          const dayEvents = eventsByDate[dayStr] ?? [];
-                          const dayIsToday = isSameDay(day, today);
-                          const formattedDayLabel = format(day, 'MMMM d, yyyy');
-                          const dayOfWeek = day.getDay();
-                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                          const visibleEvents = getEventsForDisplay(dayEvents);
-
-                          return (
-                            <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
-                              {(provided, snapshot) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.droppableProps}
-                                  className={`h-full ${idx < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
-                                  style={{ scrollSnapAlign: 'start' }}
-                                >
-                                  <div className={`px-2 pt-2 pb-3 h-full ${
-                                    snapshot.isDraggingOver
-                                      ? 'bg-theme-brand-tint-light'
-                                      : isWeekend
-                                      ? 'bg-theme-surface-warm-60'
-                                      : 'bg-theme-surface-raised'
-                                  }`}>
-                                    {/* Add task button — always visible on mobile */}
-                                    <div className="flex items-center justify-end mb-2">
-                                      <button
-                                        type="button"
-                                        className="lb-day-add p-0.5 rounded active:bg-theme-brand-tint-strong text-theme-text-tertiary transition-all"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedModalDate(null);
-                                          taskEditorRef.current?.openNew(dayStr);
-                                        }}
-                                        title={`Add task on ${formattedDayLabel}`}
-                                        aria-label={`Add task on ${formattedDayLabel}`}
-                                      >
-                                        <Plus className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-
-                                    {/* Event pills */}
-                                    <div className="flex flex-col gap-1">
-                                      {visibleEvents.map((ev: DayEvent, filteredIndex: number) => (
-                                        <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
-                                          ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
-                                          styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
-                                      ))}
-                                    </div>
-                                    {provided.placeholder}
-                                  </div>
-                                </div>
-                              )}
-                            </Droppable>
-                          );
-                        })}
+                        {flatDays.map((day: Date, idx: number) => (
+                          <WeekDayCell
+                            key={`week-mobile-${toDayKey(day)}-${idx}`}
+                            day={day}
+                            idx={idx}
+                            today={today}
+                            isMobile={true}
+                            isDragging={isDragging}
+                            callbacks={cellCallbacks}
+                            stickers={cellStickers}
+                            eventsByDate={eventsByDate}
+                          />
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -840,99 +833,19 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   <div className="flex-1 flex flex-col">
                     {weekdayHeader}
                     <div className="grid grid-cols-7 flex-1 min-h-[520px]">
-                      {rows.flat().map((day: Date, idx: number) => {
-                const dayStr = toDayKey(day);
-                const dayEvents = eventsByDate[dayStr] ?? [];
-                const isToday = isSameDay(day, today);
-                const formattedDayLabel = format(day, 'MMMM d, yyyy');
-                const dayOfWeek = day.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-                return (
-                  <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
-                    {(provided, snapshot) => {
-                      const cellClasses = [
-                        'px-2 pt-2 pb-3 transition-colors relative group h-full',
-                        snapshot.isDraggingOver
-                          ? 'bg-theme-brand-tint-light'
-                          : isWeekend
-                          ? 'bg-theme-surface-warm-60'
-                          : 'bg-theme-surface-raised',
-                      ].filter(Boolean).join(' ');
-                      const visibleEvents = getEventsForDisplay(dayEvents);
-                      const filteredEvents = visibleEvents;
-                      return (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`h-full ${idx < 6 ? 'border-r border-theme-neutral-300/40' : ''}`}
-                        >
-                          <div
-                            onClick={(e) => {
-                              const target = e.target as HTMLElement;
-                              if (target.closest('.lb-day-add') || target.closest('.lb-sticker-add')) return;
-                              if (dayEvents.length) setSelectedModalDate(dayStr);
-                            }}
-                            className={cellClasses}
-                          >
-                          {/* Day Number */}
-                          <div className="flex items-center justify-between mb-2">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); handleDateChange(day); handleViewChange('day'); }}
-                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-medium hover:bg-theme-brand-tint-strong transition-colors ${
-                                isToday
-                                  ? 'bg-theme-primary text-white hover:bg-[#a8896a]'
-                                  : 'text-theme-text-primary'
-                              }`}
-                            >
-                              {format(day, "d")}
-                            </button>
-                            <div className="flex items-center gap-0.5">
-                              <StickerAddButtonCompact
-                                dayStr={dayStr}
-                                stickersByDate={stickersByDate}
-                                maxStickersPerDay={MAX_STICKERS_PER_DAY}
-                                activeStickerDay={activeStickerDay}
-                                setActiveStickerDay={setActiveStickerDay}
-                                setStickerPalettePosition={setStickerPalettePosition}
-                                stickerTriggerRef={stickerTriggerRef}
-                              />
-                              <button
-                                type="button"
-                                className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedModalDate(null);
-                                  taskEditorRef.current?.openNew(dayStr);
-                                }}
-                                title={`Add task on ${formattedDayLabel}`}
-                                aria-label={`Add task on ${formattedDayLabel}`}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Sticker chips */}
-                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} onRemove={removeStickerFromDate} size="md" />
-
-                          {/* Compact event pills */}
-                          <div className="flex flex-col gap-1">
-                            {filteredEvents.map((ev: DayEvent, filteredIndex: number) => (
-                              <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
-                                ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
-                                styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
-                            ))}
-                          </div>
-                          {provided.placeholder}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  </Droppable>
-                );
-              })}
+                      {flatDays.map((day: Date, idx: number) => (
+                        <WeekDayCell
+                          key={`week-desktop-${toDayKey(day)}-${idx}`}
+                          day={day}
+                          idx={idx}
+                          today={today}
+                          isMobile={false}
+                          isDragging={isDragging}
+                          callbacks={cellCallbacks}
+                          stickers={cellStickers}
+                          eventsByDate={eventsByDate}
+                        />
+                      ))}
                     </div>
                   </div>
                 )
@@ -941,162 +854,21 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                 <div className="flex-1 flex flex-col">
                   {weekdayHeader}
                   <div className={`grid grid-cols-7 flex-1 ${isCompactBreakpoint ? 'auto-rows-[minmax(52px,_1fr)]' : 'auto-rows-[minmax(120px,_1fr)]'}`}>
-              {rows.flat().map((day: Date, idx: number) => {
-                const dayStr = toDayKey(day);
-                const dayEvents = eventsByDate[dayStr] ?? [];
-
-                const isCurrentMonth = isSameMonth(day, currentDate);
-                const isToday = isSameDay(day, today);
-                const formattedDayLabel = format(day, 'MMMM d, yyyy');
-                const mobileDayLabel = format(day, 'EEE');
-                const isLastRow = idx >= (rows.length - 1) * 7;
-
-                return (
-                  <Droppable key={`droppable-${dayStr}-${idx}`} droppableId={`calendar-day-${dayStr}`}>
-                    {(provided, snapshot) => {
-                      const dayOfWeek = day.getDay();
-                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                      const borderClasses = [
-                        idx % 7 < 6 ? 'border-r' : '',
-                        !isLastRow ? 'border-b' : '',
-                      ].filter(Boolean).join(' ');
-                      const cellClasses = [
-                        'p-2 transition-colors relative group h-full',
-                        snapshot.isDraggingOver
-                          ? 'bg-theme-brand-tint-light'
-                          : isCurrentMonth
-                          ? 'bg-theme-surface-raised'
-                          : 'bg-theme-surface-warm-30',
-                      ].filter(Boolean).join(' ');
-
-                      const displayEvents = getEventsForDisplay(dayEvents);
-                      const filteredEvents = displayEvents;
-
-                      if (isCompactBreakpoint) {
-                        // MOBILE: Compact cell with dots
-                        return (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`h-full border-theme-neutral-300/50 ${borderClasses}`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => { handleDateChange(day); handleViewChange('day'); }}
-                              className={`w-full h-full p-1 flex flex-col items-center justify-start transition-colors ${
-                                snapshot.isDraggingOver ? 'bg-theme-brand-tint-light'
-                                : isCurrentMonth ? 'bg-theme-surface-raised' : 'bg-theme-surface-warm-30'
-                              }`}
-                            >
-                              <span className={`text-xs w-7 h-7 flex items-center justify-center rounded-full ${
-                                isToday ? 'bg-theme-primary text-white font-semibold'
-                                : isCurrentMonth ? 'text-theme-text-secondary' : 'text-theme-text-quaternary'
-                              }`}>
-                                {format(day, 'd')}
-                              </span>
-                              {isCurrentMonth && dayEvents.length > 0 && (
-                                <div className="flex items-center gap-[3px] mt-1">
-                                  {dayEvents.slice(0, 3).map((ev, i) => {
-                                    const dotStyles = resolveEventStyles(ev.source, ev);
-                                    return (
-                                      <span key={i} className={`w-[5px] h-[5px] rounded-full ${dotStyles.dot}`}
-                                        style={dotStyles.customColor ? { backgroundColor: dotStyles.customColor } : {}} />
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </button>
-                            {provided.placeholder}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`h-full border-theme-neutral-300/50 ${borderClasses}`}
-                        >
-                          <div
-                            onClick={(e) => {
-                              const target = e.target as HTMLElement;
-                              if (target.closest('.lb-day-add') || target.closest('.lb-sticker-add')) return;
-                              if (dayEvents.length) setSelectedModalDate(dayStr);
-                            }}
-                            className={cellClasses}
-                          >
-                          {isCurrentMonth && (
-                            <>
-                          {/* Day Number */}
-                          <div className="flex items-center justify-between mb-1">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); handleDateChange(day); handleViewChange('day'); }}
-                              className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
-                                isToday ? 'bg-theme-primary text-white hover:bg-[#a8896a]' : 'text-theme-text-secondary hover:bg-theme-brand-tint-strong'
-                              }`}
-                            >
-                              <span className="text-xs">{format(day, "d")}</span>
-                            </button>
-                            <div className="flex items-center gap-0.5">
-                              <StickerAddButtonCompact
-                                dayStr={dayStr}
-                                stickersByDate={stickersByDate}
-                                maxStickersPerDay={MAX_STICKERS_PER_DAY}
-                                activeStickerDay={activeStickerDay}
-                                setActiveStickerDay={setActiveStickerDay}
-                                setStickerPalettePosition={setStickerPalettePosition}
-                                stickerTriggerRef={stickerTriggerRef}
-                              />
-                              <button
-                                type="button"
-                                className="lb-day-add opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-theme-brand-tint-strong text-theme-text-tertiary hover:text-theme-text-secondary transition-all"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedModalDate(null);
-                                  taskEditorRef.current?.openNew(dayStr);
-                                }}
-                                title={`Add task on ${formattedDayLabel}`}
-                                aria-label={`Add task on ${formattedDayLabel}`}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Sticker chips */}
-                          <StickerChips dayStr={dayStr} stickersByDate={stickersByDate} onRemove={removeStickerFromDate} size="sm" />
-
-                          {/* Calidora-style compact event pills */}
-                          <div className="flex flex-col gap-1">
-                            {filteredEvents.slice(0, 3).map((ev: DayEvent, filteredIndex: number) => (
-                              <EventPill key={ev.taskId ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`}
-                                ev={ev} dayStr={dayStr} filteredIndex={filteredIndex}
-                                styles={resolveEventStyles(ev.source, ev)} openCalendarEvent={openCalendarEvent} />
-                            ))}
-                            {dayEvents.length > 3 && (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setSelectedModalDate(dayStr);
-                                }}
-                                className="text-2xs text-theme-text-tertiary pl-1.5 hover:text-theme-text-secondary transition-colors text-left"
-                              >
-                                +{dayEvents.length - 3} more
-                              </button>
-                            )}
-                          </div>
-                          </>
-                          )}
-                          {provided.placeholder}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  </Droppable>
-                );
-              })}
+                    {flatDays.map((day: Date, idx: number) => (
+                      <MonthDayCell
+                        key={`month-${toDayKey(day)}-${idx}`}
+                        day={day}
+                        idx={idx}
+                        today={today}
+                        currentDate={currentDate}
+                        isCompactBreakpoint={isCompactBreakpoint}
+                        totalRows={rows.length}
+                        isDragging={isDragging}
+                        callbacks={cellCallbacks}
+                        stickers={cellStickers}
+                        eventsByDate={eventsByDate}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
@@ -1109,7 +881,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {selectedModalDate && (
         <EventDetailsModal
           selectedModalDate={selectedModalDate}
-          events={eventsByDate[selectedModalDate] ?? []}
+          events={eventsByDate[selectedModalDate] ?? EMPTY_EVENTS}
           bucketColors={bucketColors}
           onClose={() => setSelectedModalDate(null)}
         />

@@ -944,6 +944,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             onWidgetUpdate={handleWidgetModalUpdate}
             progressEntry={activeModalWidget ? progressByWidget[activeModalWidget.instanceId] : undefined}
             onIncrementProgress={incrementProgress}
+            onRemoveWidget={requestRemoveWidget}
           />
         )}
 

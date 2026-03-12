@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { format } from "date-fns";
 import type { RepeatOption, Task } from "@/types/tasks";
 import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { sanitizeBucketName, isoToHourLabel } from "@/lib/task-form-utils";
-import type { DayEvent, CalendarTaskMovedDetail } from "@/features/calendar/types";
+import { toDayKey, type DayEvent, type CalendarTaskMovedDetail } from "@/features/calendar/types";
 import {
   computeStickerPalettePosition as computeStickerPos,
 } from "@/features/calendar/components/calendar-stickers";
@@ -192,7 +191,7 @@ export function useCalendarActions({
     (event: DayEvent, dateStr: string) => {
       if (!event.taskId) return;
       const task = resolveTaskById(event.taskId);
-      const targetDate = dateStr || task?.due?.date || format(currentDate, "yyyy-MM-dd");
+      const targetDate = dateStr || task?.due?.date || toDayKey(currentDate);
       const fallbackHour = isoToHourLabel(event.time);
       setSelectedModalDate(null);
       taskEditorRef.current?.openWithTask(task, targetDate, {
@@ -219,7 +218,7 @@ export function useCalendarActions({
   );
 
   const taskEditorDefaultDate = useCallback(
-    () => format(currentDate, "yyyy-MM-dd"),
+    () => toDayKey(currentDate),
     [currentDate],
   );
 
