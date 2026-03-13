@@ -238,6 +238,15 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 export default function OptimizedCalendarView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  // Delay rendering DnD tree by one frame so module-level prefetchToGlobalCache
+  // calls settle before @hello-pangea/dnd registers Droppable/Draggable elements.
+  // Without this, prefetch resolution during React's initial commit can trigger
+  // state updates that interrupt DnD setup, causing "Invariant failed" in production.
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setReady(true); }, []);
+
+  if (!ready) return null; // dynamic({ ssr: false }) loading skeleton is still visible
+
   return (
     <TasksProvider selectedDate={selectedDate}>
       <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
