@@ -259,6 +259,18 @@ export function HabitChecklistPanel({ selectedDate, isDragging = false }: { sele
     }
   }, [removeWidget, toast])
 
+  // Flat index for Draggable items across all bucket groups
+  const flatIndexMap = useMemo(() => {
+    const map = new Map<string, number>()
+    let idx = 0
+    for (const { habits } of habitsByBucket) {
+      for (const w of habits) {
+        map.set(w.instanceId, idx++)
+      }
+    }
+    return map
+  }, [habitsByBucket])
+
   // Loading state
   if (loading) {
     return (
@@ -288,18 +300,6 @@ export function HabitChecklistPanel({ selectedDate, isDragging = false }: { sele
       </div>
     )
   }
-
-  // Flat index for Draggable items across all bucket groups
-  const flatIndexMap = useMemo(() => {
-    const map = new Map<string, number>()
-    let idx = 0
-    for (const { habits } of habitsByBucket) {
-      for (const w of habits) {
-        map.set(w.instanceId, idx++)
-      }
-    }
-    return map
-  }, [habitsByBucket])
 
   return (
     <div className="space-y-5 py-2">
