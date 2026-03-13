@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
-import { Check, ChevronRight, Flame, Target } from "lucide-react"
+import { Check, ChevronRight, Flame, GripVertical, Target } from "lucide-react"
+import { Droppable, Draggable } from "@hello-pangea/dnd"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWidgets } from "@/hooks/use-widgets"
@@ -62,11 +63,21 @@ function HabitRow({
   bucketName,
   onToggle,
   onOpen,
+  isDragActive,
+  dragHandleProps,
+  innerRef,
+  draggableProps,
+  isDraggingThis,
 }: {
   widget: WidgetInstance
   bucketName: string
   onToggle: (bucketName: string, widget: WidgetInstance, isCompletedToday: boolean) => void
   onOpen: (bucketName: string, widget: WidgetInstance) => void
+  isDragActive?: boolean
+  dragHandleProps?: Record<string, any>
+  innerRef?: (el: HTMLElement | null) => void
+  draggableProps?: Record<string, any>
+  isDraggingThis?: boolean
 }) {
   const data = widget.habitTrackerData
   if (!data || !data.habitName) return null
@@ -79,9 +90,24 @@ function HabitRow({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer"
+      ref={innerRef}
+      {...draggableProps}
+      className={`flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer ${
+        isDraggingThis ? "shadow-warm-lg scale-[1.02] opacity-90 ring-2 ring-theme-primary/30" : ""
+      }`}
       onClick={() => onOpen(bucketName, widget)}
     >
+      {/* Drag handle — visible when sidebar is in drag mode */}
+      {isDragActive && (
+        <div
+          {...dragHandleProps}
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-theme-text-tertiary"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
+      )}
+
       {/* Habit info */}
       <div className="flex-1 min-w-0">
         <p
@@ -127,7 +153,7 @@ function HabitRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
+export function HabitChecklistPanel({ selectedDate, isDragging = false }: { selectedDate?: Date; isDragging?: boolean }) {
   const { widgetsByBucket, updateWidget, removeWidget, loading } = useWidgets()
   const { toast } = useToast()
   const [collapsedBuckets, setCollapsedBuckets] = useState<Set<string>>(new Set())
@@ -263,66 +289,97 @@ export function HabitChecklistPanel({ selectedDate }: { selectedDate?: Date }) {
     )
   }
 
+  // Flat index for Draggable items across all bucket groups
+  const flatIndexMap = useMemo(() => {
+    const map = new Map<string, number>()
+    let idx = 0
+    for (const { habits } of habitsByBucket) {
+      for (const w of habits) {
+        map.set(w.instanceId, idx++)
+      }
+    }
+    return map
+  }, [habitsByBucket])
+
   return (
     <div className="space-y-5 py-2">
       {/* Header */}
       <div>
         <h4 className="section-label">Daily Habit Tracker</h4>
         <p className="text-xs text-theme-text-tertiary mt-0.5">
-          Stay on top of your goals
+          {isDragging ? "Drop a habit onto a calendar day" : "Stay on top of your goals"}
         </p>
       </div>
 
-      {/* Bucket sections */}
-      {habitsByBucket.map(({ bucketName, habits }) => {
-        const isCollapsed = collapsedBuckets.has(bucketName)
-        const completedCount = habits.filter((w) => {
-          const today = getDateKey(new Date())
-          return new Set(w.habitTrackerData?.completionHistory || []).has(today)
-        }).length
+      <Droppable droppableId="habit-source" isDropDisabled={true}>
+        {(droppableProvided) => (
+          <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
+            {/* Bucket sections */}
+            {habitsByBucket.map(({ bucketName, habits }) => {
+              const isCollapsed = collapsedBuckets.has(bucketName)
+              const completedCount = habits.filter((w) => {
+                const today = getDateKey(new Date())
+                return new Set(w.habitTrackerData?.completionHistory || []).has(today)
+              }).length
 
-        return (
-          <div key={bucketName} className="space-y-2">
-            {/* Bucket category header */}
-            <button
-              onClick={() => toggleBucketCollapse(bucketName)}
-              className="flex items-center gap-2 w-full group cursor-pointer select-none"
-              aria-expanded={!isCollapsed}
-            >
-              <div
-                className={`w-5 h-5 rounded-md bg-theme-neutral-200 flex items-center justify-center transition-transform duration-200 ${
-                  isCollapsed ? "rotate-0" : "rotate-90"
-                }`}
-              >
-                <ChevronRight size={12} className="text-theme-text-tertiary" />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
-                {bucketName}
-              </span>
-              <span className="text-xs text-theme-text-tertiary ml-auto">
-                {completedCount}/{habits.length}
-              </span>
-            </button>
+              return (
+                <div key={bucketName} className="space-y-2 mb-4">
+                  {/* Bucket category header */}
+                  <button
+                    onClick={() => toggleBucketCollapse(bucketName)}
+                    className="flex items-center gap-2 w-full group cursor-pointer select-none"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-md bg-theme-neutral-200 flex items-center justify-center transition-transform duration-200 ${
+                        isCollapsed ? "rotate-0" : "rotate-90"
+                      }`}
+                    >
+                      <ChevronRight size={12} className="text-theme-text-tertiary" />
+                    </div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
+                      {bucketName}
+                    </span>
+                    <span className="text-xs text-theme-text-tertiary ml-auto">
+                      {completedCount}/{habits.length}
+                    </span>
+                  </button>
 
-            {/* Habit rows */}
-            <div
-              className={`space-y-2 transition-all duration-300 ease-out overflow-hidden ${
-                isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
-              }`}
-            >
-              {habits.map((widget) => (
-                <HabitRow
-                  key={widget.instanceId}
-                  widget={widget}
-                  bucketName={bucketName}
-                  onToggle={handleToggle}
-                  onOpen={handleOpen}
-                />
-              ))}
-            </div>
+                  {/* Habit rows */}
+                  <div
+                    className={`space-y-2 transition-all duration-300 ease-out overflow-hidden ${
+                      isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
+                    }`}
+                  >
+                    {habits.map((widget) => {
+                      const flatIdx = flatIndexMap.get(widget.instanceId) ?? 0
+                      const draggableId = `habit::${widget.instanceId}::${encodeURIComponent(bucketName)}`
+                      return (
+                        <Draggable key={widget.instanceId} draggableId={draggableId} index={flatIdx}>
+                          {(provided, snapshot) => (
+                            <HabitRow
+                              innerRef={provided.innerRef}
+                              draggableProps={provided.draggableProps}
+                              dragHandleProps={provided.dragHandleProps ?? undefined}
+                              isDraggingThis={snapshot.isDragging}
+                              isDragActive={isDragging}
+                              widget={widget}
+                              bucketName={bucketName}
+                              onToggle={handleToggle}
+                              onOpen={handleOpen}
+                            />
+                          )}
+                        </Draggable>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+            {droppableProvided.placeholder}
           </div>
-        )
-      })}
+        )}
+      </Droppable>
 
       {/* Unscheduled habits indicator */}
       {unscheduledCount > 0 && (

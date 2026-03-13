@@ -25,12 +25,19 @@ interface BatchUpdateItem {
 
 type BatchUpdateFn = (updates: BatchUpdateItem[]) => Promise<any>;
 
+export interface HabitDropPayload {
+  instanceId: string;
+  bucketName: string;
+  targetDate: string;
+}
+
 interface UseDragDropHandlerOptions {
   selectedDateStr: string;
   selectedDate: Date;
   allTasks: Task[];
   batchUpdateTasks: BatchUpdateFn;
   setIsDragging: (v: boolean) => void;
+  onHabitDrop?: (payload: HabitDropPayload) => void;
 }
 
 /* ─── Zone classification ─── */
@@ -127,6 +134,7 @@ export function useDragDropHandler({
   allTasks,
   batchUpdateTasks,
   setIsDragging,
+  onHabitDrop,
 }: UseDragDropHandlerOptions) {
 
   const handleDragEnd = useCallback(
@@ -141,6 +149,20 @@ export function useDragDropHandler({
       if (!result.destination) return;
 
       const { source, destination, draggableId } = result;
+
+      // ── Habit drag handling ──
+      if (draggableId.startsWith("habit::")) {
+        const dst = classifyZone(destination.droppableId);
+        if (dst.type === "calendar-day" && onHabitDrop) {
+          const parts = draggableId.split("::");
+          const instanceId = parts[1] ?? "";
+          const bucketName = decodeURIComponent(parts[2] ?? "");
+          onHabitDrop({ instanceId, bucketName, targetDate: dst.dateStr });
+        }
+        // All other zones: no-op (snap back)
+        return;
+      }
+
       const src = classifyZone(source.droppableId);
       const dst = classifyZone(destination.droppableId);
       const taskId = extractTaskId(draggableId);
@@ -364,7 +386,7 @@ export function useDragDropHandler({
         return;
       }
     },
-    [selectedDateStr, selectedDate, allTasks, batchUpdateTasks, setIsDragging],
+    [selectedDateStr, selectedDate, allTasks, batchUpdateTasks, setIsDragging, onHabitDrop],
   );
 
   return handleDragEnd;

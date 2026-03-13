@@ -493,9 +493,16 @@ function TaskSection({
       )}
     >
       {/* Section Header */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
         className={cn(
           "flex items-center justify-between px-4 py-3 w-full text-left cursor-pointer transition-colors",
           isDone ? "hover:bg-[rgba(252,250,248,0.8)]" : "hover:bg-[rgba(252,250,248,0.6)]"
@@ -536,7 +543,7 @@ function TaskSection({
             <Plus size={18} style={{ color: config.color }} />
           </button>
         )}
-      </button>
+      </div>
 
       {/* Empty State (To Do / In Progress only) */}
       {!isDone && isExpanded && count === 0 && !addingTask && (

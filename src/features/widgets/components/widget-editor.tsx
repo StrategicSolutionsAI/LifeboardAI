@@ -839,32 +839,17 @@ export default function WidgetEditorSheet({
                   />
                 </div>
 
-                {/* Add to Tasks */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className={form.label}>Add to Tasks</p>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(taskConfig.enabled)}
-                      onChange={e => updateTaskConfig({ enabled: e.target.checked })}
-                      className={CHECKBOX_CONTROL_CLASS}
-                    />
-                  </div>
-
-                  {taskConfig.enabled && (
-                    <div className="space-y-2">
-                      <p className={form.label}>Bucket</p>
-                      <select
-                        value={taskConfig.bucket ?? ""}
-                        onChange={e => updateTaskConfig({ bucket: e.target.value })}
-                        className={form.input}
-                      >
-                        <option value="">Select bucket</option>
-                        {derivedBuckets.map(bucket => (
-                          <option key={bucket} value={bucket}>{bucket}</option>
-                        ))}
-                      </select>
-                    </div>
+                {/* Add to Tasks — hint for drag-drop */}
+                <div className="space-y-1">
+                  <p className={form.label}>Add to Tasks</p>
+                  {draft.linkedTaskId ? (
+                    <p className="text-xs text-theme-text-tertiary">
+                      Linked to an existing task.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-theme-text-tertiary">
+                      Drag this habit from the Calendar sidebar onto a day to create a linked task.
+                    </p>
                   )}
                 </div>
               </div>

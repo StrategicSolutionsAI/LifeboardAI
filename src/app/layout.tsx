@@ -91,6 +91,8 @@ export default function RootLayout({
         {/* Preconnect to external APIs used during page lifecycle */}
         <link rel="dns-prefetch" href="https://api.openai.com" />
         <link rel="dns-prefetch" href="https://api.open-meteo.com" />
+        {/* Standards-based web-app-capable (Chrome deprecates apple-mobile-web-app-capable) */}
+        <meta name="mobile-web-app-capable" content="yes" />
         {/* Apple splash screen images (eliminates white flash on iOS PWA launch) */}
         <link rel="apple-touch-startup-image" href="/splash/iphone-se-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />
         <link rel="apple-touch-startup-image" href="/splash/iphone-8-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" />

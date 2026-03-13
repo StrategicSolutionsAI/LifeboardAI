@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
+import { useWidgets } from "@/hooks/use-widgets";
+import { useToast } from "@/components/ui/use-toast";
 import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/features/calendar/components/calendar-performance-monitor";
-import { useDragDropHandler } from "@/features/calendar/hooks/use-drag-drop-handler";
+import { useDragDropHandler, type HabitDropPayload } from "@/features/calendar/hooks/use-drag-drop-handler";
+import { HabitScheduleDialog, deriveRepeatRule, type HabitScheduleMode } from "@/features/calendar/components/habit-schedule-dialog";
 import { toDayKey } from "@/features/calendar/types";
 import { prefetchToGlobalCache } from "@/hooks/use-data-cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import type { WidgetInstance } from "@/types/widgets";
 
 // Direct imports — no inner lazy loading. This module is already behind a
 // dynamic() import in page.tsx. Adding React.lazy here would create a
@@ -81,9 +85,19 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { buckets, activeBucket } = useBuckets();
   const { allTasks } = useTaskData();
-  const { batchUpdateTasks } = useTaskActions();
+  const { batchUpdateTasks, createTask } = useTaskActions();
+  const { widgetsByBucket, updateWidget } = useWidgets();
+  const { toast } = useToast();
   const selectedDateStr = useMemo(() => toDayKey(selectedDate), [selectedDate]);
   useComponentLoadTime('CalendarContent');
+
+  // ── Habit-drop modal state ──
+  const [pendingHabitDrop, setPendingHabitDrop] = useState<{
+    widget: WidgetInstance;
+    bucketName: string;
+    targetDate: string;
+  } | null>(null);
+  const [isCreatingHabitTask, setIsCreatingHabitTask] = useState(false);
 
   // Hide sidebar on mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -96,12 +110,73 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     return () => mq.removeEventListener('change', update);
   }, []);
 
+  // ── Habit drop handler ──
+  const handleHabitDrop = useCallback(
+    (payload: HabitDropPayload) => {
+      // Find the widget in widgetsByBucket
+      const widgets = widgetsByBucket[payload.bucketName] ?? [];
+      const widget = widgets.find((w) => w.instanceId === payload.instanceId);
+      if (!widget) return;
+
+      // Already linked → toast instead of modal
+      if (widget.linkedTaskId) {
+        toast({ title: "Already linked", description: `"${widget.habitTrackerData?.habitName ?? widget.name}" already has a linked task.` });
+        return;
+      }
+
+      setPendingHabitDrop({ widget, bucketName: payload.bucketName, targetDate: payload.targetDate });
+    },
+    [widgetsByBucket, toast],
+  );
+
+  // ── Habit confirm handler ──
+  const handleHabitConfirm = useCallback(
+    async (mode: HabitScheduleMode) => {
+      if (!pendingHabitDrop) return;
+      const { widget, bucketName, targetDate } = pendingHabitDrop;
+      const habitName = widget.habitTrackerData?.habitName ?? widget.name ?? "Habit";
+      const schedule = widget.schedule as boolean[] | undefined;
+
+      setIsCreatingHabitTask(true);
+      try {
+        const repeat = mode === "repeat" ? deriveRepeatRule(schedule) : "none" as const;
+        const task = await createTask(habitName, targetDate, null, bucketName, repeat, { allDay: true });
+
+        if (task?.id) {
+          updateWidget(bucketName, widget.instanceId, {
+            linkedTaskId: task.id.toString(),
+            linkedTaskSource: "supabase",
+            linkedTaskAutoCreated: true,
+            linkedTaskTitle: habitName,
+            linkedTaskConfig: {
+              enabled: true,
+              title: habitName,
+              bucket: bucketName,
+              dueDate: targetDate,
+              allDay: true,
+              repeat,
+            },
+          });
+          toast({ title: "Task created", description: `"${habitName}" added to ${targetDate}${mode === "repeat" ? " (recurring)" : ""}.` });
+        }
+      } catch (err) {
+        console.error("Failed to create habit task:", err);
+        toast({ title: "Failed to create task", description: "Please try again." });
+      } finally {
+        setIsCreatingHabitTask(false);
+        setPendingHabitDrop(null);
+      }
+    },
+    [pendingHabitDrop, createTask, updateWidget, toast],
+  );
+
   const handleDragEnd = useDragDropHandler({
     selectedDateStr,
     selectedDate,
     allTasks,
     batchUpdateTasks,
     setIsDragging,
+    onHabitDrop: handleHabitDrop,
   });
 
   return (
@@ -144,6 +219,18 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           </div>
         )}
       </div>
+
+      {/* Habit schedule dialog */}
+      {pendingHabitDrop && (
+        <HabitScheduleDialog
+          open={true}
+          onClose={() => setPendingHabitDrop(null)}
+          onConfirm={handleHabitConfirm}
+          widget={pendingHabitDrop.widget}
+          targetDate={pendingHabitDrop.targetDate}
+          isCreating={isCreatingHabitTask}
+        />
+      )}
     </DragDropContext>
   );
 }
