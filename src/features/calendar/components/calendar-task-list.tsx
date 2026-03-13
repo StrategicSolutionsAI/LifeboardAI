@@ -306,8 +306,11 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   }, [allTasks, todayStr, selectedBucket, dashboardView]);
 
   // Open tasks (only shown in Master List tab)
+  // Exclude tasks already in todayTasks to prevent duplicate draggableIds
+  // which cause "Invariant failed" in @hello-pangea/dnd.
   const openTasksBase = useMemo(() => {
-    let filtered = allTasks.filter(t => !t.completed && !t.hourSlot);
+    const todayIds = new Set(todayTasks.map(t => t.id.toString()));
+    let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && !todayIds.has(t.id.toString()));
 
     // Only filter by selectedBucket in dashboard view, not in Calendar view
     if (selectedBucket && dashboardView) {
@@ -315,7 +318,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     }
 
     return filtered;
-  }, [allTasks, selectedBucket, dashboardView]);
+  }, [allTasks, todayTasks, selectedBucket, dashboardView]);
 
   // Task ordering: localStorage-persisted today order + position-based open tasks order
   const { todayTasksOrdered, openTasksToShow } = useTaskOrdering({
