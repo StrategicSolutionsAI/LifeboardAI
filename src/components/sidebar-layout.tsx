@@ -14,6 +14,7 @@ import {
   Zap,
   Menu,
   ShoppingCart,
+  Mail,
   MoreHorizontal,
   LogOut,
 } from "lucide-react"
@@ -42,6 +43,7 @@ const navItems = [
   { href: "/calendar", icon: Calendar, label: "Calendar" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
   { href: "/folders", icon: FolderOpen, label: "Folders" },
+  { href: "/email", icon: Mail, label: "Email" },
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
@@ -77,6 +79,11 @@ const routeContext = [
     description: "Organize and browse your files and documents.",
   },
   {
+    match: (path: string) => path.startsWith("/email"),
+    title: "Email",
+    description: "Read and manage your Gmail inbox.",
+  },
+  {
     match: (path: string) => path.startsWith("/integrations"),
     title: "Integrations",
     description: "Connect tools and keep all your data in one workflow.",
@@ -109,6 +116,21 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [emailUnread, setEmailUnread] = useState(0)
+
+  // Fetch unread email count
+  useEffect(() => {
+    let cancelled = false
+    const fetchUnread = () => {
+      fetch('/api/email/unread-count')
+        .then((r) => r.json())
+        .then((data) => { if (!cancelled) setEmailUnread(data.unreadCount ?? 0) })
+        .catch(() => {})
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 120_000) // refresh every 2 min
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
 
   // Clear navigatingTo when pathname changes (navigation completed)
   useEffect(() => {
@@ -221,6 +243,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           {navItems.map(({ href, icon: Icon, label }) => {
             const activeOrNav = isActiveOrNavigating(href)
             const isNavigating = navigatingTo === href
+            const badgeCount = href === "/email" ? emailUnread : 0
             return (
               <Link
                 key={href}
@@ -236,7 +259,14 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 title={label}
               >
                 {activeOrNav && <span className={`${nav.sidebarIndicator} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} aria-hidden="true" />}
-                <Icon className={`h-5 w-5 ${activeOrNav ? "text-theme-primary" : "text-theme-text-tertiary group-hover:text-theme-text-primary"} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} />
+                <span className="relative">
+                  <Icon className={`h-5 w-5 ${activeOrNav ? "text-theme-primary" : "text-theme-text-tertiary group-hover:text-theme-text-primary"} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} />
+                  {badgeCount > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
+                </span>
                 <span className="leading-none">{label}</span>
               </Link>
             )

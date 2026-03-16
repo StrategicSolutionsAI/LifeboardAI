@@ -28,6 +28,7 @@ interface CalendarImport {
 const integrations: Integration[] = [
   { id: 'todoist', name: 'Todoist', description: 'Sync your tasks and projects from Todoist', icon: '📝', authUrl: '/api/integrations/todoist/auth' },
   { id: 'google', name: 'Google Calendar', description: 'View and manage your Google Calendar events', icon: '📅', authUrl: '/api/auth/google?redirectUrl=/integrations' },
+  { id: 'gmail', name: 'Gmail', description: 'Read and manage your Gmail inbox from LifeboardAI', icon: '📧', authUrl: '/api/auth/gmail?redirectUrl=/integrations' },
   { id: 'google-fit', name: 'Google Fit', description: 'Connect to track your fitness activities and health metrics', icon: '🏃', authUrl: '/api/auth/googlefit?redirectUrl=/integrations' },
   { id: 'fitbit', name: 'Fitbit', description: 'Track your fitness data and health metrics', icon: '⌚', authUrl: '/api/auth/fitbit?redirectUrl=/integrations' },
   { id: 'withings', name: 'Withings Smart Scale', description: 'Monitor your health data and body metrics', icon: '⚖️', authUrl: '/api/auth/withings?redirectUrl=/integrations' },
@@ -92,6 +93,15 @@ const formatRefreshSummary = (provider: string, data: any): string | null => {
       }
       if (parts.length > 0) {
         return `Synced Google Fit metrics (${parts.join(', ')}).`
+      }
+      break
+    }
+    case 'gmail': {
+      if (Array.isArray(data.messages)) {
+        const count = data.messages.length
+        return count
+          ? `Loaded ${pluralize(count, 'email')} from Gmail.`
+          : 'No emails found in Gmail inbox.'
       }
       break
     }
@@ -351,6 +361,7 @@ export default function IntegrationsPageClient() {
       case 'fitbit': endpoint = '/api/integrations/fitbit/metrics'; params = `?date=${today}`; break
       case 'google-fit': endpoint = '/api/integrations/googlefit/metrics'; params = `?date=${today}`; break
       case 'google': endpoint = '/api/integrations/google/calendar/events'; params = `?date=${today}`; break
+      case 'gmail': endpoint = '/api/email/messages'; params = '?maxResults=5'; break
       default: return null
     }
     try { const response = await fetch(`${endpoint}${params}`); if (response.ok) return await response.json(); throw new Error(`HTTP ${response.status}`) } catch { return null }

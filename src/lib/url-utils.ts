@@ -10,6 +10,7 @@ const ALLOWED_PREFIXES = [
   '/history',
   '/trends',
   '/folders',
+  '/email',
 ]
 
 /**
