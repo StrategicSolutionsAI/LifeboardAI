@@ -53,43 +53,45 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Delete any existing Withings rows for this user, then insert fresh
-    await serviceClient
-      .from('user_integrations')
-      .delete()
-      .eq('user_id', effectiveUserId)
-      .eq('provider', 'withings')
+    const providerUserId = tokenData.userid ? String(tokenData.userid) : null
 
-    const insertRow: Record<string, unknown> = {
-      user_id: effectiveUserId,
-      provider: 'withings',
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_data: tokenData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    // Try including provider_user_id; if column doesn't exist, retry without it
-    if (tokenData.userid) {
-      insertRow.provider_user_id = String(tokenData.userid)
-    }
-
-    let { error: insertError } = await serviceClient
-      .from('user_integrations')
-      .insert(insertRow)
-
-    if (insertError?.code === 'PGRST204') {
-      console.warn('provider_user_id column missing, retrying without it')
-      delete insertRow.provider_user_id
-      const retry = await serviceClient
+    // Smart refresh token retention — keep existing if Withings omits it (matches Gmail pattern)
+    let refreshTokenToStore: string | undefined = tokenData.refresh_token ?? undefined
+    if (!refreshTokenToStore) {
+      const query = serviceClient
         .from('user_integrations')
-        .insert(insertRow)
-      insertError = retry.error
+        .select('refresh_token')
+        .eq('user_id', effectiveUserId)
+        .eq('provider', 'withings')
+      if (providerUserId) query.eq('provider_user_id', providerUserId)
+      const { data: existingRow } = await query.maybeSingle()
+
+      if (existingRow?.refresh_token) {
+        refreshTokenToStore = existingRow.refresh_token as string
+      }
     }
 
-    if (insertError) {
-      console.error('Failed to store Withings tokens', insertError)
+    const tokenDataToStore = { ...tokenData, refresh_token: refreshTokenToStore }
+
+    // Atomic upsert — no delete+insert race condition
+    const { error: upsertError } = await serviceClient
+      .from('user_integrations')
+      .upsert(
+        {
+          user_id: effectiveUserId,
+          provider: 'withings',
+          provider_user_id: providerUserId,
+          access_token: tokenData.access_token,
+          refresh_token: refreshTokenToStore,
+          token_data: tokenDataToStore,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,provider,provider_user_id' },
+      )
+
+    if (upsertError) {
+      console.error('Failed to store Withings tokens', upsertError)
       redirectUrl += (redirectUrl.includes('?') ? '&' : '?') + 'integrationError=true'
     }
 

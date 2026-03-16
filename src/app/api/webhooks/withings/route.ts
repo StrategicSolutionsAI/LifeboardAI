@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/utils/supabase/server'
-import { fetchWithingsLatestWeight } from '@/lib/withings/client'
+import { createClient } from '@supabase/supabase-js'
+import { fetchWithingsLatestWeight, refreshWithingsToken } from '@/lib/withings/client'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -31,6 +31,15 @@ function verifyWithingsSignature(rawBody: string, signature: string | null): boo
   )
 }
 
+/** Check whether the stored token is expired or about to expire (within 60s). */
+function isTokenExpired(tokenData: Record<string, unknown> | null, updatedAt: string | null): boolean {
+  if (!tokenData?.expires_in || !updatedAt) return true
+  const expiresIn = Number(tokenData.expires_in)
+  const issuedAt = new Date(updatedAt).getTime()
+  const expiresAt = issuedAt + expiresIn * 1000
+  return Date.now() >= expiresAt - 60_000 // 60s buffer
+}
+
 // Withings webhook endpoint for real-time weight updates
 export async function POST(request: NextRequest) {
   try {
@@ -53,11 +62,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Not a weight measurement' }, { status: 200 })
     }
 
-    // Find the user with this Withings user ID
-    const supabase = supabaseServer()
+    // Service role client — webhook has no user session, can't use cookie-based client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
     const { data: integration, error: integrationError } = await supabase
       .from('user_integrations')
-      .select('user_id, access_token, refresh_token, token_data')
+      .select('id, user_id, access_token, refresh_token, token_data, updated_at')
       .eq('provider', 'withings')
       .eq('provider_user_id', userid.toString())
       .maybeSingle()
@@ -67,36 +80,81 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Fetch the latest weight data
-    try {
-      const weightKg = await fetchWithingsLatestWeight(integration.access_token)
+    let accessToken = integration.access_token as string
+    const refreshToken = integration.refresh_token as string
 
-      const { error: insertError } = await supabase
-        .from('weight_measurements')
-        .insert({
-          user_id: integration.user_id,
-          weight_kg: weightKg,
-          weight_lbs: Math.round(weightKg * 2.20462 * 10) / 10,
-          measured_at: new Date(startdate * 1000).toISOString(),
-          source: 'withings',
-          raw_data: body
-        })
+    // Proactive token refresh if expired or about to expire
+    if (isTokenExpired(integration.token_data as Record<string, unknown> | null, integration.updated_at as string | null)) {
+      try {
+        const refreshed = await refreshWithingsToken(refreshToken)
+        accessToken = refreshed.access_token
 
-      if (insertError) {
-        console.error('Error storing weight measurement:', insertError)
+        await supabase
+          .from('user_integrations')
+          .update({
+            access_token: refreshed.access_token,
+            refresh_token: refreshed.refresh_token ?? refreshToken,
+            token_data: refreshed,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', integration.id)
+      } catch (refreshErr) {
+        console.error('Proactive Withings token refresh failed:', refreshErr)
+        // Continue with existing token — it may still work
       }
-
-      return NextResponse.json({
-        message: 'Weight data processed successfully',
-        weightKg
-      }, { status: 200 })
-
-    } catch (fetchError) {
-      console.error('Error fetching weight data:', fetchError)
-      return NextResponse.json({
-        error: 'Failed to fetch weight data',
-      }, { status: 500 })
     }
+
+    // Fetch the latest weight data, with retry-on-401
+    let weightKg: number
+    try {
+      weightKg = await fetchWithingsLatestWeight(accessToken)
+    } catch (fetchError) {
+      // Retry once on INVALID_TOKEN (expired token that slipped past the expiry check)
+      if (fetchError instanceof Error && fetchError.message === 'INVALID_TOKEN') {
+        try {
+          const refreshed = await refreshWithingsToken(refreshToken)
+          accessToken = refreshed.access_token
+
+          await supabase
+            .from('user_integrations')
+            .update({
+              access_token: refreshed.access_token,
+              refresh_token: refreshed.refresh_token ?? refreshToken,
+              token_data: refreshed,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', integration.id)
+
+          weightKg = await fetchWithingsLatestWeight(accessToken)
+        } catch (retryErr) {
+          console.error('Withings retry after token refresh failed:', retryErr)
+          return NextResponse.json({ error: 'Failed to fetch weight data after token refresh' }, { status: 500 })
+        }
+      } else {
+        console.error('Error fetching weight data:', fetchError)
+        return NextResponse.json({ error: 'Failed to fetch weight data' }, { status: 500 })
+      }
+    }
+
+    const { error: insertError } = await supabase
+      .from('weight_measurements')
+      .insert({
+        user_id: integration.user_id,
+        weight_kg: weightKg,
+        weight_lbs: Math.round(weightKg * 2.20462 * 10) / 10,
+        measured_at: new Date(startdate * 1000).toISOString(),
+        source: 'withings',
+        raw_data: body
+      })
+
+    if (insertError) {
+      console.error('Error storing weight measurement:', insertError)
+    }
+
+    return NextResponse.json({
+      message: 'Weight data processed successfully',
+      weightKg
+    }, { status: 200 })
 
   } catch (error) {
     console.error('Webhook processing error:', error)
