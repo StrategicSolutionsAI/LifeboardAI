@@ -132,38 +132,50 @@ export interface EventPillProps {
   filteredIndex: number;
   styles: { dot: string; customColor?: string };
   openCalendarEvent: (ev: DayEvent, dayStr: string) => Promise<void>;
+  /** When false, skip <Draggable> wrapper (no Droppable ancestor available) */
+  draggable?: boolean;
 }
 
-export const EventPill = React.memo(function EventPill({ ev, dayStr, filteredIndex, styles, openCalendarEvent }: EventPillProps) {
+export const EventPill = React.memo(function EventPill({ ev, dayStr, filteredIndex, styles, openCalendarEvent, draggable = true }: EventPillProps) {
   const hasTask = Boolean(ev.taskId);
   const canEditEvent = ev.source === 'lifeboard' || ev.source === 'uploaded' || ev.source === 'google';
   const draggableId = hasTask ? `lifeboard::${ev.taskId}` : `event::${dayStr}::${filteredIndex}`;
+
+  const pillContent = (
+    dragProvided?: any,
+    dragSnapshot?: any,
+  ) => (
+    <div
+      ref={dragProvided?.innerRef}
+      {...(dragProvided?.draggableProps)}
+      {...(hasTask ? dragProvided?.dragHandleProps : {})}
+      role={canEditEvent ? 'button' : undefined}
+      tabIndex={canEditEvent ? 0 : undefined}
+      onClick={async (event) => {
+        if (!canEditEvent) return;
+        event.stopPropagation();
+        await openCalendarEvent(ev, dayStr);
+      }}
+      className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-colors hover:bg-[rgba(252,250,248,0.8)] ${
+        draggable && hasTask ? 'cursor-grab active:cursor-grabbing' : canEditEvent ? 'cursor-pointer' : ''
+      } ${dragSnapshot?.isDragging ? 'opacity-40' : ''}`}
+      style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
+      title={ev.title}
+      data-task-id={ev.taskId}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
+        style={styles.customColor ? { backgroundColor: styles.customColor } : {}} />
+      <span className="text-[11px] leading-tight text-theme-text-primary truncate">{ev.title}</span>
+    </div>
+  );
+
+  if (!draggable) {
+    return pillContent();
+  }
+
   return (
     <Draggable key={draggableId} draggableId={draggableId} index={filteredIndex} isDragDisabled={!hasTask}>
-      {(dragProvided, dragSnapshot) => (
-        <div
-          ref={dragProvided.innerRef}
-          {...dragProvided.draggableProps}
-          {...(hasTask ? dragProvided.dragHandleProps : {})}
-          role={canEditEvent ? 'button' : undefined}
-          tabIndex={canEditEvent ? 0 : undefined}
-          onClick={async (event) => {
-            if (!canEditEvent) return;
-            event.stopPropagation();
-            await openCalendarEvent(ev, dayStr);
-          }}
-          className={`flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left transition-colors hover:bg-[rgba(252,250,248,0.8)] cursor-grab active:cursor-grabbing ${
-            dragSnapshot.isDragging ? 'opacity-40' : ''
-          }`}
-          style={styles.customColor ? { backgroundColor: styles.customColor + '12' } : {}}
-          title={ev.title}
-          data-task-id={ev.taskId}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${styles.dot}`}
-            style={styles.customColor ? { backgroundColor: styles.customColor } : {}} />
-          <span className="text-[11px] leading-tight text-theme-text-primary truncate">{ev.title}</span>
-        </div>
-      )}
+      {(dragProvided, dragSnapshot) => pillContent(dragProvided, dragSnapshot)}
     </Draggable>
   );
 });

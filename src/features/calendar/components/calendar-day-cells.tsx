@@ -288,6 +288,7 @@ export const MonthDayCell = React.memo(function MonthDayCell({
                         filteredIndex={filteredIndex}
                         styles={callbacks.resolveEventStyles(ev.source, ev)}
                         openCalendarEvent={callbacks.openCalendarEvent}
+                        draggable={!!provided}
                       />
                     ))}
                     {dayEvents.length > 3 && (
@@ -395,6 +396,7 @@ export const WeekDayCell = React.memo(function WeekDayCell({
                     filteredIndex={filteredIndex}
                     styles={callbacks.resolveEventStyles(ev.source, ev)}
                     openCalendarEvent={callbacks.openCalendarEvent}
+                    draggable={!!provided}
                   />
                 ))}
               </div>
@@ -503,6 +505,7 @@ export const WeekDayCell = React.memo(function WeekDayCell({
                     filteredIndex={filteredIndex}
                     styles={callbacks.resolveEventStyles(ev.source, ev)}
                     openCalendarEvent={callbacks.openCalendarEvent}
+                    draggable={!!provided}
                   />
                 ))}
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
@@ -235,6 +235,33 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   );
 }
 
+/** Error boundary that silently retries once on DnD context errors.
+ *  React 18 concurrent rendering can cause @hello-pangea/dnd invariant
+ *  failures during recoverFromConcurrentError — a retry resolves it. */
+class DnDErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    // Only retry for DnD context errors
+    if (error.message?.includes('Could not find required context')) {
+      // Reset after a tick so children re-mount with context available
+      setTimeout(() => this.setState({ hasError: false }), 0);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 export default function OptimizedCalendarView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -249,7 +276,9 @@ export default function OptimizedCalendarView() {
 
   return (
     <TasksProvider selectedDate={selectedDate}>
-      <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      <DnDErrorBoundary>
+        <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      </DnDErrorBoundary>
       {process.env.NODE_ENV === 'development' && <CalendarPerformanceMonitor />}
     </TasksProvider>
   );
