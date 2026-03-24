@@ -401,6 +401,21 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     }
   }, [scheduleRefetch, updateAllOptimistically, updateDailyOptimistically, dateStr, localUpdateTimestamps, nocacheRef])
 
+  // Wrap refetch functions to clear the shared result cache first.
+  // Without this, fetchAllOpenTasks returns stale data from sharedResultRef
+  // (30s TTL) which overwrites optimistic updates after mutations like delete.
+  const forceRefetchDaily = useCallback(() => {
+    sharedFetchRef.current = null
+    sharedResultRef.current = null
+    refetchDaily()
+  }, [refetchDaily, sharedFetchRef, sharedResultRef])
+
+  const forceRefetchAll = useCallback(() => {
+    sharedFetchRef.current = null
+    sharedResultRef.current = null
+    refetchAll()
+  }, [refetchAll, sharedFetchRef, sharedResultRef])
+
   return {
     dailyTasks,
     allTasks,
@@ -410,8 +425,8 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     allError,
     updateDailyOptimistically,
     updateAllOptimistically,
-    refetchDaily,
-    refetchAll,
+    refetchDaily: forceRefetchDaily,
+    refetchAll: forceRefetchAll,
     scheduleRefetch,
   }
 }

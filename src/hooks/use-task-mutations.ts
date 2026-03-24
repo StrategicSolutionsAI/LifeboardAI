@@ -683,6 +683,10 @@ export function useTaskMutations(
             occurrenceDate,
             skip: true
           })
+          // Force calendar recomputation: allTasks reference must change so
+          // lifeboardEventMap recomputes and calls getTaskForOccurrence which
+          // now returns null for the skipped occurrence.
+          updateAllOptimistically(tasks => tasks ? [...tasks] : [])
         } catch (error) {
           if (typeof window !== 'undefined') {
             window.alert('Failed to skip this occurrence. Please try again.')
