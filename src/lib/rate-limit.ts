@@ -123,3 +123,9 @@ export const apiLimiter = new RateLimiter({
   maxRequests: 60,
   windowMs: 60_000,
 })
+
+/** Realtime session creation: 10 requests per minute. */
+export const realtimeLimiter = new RateLimiter({
+  maxRequests: 10,
+  windowMs: 60_000,
+})

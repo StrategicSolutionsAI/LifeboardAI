@@ -105,7 +105,7 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // ── Habit drop handler — creates a one-time all-day task (no dialog, no linking) ──
+  // ── Habit drop handler — creates a one-time task (no dialog, no linking) ──
   const handleHabitDrop = useCallback(
     (payload: HabitDropPayload) => {
       if (creatingHabitRef.current) return;
@@ -115,11 +115,32 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
       if (!widget) return;
 
       const habitName = widget.habitTrackerData?.habitName ?? widget.name ?? "Habit";
+      const targetHour = payload.hourSlot?.replace(/^hour-/, "");
+      const isTimedDrop = Boolean(payload.hourSlot);
 
       creatingHabitRef.current = true;
-      createTask(habitName, payload.targetDate, null, payload.bucketName, "none", { allDay: true })
+      createTask(
+        habitName,
+        payload.targetDate,
+        payload.hourSlot ?? null,
+        payload.bucketName,
+        "none",
+        isTimedDrop
+          ? {
+              allDay: false,
+              duration: 60,
+            }
+          : {
+              allDay: true,
+            },
+      )
         .then(() => {
-          toast({ title: "Task created", description: `"${habitName}" added to ${payload.targetDate}.` });
+          toast({
+            title: "Task created",
+            description: isTimedDrop
+              ? `"${habitName}" scheduled for ${payload.targetDate} at ${targetHour}.`
+              : `"${habitName}" added to ${payload.targetDate}.`,
+          });
         })
         .catch((err: unknown) => {
           console.error("Failed to create habit task:", err);
@@ -134,7 +155,6 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
 
   const handleDragEnd = useDragDropHandler({
     selectedDateStr,
-    selectedDate,
     allTasks,
     batchUpdateTasks,
     setIsDragging,

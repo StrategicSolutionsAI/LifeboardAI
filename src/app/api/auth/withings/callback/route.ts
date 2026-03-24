@@ -53,18 +53,15 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const providerUserId = tokenData.userid ? String(tokenData.userid) : null
-
     // Smart refresh token retention — keep existing if Withings omits it (matches Gmail pattern)
     let refreshTokenToStore: string | undefined = tokenData.refresh_token ?? undefined
     if (!refreshTokenToStore) {
-      const query = serviceClient
+      const { data: existingRow } = await serviceClient
         .from('user_integrations')
         .select('refresh_token')
         .eq('user_id', effectiveUserId)
         .eq('provider', 'withings')
-      if (providerUserId) query.eq('provider_user_id', providerUserId)
-      const { data: existingRow } = await query.maybeSingle()
+        .maybeSingle()
 
       if (existingRow?.refresh_token) {
         refreshTokenToStore = existingRow.refresh_token as string
@@ -72,26 +69,45 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenDataToStore = { ...tokenData, refresh_token: refreshTokenToStore }
+    const now = new Date().toISOString()
 
-    // Atomic upsert — no delete+insert race condition
-    const { error: upsertError } = await serviceClient
+    // Check for existing row, then update or insert (avoids constraint name mismatches)
+    const { data: existing } = await serviceClient
       .from('user_integrations')
-      .upsert(
-        {
-          user_id: effectiveUserId,
-          provider: 'withings',
-          provider_user_id: providerUserId,
+      .select('id')
+      .eq('user_id', effectiveUserId)
+      .eq('provider', 'withings')
+      .maybeSingle()
+
+    let storeError: any = null
+    if (existing) {
+      const { error } = await serviceClient
+        .from('user_integrations')
+        .update({
           access_token: tokenData.access_token,
           refresh_token: refreshTokenToStore,
           token_data: tokenDataToStore,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,provider,provider_user_id' },
-      )
+          updated_at: now,
+        })
+        .eq('id', existing.id)
+      storeError = error
+    } else {
+      const { error } = await serviceClient
+        .from('user_integrations')
+        .insert({
+          user_id: effectiveUserId,
+          provider: 'withings',
+          access_token: tokenData.access_token,
+          refresh_token: refreshTokenToStore,
+          token_data: tokenDataToStore,
+          created_at: now,
+          updated_at: now,
+        })
+      storeError = error
+    }
 
-    if (upsertError) {
-      console.error('Failed to store Withings tokens', upsertError)
+    if (storeError) {
+      console.error('Failed to store Withings tokens', storeError)
       redirectUrl += (redirectUrl.includes('?') ? '&' : '?') + 'integrationError=true'
     }
 
@@ -101,4 +117,4 @@ export async function GET(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || origin || 'http://localhost:3000'
     return NextResponse.redirect(`${baseUrl}/error?message=Withings authentication failed`)
   }
-} 
+}

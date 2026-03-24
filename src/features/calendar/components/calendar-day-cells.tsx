@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { isSameDay, isSameMonth, format } from "date-fns";
 import { Droppable } from "@hello-pangea/dnd";
 import type { DroppableProvided, DroppableStateSnapshot } from "@hello-pangea/dnd";
@@ -10,43 +10,30 @@ import { toDayKey } from "@/features/calendar/types";
 import { MAX_STICKERS_PER_DAY } from "@/features/calendar/hooks/use-calendar-stickers";
 import type { CalendarStickerMap } from "@/features/calendar/hooks/use-calendar-stickers";
 import {
+  hasNativeCalendarDragPayload,
+  readNativeCalendarDragPayload,
+} from "@/features/calendar/lib/native-calendar-dnd";
+import {
   StickerChips,
   StickerAddButtonCompact,
 } from "@/features/calendar/components/calendar-stickers";
 import { EventPill } from "@/features/calendar/components/calendar-mobile-components";
 
 // ---------------------------------------------------------------------------
-// LazyDroppable — only mounts the DnD Droppable when a drag is active.
-// Eliminates 35-42 DnD store subscriptions in month/week view when idle.
+// LazyDroppable — keep the droppable mounted for registry stability.
+// Mounting/unmounting calendar day droppables during a drag can cause
+// @hello-pangea/dnd to lose track of the target cell and throw.
 // ---------------------------------------------------------------------------
 
-/** Keeps Droppable mounted for a brief period after drag ends so drop
- *  animations settle before unmounting. Mounts immediately on drag start. */
 function LazyDroppable({
   droppableId,
-  enabled,
   direction,
   children,
 }: {
   droppableId: string;
-  enabled: boolean;
   direction?: "horizontal" | "vertical";
   children: (provided: DroppableProvided | null, snapshot: DroppableStateSnapshot | null) => React.ReactElement;
 }) {
-  // Delay unmount by 300ms so @hello-pangea/dnd drop animation completes
-  const [mounted, setMounted] = useState(enabled);
-  useEffect(() => {
-    if (enabled) {
-      setMounted(true);
-    } else {
-      const timer = setTimeout(() => setMounted(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [enabled]);
-
-  if (!mounted) {
-    return children(null, null);
-  }
   return (
     <Droppable droppableId={droppableId} direction={direction}>
       {(provided, snapshot) => children(provided, snapshot)}
@@ -63,6 +50,7 @@ export interface CellCallbacks {
   handleViewChange: (view: "day") => void;
   setSelectedModalDate: (date: string | null) => void;
   openNewTask: (dayStr: string) => void;
+  handleNativeCalendarDrop: (dayStr: string, payload: ReturnType<typeof readNativeCalendarDragPayload>) => void;
   getEventsForDisplay: (events: DayEvent[]) => DayEvent[];
   resolveEventStyles: (source: DayEvent["source"], ev?: DayEvent) => { dot: string; customColor?: string };
   openCalendarEvent: (ev: DayEvent, dayStr: string) => Promise<void>;
@@ -94,7 +82,6 @@ interface MonthDayCellProps {
   currentDate: Date;
   isCompactBreakpoint: boolean;
   totalRows: number;
-  isDragging: boolean;
   callbacks: CellCallbacks;
   stickers: StickerCallbacks;
   eventsByDate: Record<string, DayEvent[]>;
@@ -107,7 +94,6 @@ export const MonthDayCell = React.memo(function MonthDayCell({
   currentDate,
   isCompactBreakpoint,
   totalRows,
-  isDragging,
   callbacks,
   stickers,
   eventsByDate,
@@ -117,6 +103,7 @@ export const MonthDayCell = React.memo(function MonthDayCell({
   const isCurrentMonth = isSameMonth(day, currentDate);
   const isToday = isSameDay(day, today);
   const isLastRow = idx >= (totalRows - 1) * 7;
+  const [isNativeDraggingOver, setIsNativeDraggingOver] = useState(false);
 
   const borderClasses = [
     idx % 7 < 6 ? "border-r" : "",
@@ -128,7 +115,7 @@ export const MonthDayCell = React.memo(function MonthDayCell({
   if (isCompactBreakpoint) {
     // MOBILE: Compact cell with dots
     return (
-      <LazyDroppable droppableId={`calendar-day-${dayStr}`} enabled={isDragging}>
+      <LazyDroppable droppableId={`calendar-day-${dayStr}`}>
         {(provided, snapshot) => (
           <div
             ref={provided?.innerRef}
@@ -142,12 +129,26 @@ export const MonthDayCell = React.memo(function MonthDayCell({
                 callbacks.handleViewChange("day");
               }}
               className={`w-full h-full p-1 flex flex-col items-center justify-start transition-colors ${
-                snapshot?.isDraggingOver
+                snapshot?.isDraggingOver || isNativeDraggingOver
                   ? "bg-theme-brand-tint-light"
                   : isCurrentMonth
                   ? "bg-theme-surface-raised"
                   : "bg-theme-surface-warm-30"
               }`}
+              onDragOver={(event) => {
+                if (!hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                event.preventDefault();
+                if (!isNativeDraggingOver) setIsNativeDraggingOver(true);
+              }}
+              onDragLeave={() => setIsNativeDraggingOver(false)}
+              onDrop={(event) => {
+                const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                setIsNativeDraggingOver(false);
+                if (!payload) return;
+                event.preventDefault();
+                event.stopPropagation();
+                callbacks.handleNativeCalendarDrop(dayStr, payload);
+              }}
             >
               <span
                 className={`text-xs w-7 h-7 flex items-center justify-center rounded-full ${
@@ -196,9 +197,10 @@ export const MonthDayCell = React.memo(function MonthDayCell({
   const displayEvents = callbacks.getEventsForDisplay(dayEvents);
 
   return (
-    <LazyDroppable droppableId={`calendar-day-${dayStr}`} enabled={isDragging}>
+    <LazyDroppable droppableId={`calendar-day-${dayStr}`}>
       {(provided, snapshot) => {
         const bgClass = snapshot?.isDraggingOver
+          || isNativeDraggingOver
           ? "bg-theme-brand-tint-light"
           : isCurrentMonth
           ? "bg-theme-surface-raised"
@@ -219,6 +221,20 @@ export const MonthDayCell = React.memo(function MonthDayCell({
                 )
                   return;
                 if (dayEvents.length) callbacks.setSelectedModalDate(dayStr);
+              }}
+              onDragOver={(event) => {
+                if (!hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                event.preventDefault();
+                if (!isNativeDraggingOver) setIsNativeDraggingOver(true);
+              }}
+              onDragLeave={() => setIsNativeDraggingOver(false)}
+              onDrop={(event) => {
+                const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                setIsNativeDraggingOver(false);
+                if (!payload) return;
+                event.preventDefault();
+                event.stopPropagation();
+                callbacks.handleNativeCalendarDrop(dayStr, payload);
               }}
               className={`${cellClasses} ${bgClass}`}
             >
@@ -324,7 +340,6 @@ interface WeekDayCellProps {
   idx: number;
   today: Date;
   isMobile: boolean;
-  isDragging: boolean;
   callbacks: CellCallbacks;
   stickers: StickerCallbacks;
   eventsByDate: Record<string, DayEvent[]>;
@@ -335,7 +350,6 @@ export const WeekDayCell = React.memo(function WeekDayCell({
   idx,
   today,
   isMobile,
-  isDragging,
   callbacks,
   stickers,
   eventsByDate,
@@ -346,10 +360,11 @@ export const WeekDayCell = React.memo(function WeekDayCell({
   const formattedDayLabel = format(day, "MMMM d, yyyy");
   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
   const visibleEvents = callbacks.getEventsForDisplay(dayEvents);
+  const [isNativeDraggingOver, setIsNativeDraggingOver] = useState(false);
 
   if (isMobile) {
     return (
-      <LazyDroppable droppableId={`calendar-day-${dayStr}`} enabled={isDragging}>
+      <LazyDroppable droppableId={`calendar-day-${dayStr}`}>
         {(provided, snapshot) => (
           <div
             ref={provided?.innerRef}
@@ -359,12 +374,26 @@ export const WeekDayCell = React.memo(function WeekDayCell({
           >
             <div
               className={`px-2 pt-2 pb-3 h-full ${
-                snapshot?.isDraggingOver
+                snapshot?.isDraggingOver || isNativeDraggingOver
                   ? "bg-theme-brand-tint-light"
                   : isWeekend
                   ? "bg-theme-surface-warm-60"
                   : "bg-theme-surface-raised"
               }`}
+              onDragOver={(event) => {
+                if (!hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                event.preventDefault();
+                if (!isNativeDraggingOver) setIsNativeDraggingOver(true);
+              }}
+              onDragLeave={() => setIsNativeDraggingOver(false)}
+              onDrop={(event) => {
+                const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                setIsNativeDraggingOver(false);
+                if (!payload) return;
+                event.preventDefault();
+                event.stopPropagation();
+                callbacks.handleNativeCalendarDrop(dayStr, payload);
+              }}
             >
               {/* Add task button — always visible on mobile */}
               <div className="flex items-center justify-end mb-2">
@@ -410,11 +439,11 @@ export const WeekDayCell = React.memo(function WeekDayCell({
 
   // DESKTOP WEEK
   return (
-    <LazyDroppable droppableId={`calendar-day-${dayStr}`} enabled={isDragging}>
+    <LazyDroppable droppableId={`calendar-day-${dayStr}`}>
       {(provided, snapshot) => {
         const cellClasses = [
           "px-2 pt-2 pb-3 transition-colors relative group h-full",
-          snapshot?.isDraggingOver
+          snapshot?.isDraggingOver || isNativeDraggingOver
             ? "bg-theme-brand-tint-light"
             : isWeekend
             ? "bg-theme-surface-warm-60"
@@ -438,6 +467,20 @@ export const WeekDayCell = React.memo(function WeekDayCell({
                 )
                   return;
                 if (dayEvents.length) callbacks.setSelectedModalDate(dayStr);
+              }}
+              onDragOver={(event) => {
+                if (!hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                event.preventDefault();
+                if (!isNativeDraggingOver) setIsNativeDraggingOver(true);
+              }}
+              onDragLeave={() => setIsNativeDraggingOver(false)}
+              onDrop={(event) => {
+                const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                setIsNativeDraggingOver(false);
+                if (!payload) return;
+                event.preventDefault();
+                event.stopPropagation();
+                callbacks.handleNativeCalendarDrop(dayStr, payload);
               }}
               className={cellClasses}
             >

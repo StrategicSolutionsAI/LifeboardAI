@@ -1,8 +1,9 @@
 import { useCallback } from "react";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
 import type { DropResult } from "@hello-pangea/dnd";
+import { useOccurrencePrompt } from "@/contexts/tasks-occurrence-prompt-context";
 import type { Task, RepeatOption } from "@/types/tasks";
-import { toDayKey, hourSlotToISO } from "@/features/calendar/types";
+import { toDayKey, hourSlotToISO, type CalendarTaskMovedDetail } from "@/features/calendar/types";
 import { reorderChannel, type ReorderEvent } from "@/features/calendar/hooks/calendar-reorder-channel";
 
 /* ─── Types ─── */
@@ -23,19 +24,21 @@ interface BatchUpdateItem {
   occurrenceDate?: string;
 }
 
-type BatchUpdateFn = (updates: BatchUpdateItem[]) => Promise<any>;
+type BatchUpdateOptions = { occurrenceDecision?: "all" | "single" };
+type BatchUpdateWithOptionsFn = (updates: BatchUpdateItem[], options?: BatchUpdateOptions) => Promise<any>;
 
 export interface HabitDropPayload {
   instanceId: string;
   bucketName: string;
   targetDate: string;
+  hourSlot?: string | null;
+  allDay?: boolean;
 }
 
 interface UseDragDropHandlerOptions {
   selectedDateStr: string;
-  selectedDate: Date;
   allTasks: Task[];
-  batchUpdateTasks: BatchUpdateFn;
+  batchUpdateTasks: BatchUpdateWithOptionsFn;
   setIsDragging: (v: boolean) => void;
   onHabitDrop?: (payload: HabitDropPayload) => void;
 }
@@ -68,6 +71,101 @@ function extractTaskId(draggableId: string): string {
   if (draggableId.startsWith("allday::")) return draggableId.replace("allday::", "");
   if (draggableId.startsWith("lifeboard::")) return draggableId.split("::")[1] ?? draggableId;
   return draggableId;
+}
+
+export function resolveHabitDropPayload(
+  draggableId: string,
+  destinationDroppableId: string,
+  selectedDateStr: string,
+): HabitDropPayload | null {
+  if (!draggableId.startsWith("habit::")) return null;
+
+  const dst = classifyZone(destinationDroppableId);
+  const parts = draggableId.split("::");
+  const instanceId = parts[1] ?? "";
+  const bucketName = decodeURIComponent(parts[2] ?? "");
+
+  if (!instanceId || !bucketName) return null;
+
+  if (dst.type === "calendar-day") {
+    return {
+      instanceId,
+      bucketName,
+      targetDate: dst.dateStr,
+      allDay: true,
+    };
+  }
+
+  if (dst.type === "allday-strip") {
+    return {
+      instanceId,
+      bucketName,
+      targetDate: selectedDateStr,
+      allDay: true,
+    };
+  }
+
+  if (dst.type === "hour") {
+    return {
+      instanceId,
+      bucketName,
+      targetDate: selectedDateStr,
+      hourSlot: dst.id,
+      allDay: false,
+    };
+  }
+
+  return null;
+}
+
+function shiftDateString(dateStr: string, deltaDays: number): string {
+  return toDayKey(addDays(new Date(`${dateStr}T00:00:00`), deltaDays));
+}
+
+export interface CalendarDayMovePlan {
+  updates: TaskDragUpdate;
+  detail: CalendarTaskMovedDetail;
+  requiresSeriesConfirmation: boolean;
+}
+
+export function buildCalendarDayMovePlan(
+  taskId: string,
+  task: Pick<Task, "content" | "hourSlot" | "duration" | "repeatRule" | "startDate" | "endDate"> | undefined,
+  sourceDate: string,
+  destinationDate: string,
+): CalendarDayMovePlan {
+  const sourceMs = new Date(`${sourceDate}T00:00:00`).getTime();
+  const destinationMs = new Date(`${destinationDate}T00:00:00`).getTime();
+  const deltaDays = Math.round((destinationMs - sourceMs) / (24 * 60 * 60 * 1000));
+
+  const updates: TaskDragUpdate = {
+    due: { date: destinationDate },
+    hourSlot: task?.hourSlot ?? null,
+  };
+
+  if (task?.startDate && task?.endDate && task.startDate !== task.endDate) {
+    updates.startDate = shiftDateString(task.startDate, deltaDays);
+    updates.endDate = shiftDateString(task.endDate, deltaDays);
+  } else {
+    updates.startDate = destinationDate;
+    updates.endDate = destinationDate;
+  }
+
+  return {
+    updates,
+    detail: {
+      taskId,
+      fromDate: sourceDate,
+      toDate: destinationDate,
+      title: task?.content ?? "",
+      time: hourSlotToISO(task?.hourSlot ?? null, destinationDate),
+      hourSlot: task?.hourSlot ?? null,
+      allDay: !task?.hourSlot,
+      duration: task?.duration,
+      repeatRule: (task?.repeatRule ?? null) as RepeatOption | null,
+    },
+    requiresSeriesConfirmation: Boolean(task?.repeatRule),
+  };
 }
 
 /* ─── Shared helpers ─── */
@@ -130,12 +228,21 @@ const REORDER_EVENT_MAP: Record<string, ReorderEvent> = {
 
 export function useDragDropHandler({
   selectedDateStr,
-  selectedDate,
   allTasks,
   batchUpdateTasks,
   setIsDragging,
   onHabitDrop,
 }: UseDragDropHandlerOptions) {
+  const promptOccurrenceDecision = useOccurrencePrompt();
+
+  const dispatchCalendarTaskMoved = useCallback((detail: CalendarTaskMovedDetail) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("lifeboard:calendar-task-moved", {
+        detail,
+      }),
+    );
+  }, []);
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
@@ -152,12 +259,13 @@ export function useDragDropHandler({
 
       // ── Habit drag handling ──
       if (draggableId.startsWith("habit::")) {
-        const dst = classifyZone(destination.droppableId);
-        if (dst.type === "calendar-day" && onHabitDrop) {
-          const parts = draggableId.split("::");
-          const instanceId = parts[1] ?? "";
-          const bucketName = decodeURIComponent(parts[2] ?? "");
-          onHabitDrop({ instanceId, bucketName, targetDate: dst.dateStr });
+        const habitDrop = resolveHabitDropPayload(
+          draggableId,
+          destination.droppableId,
+          selectedDateStr,
+        );
+        if (habitDrop && onHabitDrop) {
+          onHabitDrop(habitDrop);
         }
         // All other zones: no-op (snap back)
         return;
@@ -263,41 +371,32 @@ export function useDragDropHandler({
         if (!calTaskId) return;
 
         const task = allTasks.find((t) => t.id?.toString?.() === calTaskId);
-        const updates: TaskDragUpdate = { due: { date: dst.dateStr } };
-        updates.hourSlot = task?.hourSlot ?? null;
+        const movePlan = buildCalendarDayMovePlan(calTaskId, task, src.dateStr, dst.dateStr);
+        const applyMove = (options?: BatchUpdateOptions) => {
+          batchUpdateTasks(
+            [{ taskId: calTaskId, updates: movePlan.updates as Partial<Task>, occurrenceDate: dst.dateStr }],
+            options,
+          ).catch((error) => {
+            console.error("Calendar drag-drop update failed:", error);
+          });
+          dispatchCalendarTaskMoved(movePlan.detail);
+        };
 
-        if (task?.startDate && task?.endDate && task.startDate !== task.endDate) {
-          const srcMs = new Date(src.dateStr + "T00:00:00").getTime();
-          const dstMs = new Date(dst.dateStr + "T00:00:00").getTime();
-          const deltaMs = dstMs - srcMs;
-          updates.startDate = toDayKey(new Date(new Date(task.startDate + "T00:00:00").getTime() + deltaMs));
-          updates.endDate = toDayKey(new Date(new Date(task.endDate + "T00:00:00").getTime() + deltaMs));
-        } else {
-          updates.startDate = dst.dateStr;
-          updates.endDate = dst.dateStr;
+        if (movePlan.requiresSeriesConfirmation) {
+          void (async () => {
+            const destinationLabel = format(new Date(`${dst.dateStr}T00:00:00`), "MMMM d, yyyy");
+            const decision = await promptOccurrenceDecision({
+              actionDescription: `Move this repeating task to ${destinationLabel}. Dragging a repeating task to a new day updates the entire series`,
+              taskTitle: task?.content,
+              allowSingle: false,
+            });
+            if (decision !== "all") return;
+            applyMove({ occurrenceDecision: "all" });
+          })();
+          return;
         }
 
-        batchUpdateTasks([
-          { taskId: calTaskId, updates: updates as Partial<Task>, occurrenceDate: dst.dateStr },
-        ]).catch((error) => {
-          console.error("Calendar drag-drop update failed:", error);
-        });
-
-        window.dispatchEvent(
-          new CustomEvent("lifeboard:calendar-task-moved", {
-            detail: {
-              taskId: calTaskId,
-              fromDate: src.dateStr,
-              toDate: dst.dateStr,
-              title: task?.content ?? "",
-              time: hourSlotToISO(task?.hourSlot ?? null, dst.dateStr),
-              hourSlot: task?.hourSlot ?? null,
-              allDay: !task?.hourSlot,
-              duration: task?.duration,
-              repeatRule: (task?.repeatRule ?? null) as RepeatOption | null,
-            },
-          }),
-        );
+        applyMove();
         return;
       }
 
@@ -386,7 +485,7 @@ export function useDragDropHandler({
         return;
       }
     },
-    [selectedDateStr, selectedDate, allTasks, batchUpdateTasks, setIsDragging, onHabitDrop],
+    [selectedDateStr, allTasks, batchUpdateTasks, setIsDragging, onHabitDrop, promptOccurrenceDecision, dispatchCalendarTaskMoved],
   );
 
   return handleDragEnd;

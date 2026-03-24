@@ -16,6 +16,7 @@ import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/compone
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
 import { useWidgets } from "@/hooks/use-widgets";
+import { useToast } from "@/components/ui/use-toast";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { useCalendarEvents } from "@/features/calendar/hooks/use-calendar-events";
 import { useCalendarNavigation } from "@/features/calendar/hooks/use-calendar-navigation";
@@ -41,6 +42,13 @@ import {
 import { MobileViewDropdown, MobileOverflowMenu } from "@/features/calendar/components/calendar-mobile-components";
 import { MonthDayCell, WeekDayCell } from "@/features/calendar/components/calendar-day-cells";
 import type { CellCallbacks, StickerCallbacks } from "@/features/calendar/components/calendar-day-cells";
+import { useOccurrencePrompt } from "@/contexts/tasks-occurrence-prompt-context";
+import { buildCalendarDayMovePlan } from "@/features/calendar/hooks/use-drag-drop-handler";
+import {
+  type NativeCalendarDragPayload,
+  hasNativeCalendarDragPayload,
+  readNativeCalendarDragPayload,
+} from "@/features/calendar/lib/native-calendar-dnd";
 
 
 const CalendarFileUpload = dynamic(
@@ -67,7 +75,9 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const { stickersByDate, addStickerToDate, removeStickerFromDate, clearStickersForDate } = useCalendarStickers();
+  const { toast } = useToast();
   const [activeStickerDay, setActiveStickerDay] = useState<string | null>(null);
+  const [isAlldayNativeDragOver, setIsAlldayNativeDragOver] = useState(false);
   const [selectedModalDate, setSelectedModalDate] = useState<string | null>(null);
   const [deleteConfirmTask, setDeleteConfirmTask] = useState<{ id: string; title: string; date: string } | null>(null);
   const [uploadRefreshIndex, setUploadRefreshIndex] = useState(0);
@@ -95,7 +105,8 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
 
   // Get tasks from context
   const { allTasks } = useTaskData();
-  const { deleteTask, refetch, getTaskForOccurrence, createTask } = useTaskActions();
+  const occurrencePrompt = useOccurrencePrompt();
+  const { deleteTask, refetch, getTaskForOccurrence, createTask, batchUpdateTasks } = useTaskActions();
 
   // Filter out tasks linked to habit widgets where showInCalendar is false
   const { widgetsByBucket: calWidgets } = useWidgets();
@@ -197,15 +208,80 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
     taskEditorRef.current?.openNew(dayStr);
   }, []);
 
+  const handleNativeCalendarDrop = useCallback(async (dayStr: string, payload: NativeCalendarDragPayload | null, hourSlot?: string | null) => {
+    if (!payload) return;
+
+    try {
+      if (payload.type === "calendar-task") {
+        if (payload.sourceDate === dayStr) return;
+        const task = calendarTasks.find((item) => item.id?.toString?.() === payload.taskId);
+        const movePlan = buildCalendarDayMovePlan(payload.taskId, task, payload.sourceDate, dayStr);
+
+        if (movePlan.requiresSeriesConfirmation) {
+          const destinationLabel = format(new Date(`${dayStr}T00:00:00`), "MMMM d, yyyy");
+          const decision = await occurrencePrompt({
+            actionDescription: `Move this repeating task to ${destinationLabel}. Dragging a repeating task to a new day updates the entire series`,
+            taskTitle: task?.content,
+            allowSingle: false,
+          });
+          if (decision !== "all") return;
+          await batchUpdateTasks(
+            [{ taskId: payload.taskId, updates: movePlan.updates as Partial<Task>, occurrenceDate: dayStr }],
+            { occurrenceDecision: "all" },
+          );
+        } else {
+          await batchUpdateTasks([
+            { taskId: payload.taskId, updates: movePlan.updates as Partial<Task>, occurrenceDate: dayStr },
+          ]);
+        }
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("lifeboard:calendar-task-moved", { detail: movePlan.detail }));
+        }
+        return;
+      }
+
+      const widgets = calWidgets[payload.bucketName] ?? [];
+      const widget = widgets.find((item) => item.instanceId === payload.instanceId);
+      if (!widget) return;
+
+      const habitName = widget.habitTrackerData?.habitName ?? widget.name ?? "Habit";
+      const isTimedDrop = Boolean(hourSlot);
+      const normalizedSlot = hourSlot ? (hourSlot.startsWith("hour-") ? hourSlot : `hour-${hourSlot}`) : null;
+      await createTask(habitName, dayStr, normalizedSlot, payload.bucketName, "none",
+        isTimedDrop ? { allDay: false, duration: 60 } : { allDay: true },
+      );
+      const targetHour = normalizedSlot?.replace(/^hour-/, "");
+      toast({
+        title: "Task created",
+        description: isTimedDrop
+          ? `"${habitName}" scheduled for ${dayStr} at ${targetHour}.`
+          : `"${habitName}" added to ${dayStr}.`,
+      });
+    } catch (error) {
+      console.error("Native calendar drop failed:", error);
+      toast({
+        title: "Couldn't move item",
+        description: "Please try again.",
+      });
+    }
+  }, [calendarTasks, occurrencePrompt, batchUpdateTasks, calWidgets, createTask, toast]);
+
   const cellCallbacks = useMemo<CellCallbacks>(() => ({
     handleDateChange,
     handleViewChange: handleViewChange as (view: "day") => void,
     setSelectedModalDate,
     openNewTask,
+    handleNativeCalendarDrop,
     getEventsForDisplay,
     resolveEventStyles,
     openCalendarEvent,
-  }), [handleDateChange, handleViewChange, openNewTask, getEventsForDisplay, resolveEventStyles, openCalendarEvent]);
+  }), [handleDateChange, handleViewChange, openNewTask, handleNativeCalendarDrop, getEventsForDisplay, resolveEventStyles, openCalendarEvent]);
+
+  // Callback for native habit drops on hourly planner hour slots
+  const handleHourSlotNativeDrop = useCallback((hourSlot: string, payload: NativeCalendarDragPayload) => {
+    handleNativeCalendarDrop(toDayKey(currentDate), payload, hourSlot);
+  }, [handleNativeCalendarDrop, currentDate]);
 
   const cellStickers = useMemo<StickerCallbacks>(() => ({
     stickersByDate,
@@ -594,8 +670,22 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                   <div
                     ref={alldayProvided.innerRef}
                     {...alldayProvided.droppableProps}
-                    className="flex items-center gap-2 mt-3 pt-2.5 border-t border-theme-neutral-300/30"
-                    style={dayViewStats.allDayEvents.length === 0 ? { height: 0, overflow: 'hidden', margin: 0, padding: 0, border: 'none' } : undefined}
+                    className={`flex items-center gap-2 mt-3 pt-2.5 border-t border-theme-neutral-300/30 transition-colors ${isAlldayNativeDragOver ? 'bg-theme-brand-tint-light rounded-lg' : ''}`}
+                    style={dayViewStats.allDayEvents.length === 0 && !isAlldayNativeDragOver ? { height: 0, overflow: 'hidden', margin: 0, padding: 0, border: 'none' } : undefined}
+                    onDragOver={(event) => {
+                      if (!hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                      event.preventDefault();
+                      if (!isAlldayNativeDragOver) setIsAlldayNativeDragOver(true);
+                    }}
+                    onDragLeave={() => setIsAlldayNativeDragOver(false)}
+                    onDrop={(event) => {
+                      const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                      setIsAlldayNativeDragOver(false);
+                      if (!payload) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleNativeCalendarDrop(toDayKey(currentDate), payload);
+                    }}
                   >
                     <span className="text-2xs font-semibold uppercase tracking-[1px] text-theme-text-quaternary shrink-0">All day</span>
                     <div className="flex flex-wrap gap-1.5">
@@ -734,6 +824,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         bucketColors={bucketColors}
                         isMobile={isCompactBreakpoint}
                         familyMembers={familyMembers}
+                        onNativeHabitDrop={handleHourSlotNativeDrop}
                       />
                     {provided.placeholder}
                   </div>
@@ -812,7 +903,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                             idx={idx}
                             today={today}
                             isMobile={true}
-                            isDragging={isDragging}
                             callbacks={cellCallbacks}
                             stickers={cellStickers}
                             eventsByDate={eventsByDate}
@@ -833,7 +923,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                           idx={idx}
                           today={today}
                           isMobile={false}
-                          isDragging={isDragging}
                           callbacks={cellCallbacks}
                           stickers={cellStickers}
                           eventsByDate={eventsByDate}
@@ -856,7 +945,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         currentDate={currentDate}
                         isCompactBreakpoint={isCompactBreakpoint}
                         totalRows={rows.length}
-                        isDragging={isDragging}
                         callbacks={cellCallbacks}
                         stickers={cellStickers}
                         eventsByDate={eventsByDate}

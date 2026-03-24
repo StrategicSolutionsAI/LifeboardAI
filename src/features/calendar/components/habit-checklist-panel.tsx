@@ -3,13 +3,13 @@
 import { useMemo, useState, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Check, ChevronRight, Flame, GripVertical, Target } from "lucide-react"
-import { Droppable, Draggable } from "@hello-pangea/dnd"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWidgets } from "@/hooks/use-widgets"
 import { useToast } from "@/components/ui/use-toast"
 import { getDateKey, calculateStreak, getLast7Days, buildTogglePayload, fireConfetti } from "@/lib/habit-utils"
 import type { WidgetInstance } from "@/types/widgets"
+import { writeNativeCalendarDragPayload } from "@/features/calendar/lib/native-calendar-dnd"
 
 const HabitTrackerWidget = dynamic(
   () => import("@/features/widgets/components/habit-tracker-widget").then((m) => m.HabitTrackerWidget),
@@ -64,20 +64,12 @@ function HabitRow({
   onToggle,
   onOpen,
   isDragActive,
-  dragHandleProps,
-  innerRef,
-  draggableProps,
-  isDraggingThis,
 }: {
   widget: WidgetInstance
   bucketName: string
   onToggle: (bucketName: string, widget: WidgetInstance, isCompletedToday: boolean) => void
   onOpen: (bucketName: string, widget: WidgetInstance) => void
   isDragActive?: boolean
-  dragHandleProps?: Record<string, any>
-  innerRef?: (el: HTMLElement | null) => void
-  draggableProps?: Record<string, any>
-  isDraggingThis?: boolean
 }) {
   const data = widget.habitTrackerData
   if (!data || !data.habitName) return null
@@ -90,23 +82,35 @@ function HabitRow({
 
   return (
     <div
-      ref={innerRef}
-      {...draggableProps}
-      className={`group flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer ${
-        isDraggingThis ? "shadow-warm-lg scale-[1.02] opacity-90 ring-2 ring-theme-primary/30" : ""
-      }`}
+      className="group flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer"
       onClick={() => onOpen(bucketName, widget)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onOpen(bucketName, widget)
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
-      {/* Always mount a drag handle so dnd can register it even when visually subtle. */}
-      <div
-        {...dragHandleProps}
+      <button
+        type="button"
+        draggable
+        onDragStart={(event) => {
+          writeNativeCalendarDragPayload(event.dataTransfer, {
+            type: "habit",
+            instanceId: widget.instanceId,
+            bucketName,
+          })
+        }}
         className={`flex-shrink-0 cursor-grab active:cursor-grabbing text-theme-text-tertiary transition-opacity ${
           isDragActive ? "opacity-100" : "opacity-30 group-hover:opacity-70"
         }`}
         onClick={(e) => e.stopPropagation()}
+        title={`Drag ${data.habitName} onto a calendar day`}
       >
         <GripVertical className="h-4 w-4" />
-      </div>
+      </button>
 
       {/* Habit info */}
       <div className="flex-1 min-w-0">
@@ -259,18 +263,6 @@ export function HabitChecklistPanel({ selectedDate, isDragging = false }: { sele
     }
   }, [removeWidget, toast])
 
-  // Flat index for Draggable items across all bucket groups
-  const flatIndexMap = useMemo(() => {
-    const map = new Map<string, number>()
-    let idx = 0
-    for (const { habits } of habitsByBucket) {
-      for (const w of habits) {
-        map.set(w.instanceId, idx++)
-      }
-    }
-    return map
-  }, [habitsByBucket])
-
   // Loading state
   if (loading) {
     return (
@@ -311,75 +303,56 @@ export function HabitChecklistPanel({ selectedDate, isDragging = false }: { sele
         </p>
       </div>
 
-      <Droppable droppableId="habit-source" isDropDisabled={true}>
-        {(droppableProvided) => (
-          <div ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
-            {/* Bucket sections */}
-            {habitsByBucket.map(({ bucketName, habits }) => {
-              const isCollapsed = collapsedBuckets.has(bucketName)
-              const completedCount = habits.filter((w) => {
-                const today = getDateKey(new Date())
-                return new Set(w.habitTrackerData?.completionHistory || []).has(today)
-              }).length
+      <div>
+        {habitsByBucket.map(({ bucketName, habits }) => {
+          const isCollapsed = collapsedBuckets.has(bucketName)
+          const completedCount = habits.filter((w) => {
+            const today = getDateKey(new Date())
+            return new Set(w.habitTrackerData?.completionHistory || []).has(today)
+          }).length
 
-              return (
-                <div key={bucketName} className="space-y-2 mb-4">
-                  {/* Bucket category header */}
-                  <button
-                    onClick={() => toggleBucketCollapse(bucketName)}
-                    className="flex items-center gap-2 w-full group cursor-pointer select-none"
-                    aria-expanded={!isCollapsed}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-md bg-theme-neutral-200 flex items-center justify-center transition-transform duration-200 ${
-                        isCollapsed ? "rotate-0" : "rotate-90"
-                      }`}
-                    >
-                      <ChevronRight size={12} className="text-theme-text-tertiary" />
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
-                      {bucketName}
-                    </span>
-                    <span className="text-xs text-theme-text-tertiary ml-auto">
-                      {completedCount}/{habits.length}
-                    </span>
-                  </button>
-
-                  {/* Habit rows */}
-                  <div
-                    className={`space-y-2 transition-all duration-300 ease-out overflow-hidden ${
-                      isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
-                    }`}
-                  >
-                    {habits.map((widget) => {
-                      const flatIdx = flatIndexMap.get(widget.instanceId) ?? 0
-                      const draggableId = `habit::${widget.instanceId}::${encodeURIComponent(bucketName)}`
-                      return (
-                        <Draggable key={widget.instanceId} draggableId={draggableId} index={flatIdx}>
-                          {(provided, snapshot) => (
-                            <HabitRow
-                              innerRef={provided.innerRef}
-                              draggableProps={provided.draggableProps}
-                              dragHandleProps={provided.dragHandleProps ?? undefined}
-                              isDraggingThis={snapshot.isDragging}
-                              isDragActive={isDragging}
-                              widget={widget}
-                              bucketName={bucketName}
-                              onToggle={handleToggle}
-                              onOpen={handleOpen}
-                            />
-                          )}
-                        </Draggable>
-                      )
-                    })}
-                  </div>
+          return (
+            <div key={bucketName} className="space-y-2 mb-4">
+              <button
+                onClick={() => toggleBucketCollapse(bucketName)}
+                className="flex items-center gap-2 w-full group cursor-pointer select-none"
+                aria-expanded={!isCollapsed}
+              >
+                <div
+                  className={`w-5 h-5 rounded-md bg-theme-neutral-200 flex items-center justify-center transition-transform duration-200 ${
+                    isCollapsed ? "rotate-0" : "rotate-90"
+                  }`}
+                >
+                  <ChevronRight size={12} className="text-theme-text-tertiary" />
                 </div>
-              )
-            })}
-            {droppableProvided.placeholder}
-          </div>
-        )}
-      </Droppable>
+                <span className="text-xs font-semibold uppercase tracking-wide text-theme-text-tertiary">
+                  {bucketName}
+                </span>
+                <span className="text-xs text-theme-text-tertiary ml-auto">
+                  {completedCount}/{habits.length}
+                </span>
+              </button>
+
+              <div
+                className={`space-y-2 transition-all duration-300 ease-out overflow-hidden ${
+                  isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
+                }`}
+              >
+                {habits.map((widget) => (
+                  <HabitRow
+                    key={widget.instanceId}
+                    isDragActive={isDragging}
+                    widget={widget}
+                    bucketName={bucketName}
+                    onToggle={handleToggle}
+                    onOpen={handleOpen}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
       {/* Unscheduled habits indicator */}
       {unscheduledCount > 0 && (

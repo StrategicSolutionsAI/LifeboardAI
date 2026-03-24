@@ -421,7 +421,10 @@ export function useTaskMutations(
 
   // ── Batch update ───────────────────────────────────────────────────
 
-  const batchUpdateTasks = useCallback(async (updates: { taskId: string; updates: Partial<Task>; occurrenceDate?: string }[]) => {
+  const batchUpdateTasks = useCallback(async (
+    updates: { taskId: string; updates: Partial<Task>; occurrenceDate?: string }[],
+    options?: { occurrenceDecision?: Exclude<OccurrenceDecision, 'cancel'> }
+  ) => {
     if (!Array.isArray(updates) || updates.length === 0) return
 
     const taskCache = new Map<string, Task | undefined>()
@@ -492,13 +495,15 @@ export function useTaskMutations(
       })
       .filter(Boolean) as { task: Task; original: { taskId: string; updates: Partial<Task>; occurrenceDate?: string } }[]
 
-    let decision: OccurrenceDecision = 'all'
+    let decision: OccurrenceDecision = options?.occurrenceDecision ?? 'all'
     if (repeatingTimeUpdates.length > 0) {
-      const firstPatch = repeatingTimeUpdates[0].original.updates as Record<string, any> | undefined
-      decision = await promptOccurrenceDecision({
-        actionDescription: describeChange(firstPatch),
-        taskTitle: repeatingTimeUpdates[0].task.content
-      })
+      if (!options?.occurrenceDecision) {
+        const firstPatch = repeatingTimeUpdates[0].original.updates as Record<string, any> | undefined
+        decision = await promptOccurrenceDecision({
+          actionDescription: describeChange(firstPatch),
+          taskTitle: repeatingTimeUpdates[0].task.content
+        })
+      }
       if (decision === 'cancel') return
     }
 

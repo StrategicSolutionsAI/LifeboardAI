@@ -17,6 +17,11 @@ import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import type { RepeatOption } from "@/types/tasks";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import type { FamilyMemberOption } from "@/hooks/use-family-members";
+import type { NativeCalendarDragPayload } from "@/features/calendar/lib/native-calendar-dnd";
+import {
+  hasNativeCalendarDragPayload,
+  readNativeCalendarDragPayload,
+} from "@/features/calendar/lib/native-calendar-dnd";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -158,6 +163,8 @@ interface HourlyPlannerProps {
   isMobile?: boolean;
   /** Family members for assignee color lookup */
   familyMembers?: FamilyMemberOption[];
+  /** Handler for native habit drops on hour slots (from habit panel drag) */
+  onNativeHabitDrop?: (hourSlot: string, payload: NativeCalendarDragPayload) => void;
 }
 
 export interface HourlyPlannerHandle {
@@ -177,6 +184,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   onTaskOpen,
   isMobile = false,
   familyMembers = [],
+  onNativeHabitDrop,
 }, ref) => {
   const { scheduledTasks } = useTaskData();
   const {
@@ -247,6 +255,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
   const effectiveDragging = isDragging || dragging;
   const suppressDragUntilRef = useRef<number>(0);
   const [draggingOverSlot, setDraggingOverSlot] = useState<string | null>(null);
+  const [nativeDragOverSlot, setNativeDragOverSlot] = useState<string | null>(null);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setDragging(false);
@@ -814,7 +823,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                       ? 'border-t border-theme-neutral-300/30 h-[28px] sm:h-[18px]'
                       : hasTask ? 'h-[28px] sm:h-[17px]' : 'h-[28px] sm:h-[17px]'
                   } ${index === 0 ? 'border-t-0' : ''} ${
-                    snapshot.isDraggingOver
+                    snapshot.isDraggingOver || nativeDragOverSlot === timeSlot
                       ? 'bg-theme-primary-50/80'
                       : isPast && !hasTask
                       ? 'opacity-40'
@@ -823,6 +832,23 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                   style={{ minHeight: SLOT_HEIGHT, ...(hasTask ? { zIndex: 2 } : {}) }}
                   onMouseEnter={() => handleSlotHover(timeSlot, true)}
                   onMouseLeave={() => handleSlotHover(timeSlot, false)}
+                  onDragOver={(event) => {
+                    if (!onNativeHabitDrop || !hasNativeCalendarDragPayload(event.dataTransfer)) return;
+                    event.preventDefault();
+                    if (nativeDragOverSlot !== timeSlot) setNativeDragOverSlot(timeSlot);
+                  }}
+                  onDragLeave={() => {
+                    if (nativeDragOverSlot === timeSlot) setNativeDragOverSlot(null);
+                  }}
+                  onDrop={(event) => {
+                    if (!onNativeHabitDrop) return;
+                    const payload = readNativeCalendarDragPayload(event.dataTransfer);
+                    setNativeDragOverSlot(null);
+                    if (!payload) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onNativeHabitDrop(timeSlot, payload);
+                  }}
                 >
                   {/* Time label - only for main hours, positioned above the dividing line */}
                   <div className="w-[56px] shrink-0 flex flex-col items-end text-right pr-1">
@@ -842,7 +868,7 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                     style={{ minHeight: SLOT_HEIGHT }}
                   >
                     {/* Drag-over indicator */}
-                    {effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) && (
+                    {(effectiveDragging && (draggingOverSlot === timeSlot || snapshot.isDraggingOver) || nativeDragOverSlot === timeSlot) && (
                       <>
                         <div
                           className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-theme-primary-300/60 bg-theme-primary-50/40"
