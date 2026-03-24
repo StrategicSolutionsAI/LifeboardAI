@@ -92,21 +92,21 @@ function HabitRow({
     <div
       ref={innerRef}
       {...draggableProps}
-      className={`flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer ${
+      className={`group flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-white p-3 transition-all duration-200 hover:shadow-warm cursor-pointer ${
         isDraggingThis ? "shadow-warm-lg scale-[1.02] opacity-90 ring-2 ring-theme-primary/30" : ""
       }`}
       onClick={() => onOpen(bucketName, widget)}
     >
-      {/* Drag handle — visible when sidebar is in drag mode */}
-      {isDragActive && (
-        <div
-          {...dragHandleProps}
-          className="flex-shrink-0 cursor-grab active:cursor-grabbing text-theme-text-tertiary"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-4 w-4" />
-        </div>
-      )}
+      {/* Always mount a drag handle so dnd can register it even when visually subtle. */}
+      <div
+        {...dragHandleProps}
+        className={`flex-shrink-0 cursor-grab active:cursor-grabbing text-theme-text-tertiary transition-opacity ${
+          isDragActive ? "opacity-100" : "opacity-30 group-hover:opacity-70"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </div>
 
       {/* Habit info */}
       <div className="flex-1 min-w-0">
