@@ -1,7 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { Component, useState, useEffect, useRef } from "react";
 import { Draggable } from "@hello-pangea/dnd";
+
+/** Catches DnD context errors (e.g. React 18 concurrent mode race) and falls
+ *  back to rendering children without the Draggable wrapper. */
+class DraggableErrorBoundary extends Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
 import { Upload, MoreHorizontal } from "lucide-react";
 import type { CalendarView, DayEvent } from "@/features/calendar/types";
 
@@ -174,8 +187,10 @@ export const EventPill = React.memo(function EventPill({ ev, dayStr, filteredInd
   }
 
   return (
-    <Draggable key={draggableId} draggableId={draggableId} index={filteredIndex} isDragDisabled={!hasTask}>
-      {(dragProvided, dragSnapshot) => pillContent(dragProvided, dragSnapshot)}
-    </Draggable>
+    <DraggableErrorBoundary fallback={pillContent()}>
+      <Draggable key={draggableId} draggableId={draggableId} index={filteredIndex} isDragDisabled={!hasTask}>
+        {(dragProvided, dragSnapshot) => pillContent(dragProvided, dragSnapshot)}
+      </Draggable>
+    </DraggableErrorBoundary>
   );
 });

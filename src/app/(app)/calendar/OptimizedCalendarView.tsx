@@ -235,49 +235,64 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   );
 }
 
-/** Error boundary that silently retries once on DnD context errors.
+/** Error boundary that retries up to MAX_RETRIES on DnD context errors.
  *  React 18 concurrent rendering can cause @hello-pangea/dnd invariant
- *  failures during recoverFromConcurrentError — a retry resolves it. */
+ *  failures during recoverFromConcurrentError — a retry resolves it.
+ *  Uses an incrementing key to force a full subtree remount on each retry. */
 class DnDErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; retryKey: number }
 > {
-  state = { hasError: false };
+  static MAX_RETRIES = 3;
+  state = { hasError: false, retryKey: 0 };
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
   componentDidCatch(error: Error) {
-    // Only retry for DnD context errors
-    if (error.message?.includes('Could not find required context')) {
-      // Reset after a tick so children re-mount with context available
-      setTimeout(() => this.setState({ hasError: false }), 0);
+    if (
+      error.message?.includes('Could not find required context') &&
+      this.state.retryKey < DnDErrorBoundary.MAX_RETRIES
+    ) {
+      // Increasing delay on each retry so context has time to settle
+      const delay = 100 * (this.state.retryKey + 1);
+      setTimeout(() => {
+        this.setState(prev => ({
+          hasError: false,
+          retryKey: prev.retryKey + 1,
+        }));
+      }, delay);
     }
+    // If retries exhausted, stay in hasError = true → render null
+    // Prevents infinite loop that crashes the page via the app error boundary
   }
 
   render() {
     if (this.state.hasError) return null;
-    return this.props.children;
+    // Changing key forces React to destroy & recreate the entire subtree,
+    // ensuring DragDropContext + DeferredChildren get a fresh mount.
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>;
   }
 }
 
 export default function OptimizedCalendarView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Delay rendering DnD tree by one frame so module-level prefetchToGlobalCache
-  // calls settle before @hello-pangea/dnd registers Droppable/Draggable elements.
-  // Without this, prefetch resolution during React's initial commit can trigger
-  // state updates that interrupt DnD setup, causing "Invariant failed" in production.
+  // Defer CalendarContent mount by one frame so that React 18's initial
+  // concurrent render completes before @hello-pangea/dnd's DragDropContext
+  // and its Droppable/Draggable children mount. This prevents the
+  // "Could not find required context" invariant that fires during
+  // recoverFromConcurrentError when DnD context tears.
   const [ready, setReady] = useState(false);
   useEffect(() => { setReady(true); }, []);
-
-  if (!ready) return null; // dynamic({ ssr: false }) loading skeleton is still visible
 
   return (
     <TasksProvider selectedDate={selectedDate}>
       <DnDErrorBoundary>
-        <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
+        {ready ? (
+          <CalendarContent selectedDate={selectedDate} onDateChange={setSelectedDate} />
+        ) : null}
       </DnDErrorBoundary>
       {process.env.NODE_ENV === 'development' && <CalendarPerformanceMonitor />}
     </TasksProvider>

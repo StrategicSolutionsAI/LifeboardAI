@@ -403,16 +403,27 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     // Process only tasks that have been scheduled (have hourSlot)
     scopedScheduledTasks.forEach((t) => {
       const slot = t.hourSlot?.replace('hour-', '') || '';
-      
+
       // Validate slot exists in our time slots array
       if (!TIME_SLOTS.includes(slot)) {
         return;
       }
-      
+
+      // Compute duration: prefer explicit duration, then derive from start/end slots
+      let taskDuration = t.duration;
+      if (taskDuration == null && t.endHourSlot) {
+        const endSlot = t.endHourSlot.replace('hour-', '');
+        const startMin = parseTimeSlot(slot);
+        const endMin = parseTimeSlot(endSlot);
+        if (endMin > startMin) {
+          taskDuration = endMin - startMin;
+        }
+      }
+
       plan[slot].push({
         id: t.id.toString(),
         content: t.content,
-        duration: t.duration ?? 60,
+        duration: taskDuration ?? 60,
         bucket: t.bucket,
         assigneeId: t.assigneeId ?? null,
       });
