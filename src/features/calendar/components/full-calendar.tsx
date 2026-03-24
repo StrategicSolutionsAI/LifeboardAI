@@ -11,8 +11,7 @@ import {
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Plus, Upload, Clock, CalendarDays, CheckCircle2, GripVertical } from "lucide-react";
 import type { HourlyPlannerHandle } from "@/features/calendar/components/hourly-planner";
-
-const LazyHourlyPlanner = React.lazy(() => import("@/features/calendar/components/hourly-planner"));
+import HourlyPlanner from "@/features/calendar/components/hourly-planner";
 import TaskEditorModal, { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import type { RepeatOption, Task } from "@/types/tasks";
@@ -721,12 +720,7 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                       snapshot.isDraggingOver ? 'ring-2 ring-theme-primary-300/50' : ''
                     }`}
                   >
-                    <React.Suspense fallback={
-                      <div className="flex items-center justify-center py-16 text-sm text-theme-text-tertiary">
-                        Loading planner…
-                      </div>
-                    }>
-                      <LazyHourlyPlanner
+                      <HourlyPlanner
                         ref={hourlyPlannerRef}
                         className="max-h-[75vh] overflow-y-auto rounded-xl flex-1"
                         showTimeIndicator={true}
@@ -741,7 +735,6 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
                         isMobile={isCompactBreakpoint}
                         familyMembers={familyMembers}
                       />
-                    </React.Suspense>
                     {provided.placeholder}
                   </div>
                 )}

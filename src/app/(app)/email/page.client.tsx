@@ -36,10 +36,17 @@ import {
   Undo2,
   AlertCircle,
   RefreshCcw,
+  Pencil,
+  Menu,
+  AlertTriangle,
+  Clock,
+  Megaphone,
+  ExternalLink,
 } from 'lucide-react'
 import { interactive } from '@/lib/styles'
 import type { ParsedEmail, AttachmentMeta } from '@/lib/gmail/message-parser'
 import type { SenderGroup } from '@/app/api/email/inbox-cleaner/scan/route'
+import type { MarketingSenderGroup } from '@/app/api/email/ai/marketing/route'
 
 type MessageSummary = Omit<ParsedEmail, 'textBody' | 'htmlBody'>
 
@@ -163,7 +170,18 @@ function NotConnectedView() {
   )
 }
 
-// ── Email List Item ──────────────────────────────────────────────────────
+// ── Label icon mapping ───────────────────────────────────────────────────
+
+const LABEL_ICONS: Record<string, typeof Inbox> = {
+  INBOX: Inbox,
+  STARRED: Star,
+  SENT: SendHorizonal,
+  DRAFT: FileText,
+  SPAM: AlertTriangle,
+  TRASH: Trash2,
+}
+
+// ── Email List Item (Gmail-style single row) ─────────────────────────────
 
 function EmailListItem({
   message,
@@ -171,83 +189,178 @@ function EmailListItem({
   isChecked,
   onClick,
   onCheck,
+  onStar,
+  onArchive,
+  onDelete,
+  onToggleRead,
+  onSnooze,
 }: {
   message: MessageSummary
   isSelected: boolean
   isChecked: boolean
   onClick: () => void
   onCheck: () => void
+  onStar: () => void
+  onArchive: () => void
+  onDelete: () => void
+  onToggleRead: () => void
+  onSnooze: (option: string) => void
 }) {
+  const isStarred = message.labelIds?.includes('STARRED')
+  const hasAttachments = message.attachments?.length > 0
+
   return (
     <div
-      className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-theme-neutral-300/50 ${interactive.transitionFast} ${
+      onClick={onClick}
+      className={`flex items-center h-10 px-2 cursor-pointer group border-b border-theme-neutral-300/20 ${interactive.transitionFast} ${
         isSelected
-          ? 'bg-theme-brand-tint'
+          ? 'bg-theme-brand-tint/60'
           : isChecked
             ? 'bg-theme-brand-tint-subtle'
-            : 'hover:bg-theme-surface-raised'
-      }`}
+            : message.isUnread
+              ? 'bg-white'
+              : 'bg-theme-surface-base/40'
+      } hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.3),0_1px_3px_1px_rgba(60,64,67,.15)] hover:z-[1] relative`}
     >
-      <label className="flex-shrink-0 mt-1.5 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+      {/* Checkbox */}
+      <label className="flex-shrink-0 px-2 cursor-pointer flex items-center" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={isChecked}
           onChange={onCheck}
-          className="h-4 w-4 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/30 cursor-pointer"
+          className="h-[18px] w-[18px] rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/30 cursor-pointer"
         />
       </label>
-      <button onClick={onClick} className="flex-1 min-w-0 text-left flex items-start gap-3">
-        <div
-          className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold ${getInitialColor(message.from)}`}
-        >
-          {extractInitial(message.from)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span
-              className={`text-sm truncate ${
-                message.isUnread
-                  ? 'font-semibold text-theme-text-primary'
-                  : 'font-medium text-theme-text-secondary'
-              }`}
-            >
-              {extractSenderName(message.from)}
-            </span>
-            <span className="text-xs text-theme-text-tertiary flex-shrink-0">
-              {formatEmailDate(message.date)}
-            </span>
-          </div>
-          <p
-            className={`text-sm truncate ${
-              message.isUnread
-                ? 'font-semibold text-theme-text-primary'
-                : 'text-theme-text-secondary'
-            }`}
-          >
-            {message.subject || '(no subject)'}
-          </p>
-          <p className="text-xs text-theme-text-tertiary truncate mt-0.5">
-            {message.snippet}
-          </p>
-        </div>
-        {message.isUnread && (
-          <div className="flex-shrink-0 mt-1.5 w-2 h-2 rounded-full bg-theme-primary" />
-        )}
+
+      {/* Star */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onStar() }}
+        className="flex-shrink-0 p-1 rounded-full hover:bg-theme-surface-raised"
+      >
+        <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-theme-text-tertiary/50 group-hover:text-theme-text-tertiary'}`} />
       </button>
+
+      {/* Sender name (fixed width) */}
+      <span
+        className={`flex-shrink-0 w-[180px] truncate text-[13px] pl-2 ${
+          message.isUnread
+            ? 'font-bold text-theme-text-primary'
+            : 'text-theme-text-secondary'
+        }`}
+      >
+        {extractSenderName(message.from)}
+      </span>
+
+      {/* Subject + snippet */}
+      <span className="flex-1 min-w-0 flex items-center gap-0 truncate pl-2 pr-2">
+        <span
+          className={`text-[13px] truncate flex-shrink ${
+            message.isUnread
+              ? 'font-bold text-theme-text-primary'
+              : 'text-theme-text-secondary'
+          }`}
+        >
+          {message.subject || '(no subject)'}
+        </span>
+        {message.snippet && (
+          <span className="text-[13px] text-theme-text-tertiary truncate flex-shrink-[2]">
+            &nbsp;- {message.snippet}
+          </span>
+        )}
+      </span>
+
+      {/* Attachment icon */}
+      {hasAttachments && (
+        <Paperclip className="flex-shrink-0 h-3.5 w-3.5 text-theme-text-tertiary mr-2" />
+      )}
+
+      {/* Date (visible by default, hidden on hover) */}
+      <span
+        className={`flex-shrink-0 text-xs pr-2 group-hover:hidden ${
+          message.isUnread
+            ? 'font-bold text-theme-text-primary'
+            : 'text-theme-text-tertiary'
+        }`}
+      >
+        {formatEmailDate(message.date)}
+      </span>
+
+      {/* Hover action buttons (hidden by default, visible on hover) */}
+      <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0 pr-1" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onArchive}
+          title="Archive"
+          className="p-1 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary hover:text-theme-text-primary"
+        >
+          <Archive className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          title="Delete"
+          className="p-1 rounded-full hover:bg-red-50 text-theme-text-secondary hover:text-red-600"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onToggleRead}
+          title={message.isUnread ? 'Mark as read' : 'Mark as unread'}
+          className="p-1 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary hover:text-theme-text-primary"
+        >
+          {message.isUnread ? <MailOpen className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+        </button>
+        <div className="relative group/snooze">
+          <button
+            title="Snooze"
+            className="p-1 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary hover:text-theme-text-primary"
+          >
+            <Clock className="h-4 w-4" />
+          </button>
+          <div className="absolute right-0 top-full mt-1 hidden group-hover/snooze:block bg-white rounded-lg shadow-[0_2px_10px_rgba(0,0,0,.2)] border border-theme-neutral-300/50 py-1 z-30 w-40">
+            {[
+              { key: '1h', label: 'In 1 hour' },
+              { key: 'tomorrow', label: 'Tomorrow morning' },
+              { key: 'nextWeek', label: 'Next week' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => onSnooze(key)}
+                className="w-full text-left px-3 py-1.5 text-xs text-theme-text-secondary hover:bg-theme-surface-raised"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Compose Modal ────────────────────────────────────────────────────────
 
+interface PendingSend {
+  to: string
+  cc?: string
+  bcc?: string
+  subject: string
+  body: string
+  inReplyTo?: string
+  references?: string
+  threadId?: string
+  draftId?: string
+  attachments: File[]
+}
+
 function ComposeModal({
   initial,
   onClose,
   onSent,
+  onSendPending,
 }: {
   initial: ComposeState
   onClose: () => void
   onSent: () => void
+  onSendPending?: (payload: PendingSend, composeState: ComposeState) => void
 }) {
   const [to, setTo] = useState(initial.to)
   const [cc, setCc] = useState(initial.cc)
@@ -341,11 +454,32 @@ function ComposeModal({
       setError('To and Subject are required')
       return
     }
-    setSending(true)
-    setError('')
 
     // Cancel any pending draft save
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+
+    // If undo send is supported, delegate to parent
+    if (onSendPending) {
+      onSendPending(
+        {
+          to: to.trim(),
+          cc: cc.trim() || undefined,
+          bcc: bcc.trim() || undefined,
+          subject: subject.trim(),
+          body,
+          inReplyTo: initial.inReplyTo || undefined,
+          references: initial.references || undefined,
+          threadId: initial.threadId || undefined,
+          draftId: draftId || undefined,
+          attachments,
+        },
+        initial,
+      )
+      return
+    }
+
+    setSending(true)
+    setError('')
 
     try {
       let res: Response
@@ -572,22 +706,26 @@ function ComposeModal({
 
 function ReadingPane({
   messageId,
+  threadId,
   onBack,
   onCompose,
   onActionDone,
   account,
 }: {
   messageId: string
+  threadId?: string
   onBack?: () => void
   onCompose: (state: ComposeState) => void
   onActionDone: () => void
   account?: string
 }) {
+  const [threadMessages, setThreadMessages] = useState<ParsedEmail[]>([])
   const [message, setMessage] = useState<ParsedEmail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [aiReplyLoading, setAiReplyLoading] = useState(false)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
@@ -595,13 +733,32 @@ function ReadingPane({
     setLoading(true)
     setError(null)
 
-    fetch(`/api/email/messages/${messageId}`)
+    const params = account ? `?account=${encodeURIComponent(account)}` : ''
+    const url = threadId
+      ? `/api/email/threads/${threadId}${params}`
+      : `/api/email/messages/${messageId}${params}`
+
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((data) => {
-        if (!cancelled) setMessage(data.message)
+        if (cancelled) return
+        if (threadId && data.messages) {
+          // Thread response: array of messages sorted oldest to newest
+          const msgs = data.messages as ParsedEmail[]
+          setThreadMessages(msgs)
+          // Set active message to the clicked one, or latest
+          const active = msgs.find((m) => m.id === messageId) ?? msgs[msgs.length - 1]
+          setMessage(active)
+          // Expand the clicked message by default (collapse others)
+          setExpandedIds(new Set([active.id]))
+        } else {
+          setMessage(data.message)
+          setThreadMessages([data.message])
+          setExpandedIds(new Set([data.message.id]))
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -613,7 +770,7 @@ function ReadingPane({
     return () => {
       cancelled = true
     }
-  }, [messageId])
+  }, [messageId, threadId, account])
 
   // Auto-mark as read when opening
   useEffect(() => {
@@ -770,19 +927,17 @@ function ReadingPane({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Mobile back button */}
-      {onBack && (
-        <button
-          onClick={onBack}
-          className={`md:hidden flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-theme-primary border-b border-theme-neutral-300 ${interactive.transitionFast} hover:bg-theme-surface-raised`}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to inbox
-        </button>
-      )}
-
-      {/* Action bar */}
+      {/* Action bar with back button */}
       <div className="flex items-center gap-1 px-3 py-2 border-b border-theme-neutral-300 bg-white overflow-x-auto">
+        {onBack && (
+          <button
+            onClick={onBack}
+            title="Back to inbox"
+            className={`p-1.5 rounded-full hover:bg-theme-surface-raised mr-1 ${interactive.transitionFast}`}
+          >
+            <ArrowLeft className="h-4 w-4 text-theme-text-secondary" />
+          </button>
+        )}
         <ActionButton
           icon={Reply}
           label="Reply"
@@ -832,61 +987,118 @@ function ReadingPane({
         />
       </div>
 
-      {/* Headers */}
-      <div className="px-4 md:px-6 py-4 border-b border-theme-neutral-300 space-y-1.5">
-        <h2 className="text-lg font-semibold text-theme-text-primary leading-tight">
-          {message.subject || '(no subject)'}
-        </h2>
-        <div className="text-sm text-theme-text-secondary">
-          <span className="font-medium">From:</span> {message.from}
+      {/* Thread subject header */}
+      <div className="px-4 md:px-6 py-3 border-b border-theme-neutral-300">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-theme-text-primary leading-tight flex-1">
+            {message.subject || '(no subject)'}
+          </h2>
+          {threadMessages.length > 1 && (
+            <span className="text-xs text-theme-text-tertiary bg-theme-surface-raised px-2 py-0.5 rounded-full flex-shrink-0">
+              {threadMessages.length} messages
+            </span>
+          )}
         </div>
-        <div className="text-sm text-theme-text-tertiary">
-          <span className="font-medium text-theme-text-secondary">To:</span>{' '}
-          {message.to}
-        </div>
-        {message.cc && (
-          <div className="text-sm text-theme-text-tertiary">
-            <span className="font-medium text-theme-text-secondary">Cc:</span>{' '}
-            {message.cc}
-          </div>
-        )}
-        <div className="text-xs text-theme-text-tertiary">{message.date}</div>
-
-        {/* Attachments */}
-        {message.attachments.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <Paperclip className="h-3.5 w-3.5 text-theme-text-tertiary" />
-            {message.attachments.map((att: AttachmentMeta, i: number) => (
-              <a
-                key={i}
-                href={`/api/email/messages/${messageId}/attachments/${att.attachmentId}?filename=${encodeURIComponent(att.filename)}&mimeType=${encodeURIComponent(att.mimeType)}`}
-                download={att.filename}
-                className="inline-flex items-center gap-1 text-xs text-theme-primary bg-theme-brand-tint-subtle rounded px-1.5 py-0.5 hover:bg-theme-brand-tint"
-              >
-                <Download className="h-3 w-3" />
-                {att.filename}
-                <span className="text-theme-text-tertiary">({formatFileSize(att.size)})</span>
-              </a>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Body */}
+      {/* Thread messages */}
       <div className="flex-1 overflow-y-auto">
-        {sanitizedHtml ? (
-          <iframe
-            ref={iframeRef}
-            srcDoc={sanitizedHtml}
-            sandbox=""
-            className="w-full min-h-[300px] border-0"
-            title="Email content"
-          />
-        ) : (
-          <pre className="px-4 md:px-6 py-4 text-sm text-theme-text-primary whitespace-pre-wrap font-sans leading-relaxed">
-            {message.textBody || '(no content)'}
-          </pre>
-        )}
+        {threadMessages.map((msg) => {
+          const isExpanded = expandedIds.has(msg.id)
+          const msgHtml = msg.htmlBody ? sanitizeEmailHtml(msg.htmlBody) : null
+
+          return (
+            <div key={msg.id} className="border-b border-theme-neutral-300/50">
+              {/* Collapsed header (click to expand) */}
+              <button
+                onClick={() => {
+                  setExpandedIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(msg.id)) next.delete(msg.id)
+                    else next.add(msg.id)
+                    return next
+                  })
+                  setMessage(msg)
+                }}
+                className={`w-full text-left flex items-center gap-3 px-4 md:px-6 py-3 hover:bg-theme-surface-raised/50 ${interactive.transitionFast}`}
+              >
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${getInitialColor(msg.from)}`}>
+                  {extractInitial(msg.from)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm truncate ${msg.isUnread ? 'font-bold text-theme-text-primary' : 'font-medium text-theme-text-secondary'}`}>
+                      {extractSenderName(msg.from)}
+                    </span>
+                    <span className="text-xs text-theme-text-tertiary flex-shrink-0">
+                      {formatEmailDate(msg.date)}
+                    </span>
+                  </div>
+                  {!isExpanded && (
+                    <p className="text-xs text-theme-text-tertiary truncate mt-0.5">
+                      {msg.snippet}
+                    </p>
+                  )}
+                </div>
+              </button>
+
+              {/* Expanded content */}
+              {isExpanded && (
+                <div className="px-4 md:px-6 pb-4">
+                  {/* To/Cc details */}
+                  <div className="text-xs text-theme-text-tertiary space-y-0.5 mb-3 pl-11">
+                    <div>to {msg.to}</div>
+                    {msg.cc && <div>cc {msg.cc}</div>}
+                  </div>
+
+                  {/* Attachments */}
+                  {msg.attachments.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3 pl-11">
+                      <Paperclip className="h-3.5 w-3.5 text-theme-text-tertiary" />
+                      {msg.attachments.map((att: AttachmentMeta, i: number) => (
+                        <a
+                          key={i}
+                          href={`/api/email/messages/${msg.id}/attachments/${att.attachmentId}?filename=${encodeURIComponent(att.filename)}&mimeType=${encodeURIComponent(att.mimeType)}`}
+                          download={att.filename}
+                          className="inline-flex items-center gap-1 text-xs text-theme-primary bg-theme-brand-tint-subtle rounded px-1.5 py-0.5 hover:bg-theme-brand-tint"
+                        >
+                          <Download className="h-3 w-3" />
+                          {att.filename}
+                          <span className="text-theme-text-tertiary">({formatFileSize(att.size)})</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Body */}
+                  <div className="pl-11">
+                    {msgHtml ? (
+                      <iframe
+                        ref={msg.id === message.id ? iframeRef : undefined}
+                        srcDoc={msgHtml}
+                        sandbox=""
+                        className="w-full min-h-[200px] border-0"
+                        title={`Email from ${extractSenderName(msg.from)}`}
+                        onLoad={(e) => {
+                          try {
+                            const doc = (e.target as HTMLIFrameElement).contentDocument
+                            if (doc?.body) {
+                              (e.target as HTMLIFrameElement).style.height = `${doc.body.scrollHeight + 32}px`
+                            }
+                          } catch { /* sandbox */ }
+                        }}
+                      />
+                    ) : (
+                      <pre className="text-sm text-theme-text-primary whitespace-pre-wrap font-sans leading-relaxed">
+                        {msg.textBody || '(no content)'}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -919,17 +1131,6 @@ function ActionButton({
       )}
       <span className="hidden sm:inline">{label}</span>
     </button>
-  )
-}
-
-// ── Empty State ──────────────────────────────────────────────────────────
-
-function EmptyReadingPane() {
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-theme-text-tertiary gap-2">
-      <Mail className="h-10 w-10 opacity-30" />
-      <p className="text-sm">Select an email to read</p>
-    </div>
   )
 }
 
@@ -1024,6 +1225,8 @@ function InboxCleanerModal({
       const data = await res.json()
       setSenders(data.senders)
       setTotalPromotional(data.totalPromotionalEmails)
+      // Default all senders to have delete toggled on
+      setDeleteForSender(new Set(data.senders.map((s: SenderGroup) => s.senderEmail)))
       setScanState('done')
     } catch (err: any) {
       setScanError(err.message || 'Failed to scan')
@@ -1698,7 +1901,6 @@ function InboxCleanerModal({
 export default function EmailPageClient() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
-  const [showMobileReading, setShowMobileReading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeQuery, setActiveQuery] = useState('')
   const [composeState, setComposeState] = useState<ComposeState | null>(null)
@@ -1717,48 +1919,58 @@ export default function EmailPageClient() {
 
   // Multi-select state
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
-  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkActing, setBulkActing] = useState<string | null>(null)
 
   // AI agent state
   const [spamFilterState, setSpamFilterState] = useState<'idle' | 'scanning' | 'done'>('idle')
   const [spamResults, setSpamResults] = useState<{ totalChecked: number; movedCount: number } | null>(null)
   const [organizeState, setOrganizeState] = useState<'idle' | 'scanning' | 'done'>('idle')
   const [organizeResults, setOrganizeResults] = useState<{ totalOrganized: number; categorySummary: Record<string, number> } | null>(null)
+  const [marketingState, setMarketingState] = useState<'idle' | 'scanning' | 'done'>('idle')
+  const [marketingResults, setMarketingResults] = useState<{ movedCount: number; senders: MarketingSenderGroup[] } | null>(null)
   const [showInboxCleaner, setShowInboxCleaner] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Check connection status
+  // Parallel initial data fetch — eliminates connection→accounts→labels waterfall
   useEffect(() => {
-    fetch('/api/integrations/status?provider=gmail')
-      .then((res) => res.json())
-      .then((data) => setIsConnected(data.connected === true))
-      .catch(() => setIsConnected(false))
-  }, [])
+    let cancelled = false
 
-  // Fetch connected accounts on mount
-  useEffect(() => {
-    if (!isConnected) return
-    fetch('/api/email/accounts')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.accounts) {
-          setAccounts(data.accounts)
-          // If no account selected, default to first
-          if (!selectedAccount && data.accounts.length > 0) {
-            setSelectedAccount(data.accounts[0])
+    Promise.all([
+      fetch('/api/integrations/status?provider=gmail').then((r) => r.json()),
+      fetch('/api/email/accounts').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/email/labels').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ])
+      .then(([statusData, accountsData, labelsData]) => {
+        if (cancelled) return
+        const connected = statusData?.connected === true
+        setIsConnected(connected)
+        if (!connected) return
+
+        if (accountsData?.accounts) {
+          setAccounts(accountsData.accounts)
+          if (accountsData.accounts.length > 0) {
+            setSelectedAccount(accountsData.accounts[0])
           }
         }
+        if (labelsData?.labels) setLabels(labelsData.labels)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setIsConnected(false)
+      })
+
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected])
+  }, [])
 
   // Build account query param string for API calls
   const accountParam = selectedAccount ? `&account=${encodeURIComponent(selectedAccount)}` : ''
 
-  // Fetch labels on mount
+  // Refetch labels when selected account changes
   useEffect(() => {
-    if (!isConnected) return
-    fetch(`/api/email/labels?${selectedAccount ? `account=${encodeURIComponent(selectedAccount)}` : ''}`)
+    if (!isConnected || !selectedAccount) return
+    fetch(`/api/email/labels?account=${encodeURIComponent(selectedAccount)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.labels) setLabels(data.labels)
@@ -1780,7 +1992,7 @@ export default function EmailPageClient() {
   })()
 
   const fetchMessages = useCallback(async (): Promise<MessagesResponse> => {
-    const params = new URLSearchParams({ maxResults: '30' })
+    const params = new URLSearchParams({ maxResults: '20' })
     const q = activeQuery || labelQuery
     params.set('q', q)
     if (selectedAccount) params.set('account', selectedAccount)
@@ -1795,7 +2007,7 @@ export default function EmailPageClient() {
     error: messagesError,
     refetch,
   } = useDataCache<MessagesResponse>(`gmail-messages-${selectedAccount}-${activeLabel}-${activeQuery}`, fetchMessages, {
-    ttl: 60_000,
+    ttl: 300_000,
   })
 
   // Sync cache data into allMessages
@@ -1809,14 +2021,13 @@ export default function EmailPageClient() {
   const handleLabelChange = useCallback((labelId: string) => {
     setActiveLabel(labelId)
     setSelectedMessageId(null)
-    setShowMobileReading(false)
   }, [])
 
   const handleLoadMore = useCallback(async () => {
     if (!nextPageToken || loadingMore) return
     setLoadingMore(true)
     try {
-      const params = new URLSearchParams({ maxResults: '30', pageToken: nextPageToken })
+      const params = new URLSearchParams({ maxResults: '20', pageToken: nextPageToken })
       const q = activeQuery || labelQuery
       params.set('q', q)
       if (selectedAccount) params.set('account', selectedAccount)
@@ -1836,12 +2047,66 @@ export default function EmailPageClient() {
 
   const handleSelectMessage = useCallback((id: string) => {
     setSelectedMessageId(id)
-    setShowMobileReading(true)
   }, [])
 
-  const handleMobileBack = useCallback(() => {
-    setShowMobileReading(false)
+  // Single-message quick actions (for hover buttons)
+  const handleQuickAction = useCallback(async (id: string, action: string) => {
+    const accountParam = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+    // Optimistic: remove from list for archive/trash
+    if (action === 'archive' || action === 'trash') {
+      setAllMessages((prev) => prev.filter((m) => m.id !== id))
+      if (selectedMessageId === id) setSelectedMessageId(null)
+    }
+    if (action === 'markRead' || action === 'markUnread') {
+      setAllMessages((prev) =>
+        prev.map((m) => m.id === id ? { ...m, isUnread: action === 'markUnread' } : m),
+      )
+    }
+    try {
+      await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+    } catch (err) {
+      console.error(`Quick action ${action} error:`, err)
+      refetch() // revert on failure
+    }
+  }, [selectedAccount, selectedMessageId, refetch])
+
+  const handleBackToList = useCallback(() => {
+    setSelectedMessageId(null)
   }, [])
+
+  const handleSnooze = useCallback(async (id: string, option: string) => {
+    // For now, snooze = archive (remove from inbox)
+    // A cron job would re-add to INBOX at the scheduled time
+    const accountParam = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+    setAllMessages((prev) => prev.filter((m) => m.id !== id))
+    if (selectedMessageId === id) setSelectedMessageId(null)
+
+    const label = option === '1h' ? 'Snoozed/1h' : option === 'tomorrow' ? 'Snoozed/Tomorrow' : 'Snoozed/NextWeek'
+    try {
+      // Archive it
+      await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      })
+      // Try to add a snooze label (create if needed, but don't fail)
+      try {
+        // Create label if it doesn't exist
+        await fetch(`/api/email/labels${accountParam ? `?${accountParam.slice(1)}` : ''}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: label }),
+        })
+      } catch { /* label may already exist */ }
+    } catch (err) {
+      console.error('Snooze error:', err)
+      refetch()
+    }
+  }, [selectedAccount, selectedMessageId, refetch])
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault()
@@ -1853,7 +2118,6 @@ export default function EmailPageClient() {
     setSelectedAccount(acct)
     localStorage.setItem('gmail-selected-account', acct)
     setSelectedMessageId(null)
-    setShowMobileReading(false)
   }, [])
 
   const handleClearSearch = () => {
@@ -1885,9 +2149,107 @@ export default function EmailPageClient() {
     refetch()
   }
 
+  // ── Undo send ──
+  const [undoSend, setUndoSend] = useState<{
+    payload: PendingSend
+    composeState: ComposeState
+    timeLeft: number
+  } | null>(null)
+  const undoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const undoCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const UNDO_SEND_DELAY = 5 // seconds
+
+  const executeSend = useCallback(async (payload: PendingSend) => {
+    try {
+      let res: Response
+      if (payload.attachments.length > 0) {
+        const formData = new FormData()
+        formData.append('to', payload.to)
+        if (payload.cc) formData.append('cc', payload.cc)
+        if (payload.bcc) formData.append('bcc', payload.bcc)
+        formData.append('subject', payload.subject)
+        formData.append('body', payload.body)
+        if (payload.inReplyTo) formData.append('inReplyTo', payload.inReplyTo)
+        if (payload.references) formData.append('references', payload.references)
+        if (payload.threadId) formData.append('threadId', payload.threadId)
+        if (payload.draftId) formData.append('draftId', payload.draftId)
+        for (const file of payload.attachments) {
+          formData.append('attachments', file)
+        }
+        res = await fetch('/api/email/send', { method: 'POST', body: formData })
+      } else {
+        res = await fetch('/api/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: payload.to,
+            cc: payload.cc,
+            bcc: payload.bcc,
+            subject: payload.subject,
+            body: payload.body,
+            inReplyTo: payload.inReplyTo,
+            references: payload.references,
+            threadId: payload.threadId,
+            draftId: payload.draftId,
+          }),
+        })
+      }
+      if (!res.ok) console.error('Send failed:', res.status)
+      else refetch()
+    } catch (err) {
+      console.error('Send error:', err)
+    }
+  }, [refetch])
+
+  const handleSendPending = useCallback((payload: PendingSend, compose: ComposeState) => {
+    // Close compose modal immediately
+    setComposeState(null)
+
+    // Clear any existing undo timer
+    if (undoSendTimerRef.current) clearTimeout(undoSendTimerRef.current)
+    if (undoCountdownRef.current) clearInterval(undoCountdownRef.current)
+
+    // Start undo countdown
+    setUndoSend({ payload, composeState: compose, timeLeft: UNDO_SEND_DELAY })
+
+    undoCountdownRef.current = setInterval(() => {
+      setUndoSend((prev) => {
+        if (!prev) return null
+        if (prev.timeLeft <= 1) return prev // will be cleared by send timer
+        return { ...prev, timeLeft: prev.timeLeft - 1 }
+      })
+    }, 1000)
+
+    undoSendTimerRef.current = setTimeout(() => {
+      if (undoCountdownRef.current) clearInterval(undoCountdownRef.current)
+      setUndoSend((prev) => {
+        if (prev) executeSend(prev.payload)
+        return null
+      })
+    }, UNDO_SEND_DELAY * 1000)
+  }, [executeSend])
+
+  const handleUndoSend = useCallback(() => {
+    if (!undoSend) return
+    // Cancel the pending send
+    if (undoSendTimerRef.current) clearTimeout(undoSendTimerRef.current)
+    if (undoCountdownRef.current) clearInterval(undoCountdownRef.current)
+    // Reopen compose with the original state
+    setComposeState(undoSend.composeState)
+    setUndoSend(null)
+  }, [undoSend])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (undoSendTimerRef.current) clearTimeout(undoSendTimerRef.current)
+      if (undoCountdownRef.current) clearInterval(undoCountdownRef.current)
+    }
+  }, [])
+
   const handleActionDone = () => {
     setSelectedMessageId(null)
-    setShowMobileReading(false)
     refetch()
   }
 
@@ -1900,6 +2262,49 @@ export default function EmailPageClient() {
     })
   }, [])
 
+  const handleStarToggle = useCallback(async (id: string) => {
+    const msg = allMessages.find((m) => m.id === id)
+    if (!msg) return
+    const isStarred = msg.labelIds?.includes('STARRED')
+    const action = isStarred ? 'unstar' : 'star'
+    // Optimistic update
+    setAllMessages((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              labelIds: isStarred
+                ? m.labelIds.filter((l) => l !== 'STARRED')
+                : [...m.labelIds, 'STARRED'],
+            }
+          : m,
+      ),
+    )
+    try {
+      const params = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+      await fetch(`/api/email/messages/${id}/modify${params}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+    } catch (err) {
+      console.error('Star toggle error:', err)
+      // Revert on failure
+      setAllMessages((prev) =>
+        prev.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                labelIds: isStarred
+                  ? [...m.labelIds, 'STARRED']
+                  : m.labelIds.filter((l) => l !== 'STARRED'),
+              }
+            : m,
+        ),
+      )
+    }
+  }, [allMessages, selectedAccount])
+
   const handleSelectAll = useCallback(() => {
     if (checkedIds.size === messages.length) {
       setCheckedIds(new Set())
@@ -1908,9 +2313,9 @@ export default function EmailPageClient() {
     }
   }, [checkedIds.size, messages])
 
-  const handleBulkDelete = useCallback(async () => {
+  const handleBulkAction = useCallback(async (action: string) => {
     if (checkedIds.size === 0) return
-    setBulkDeleting(true)
+    setBulkActing(action)
     const accountParam = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
     try {
       await Promise.all(
@@ -1918,18 +2323,17 @@ export default function EmailPageClient() {
           fetch(`/api/email/messages/${id}/modify${accountParam}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'trash' }),
+            body: JSON.stringify({ action }),
           }),
         ),
       )
       setCheckedIds(new Set())
-      setSelectedMessageId(null)
-      setShowMobileReading(false)
+      if (action === 'trash' || action === 'archive') setSelectedMessageId(null)
       refetch()
     } catch (err) {
-      console.error('Bulk delete error:', err)
+      console.error(`Bulk ${action} error:`, err)
     } finally {
-      setBulkDeleting(false)
+      setBulkActing(null)
     }
   }, [checkedIds, selectedAccount, refetch])
 
@@ -1944,6 +2348,36 @@ export default function EmailPageClient() {
       .then((data) => { if (data.labels) setLabels(data.labels) })
       .catch(() => {})
   }, [selectedAccount])
+
+  const [deletingLabels, setDeletingLabels] = useState(false)
+
+  const handleDeleteAllLabels = useCallback(async () => {
+    const userLabels = labels.filter((l) => l.type === 'user')
+    if (userLabels.length === 0) return
+    if (!window.confirm(`Remove all ${userLabels.length} custom labels? Emails will stay in your archive.`)) return
+
+    setDeletingLabels(true)
+    try {
+      const params = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+      const res = await fetch(`/api/email/labels${params}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ labelIds: userLabels.map((l) => l.id) }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      console.log(`Deleted ${data.deletedCount} labels`)
+      refreshLabels()
+      // Reset to inbox if current label was deleted
+      if (labels.find((l) => l.id === activeLabel)?.type === 'user') {
+        setActiveLabel('INBOX')
+      }
+    } catch (err) {
+      console.error('Failed to delete labels:', err)
+    } finally {
+      setDeletingLabels(false)
+    }
+  }, [labels, selectedAccount, refreshLabels, activeLabel])
 
   const handleSpamFilter = useCallback(async () => {
     setSpamFilterState('scanning')
@@ -1994,6 +2428,41 @@ export default function EmailPageClient() {
     }
   }, [allMessages, selectedAccount, refreshLabels])
 
+  const handleSweepMarketing = useCallback(async () => {
+    setMarketingState('scanning')
+    setMarketingResults(null)
+    try {
+      const params = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+      const res = await fetch(`/api/email/ai/marketing${params}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setMarketingResults({ movedCount: data.movedCount, senders: data.senders })
+      if (data.movedCount > 0) {
+        refetch()
+        refreshLabels()
+      }
+    } catch (err) {
+      console.error('Marketing sweep error:', err)
+    } finally {
+      setMarketingState('done')
+    }
+  }, [selectedAccount, refetch, refreshLabels])
+
+  // Sidebar label content (shared between desktop and mobile)
+  const sidebarLabels = useMemo(() => {
+    if (labels.length === 0) return []
+    // System labels first in Gmail order, then custom
+    const systemOrder = ['INBOX', 'STARRED', 'SENT', 'DRAFT', 'SPAM', 'TRASH']
+    const system = systemOrder
+      .map((id) => labels.find((l) => l.id === id))
+      .filter(Boolean) as GmailLabel[]
+    const custom = labels.filter((l) => l.type === 'user')
+    return [...system, ...custom]
+  }, [labels])
+
   // Loading connection check
   if (isConnected === null) {
     return (
@@ -2007,332 +2476,500 @@ export default function EmailPageClient() {
     return <NotConnectedView />
   }
 
-  return (
+  const renderSidebarContent = (onNavigate?: () => void) => (
     <>
-      <div className="flex flex-col h-[calc(100dvh-160px)] md:h-[calc(100dvh-140px)] -mx-6 sm:-mx-8 md:-mx-10 -mt-4 sm:-mt-6 md:-mt-8">
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-theme-neutral-300 bg-white/80 backdrop-blur-sm">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewCompose}
-            className="gap-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Compose</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={messagesLoading}
-            className="gap-1.5"
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${messagesLoading ? 'animate-spin' : ''}`}
-            />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSpamFilter}
-            disabled={spamFilterState === 'scanning' || allMessages.length === 0}
-            className="gap-1.5"
-            title="AI spam detection"
-          >
-            {spamFilterState === 'scanning' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Shield className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">Filter Spam</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOrganize}
-            disabled={organizeState === 'scanning' || allMessages.length === 0}
-            className="gap-1.5"
-            title="AI email organization"
-          >
-            {organizeState === 'scanning' ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FolderKanban className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">Organize</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowInboxCleaner(true)}
-            className="gap-1.5"
-            title="Scan promotional senders & unsubscribe"
-          >
-            <MailMinus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Clean Up</span>
-          </Button>
+      {/* Compose button */}
+      <div className="px-3 pt-4 pb-2">
+        <button
+          onClick={() => { handleNewCompose(); onNavigate?.() }}
+          className="flex items-center gap-3 w-full h-14 px-6 rounded-2xl bg-white border border-theme-neutral-300/60 shadow-warm-sm hover:shadow-warm text-theme-text-primary text-sm font-medium transition-shadow"
+        >
+          <Pencil className="h-5 w-5 text-theme-text-secondary" />
+          Compose
+        </button>
+      </div>
 
-          {/* Search */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md ml-auto flex items-center gap-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-theme-text-tertiary" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search emails..."
-                className="w-full pl-8 pr-8 py-1.5 text-sm rounded-lg border border-theme-neutral-300 bg-white outline-none focus:border-theme-primary/50 focus:ring-1 focus:ring-theme-primary/20 text-theme-text-primary placeholder:text-theme-text-tertiary"
-              />
-              {(searchQuery || activeQuery) && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-theme-surface-raised"
-                >
-                  <X className="h-3 w-3 text-theme-text-tertiary" />
-                </button>
-              )}
-            </div>
-          </form>
-
-          {/* Account selector */}
-          {accounts.length > 1 && (
-            <select
-              value={selectedAccount}
-              onChange={(e) => handleAccountSwitch(e.target.value)}
-              className="text-xs border border-theme-neutral-300 rounded-md px-2 py-1 bg-white text-theme-text-secondary outline-none focus:border-theme-primary/50 flex-shrink-0"
+      {/* Labels navigation */}
+      <nav className="flex-1 overflow-y-auto px-2 py-1">
+        {/* System labels */}
+        {sidebarLabels.filter((l) => l.type === 'system').map((label) => {
+          const LabelIcon = LABEL_ICONS[label.id] ?? Tag
+          const isActive = activeLabel === label.id && !activeQuery
+          return (
+            <button
+              key={label.id}
+              onClick={() => { handleLabelChange(label.id); onNavigate?.() }}
+              className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium mb-px ${interactive.transitionFast} ${
+                isActive
+                  ? 'bg-theme-brand-tint text-theme-primary font-bold'
+                  : 'text-theme-text-secondary hover:bg-theme-surface-raised'
+              }`}
             >
-              {accounts.map((acct) => (
-                <option key={acct} value={acct}>{acct}</option>
-              ))}
-            </select>
-          )}
+              <LabelIcon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-theme-primary' : ''}`} />
+              <span className="flex-1 text-left truncate">{label.name}</span>
+            </button>
+          )
+        })}
 
-          {/* Add account button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              window.location.href = '/api/auth/gmail?redirectUrl=/email'
-            }}
-            className="gap-1 text-xs flex-shrink-0"
-            title="Add another Gmail account"
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            <span className="hidden lg:inline">Add account</span>
-          </Button>
-
-          <div className="flex items-center gap-1.5 text-xs text-theme-text-tertiary flex-shrink-0">
-            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-            <span className="hidden sm:inline">{accounts.length <= 1 ? 'Connected' : ''}</span>
-          </div>
-        </div>
-
-        {/* Label tabs */}
-        {!activeQuery && labels.length > 0 && (
-          <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-theme-neutral-300 bg-white overflow-x-auto">
-            {labels.map((label) => {
-              const icon = {
-                INBOX: Inbox,
-                STARRED: Star,
-                SENT: SendHorizonal,
-                DRAFT: FileText,
-                SPAM: Mail,
-                TRASH: Trash2,
-              }[label.id] ?? Tag
-              const LabelIcon = icon
+        {/* Custom labels */}
+        {sidebarLabels.some((l) => l.type === 'user') && (
+          <>
+            <div className="flex items-center justify-between px-3 pt-3 pb-1">
+              <p className="text-[11px] font-semibold text-theme-text-tertiary uppercase tracking-wider">Labels</p>
+              <button
+                onClick={handleDeleteAllLabels}
+                disabled={deletingLabels}
+                className="text-[10px] text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+              >
+                {deletingLabels ? 'Removing...' : 'Remove all'}
+              </button>
+            </div>
+            {sidebarLabels.filter((l) => l.type === 'user').map((label) => {
+              const isActive = activeLabel === label.id && !activeQuery
               return (
                 <button
                   key={label.id}
-                  onClick={() => handleLabelChange(label.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${interactive.transitionFast} ${
-                    activeLabel === label.id
-                      ? 'bg-theme-brand-tint text-theme-primary'
-                      : 'text-theme-text-secondary hover:bg-theme-surface-raised hover:text-theme-text-primary'
+                  onClick={() => { handleLabelChange(label.id); onNavigate?.() }}
+                  className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium mb-px ${interactive.transitionFast} ${
+                    isActive
+                      ? 'bg-theme-brand-tint text-theme-primary font-bold'
+                      : 'text-theme-text-secondary hover:bg-theme-surface-raised'
                   }`}
                 >
-                  <LabelIcon className="h-3.5 w-3.5" />
-                  {label.name}
+                  <Tag className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-theme-primary' : ''}`} />
+                  <span className="flex-1 text-left truncate">{label.name}</span>
                 </button>
               )
             })}
-          </div>
+          </>
         )}
+      </nav>
 
-        {/* Active search indicator */}
-        {activeQuery && (
-          <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-theme-text-secondary bg-theme-brand-tint-subtle border-b border-theme-neutral-300/50">
-            <Search className="h-3 w-3" />
-            Results for &ldquo;{activeQuery}&rdquo;
-            <button
-              onClick={handleClearSearch}
-              className="ml-auto text-theme-primary hover:underline"
-            >
-              Clear
-            </button>
-          </div>
-        )}
+      {/* AI tools section */}
+      <div className="border-t border-theme-neutral-300/50 px-2 py-2">
+        <p className="px-3 py-1 text-[11px] font-semibold text-theme-text-tertiary uppercase tracking-wider">AI Tools</p>
+        <button
+          onClick={() => { handleSpamFilter(); onNavigate?.() }}
+          disabled={spamFilterState === 'scanning' || allMessages.length === 0}
+          className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised disabled:opacity-50 ${interactive.transitionFast}`}
+        >
+          {spamFilterState === 'scanning' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+          <span className="flex-1 text-left">Filter Spam</span>
+        </button>
+        <button
+          onClick={() => { handleOrganize(); onNavigate?.() }}
+          disabled={organizeState === 'scanning' || allMessages.length === 0}
+          className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised disabled:opacity-50 ${interactive.transitionFast}`}
+        >
+          {organizeState === 'scanning' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderKanban className="h-4 w-4" />}
+          <span className="flex-1 text-left">Organize</span>
+        </button>
+        <button
+          onClick={() => { handleSweepMarketing(); onNavigate?.() }}
+          disabled={marketingState === 'scanning'}
+          className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised disabled:opacity-50 ${interactive.transitionFast}`}
+        >
+          {marketingState === 'scanning' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
+          <span className="flex-1 text-left">Sweep Marketing</span>
+        </button>
+        <button
+          onClick={() => { setShowInboxCleaner(true); onNavigate?.() }}
+          className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised ${interactive.transitionFast}`}
+        >
+          <MailMinus className="h-4 w-4" />
+          <span className="flex-1 text-left">Clean Up</span>
+        </button>
+      </div>
 
-        {/* AI agent result banners */}
-        {spamFilterState === 'scanning' && (
-          <div className="flex items-center gap-2 px-4 py-2 text-xs text-theme-text-secondary bg-amber-50 border-b border-amber-200">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
-            Scanning emails for spam...
-          </div>
-        )}
-        {spamResults && spamFilterState === 'done' && (
-          <div className="flex items-center gap-2 px-4 py-2 text-xs bg-green-50 border-b border-green-200">
-            <Shield className="h-3.5 w-3.5 text-green-600" />
-            <span className="text-green-800">
-              Scanned {spamResults.totalChecked} emails. Moved {spamResults.movedCount} to Spam Review.
-            </span>
-            <button
-              onClick={() => { setSpamResults(null); setSpamFilterState('idle') }}
-              className="ml-auto p-0.5 rounded hover:bg-green-100"
-            >
-              <X className="h-3 w-3 text-green-600" />
-            </button>
-          </div>
-        )}
-        {organizeState === 'scanning' && (
-          <div className="flex items-center gap-2 px-4 py-2 text-xs text-theme-text-secondary bg-blue-50 border-b border-blue-200">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
-            Organizing emails...
-          </div>
-        )}
-        {organizeResults && organizeState === 'done' && (
-          <div className="flex items-center gap-2 px-4 py-2 text-xs bg-blue-50 border-b border-blue-200">
-            <FolderKanban className="h-3.5 w-3.5 text-blue-600" />
-            <span className="text-blue-800">
-              Organized {organizeResults.totalOrganized} emails
-              {Object.keys(organizeResults.categorySummary).length > 0 && (
-                <>: {Object.entries(organizeResults.categorySummary).map(([cat, count], i) => (
-                  <span key={cat}>{i > 0 ? ', ' : ''}{cat} ({count})</span>
-                ))}</>
-              )}
-            </span>
-            <button
-              onClick={() => { setOrganizeResults(null); setOrganizeState('idle') }}
-              className="ml-auto p-0.5 rounded hover:bg-blue-100"
-            >
-              <X className="h-3 w-3 text-blue-600" />
-            </button>
-          </div>
-        )}
-
-        {/* Content area */}
-        <div className="flex flex-1 min-h-0">
-          {/* Email list */}
-          <div
-            className={`${
-              showMobileReading ? 'hidden md:flex' : 'flex'
-            } w-full md:w-[380px] flex-col border-r border-theme-neutral-300 bg-white`}
+      {/* Account section */}
+      <div className="border-t border-theme-neutral-300/50 px-3 py-2.5">
+        {accounts.length > 1 && (
+          <select
+            value={selectedAccount}
+            onChange={(e) => handleAccountSwitch(e.target.value)}
+            className="w-full text-xs border border-theme-neutral-300 rounded-md px-2 py-1.5 bg-white text-theme-text-secondary outline-none focus:border-theme-primary/50 mb-1.5"
           >
-            {/* Bulk action bar */}
-            {checkedIds.size > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-theme-neutral-300 bg-theme-surface-raised">
-                <label className="flex items-center gap-2 cursor-pointer">
+            {accounts.map((acct) => (
+              <option key={acct} value={acct}>{acct}</option>
+            ))}
+          </select>
+        )}
+        <button
+          onClick={() => { window.location.href = '/api/auth/gmail?redirectUrl=/email' }}
+          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-theme-text-secondary hover:bg-theme-surface-raised ${interactive.transitionFast}`}
+        >
+          <UserPlus className="h-3.5 w-3.5" />
+          Add account
+        </button>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      <div className="flex h-[calc(100dvh-160px)] md:h-[calc(100dvh-140px)] -mx-6 sm:-mx-8 md:-mx-10 -mt-4 sm:-mt-6 md:-mt-8">
+
+        {/* ── Gmail-style left sidebar (desktop) ── */}
+        <aside className="hidden md:flex w-[220px] lg:w-[256px] flex-shrink-0 flex-col border-r border-theme-neutral-300 bg-theme-surface-base">
+          {renderSidebarContent()}
+        </aside>
+
+        {/* ── Mobile sidebar overlay ── */}
+        {sidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setSidebarOpen(false)} />
+            <aside className="relative w-[280px] h-full bg-white shadow-xl flex flex-col z-10">
+              {/* Close button */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-theme-neutral-300/50">
+                <span className="text-sm font-semibold text-theme-text-primary">Mail</span>
+                <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-full hover:bg-theme-surface-raised">
+                  <X className="h-5 w-5 text-theme-text-secondary" />
+                </button>
+              </div>
+              {renderSidebarContent(() => setSidebarOpen(false))}
+            </aside>
+          </div>
+        )}
+
+        {/* ── Main content area ── */}
+        <div className="flex-1 flex flex-col min-w-0">
+
+          {/* Top toolbar */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-theme-neutral-300 bg-white/80 backdrop-blur-sm">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-1.5 rounded-full hover:bg-theme-surface-raised"
+            >
+              <Menu className="h-5 w-5 text-theme-text-secondary" />
+            </button>
+
+            {/* Mobile compose */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNewCompose}
+              className="md:hidden gap-1.5"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+
+            {/* List-view controls: select all, refresh, bulk actions (hidden when reading) */}
+            {!selectedMessageId && (
+              <>
+                {/* Select all checkbox */}
+                <label className="hidden md:flex items-center cursor-pointer px-1" title="Select all">
                   <input
                     type="checkbox"
                     checked={checkedIds.size === messages.length && messages.length > 0}
                     onChange={handleSelectAll}
-                    className="h-4 w-4 rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/30 cursor-pointer"
+                    className="h-[18px] w-[18px] rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/30 cursor-pointer"
                   />
-                  <span className="text-xs font-medium text-theme-text-secondary">
-                    {checkedIds.size} selected
-                  </span>
                 </label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleting}
-                  className="ml-auto gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+
+                {/* Refresh */}
+                <button
+                  onClick={() => refetch()}
+                  disabled={messagesLoading}
+                  title="Refresh"
+                  className="p-1.5 rounded-full hover:bg-theme-surface-raised disabled:opacity-50"
                 >
-                  {bulkDeleting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
-                  )}
-                  Delete
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCheckedIds(new Set())}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-              </div>
+                  <RefreshCw className={`h-4 w-4 text-theme-text-secondary ${messagesLoading ? 'animate-spin' : ''}`} />
+                </button>
+
+                {/* Bulk actions (when items checked) */}
+                {checkedIds.size > 0 && (
+                  <div className="flex items-center gap-1 border-l border-theme-neutral-300 pl-2 ml-1">
+                    <span className="text-xs font-medium text-theme-text-secondary mr-1">
+                      {checkedIds.size} selected
+                    </span>
+                    <button
+                      onClick={() => handleBulkAction('archive')}
+                      disabled={!!bulkActing}
+                      title="Archive selected"
+                      className="p-1.5 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary disabled:opacity-50"
+                    >
+                      {bulkActing === 'archive' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => handleBulkAction('trash')}
+                      disabled={!!bulkActing}
+                      title="Delete selected"
+                      className="p-1.5 rounded-full hover:bg-red-50 text-theme-text-secondary hover:text-red-600 disabled:opacity-50"
+                    >
+                      {bulkActing === 'trash' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => handleBulkAction('markRead')}
+                      disabled={!!bulkActing}
+                      title="Mark as read"
+                      className="p-1.5 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary disabled:opacity-50"
+                    >
+                      {bulkActing === 'markRead' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailOpen className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => setCheckedIds(new Set())}
+                      title="Clear selection"
+                      className="p-1.5 rounded-full hover:bg-theme-surface-raised text-theme-text-secondary"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
-            <div className="flex-1 overflow-y-auto">
-              {messagesLoading && messages.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-theme-text-tertiary" />
-                </div>
-              ) : messagesError ? (
-                <div className="px-4 py-8 text-center text-sm text-red-600">
-                  Failed to load emails. Please try again.
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-theme-text-tertiary">
-                  {activeQuery ? 'No results found.' : 'Your inbox is empty.'}
-                </div>
-              ) : (
-                <>
-                  {messages.map((msg) => (
-                    <EmailListItem
-                      key={msg.id}
-                      message={msg}
-                      isSelected={selectedMessageId === msg.id}
-                      isChecked={checkedIds.has(msg.id)}
-                      onClick={() => handleSelectMessage(msg.id)}
-                      onCheck={() => handleToggleCheck(msg.id)}
-                    />
+            {/* Search bar (centered, prominent) with operators dropdown */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-auto relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-theme-text-tertiary" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                  placeholder="Search mail"
+                  className="w-full pl-10 pr-10 py-2 text-sm rounded-full bg-theme-surface-raised/80 border-0 outline-none focus:bg-white focus:shadow-[0_1px_3px_rgba(60,64,67,.3)] text-theme-text-primary placeholder:text-theme-text-tertiary"
+                />
+                {(searchQuery || activeQuery) && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-theme-surface-raised"
+                  >
+                    <X className="h-4 w-4 text-theme-text-tertiary" />
+                  </button>
+                )}
+              </div>
+              {/* Search operators dropdown */}
+              {searchFocused && !activeQuery && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-[0_2px_10px_rgba(0,0,0,.2)] border border-theme-neutral-300/50 py-2 z-20">
+                  <p className="px-3 pb-1.5 text-[11px] font-semibold text-theme-text-tertiary uppercase tracking-wider">Search operators</p>
+                  {[
+                    { op: 'from:', desc: 'Sender email or name', example: 'from:john@example.com' },
+                    { op: 'to:', desc: 'Recipient', example: 'to:me' },
+                    { op: 'subject:', desc: 'Words in subject line', example: 'subject:meeting' },
+                    { op: 'has:attachment', desc: 'Has file attachments', example: 'has:attachment' },
+                    { op: 'is:unread', desc: 'Unread messages only', example: 'is:unread' },
+                    { op: 'is:starred', desc: 'Starred messages only', example: 'is:starred' },
+                    { op: 'before:', desc: 'Sent before date', example: 'before:2026/01/01' },
+                    { op: 'after:', desc: 'Sent after date', example: 'after:2026/01/01' },
+                    { op: 'label:', desc: 'Messages with label', example: 'label:work' },
+                    { op: 'in:anywhere', desc: 'Search all mail', example: 'in:anywhere' },
+                  ].map(({ op, desc }) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setSearchQuery((prev) => prev + (prev && !prev.endsWith(' ') ? ' ' : '') + op)
+                        searchInputRef.current?.focus()
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-1.5 text-left hover:bg-theme-surface-raised"
+                    >
+                      <code className="text-xs font-mono text-theme-primary bg-theme-brand-tint-subtle px-1.5 py-0.5 rounded">{op}</code>
+                      <span className="text-xs text-theme-text-secondary">{desc}</span>
+                    </button>
                   ))}
-                  {nextPageToken && (
-                    <div className="flex justify-center py-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleLoadMore}
-                        disabled={loadingMore}
-                        className="gap-1.5"
-                      >
-                        {loadingMore ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        )}
-                        Load more
-                      </Button>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
+            </form>
+
+            {/* Right side: account, connected status */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {accounts.length > 1 && (
+                <select
+                  value={selectedAccount}
+                  onChange={(e) => handleAccountSwitch(e.target.value)}
+                  className="hidden md:block text-xs border border-theme-neutral-300 rounded-md px-2 py-1 bg-white text-theme-text-secondary outline-none focus:border-theme-primary/50"
+                >
+                  {accounts.map((acct) => (
+                    <option key={acct} value={acct}>{acct}</option>
+                  ))}
+                </select>
+              )}
+              <div className="hidden sm:flex items-center gap-1 text-xs text-theme-text-tertiary">
+                <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+              </div>
             </div>
           </div>
 
-          {/* Reading pane */}
-          <div
-            className={`${
-              showMobileReading ? 'flex' : 'hidden md:flex'
-            } flex-1 flex-col bg-white min-w-0`}
-          >
+          {/* Active search indicator */}
+          {activeQuery && (
+            <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-theme-text-secondary bg-theme-brand-tint-subtle border-b border-theme-neutral-300/50">
+              <Search className="h-3 w-3" />
+              Results for &ldquo;{activeQuery}&rdquo;
+              <button
+                onClick={handleClearSearch}
+                className="ml-auto text-theme-primary hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          {/* AI agent result banners */}
+          {spamFilterState === 'scanning' && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs text-theme-text-secondary bg-amber-50 border-b border-amber-200">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+              Scanning emails for spam...
+            </div>
+          )}
+          {spamResults && spamFilterState === 'done' && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs bg-green-50 border-b border-green-200">
+              <Shield className="h-3.5 w-3.5 text-green-600" />
+              <span className="text-green-800">
+                Scanned {spamResults.totalChecked} emails. Moved {spamResults.movedCount} to Spam Review.
+              </span>
+              <button
+                onClick={() => { setSpamResults(null); setSpamFilterState('idle') }}
+                className="ml-auto p-0.5 rounded hover:bg-green-100"
+              >
+                <X className="h-3 w-3 text-green-600" />
+              </button>
+            </div>
+          )}
+          {organizeState === 'scanning' && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs text-theme-text-secondary bg-blue-50 border-b border-blue-200">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+              Organizing emails...
+            </div>
+          )}
+          {organizeResults && organizeState === 'done' && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs bg-blue-50 border-b border-blue-200">
+              <FolderKanban className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-blue-800">
+                Organized {organizeResults.totalOrganized} emails
+                {Object.keys(organizeResults.categorySummary).length > 0 && (
+                  <>: {Object.entries(organizeResults.categorySummary).map(([cat, count], i) => (
+                    <span key={cat}>{i > 0 ? ', ' : ''}{cat} ({count})</span>
+                  ))}</>
+                )}
+              </span>
+              <button
+                onClick={() => { setOrganizeResults(null); setOrganizeState('idle') }}
+                className="ml-auto p-0.5 rounded hover:bg-blue-100"
+              >
+                <X className="h-3 w-3 text-blue-600" />
+              </button>
+            </div>
+          )}
+          {marketingState === 'scanning' && (
+            <div className="flex items-center gap-2 px-4 py-2 text-xs text-theme-text-secondary bg-amber-50 border-b border-amber-200">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+              Sweeping marketing emails...
+            </div>
+          )}
+          {marketingResults && marketingState === 'done' && (
+            <div className="flex flex-col border-b border-amber-200">
+              <div className="flex items-center gap-2 px-4 py-2 text-xs bg-amber-50">
+                <Megaphone className="h-3.5 w-3.5 text-amber-600" />
+                <span className="text-amber-800">
+                  Moved {marketingResults.movedCount} marketing email{marketingResults.movedCount !== 1 ? 's' : ''} to Marketing label
+                  {marketingResults.senders.length > 0 && ` — ${marketingResults.senders.length} sender${marketingResults.senders.length !== 1 ? 's' : ''} found`}
+                </span>
+                <button
+                  onClick={() => { setMarketingResults(null); setMarketingState('idle') }}
+                  className="ml-auto p-0.5 rounded hover:bg-amber-100"
+                >
+                  <X className="h-3 w-3 text-amber-600" />
+                </button>
+              </div>
+              {marketingResults.senders.length > 0 && (
+                <div className="max-h-[200px] overflow-y-auto bg-amber-50/50 divide-y divide-amber-100">
+                  {marketingResults.senders.map((sender) => (
+                    <div key={sender.senderEmail} className="flex items-center gap-3 px-4 py-2 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-theme-text-primary truncate">{sender.senderName}</p>
+                        <p className="text-theme-text-tertiary truncate">{sender.senderEmail} · {sender.emailCount} email{sender.emailCount !== 1 ? 's' : ''}</p>
+                      </div>
+                      {sender.unsubscribeUrl && (
+                        <a
+                          href={sender.unsubscribeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-red-600 hover:bg-red-50 border border-red-200 whitespace-nowrap"
+                        >
+                          Unsubscribe <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Content: full-width list OR reading view (Gmail-style) ── */}
+          <div className="flex-1 min-h-0 flex flex-col bg-white">
             {selectedMessageId ? (
+              /* Reading view — replaces the list, like Gmail */
               <ReadingPane
                 messageId={selectedMessageId}
-                onBack={handleMobileBack}
+                threadId={allMessages.find((m) => m.id === selectedMessageId)?.threadId}
+                onBack={handleBackToList}
                 onCompose={handleCompose}
                 onActionDone={handleActionDone}
                 account={selectedAccount || undefined}
               />
             ) : (
-              <EmptyReadingPane />
+              /* Email list — full width */
+              <div className="flex-1 overflow-y-auto">
+                {messagesLoading && messages.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-5 w-5 animate-spin text-theme-text-tertiary" />
+                  </div>
+                ) : messagesError ? (
+                  <div className="px-4 py-8 text-center text-sm text-red-600">
+                    Failed to load emails. Please try again.
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="px-4 py-12 text-center">
+                    <Mail className="h-12 w-12 text-theme-text-tertiary/30 mx-auto mb-3" />
+                    <p className="text-sm text-theme-text-tertiary">
+                      {activeQuery ? 'No results found.' : 'Nothing here yet.'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {messages.map((msg) => (
+                      <EmailListItem
+                        key={msg.id}
+                        message={msg}
+                        isSelected={selectedMessageId === msg.id}
+                        isChecked={checkedIds.has(msg.id)}
+                        onClick={() => handleSelectMessage(msg.id)}
+                        onCheck={() => handleToggleCheck(msg.id)}
+                        onStar={() => handleStarToggle(msg.id)}
+                        onArchive={() => handleQuickAction(msg.id, 'archive')}
+                        onDelete={() => handleQuickAction(msg.id, 'trash')}
+                        onToggleRead={() => handleQuickAction(msg.id, msg.isUnread ? 'markRead' : 'markUnread')}
+                        onSnooze={(option) => handleSnooze(msg.id, option)}
+                      />
+                    ))}
+                    {nextPageToken && (
+                      <div className="flex justify-center py-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleLoadMore}
+                          disabled={loadingMore}
+                          className="gap-1.5"
+                        >
+                          {loadingMore ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          Load more
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2344,6 +2981,7 @@ export default function EmailPageClient() {
           initial={composeState}
           onClose={() => setComposeState(null)}
           onSent={handleSent}
+          onSendPending={handleSendPending}
         />
       )}
 
@@ -2353,6 +2991,19 @@ export default function EmailPageClient() {
           onClose={() => setShowInboxCleaner(false)}
           account={selectedAccount || undefined}
         />
+      )}
+
+      {/* Undo send toast */}
+      {undoSend && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#323232] text-white text-sm px-4 py-3 rounded-lg shadow-lg">
+          <span>Message sent. Sending in {undoSend.timeLeft}s...</span>
+          <button
+            onClick={handleUndoSend}
+            className="font-semibold text-blue-300 hover:text-blue-200 uppercase text-xs tracking-wide"
+          >
+            Undo
+          </button>
+        </div>
       )}
     </>
   )

@@ -108,14 +108,8 @@ export function parseGmailMessage(
   includeBody = false,
 ): ParsedEmail {
   const headers = message.payload?.headers
-  const { textBody, htmlBody, attachments } = includeBody
-    ? walkParts(message.payload)
-    : { textBody: '', htmlBody: '', attachments: [] as AttachmentMeta[] }
-
-  // Collect attachment metadata even for list view (no body)
-  const attachmentMeta = includeBody
-    ? attachments
-    : walkParts(message.payload).attachments
+  // Single walkParts call — extract bodies + attachments in one pass
+  const walked = walkParts(message.payload)
 
   return {
     id: message.id ?? '',
@@ -128,9 +122,9 @@ export function parseGmailMessage(
     snippet: message.snippet ?? '',
     labelIds: message.labelIds ?? [],
     isUnread: message.labelIds?.includes('UNREAD') ?? false,
-    textBody,
-    htmlBody,
-    attachments: includeBody ? attachments : attachmentMeta,
+    textBody: includeBody ? walked.textBody : '',
+    htmlBody: includeBody ? walked.htmlBody : '',
+    attachments: walked.attachments,
   }
 }
 

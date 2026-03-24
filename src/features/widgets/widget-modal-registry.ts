@@ -117,6 +117,10 @@ const FamilyMembersWidget = dynamic(
   () => import('@/features/widgets/components/family-members-widget').then(m => m.FamilyMembersWidget),
   { ssr: false },
 )
+const BudgetWidgetModal = dynamic(
+  () => import('@/features/widgets/components/budget-widget-modal').then(m => m.BudgetWidgetModal),
+  { ssr: false },
+)
 
 // ── Stateful render helper ───────────────────────────────────────────────
 
@@ -217,6 +221,17 @@ export const WIDGET_MODAL_REGISTRY: Record<string, WidgetModalEntry> = {
     render: (props) =>
       props.widget
         ? React.createElement(FamilyMembersWidget, {
+            widget: props.widget,
+            onUpdate: props.onUpdate,
+          })
+        : null,
+  },
+  finance_budget: {
+    title: 'Budget Planner',
+    contentMargin: 'mt-6',
+    render: (props) =>
+      props.widget
+        ? React.createElement(BudgetWidgetModal, {
             widget: props.widget,
             onUpdate: props.onUpdate,
           })

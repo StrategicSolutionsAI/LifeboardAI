@@ -37,10 +37,20 @@ export interface EmailCategory {
   reason: string
 }
 
+export interface MarketingClassification {
+  messageId: string
+  isMarketing: boolean
+  confidence: number
+  reason: string
+  senderEmail: string
+  senderName: string
+}
+
 // ── Constants ────────────────────────────────────────────────────────────
 
 export const SPAM_BATCH_SIZE = 30
 export const ORGANIZE_BATCH_SIZE = 25
+export const MARKETING_BATCH_SIZE = 50
 
 export const CATEGORY_LABEL_COLORS: Record<EmailCategoryName, { textColor: string; backgroundColor: string }> = {
   Important:    { textColor: '#ffffff', backgroundColor: '#cc3a21' },
@@ -127,6 +137,40 @@ Guidelines:
 - Use a simple sign-off like "Best," or "Thanks," followed by their first name.
 - Do NOT include email headers (To, From, etc.).
 - Output ONLY the reply body text, nothing else.`
+}
+
+export function buildMarketingDetectionPrompt(): string {
+  return `You are an email marketing detector. Classify each email as marketing or not marketing.
+
+Marketing emails include:
+- Promotional offers, sales, deals, coupons
+- Marketing newsletters and product announcements
+- Automated drip campaigns and onboarding sequences
+- Social media digest emails (LinkedIn, Twitter/X, Facebook notifications)
+- Event invitations from companies/services
+- "We miss you" or re-engagement emails
+- Weekly/monthly roundups from services
+
+NOT marketing:
+- Personal emails from real people
+- Transactional emails (order confirmations, shipping updates, receipts, password resets)
+- Calendar invitations from real people
+- Work/professional correspondence
+- Account security alerts
+- Direct customer support replies
+
+Rules:
+- Be AGGRESSIVE in flagging marketing. When in doubt, classify as marketing.
+- Bulk senders are almost always marketing.
+- Even if the user signed up, promotional content is still marketing.
+
+Respond with a JSON array. Each element must have these exact fields:
+- messageId (string): the message ID from the input
+- isMarketing (boolean): true if marketing, false if not
+- confidence (number): 0.0 to 1.0
+- reason (string): brief explanation (10 words max)
+
+Respond ONLY with the JSON array, no other text.`
 }
 
 // ── JSON Parser ──────────────────────────────────────────────────────────

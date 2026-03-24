@@ -110,6 +110,54 @@ export const updateHouseholdMemberSchema = z.object({
   displayName: z.string().max(100).optional(),
 })
 
+// ---------- Budget ----------
+
+const monthDate = z.string().regex(/^\d{4}-\d{2}-01$/, 'Must be YYYY-MM-01 format')
+
+export const createBudgetCategorySchema = z.object({
+  name: z.string().min(1, 'name required').max(100),
+  icon: z.string().max(50).optional(),
+  color: z.string().max(20).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+})
+
+export const updateBudgetCategorySchema = z.object({
+  id: z.string().min(1, 'id required'),
+  name: z.string().min(1).max(100).optional(),
+  icon: z.string().max(50).optional(),
+  color: z.string().max(20).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+})
+
+export const deleteBudgetCategorySchema = z.object({
+  id: z.string().min(1, 'id required'),
+})
+
+export const createBudgetExpenseSchema = z.object({
+  categoryId: z.string().min(1, 'categoryId required'),
+  amount: z.number().positive('amount must be positive'),
+  date: dateString.optional(),
+  note: z.string().max(500).nullable().optional(),
+})
+
+export const updateBudgetExpenseSchema = z.object({
+  id: z.string().min(1, 'id required'),
+  categoryId: z.string().min(1).optional(),
+  amount: z.number().positive().optional(),
+  date: dateString.optional(),
+  note: z.string().max(500).nullable().optional(),
+})
+
+export const deleteBudgetExpenseSchema = z.object({
+  id: z.string().min(1, 'id required'),
+})
+
+export const upsertMonthlyBudgetSchema = z.object({
+  categoryId: z.string().min(1, 'categoryId required'),
+  month: monthDate,
+  amount: z.number().min(0, 'amount must be non-negative'),
+})
+
 // ---------- Helpers ----------
 
 /**

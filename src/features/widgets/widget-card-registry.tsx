@@ -54,6 +54,14 @@ const NutritionSummaryWidget = dynamic(
   { loading: () => <Skeleton className="h-24 w-full" /> }
 );
 
+const BudgetWidgetCard = dynamic(
+  () =>
+    import("./components/budget-widget-card").then(
+      (m) => m.BudgetWidgetCard
+    ),
+  { loading: () => <Skeleton className="h-24 w-full" /> }
+);
+
 // ── Countdown widgets ───────────────────────────────────────────────────
 
 function renderBirthdayBody({ widget: w }: CardBodyRenderProps) {
@@ -1201,6 +1209,13 @@ export const WIDGET_CARD_REGISTRY: Record<string, WidgetCardEntry> = {
   linked_task: {
     renderBody: renderLinkedTaskBody,
     getTitle: (w) => w.linkedTaskTitle || null,
+    showIncrement: false,
+    hideTaskConvert: true,
+  },
+  // Finance widgets
+  finance_budget: {
+    renderBody: ({ widget }) =>
+      React.createElement(BudgetWidgetCard, { widget }),
     showIncrement: false,
     hideTaskConvert: true,
   },

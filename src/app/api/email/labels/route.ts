@@ -87,3 +87,38 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     type: result.data.type,
   })
 }, 'POST /api/email/labels')
+
+/**
+ * DELETE /api/email/labels — delete user labels (not system labels)
+ * Body: { labelIds: string[] } — IDs of labels to delete
+ */
+export const DELETE = withAuth(async (req: NextRequest, { supabase, user }) => {
+  const { searchParams } = new URL(req.url)
+  const account = searchParams.get('account') ?? undefined
+
+  const gmail = await getGmailForUser(supabase, user.id, account)
+  if (!gmail) {
+    return NextResponse.json({ error: 'Gmail not connected' }, { status: 404 })
+  }
+
+  const { labelIds } = await req.json()
+  if (!Array.isArray(labelIds) || labelIds.length === 0) {
+    return NextResponse.json({ error: 'labelIds array is required' }, { status: 400 })
+  }
+
+  // Only allow deleting user labels, never system labels
+  const systemIds = new Set(Object.keys(SYSTEM_LABEL_ORDER))
+  const safeIds = labelIds.filter((id: string) => !systemIds.has(id) && !HIDDEN_LABELS.has(id))
+
+  const results: { id: string; deleted: boolean; error?: string }[] = []
+  for (const id of safeIds) {
+    try {
+      await gmail.users.labels.delete({ userId: 'me', id })
+      results.push({ id, deleted: true })
+    } catch (err: any) {
+      results.push({ id, deleted: false, error: err.message ?? 'Unknown error' })
+    }
+  }
+
+  return NextResponse.json({ results, deletedCount: results.filter((r) => r.deleted).length })
+}, 'DELETE /api/email/labels')

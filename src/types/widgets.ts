@@ -266,6 +266,13 @@ export interface WidgetInstance extends WidgetTemplate {
       createdAt: string        // ISO timestamp
     }>
   }
+  // Budget widget cached summary
+  budgetData?: {
+    totalBudget: number
+    totalSpent: number
+    healthScore: number
+    month: string             // YYYY-MM-01
+  }
   // Home Projects data
   homeProjectsData?: {
     projects?: Array<{
