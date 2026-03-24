@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { flushSync } from "react-dom";
+import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import { updateUserPreferenceFields, invalidatePreferencesCache } from "@/lib/user-preferences";
 import { ensureCacheOwner } from "@/lib/auth-cleanup";
 import { useWeather } from "@/features/dashboard/hooks/use-weather";
@@ -37,6 +39,7 @@ import type { Task } from "@/types/tasks";
 import type { ProgressEntry } from "@/features/dashboard/types";
 import { getSuggestedColorForBucket } from "@/features/dashboard/constants";
 import dynamic from 'next/dynamic';
+import { DraggableWidgetCard, WidgetCardSkeleton } from "@/features/widgets/components/draggable-widget-card";
 
 // Lazy-load these heavy components — only rendered when user opens a drawer/sheet
 const WidgetEditorSheet = dynamic(
@@ -48,8 +51,6 @@ const WidgetLibrary = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-48 w-full" /> }
 );
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
-const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTaskData, useTaskActions } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
@@ -88,14 +89,42 @@ const ChatBarLazy = dynamic(
   () => import("@/components/chat-bar").then(m => m.ChatBar),
   { ssr: false, loading: () => null }
 );
-const DraggableWidgetCard = dynamic(
-  () => import("@/features/widgets/components/draggable-widget-card").then(m => m.DraggableWidgetCard),
-  { ssr: false }
-);
-const WidgetCardSkeleton = dynamic(
-  () => import("@/features/widgets/components/draggable-widget-card").then(m => m.WidgetCardSkeleton),
-  { ssr: false }
-);
+
+class DashboardDnDErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; retryKey: number }
+> {
+  static MAX_RETRIES = 3;
+  state = { hasError: false, retryKey: 0 };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    if (
+      error.message?.includes("Could not find required context") &&
+      this.state.retryKey < DashboardDnDErrorBoundary.MAX_RETRIES
+    ) {
+      const delay = 100 * (this.state.retryKey + 1);
+      setTimeout(() => {
+        this.setState((prev) => ({
+          hasError: false,
+          retryKey: prev.retryKey + 1,
+        }));
+      }, delay);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return (
+      <React.Fragment key={this.state.retryKey}>
+        {this.props.children}
+      </React.Fragment>
+    );
+  }
+}
 
 
 // Inner component that uses TasksContext
@@ -162,12 +191,31 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     setConfirmState,
     onBucketRemoved: async (bucket) => {
       const cleanedWidgets = { ...widgetsByBucketRef.current };
+      const removedWidgets = cleanedWidgets[bucket] ?? [];
       delete cleanedWidgets[bucket];
+
+      // Move widgets to first remaining bucket instead of destroying them
+      const remainingBuckets = (bucketHook.bucketsRef.current ?? []).filter(
+        (b: string) => b !== bucket
+      );
+      const targetBucket = remainingBuckets.length > 0 ? remainingBuckets[0] : null;
+
+      if (removedWidgets.length > 0 && targetBucket) {
+        const existing = cleanedWidgets[targetBucket] ?? [];
+        cleanedWidgets[targetBucket] = [...existing, ...removedWidgets];
+      }
+
       widgetsByBucketRef.current = cleanedWidgets;
       setWidgetsByBucketRef.current(cleanedWidgets);
+
       const cleanedColors = { ...bucketHook.bucketColors };
       delete cleanedColors[bucket];
       return { cleanedWidgets, cleanedColors };
+    },
+    getWidgetSnapshot: () => ({ ...widgetsByBucketRef.current }),
+    restoreWidgets: (widgets) => {
+      widgetsByBucketRef.current = widgets;
+      setWidgetsByBucketRef.current(widgets);
     },
     onBucketRenamed: (oldName, newName) => {
       const wbb = widgetsByBucketRef.current;
@@ -999,13 +1047,24 @@ export function TaskBoardDashboard() {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   });
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    flushSync(() => {
+      setReady(true);
+    });
+  }, []);
 
   return (
     <TasksProvider selectedDate={selectedDate}>
-      <TaskBoardDashboardInner
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-      />
+      <DashboardDnDErrorBoundary>
+        {ready ? (
+          <TaskBoardDashboardInner
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+          />
+        ) : null}
+      </DashboardDnDErrorBoundary>
     </TasksProvider>
   );
 }

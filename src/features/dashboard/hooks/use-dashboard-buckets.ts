@@ -44,6 +44,10 @@ interface UseDashboardBucketsOptions {
   }>;
   /** Called when a bucket is renamed — orchestrator should move widget data */
   onBucketRenamed: (oldName: string, newName: string) => void;
+  /** Returns a snapshot of the current widgets-by-bucket state */
+  getWidgetSnapshot: () => Record<string, WidgetInstance[]>;
+  /** Restores a previous widgets-by-bucket state (for undo) */
+  restoreWidgets: (widgets: Record<string, WidgetInstance[]>) => void;
 }
 
 export interface UseDashboardBucketsReturn {
@@ -91,6 +95,8 @@ export function useDashboardBuckets({
   setConfirmState,
   onBucketRemoved,
   onBucketRenamed,
+  getWidgetSnapshot,
+  restoreWidgets,
 }: UseDashboardBucketsOptions): UseDashboardBucketsReturn {
   // ── State ──
   const [buckets, setBuckets] = useState<string[]>(() => {
@@ -328,16 +334,29 @@ export function useDashboardBuckets({
   const requestRemoveBucket = useCallback((bucket: string) => {
     const previousBuckets = [...buckets];
     const previousActiveBucket = activeBucket;
+    const previousColors = { ...bucketColors };
+    const previousWidgets = getWidgetSnapshot();
 
     setIsEditorOpen(false);
 
+    // Determine where widgets will be moved
+    const remaining = buckets.filter(b => b !== bucket);
+    const targetBucket = remaining.length > 0 ? remaining[0] : null;
+    const bucketWidgetCount = (previousWidgets[bucket] ?? []).length;
+    const hasWidgetsToMove = bucketWidgetCount > 0 && targetBucket;
+
+    const description = hasWidgetsToMove
+      ? `Tasks, calendar events, and shopping list items will be permanently deleted. ${bucketWidgetCount} widget${bucketWidgetCount > 1 ? 's' : ''} will be moved to "${targetBucket}".`
+      : "This permanently removes the tab and all its data.";
+
     setConfirmState({
       title: `Remove "${bucket}" tab?`,
-      description: "This permanently removes the tab and all its tasks, calendar events, and shopping list items.",
+      description,
       confirmLabel: "Remove tab",
       onConfirm: async () => {
         await handleRemoveBucketImmediate(bucket);
         pushUndo(`Removed ${bucket} tab`, async () => {
+          // Restore buckets
           setBuckets(previousBuckets);
           bucketsRef.current = previousBuckets;
           if (previousActiveBucket) {
@@ -347,15 +366,29 @@ export function useDashboardBuckets({
           } else {
             setActiveBucket("");
           }
+          // Restore colors
+          setBucketColors(previousColors);
+          // Restore widgets to their original state
+          restoreWidgets(previousWidgets);
 
           if (typeof window !== "undefined") {
             localStorage.setItem("life_buckets", JSON.stringify(previousBuckets));
+            localStorage.setItem("bucket_colors", JSON.stringify(previousColors));
+            localStorage.setItem("widgets_by_bucket", JSON.stringify({
+              widgets: previousWidgets,
+              savedAt: new Date().toISOString(),
+            }));
             markBucketsSaved();
             window.dispatchEvent(new CustomEvent("lifeBucketsChanged"));
+            window.dispatchEvent(new CustomEvent("bucketColorsChanged"));
           }
 
           try {
-            const ok = await updateUserPreferenceFields({ life_buckets: previousBuckets });
+            const ok = await updateUserPreferenceFields({
+              life_buckets: previousBuckets,
+              bucket_colors: previousColors,
+              widgets_by_bucket: previousWidgets,
+            });
             if (ok) markBucketsSynced();
           } catch (err) {
             console.error("Failed to restore bucket after undo:", err);
@@ -363,7 +396,7 @@ export function useDashboardBuckets({
         });
       },
     });
-  }, [buckets, activeBucket, handleRemoveBucketImmediate, pushUndo, setConfirmState]);
+  }, [buckets, activeBucket, bucketColors, handleRemoveBucketImmediate, pushUndo, setConfirmState, getWidgetSnapshot, restoreWidgets]);
 
   const handleBucketColorChange = useCallback(async (bucket: string, colorHex: string) => {
     setBucketColors(prev => ({ ...prev, [bucket]: colorHex }));
