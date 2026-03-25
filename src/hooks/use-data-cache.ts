@@ -83,7 +83,7 @@ export function useDataCache<T>(
   const { ttl = DEFAULT_TTL } = options
   const queryClient = useQueryClient()
 
-  const { data, isLoading, error, refetch } = useQuery<T>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<T>({
     queryKey: [key],
     queryFn: fetcher,
     staleTime: ttl,
@@ -104,6 +104,7 @@ export function useDataCache<T>(
   return {
     data: data ?? null,
     loading: isLoading,
+    fetching: isFetching,
     error: error ?? null,
     refetch,
     updateOptimistically,
@@ -119,7 +120,7 @@ export function useGlobalCache<T>(
   const { ttl = DEFAULT_TTL, refetchInterval, refetchOnWindowFocus } = options
   const queryClient = useQueryClient()
 
-  const { data, isLoading, error, refetch } = useQuery<T>({
+  const { data, isLoading, isFetching, error, refetch } = useQuery<T>({
     queryKey: [key],
     queryFn: fetcher,
     staleTime: ttl,
@@ -135,6 +136,7 @@ export function useGlobalCache<T>(
   return {
     data: data ?? null,
     loading: isLoading,
+    fetching: isFetching,
     error: error ?? null,
     refetch,
     invalidate,

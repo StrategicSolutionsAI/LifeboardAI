@@ -2004,6 +2004,7 @@ export default function EmailPageClient() {
   const {
     data: messagesData,
     loading: messagesLoading,
+    fetching: messagesFetching,
     error: messagesError,
     refetch,
   } = useDataCache<MessagesResponse>(`gmail-messages-${selectedAccount}-${activeLabel}-${activeQuery}`, fetchMessages, {
@@ -2670,11 +2671,11 @@ export default function EmailPageClient() {
                 {/* Refresh */}
                 <button
                   onClick={() => refetch()}
-                  disabled={messagesLoading}
+                  disabled={messagesFetching}
                   title="Refresh"
                   className="p-1.5 rounded-full hover:bg-theme-surface-raised disabled:opacity-50"
                 >
-                  <RefreshCw className={`h-4 w-4 text-theme-text-secondary ${messagesLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 text-theme-text-secondary ${messagesFetching ? 'animate-spin' : ''}`} />
                 </button>
 
                 {/* Bulk actions (when items checked) */}
