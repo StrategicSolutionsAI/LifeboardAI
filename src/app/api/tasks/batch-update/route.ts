@@ -80,8 +80,9 @@ export const POST = withAuth(async (req, { supabase, user }) => {
         console.error('Failed to sync calendar event after task update', { taskId, syncError })
       }
     }
-    results.push({ id: taskId, ok: !error })
+    results.push({ id: taskId, ok: !error, error: error?.message })
   }
 
-  return NextResponse.json({ ok: true, results })
+  const allOk = results.every(r => r.ok)
+  return NextResponse.json({ ok: allOk, results })
 }, 'POST /api/tasks/batch-update')

@@ -383,6 +383,9 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             console.error("Failed to refresh tasks after update", error);
           }
         }
+      } catch (error) {
+        console.error("Failed to save task", error);
+        toast({ title: "Failed to save changes. Please try again." });
       } finally {
         setIsSubmitting(false);
       }
@@ -404,6 +407,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       resetState,
       refetch,
       batchUpdateTasks,
+      toast,
     ]);
 
     const handleDelete = useCallback(async () => {

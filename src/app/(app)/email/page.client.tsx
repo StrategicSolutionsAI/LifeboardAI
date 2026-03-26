@@ -42,11 +42,15 @@ import {
   Clock,
   Megaphone,
   ExternalLink,
+  ListTodo,
+  MapPin,
+  Calendar,
 } from 'lucide-react'
 import { interactive } from '@/lib/styles'
 import type { ParsedEmail, AttachmentMeta } from '@/lib/gmail/message-parser'
 import type { SenderGroup } from '@/app/api/email/inbox-cleaner/scan/route'
 import type { MarketingSenderGroup } from '@/app/api/email/ai/marketing/route'
+import type { TaskExtraction } from '@/lib/gmail/email-ai-utils'
 
 type MessageSummary = Omit<ParsedEmail, 'textBody' | 'htmlBody'>
 

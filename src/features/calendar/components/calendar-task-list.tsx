@@ -174,6 +174,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     later: true
   });
   const [rescheduleTaskId, setRescheduleTaskId] = useState<string | null>(null);
+  const [masterListBucketFilter, setMasterListBucketFilter] = useState<string>("all");
 
   // Filter upcoming tasks by selected bucket if provided
   const filteredUpcomingTasks = useMemo(() => {
@@ -247,6 +248,13 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     });
   }, [dashboardView, allTasks, selectedBucket]);
 
+  // Sync new-task bucket when the master list filter changes
+  useEffect(() => {
+    if (!dashboardView && masterListBucketFilter !== "all") {
+      setTaskBucket(masterListBucketFilter);
+    }
+  }, [masterListBucketFilter, dashboardView]);
+
   // Handle task expansion
   const handleTaskExpand = useCallback((taskId: string) => {
     setExpandedTasks(prev => {
@@ -295,15 +303,21 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   const referenceDate = useMemo(() => (dashboardView ? new Date() : selectedDate), [dashboardView, selectedDate]);
   const todayStr = useMemo(() => toDayKey(referenceDate), [referenceDate]);
   const todayTasks = useMemo(() => {
-    let filtered = allTasks.filter(t => !t.hourSlot && doesTaskOccurOnDate(t, todayStr));
+    // In calendar master list, include time-slotted tasks so it's a complete view of the day
+    let filtered = allTasks.filter(t => (dashboardView ? !t.hourSlot : true) && doesTaskOccurOnDate(t, todayStr));
 
-    // Only filter by selectedBucket in dashboard view, not in Calendar view
+    // Filter by selectedBucket in dashboard view
     if (selectedBucket && dashboardView) {
       filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
 
+    // Filter by masterListBucketFilter in calendar view
+    if (!dashboardView && masterListBucketFilter !== "all") {
+      filtered = filtered.filter(t => t.bucket === masterListBucketFilter);
+    }
+
     return filtered;
-  }, [allTasks, todayStr, selectedBucket, dashboardView]);
+  }, [allTasks, todayStr, selectedBucket, dashboardView, masterListBucketFilter]);
 
   // Open tasks (only shown in Master List tab)
   // Exclude tasks already in todayTasks to prevent duplicate draggableIds
@@ -312,13 +326,18 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
     const todayIds = new Set(todayTasks.map(t => t.id.toString()));
     let filtered = allTasks.filter(t => !t.completed && !t.hourSlot && !todayIds.has(t.id.toString()));
 
-    // Only filter by selectedBucket in dashboard view, not in Calendar view
+    // Filter by selectedBucket in dashboard view
     if (selectedBucket && dashboardView) {
       filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
 
+    // Filter by masterListBucketFilter in calendar view
+    if (!dashboardView && masterListBucketFilter !== "all") {
+      filtered = filtered.filter(t => t.bucket === masterListBucketFilter);
+    }
+
     return filtered;
-  }, [allTasks, todayTasks, selectedBucket, dashboardView]);
+  }, [allTasks, todayTasks, selectedBucket, dashboardView, masterListBucketFilter]);
 
   // Task ordering: localStorage-persisted today order + position-based open tasks order
   const { todayTasksOrdered, openTasksToShow } = useTaskOrdering({
@@ -746,6 +765,39 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
         {/* Master List tab: show today tasks first, then open tasks */}
         {taskView === 'Master List' && (
           <div className="space-y-6">
+            {/* Bucket filter for calendar view */}
+            {!dashboardView && availableBuckets.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setMasterListBucketFilter("all")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-150 ${
+                    masterListBucketFilter === "all"
+                      ? "bg-theme-secondary text-white border-theme-secondary shadow-sm"
+                      : "bg-white text-theme-text-subtle border-theme-neutral-300 hover:border-theme-secondary/50 hover:text-theme-text-primary"
+                  }`}
+                >
+                  All Buckets
+                </button>
+                {availableBuckets.map((bucket) => {
+                  const isActive = masterListBucketFilter === bucket;
+                  const colorClasses = getBucketColorClasses(bucket, bucketColors);
+                  return (
+                    <button
+                      key={bucket}
+                      onClick={() => setMasterListBucketFilter(bucket)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-150 ${
+                        isActive
+                          ? `${colorClasses} ring-1 ring-offset-1 ring-theme-secondary/40 shadow-sm`
+                          : "bg-white text-theme-text-subtle border-theme-neutral-300 hover:border-theme-secondary/50 hover:text-theme-text-primary"
+                      }`}
+                    >
+                      {bucket}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Today's Tasks Section in Master List */}
             <Droppable droppableId="masterTodayTasks">
               {(provided: any, snapshot: any) => (
@@ -987,7 +1039,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               {/* Add open task */}
               {!isOpenCollapsed && (
                 <div className="mt-2 space-y-2">
-                  {availableBuckets.length > 0 && (
+                  {availableBuckets.length > 0 && (!dashboardView ? masterListBucketFilter === "all" : true) && (
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-theme-text-subtle font-medium">Bucket:</label>
                       <select

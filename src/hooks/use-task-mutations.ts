@@ -594,6 +594,10 @@ export function useTaskMutations(
       return source === 'todoist';
     });
 
+    // Snapshot current state for rollback on failure
+    const dailySnapshot = dailyTasks
+    const allSnapshot = allTasks
+
     // Invalidate shared fetch cache
     sharedFetchRef.current = null
     sharedResultRef.current = null
@@ -607,7 +611,17 @@ export function useTaskMutations(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ updates: supabaseUpdates })
         })
-        if (!res.ok) console.warn('Supabase batch update failed')
+        if (!res.ok) {
+          updateDailyOptimistically(() => dailySnapshot || [])
+          updateAllOptimistically(() => allSnapshot || [])
+          throw new Error('Failed to save task changes')
+        }
+        const body = await res.json().catch(() => null)
+        if (body && !body.ok) {
+          updateDailyOptimistically(() => dailySnapshot || [])
+          updateAllOptimistically(() => allSnapshot || [])
+          throw new Error('Failed to save task changes')
+        }
       }
 
       if (todoistUpdates.length === 0) {
@@ -621,26 +635,18 @@ export function useTaskMutations(
         body: JSON.stringify({ updates: todoistUpdates })
       })
       if (!res.ok) {
-        const errorText = await res.text().catch(() => '')
-        console.warn('❌ Batch update non-OK:', res.status, errorText)
-        refetchDaily()
-        refetchAll()
-        return
+        // Revert optimistic update
+        updateDailyOptimistically(() => dailySnapshot || [])
+        updateAllOptimistically(() => allSnapshot || [])
+        throw new Error('Failed to save task changes')
       }
-      const result = await res.json().catch(() => null)
     } catch (error) {
-      console.warn('💥 Batch update network error (continuing with optimistic state):', error)
-      try {
-        await fetch('/api/tasks/batch-update', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: updatesForAll })
-        })
-      } catch {}
+      // Revert optimistic update on network errors
+      updateDailyOptimistically(() => dailySnapshot || [])
+      updateAllOptimistically(() => allSnapshot || [])
       refetchDaily()
       refetchAll()
-      return
+      throw error instanceof Error ? error : new Error('Failed to save task changes')
     }
   }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr, promptOccurrenceDecision, upsertOccurrenceException, sharedFetchRef, sharedResultRef])
 

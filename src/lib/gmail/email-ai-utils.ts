@@ -173,6 +173,58 @@ Respond with a JSON array. Each element must have these exact fields:
 Respond ONLY with the JSON array, no other text.`
 }
 
+// ── Task Extraction Types & Prompt ───────────────────────────────────────
+
+export interface TaskExtraction {
+  title: string
+  description: string
+  dueDate: string | null
+  dueTime: string | null
+  location: string | null
+  suggestedBucket: string | null
+  sourceEmailSubject: string
+  confidence: number
+}
+
+export function buildTaskExtractionPrompt(currentDate: string, buckets: string[]): string {
+  const bucketList = buckets.length > 0
+    ? `Available buckets: ${buckets.map(b => `"${b}"`).join(', ')}`
+    : 'No buckets configured — set suggestedBucket to null.'
+
+  return `You are a task extraction assistant for a personal life management app called LifeboardAI. Analyze a batch of emails and identify any actionable items that could become tasks for the user.
+
+Today's date is ${currentDate}.
+${bucketList}
+
+Look for:
+- Action items: things the user needs to do, respond to, prepare, attend, submit, review, etc.
+- Appointments and meetings: scheduled events with dates/times
+- Deadlines: due dates for projects, applications, payments, etc.
+- Requests: someone asking the user to do something
+- Events: invitations, RSVPs, reservations
+- Follow-ups: things to check on later
+
+Extract the following for each task:
+- title: A concise, actionable task title (start with a verb, e.g., "Review proposal from John", "Attend team meeting")
+- description: Brief details from the email relevant to this task (key context, people involved, requirements)
+- dueDate: ISO date string (YYYY-MM-DD) if a date is mentioned or can be inferred. Use null if no date.
+- dueTime: Time in HH:MM 24-hour format if a specific time is mentioned. Use null if no time.
+- location: Physical or virtual location if mentioned (address, room, Zoom link, etc.). Use null if none.
+- suggestedBucket: Pick the most fitting bucket from the available list. Match by relevance (e.g., work tasks → "Work", personal errands → "Personal", health items → "Health"). Use null if no bucket fits or no buckets are available.
+- sourceEmailSubject: The subject line of the email this task came from.
+- confidence: 0.0 to 1.0 — how confident you are this is an actionable task
+
+Rules:
+- Only extract genuinely actionable items. Marketing emails, newsletters, and notifications usually have NO tasks.
+- Be conservative. If unsure whether something is a task, set confidence below 0.5.
+- Return an empty array if no tasks are found across all emails.
+- Maximum 3 tasks per email, 10 tasks total across the batch.
+- For relative dates ("next Monday", "tomorrow", "in 2 weeks"), compute the actual date based on today's date.
+
+Respond with a JSON array. Each element must have the exact fields described above.
+Respond ONLY with the JSON array, no other text.`
+}
+
 // ── JSON Parser ──────────────────────────────────────────────────────────
 
 /**
