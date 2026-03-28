@@ -36,5 +36,14 @@ export function sanitizeEmailHtml(html: string): string {
     '$1="',
   )
 
+  // Rewrite all <a> tags to open in a new tab.
+  // Directly modifying href attributes is more reliable than <base target="_blank">
+  // since email HTML often lacks proper <head> structure.
+  sanitized = sanitized.replace(/<a(\s[^>]*)?>/gi, (match, attrs = '') => {
+    // Remove any existing target attribute
+    const cleaned = attrs.replace(/\s*target\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    return `<a${cleaned} target="_blank" rel="noopener noreferrer">`
+  })
+
   return sanitized
 }

@@ -787,24 +787,31 @@ function ReadingPane({
     }
   }, [message?.isUnread, messageId])
 
-  // Auto-resize iframe
+  // Auto-resize iframe using ResizeObserver so height updates as images/content load
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !message?.htmlBody) return
 
+    let ro: ResizeObserver | null = null
+
     const handleLoad = () => {
       try {
         const doc = iframe.contentDocument
-        if (doc?.body) {
-          iframe.style.height = `${doc.body.scrollHeight + 32}px`
-        }
+        if (!doc?.body) return
+        const update = () => { iframe.style.height = `${doc.body.scrollHeight + 32}px` }
+        update()
+        ro = new ResizeObserver(update)
+        ro.observe(doc.body)
       } catch {
         // sandbox may block access
       }
     }
 
     iframe.addEventListener('load', handleLoad)
-    return () => iframe.removeEventListener('load', handleLoad)
+    return () => {
+      iframe.removeEventListener('load', handleLoad)
+      ro?.disconnect()
+    }
   }, [message?.htmlBody])
 
   const handleAction = async (action: string) => {
@@ -832,6 +839,12 @@ function ReadingPane({
       if (action === 'archive' || action === 'trash') {
         onActionDone()
       }
+      // Optimistically update sidebar unread badge
+      const wasUnread = message?.isUnread ?? false
+      let delta = 0
+      if ((action === 'archive' || action === 'trash' || action === 'markRead') && wasUnread) delta = -1
+      if (action === 'markUnread' && !wasUnread) delta = 1
+      if (delta !== 0) window.dispatchEvent(new CustomEvent('email-unread-changed', { detail: { delta } }))
     } catch {
       // silently fail
     } finally {
@@ -1080,15 +1093,18 @@ function ReadingPane({
                       <iframe
                         ref={msg.id === message.id ? iframeRef : undefined}
                         srcDoc={msgHtml}
-                        sandbox=""
+                        sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
                         className="w-full min-h-[200px] border-0"
                         title={`Email from ${extractSenderName(msg.from)}`}
                         onLoad={(e) => {
                           try {
-                            const doc = (e.target as HTMLIFrameElement).contentDocument
-                            if (doc?.body) {
-                              (e.target as HTMLIFrameElement).style.height = `${doc.body.scrollHeight + 32}px`
-                            }
+                            const iframe = e.target as HTMLIFrameElement
+                            const doc = iframe.contentDocument
+                            if (!doc?.body) return
+                            const update = () => { iframe.style.height = `${doc.body.scrollHeight + 32}px` }
+                            update()
+                            const ro = new ResizeObserver(update)
+                            ro.observe(doc.body)
                           } catch { /* sandbox */ }
                         }}
                       />
@@ -2023,6 +2039,12 @@ export default function EmailPageClient() {
     }
   }, [messagesData])
 
+  // Keep sidebar badge in sync with local message state
+  useEffect(() => {
+    const unreadCount = allMessages.filter((m) => m.isUnread).length
+    window.dispatchEvent(new CustomEvent('email-unread-changed', { detail: { count: unreadCount } }))
+  }, [allMessages])
+
   const handleLabelChange = useCallback((labelId: string) => {
     setActiveLabel(labelId)
     setSelectedMessageId(null)
@@ -2077,7 +2099,7 @@ export default function EmailPageClient() {
       console.error(`Quick action ${action} error:`, err)
       refetch() // revert on failure
     }
-  }, [selectedAccount, selectedMessageId, refetch])
+  }, [selectedAccount, selectedMessageId, allMessages, refetch])
 
   const handleBackToList = useCallback(() => {
     setSelectedMessageId(null)
@@ -2322,6 +2344,8 @@ export default function EmailPageClient() {
     if (checkedIds.size === 0) return
     setBulkActing(action)
     const accountParam = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+    // Count unread in checked set for optimistic sidebar update
+    const unreadInChecked = allMessages.filter((m) => checkedIds.has(m.id) && m.isUnread).length
     try {
       await Promise.all(
         Array.from(checkedIds).map((id) =>
@@ -2335,6 +2359,10 @@ export default function EmailPageClient() {
       setCheckedIds(new Set())
       if (action === 'trash' || action === 'archive') setSelectedMessageId(null)
       refetch()
+      // Optimistically update sidebar badge
+      if (unreadInChecked > 0 && (action === 'trash' || action === 'archive' || action === 'markRead')) {
+        window.dispatchEvent(new CustomEvent('email-unread-changed', { detail: { delta: -unreadInChecked } }))
+      }
     } catch (err) {
       console.error(`Bulk ${action} error:`, err)
     } finally {
