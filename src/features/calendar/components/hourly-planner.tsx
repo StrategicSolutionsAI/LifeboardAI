@@ -156,7 +156,7 @@ interface HourlyPlannerProps {
   isDragging?: boolean;
   wrapWithContext?: boolean;
   plannerDate?: string; // yyyy-MM-dd for creating tasks on selected day
-  onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => void;
+  onTaskOpen?: (taskId: string, metadata?: { hourSlot?: string | null; endHourSlot?: string | null; plannerDate?: string | null }) => void;
   /** User-saved bucket→color map from preferences, for accurate color matching */
   bucketColors?: Record<string, string>;
   /** When true, applies mobile-optimised layout (always-visible affordances, no resize) */
@@ -943,8 +943,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                               const taskId = t.id.toString();
                               if (onTaskOpen) {
                                 const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                const normalizedEnd = endTime.startsWith('hour-') ? endTime : `hour-${endTime}`;
                                 onTaskOpen(taskId, {
                                   hourSlot: normalizedSlot,
+                                  endHourSlot: normalizedEnd,
                                   plannerDate: activePlannerDate,
                                 });
                                 return;
@@ -1021,8 +1023,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                           const taskId = t.id.toString();
                                           if (onTaskOpen) {
                                             const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                            const normalizedEnd = endTime.startsWith('hour-') ? endTime : `hour-${endTime}`;
                                             onTaskOpen(taskId, {
                                               hourSlot: normalizedSlot,
+                                              endHourSlot: normalizedEnd,
                                               plannerDate: activePlannerDate,
                                             });
                                             return;
@@ -1075,8 +1079,10 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
                                           const taskId = t.id.toString();
                                           if (onTaskOpen) {
                                             const normalizedSlot = timeSlot.startsWith('hour-') ? timeSlot : `hour-${timeSlot}`;
+                                            const normalizedEnd = endTime.startsWith('hour-') ? endTime : `hour-${endTime}`;
                                             onTaskOpen(taskId, {
                                               hourSlot: normalizedSlot,
+                                              endHourSlot: normalizedEnd,
                                               plannerDate: activePlannerDate,
                                             });
                                             return;

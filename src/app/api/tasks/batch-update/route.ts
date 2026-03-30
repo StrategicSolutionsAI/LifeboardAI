@@ -33,8 +33,15 @@ export const POST = withAuth(async (req, { supabase, user }) => {
 
     if (patch.startDate !== undefined) updateData.start_date = patch.startDate ?? null
     if (patch.endDate !== undefined) updateData.end_date = patch.endDate ?? null
-    if (patch.due !== undefined) updateData.due_date = patch.due?.date ?? null
-    else if (patch.startDate !== undefined) updateData.due_date = patch.startDate ?? null
+    if (patch.due !== undefined) {
+      updateData.due_date = patch.due?.date ?? null
+      // Keep start_date in sync when only due is updated (e.g. from date badge)
+      if (updateData.start_date === undefined) {
+        updateData.start_date = patch.due?.date ?? null
+      }
+    } else if (patch.startDate !== undefined) {
+      updateData.due_date = patch.startDate ?? null
+    }
 
     if (patch.hourSlot !== undefined) updateData.hour_slot = normalizeHourSlot(patch.hourSlot)
     if (patch.endHourSlot !== undefined) updateData.end_hour_slot = normalizeHourSlot(patch.endHourSlot)

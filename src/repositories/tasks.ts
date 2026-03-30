@@ -4,14 +4,16 @@ export const TASK_SELECT_COLUMNS =
   'id, user_id, content, completed, due_date, start_date, end_date, hour_slot, end_hour_slot, bucket, position, duration, repeat_rule, all_day, kanban_status, assignee_id, created_at, updated_at'
 
 export function mapRowToTask(row: any): Task {
-  const startDate: string | undefined = row.start_date ?? row.due_date ?? undefined
+  // due_date is the canonical date users change; start_date is for range spans
+  const dueDate: string | undefined = row.due_date ?? row.start_date ?? undefined
+  const startDate: string | undefined = row.start_date ?? dueDate ?? undefined
   const endDate: string | undefined = row.end_date ?? startDate ?? undefined
   return {
     id: row.id,
     content: row.content,
     completed: row.completed,
-    due: startDate ? { date: startDate } : undefined,
-    startDate,
+    due: dueDate ? { date: dueDate } : undefined,
+    startDate: dueDate ?? startDate,
     endDate,
     hourSlot: row.hour_slot || undefined,
     endHourSlot: row.end_hour_slot || undefined,

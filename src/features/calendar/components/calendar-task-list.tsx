@@ -278,7 +278,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   const handleRescheduleSelect = useCallback(async (taskId: string, newDate: string | null) => {
     try {
       await batchUpdateTasks([
-        { taskId, updates: { due: newDate ? { date: newDate } : null } },
+        { taskId, updates: { due: newDate ? { date: newDate } : null, startDate: newDate } },
       ]);
     } catch (error) {
       console.error('Failed to reschedule task', error);

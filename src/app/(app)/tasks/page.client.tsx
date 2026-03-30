@@ -475,9 +475,8 @@ function TasksBoardShell() {
     async (taskId: string, newDate: string | null) => {
       setLoadingTasks((prev) => new Set(prev).add(taskId));
       try {
-        // API route checks `patch.due` and uses `patch.due?.date ?? null`
         const due = newDate ? { date: newDate } : { date: undefined };
-        await batchUpdateTasks([{ taskId, updates: { due } }]);
+        await batchUpdateTasks([{ taskId, updates: { due, startDate: newDate } }]);
       } catch {
         toast({
           title: "Failed to update due date",

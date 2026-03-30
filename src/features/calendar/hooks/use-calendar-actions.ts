@@ -210,7 +210,7 @@ export function useCalendarActions({
   );
 
   const openTaskEditorById = useCallback(
-    (taskId: string, metadata?: { hourSlot?: string | null; plannerDate?: string | null }) => {
+    (taskId: string, metadata?: { hourSlot?: string | null; endHourSlot?: string | null; plannerDate?: string | null }) => {
       setSelectedModalDate(null);
       taskEditorRef.current?.openByTaskId(taskId, metadata);
     },

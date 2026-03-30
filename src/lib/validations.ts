@@ -93,6 +93,24 @@ export const deleteShoppingItemSchema = z.object({
   id: z.string().min(1, 'id required'),
 })
 
+// ---------- Notes ----------
+
+export const createNoteSchema = z.object({
+  title: z.string().max(500).optional(),
+  body: z.string().max(50000).optional(),
+})
+
+export const updateNoteSchema = z.object({
+  id: z.string().min(1, 'id required'),
+  title: z.string().max(500).optional(),
+  body: z.string().max(50000).optional(),
+  isPinned: z.boolean().optional(),
+})
+
+export const deleteNoteSchema = z.object({
+  id: z.string().min(1, 'id required'),
+})
+
 // ---------- Household ----------
 
 export const createHouseholdSchema = z.object({

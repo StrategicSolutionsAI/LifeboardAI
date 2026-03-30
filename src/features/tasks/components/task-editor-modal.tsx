@@ -71,6 +71,7 @@ type TaskEditorOpenOptions = {
 
 type OpenByIdMetadata = {
   hourSlot?: string | null;
+  endHourSlot?: string | null;
   plannerDate?: string | null;
 };
 
@@ -173,7 +174,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       const fallbackEndDate = options.fallbackEndDate ?? task?.endDate ?? effectiveDate;
       const bucketDefault = evaluateBucketDefault();
       const hourLabel = extractHourLabel(task?.hourSlot) || extractHourLabel(options.fallbackHourLabel) || "";
-      const endHourLabel = extractHourLabel(task?.endHourSlot) || extractHourLabel(options.fallbackEndHourLabel) || "";
+      const endHourLabel = extractHourLabel(options.fallbackEndHourLabel) || extractHourLabel(task?.endHourSlot) || "";
       const repeatDefault = task ? deriveRepeatOption(task) : (options.fallbackRepeat ?? "none");
       const sanitizedTaskBucket = sanitizeBucketName(task?.bucket);
       const sanitizedFallbackBucket = sanitizeBucketName(options.fallbackBucket);
@@ -201,10 +202,12 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const openByTaskId = useCallback((taskId: string, metadata?: OpenByIdMetadata) => {
       const task = ensureTaskLookup(taskId);
       const fallbackHour = extractHourLabel(metadata?.hourSlot) || extractHourLabel(task?.hourSlot);
+      const fallbackEndHour = extractHourLabel(metadata?.endHourSlot) || extractHourLabel(task?.endHourSlot);
       const plannerDate = metadata?.plannerDate || task?.startDate || task?.due?.date || resolveDefaultDate();
       openWithTask(task, plannerDate, {
         fallbackTaskId: taskId,
         fallbackHourLabel: fallbackHour,
+        fallbackEndHourLabel: fallbackEndHour,
         fallbackRepeat: task?.repeatRule ?? null,
         fallbackBucket: task?.bucket,
         fallbackAllDay: task?.allDay,

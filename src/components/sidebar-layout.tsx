@@ -14,6 +14,7 @@ import {
   Zap,
   Menu,
   ShoppingCart,
+  StickyNote,
   Mail,
   MoreHorizontal,
   LogOut,
@@ -46,6 +47,7 @@ const navItems = [
   { href: "/email", icon: Mail, label: "Email" },
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
+  { href: "/notes", icon: StickyNote, label: "Notes" },
   { href: "/profile", icon: UserCircle2, label: "Profile" },
   { href: "/history", icon: History, label: "History" },
 ]
@@ -94,6 +96,11 @@ const routeContext = [
     description: "Capture and manage your household list quickly.",
   },
   {
+    match: (path: string) => path.startsWith("/notes"),
+    title: "Notes",
+    description: "Capture ideas, thoughts, and reference material.",
+  },
+  {
     match: (path: string) => path.startsWith("/history"),
     title: "History",
     description: "Review trends and progress across recent activity.",
@@ -129,7 +136,17 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     }
     fetchUnread()
     const interval = setInterval(fetchUnread, 120_000) // refresh every 2 min
-    return () => { cancelled = true; clearInterval(interval) }
+    // Accept absolute count from email page (overrides API-based count)
+    const onUnreadChanged = (e: Event) => {
+      const count = (e as CustomEvent).detail?.count as number | undefined
+      if (typeof count === 'number') {
+        setEmailUnread(count)
+      } else {
+        fetchUnread()
+      }
+    }
+    window.addEventListener('email-unread-changed', onUnreadChanged)
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener('email-unread-changed', onUnreadChanged) }
   }, [])
 
   // Clear navigatingTo when pathname changes (navigation completed)
