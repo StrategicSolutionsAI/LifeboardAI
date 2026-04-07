@@ -55,6 +55,14 @@ export const POST = withAuth(async (req, { supabase, user }) => {
     if (updateData.due_date === undefined && updateData.start_date !== undefined) {
       updateData.due_date = updateData.start_date
     }
+    // Keep end_date in sync: when start/due date changes but endDate wasn't
+    // explicitly included, and the task is non-recurring, update end_date to
+    // match so it doesn't get stranded in the past.
+    const newRepeatRule = patch.repeatRule ?? undefined
+    const isNonRecurring = !newRepeatRule || newRepeatRule === 'none'
+    if (isNonRecurring && updateData.start_date && updateData.end_date === undefined) {
+      updateData.end_date = updateData.start_date
+    }
 
     const { data, error } = await supabase
       .from('lifeboard_tasks')

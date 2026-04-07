@@ -253,7 +253,6 @@ export function useCalendarActions({
           );
 
           if (task?.id) {
-            await refetch();
             taskEditorRef.current?.openByTaskId(task.id.toString(), {
               plannerDate: dateStr,
               hourSlot: hourSlot || undefined,

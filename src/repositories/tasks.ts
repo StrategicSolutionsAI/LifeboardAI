@@ -7,7 +7,15 @@ export function mapRowToTask(row: any): Task {
   // due_date is the canonical date users change; start_date is for range spans
   const dueDate: string | undefined = row.due_date ?? row.start_date ?? undefined
   const startDate: string | undefined = row.start_date ?? dueDate ?? undefined
-  const endDate: string | undefined = row.end_date ?? startDate ?? undefined
+  const rawEndDate: string | undefined = row.end_date ?? startDate ?? undefined
+  // For non-recurring tasks, endDate must never be before startDate.
+  // This can happen when a task's due/start date is moved forward but
+  // end_date isn't updated in the DB.
+  const rule = row.repeat_rule
+  const endDate: string | undefined =
+    (!rule || rule === 'none') && rawEndDate && startDate && rawEndDate < startDate
+      ? startDate
+      : rawEndDate
   return {
     id: row.id,
     content: row.content,

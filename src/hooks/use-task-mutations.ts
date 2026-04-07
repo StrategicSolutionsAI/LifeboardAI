@@ -47,6 +47,18 @@ export function useTaskMutations(
 
   const { upsertOccurrenceException } = occurrences
 
+  // ── Shared helper: announce task update to other components ────────
+  const announceTaskUpdate = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      sharedFetchRef.current = null
+      sharedResultRef.current = null
+      const timestamp = Date.now()
+      localUpdateTimestamps.current.add(timestamp)
+      window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
+      window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
+    }
+  }, [sharedFetchRef, sharedResultRef, localUpdateTimestamps])
+
   // ── Create task ────────────────────────────────────────────────────
 
   const createTask = useCallback(async (
@@ -91,18 +103,6 @@ export function useTaskMutations(
     const resolvedAllDay = typeof allDay === 'boolean'
       ? allDay
       : !normalizedHourSlot && !normalizedEndHourSlot
-
-    // Helper: announce task update to other components
-    const announceTaskUpdate = () => {
-      if (typeof window !== 'undefined') {
-        sharedFetchRef.current = null
-        sharedResultRef.current = null
-        const timestamp = Date.now()
-        localUpdateTimestamps.current.add(timestamp)
-        window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
-        window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
-      }
-    }
 
     // Helper: add task to optimistic caches
     const addToOptimisticCaches = (task: Task) => {
@@ -170,6 +170,49 @@ export function useTaskMutations(
       assignee_id: options?.assigneeId ?? null,
     }
 
+    // ── Step 0: Optimistic update — add temp task to caches immediately ──
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const tempTask: Task = {
+      id: tempId,
+      content: trimmed,
+      completed: false,
+      due: dueDate ? { date: dueDate } : undefined,
+      startDate: dueDate ?? undefined,
+      endDate: resolvedEndDate ?? undefined,
+      hourSlot: normalizedHourSlot,
+      endHourSlot: normalizedEndHourSlot,
+      duration: explicitDuration ?? undefined,
+      assigneeId: options?.assigneeId ?? null,
+      bucket: bucket || undefined,
+      position: undefined,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      repeatRule: repeatRule,
+      allDay: resolvedAllDay,
+      source: 'supabase',
+    }
+    addToOptimisticCaches(tempTask)
+
+    // Helper: replace temp task with the real server-returned task in caches
+    const replaceTempWithReal = (realTask: Task) => {
+      const replacer = (current: Task[] | null) =>
+        (current || []).map(t => t.id === tempId ? realTask : t)
+      if (dueDate === dateStr) {
+        updateDailyOptimistically(replacer)
+      }
+      updateAllOptimistically(replacer)
+    }
+
+    // Helper: remove temp task from caches on total failure
+    const revertOptimistic = () => {
+      const remover = (current: Task[] | null) =>
+        (current || []).filter(t => t.id !== tempId)
+      if (dueDate === dateStr) {
+        updateDailyOptimistically(remover)
+      }
+      updateAllOptimistically(remover)
+    }
+
     // ── Step 1: Always write to Supabase first ──
     try {
       const supaRes = await fetch('/api/tasks', {
@@ -182,7 +225,7 @@ export function useTaskMutations(
       if (supaRes.ok) {
         const json = await supaRes.json()
         const task = ensureTaskSource(json.task as Task, 'supabase')
-        addToOptimisticCaches(task)
+        replaceTempWithReal(task)
 
         // ── Step 2: Also sync to Todoist if connected (best-effort, non-blocking) ──
         if (todoistConnectedRef.current !== false) {
@@ -283,7 +326,7 @@ export function useTaskMutations(
           ...(metadata.allDay !== undefined ? { allDay: metadata.allDay } : {}),
         }
         const todoistTask = ensureTaskSource(enhancedTask as Task, 'todoist')
-        addToOptimisticCaches(todoistTask)
+        replaceTempWithReal(todoistTask)
         return todoistTask
       }
 
@@ -298,11 +341,12 @@ export function useTaskMutations(
     console.warn('Both Supabase and Todoist failed — creating local task')
     const local = createLocalTask()
     if (local) {
-      addToOptimisticCaches(local)
+      replaceTempWithReal(local)
       return local
     }
+    revertOptimistic()
     throw new Error('Failed to create task: all persistence methods failed')
-  }, [dateStr, updateDailyOptimistically, updateAllOptimistically, sharedFetchRef, sharedResultRef, todoistConnectedRef, setTodoistConnected, localUpdateTimestamps])
+  }, [dateStr, updateDailyOptimistically, updateAllOptimistically, announceTaskUpdate, todoistConnectedRef, setTodoistConnected])
 
   // ── Toggle task completion ─────────────────────────────────────────
 
@@ -381,6 +425,7 @@ export function useTaskMutations(
 
     updateDailyOptimistically(updater)
     updateAllOptimistically(updater)
+    announceTaskUpdate()
 
     const shouldUseSupabaseFirst = todoistConnectedRef.current === false || source !== 'todoist'
 
@@ -417,7 +462,7 @@ export function useTaskMutations(
       revertOptimistic()
       throw error
     }
-  }, [allTasks, dailyTasks, updateDailyOptimistically, updateAllOptimistically, todoistConnectedRef, setTodoistConnected])
+  }, [allTasks, dailyTasks, updateDailyOptimistically, updateAllOptimistically, todoistConnectedRef, setTodoistConnected, announceTaskUpdate])
 
   // ── Batch update ───────────────────────────────────────────────────
 
@@ -580,6 +625,7 @@ export function useTaskMutations(
 
     updateDailyOptimistically(tasks => mergeTasks(tasks, updatesForAll, { constrainToDate: true }))
     updateAllOptimistically(tasks => mergeTasks(tasks, updatesForAll))
+    announceTaskUpdate()
 
     // Separate updates by task source
     const supabaseUpdates = updatesForAll.filter(update => {
@@ -597,10 +643,6 @@ export function useTaskMutations(
     // Snapshot current state for rollback on failure
     const dailySnapshot = dailyTasks
     const allSnapshot = allTasks
-
-    // Invalidate shared fetch cache
-    sharedFetchRef.current = null
-    sharedResultRef.current = null
 
     // Send batch update to server
     try {
@@ -648,7 +690,7 @@ export function useTaskMutations(
       refetchAll()
       throw error instanceof Error ? error : new Error('Failed to save task changes')
     }
-  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr, promptOccurrenceDecision, upsertOccurrenceException, sharedFetchRef, sharedResultRef])
+  }, [updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, allTasks, dailyTasks, dateStr, promptOccurrenceDecision, upsertOccurrenceException, announceTaskUpdate])
 
   // ── Delete task ────────────────────────────────────────────────────
 
@@ -698,12 +740,45 @@ export function useTaskMutations(
           // lifeboardEventMap recomputes and calls getTaskForOccurrence which
           // now returns null for the skipped occurrence.
           updateAllOptimistically(tasks => tasks ? [...tasks] : [])
+          announceTaskUpdate()
         } catch (error) {
           if (typeof window !== 'undefined') {
             window.alert('Failed to skip this occurrence. Please try again.')
           }
         }
         return
+      }
+      if (decision === 'future') {
+        const occurrenceDate = occurrenceDateInput || task.due?.date || dateStr
+        // Set the task's endDate to the day before the selected occurrence,
+        // so this occurrence and all future ones are removed.
+        const occMs = new Date(`${occurrenceDate}T00:00:00`).getTime()
+        const dayBefore = new Date(occMs - 86400000)
+        const endDate = `${dayBefore.getFullYear()}-${String(dayBefore.getMonth() + 1).padStart(2, '0')}-${String(dayBefore.getDate()).padStart(2, '0')}`
+        const taskStart = task.startDate ?? task.due?.date
+        // If the occurrence is the very first one, just delete the whole task
+        if (taskStart && endDate < taskStart) {
+          // Fall through to full delete below
+        } else {
+          try {
+            const res = await fetch('/api/tasks/batch-update', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ updates: [{ taskId, updates: { endDate } }] })
+            })
+            if (!res.ok) throw new Error('Failed to update task endDate')
+            updateAllOptimistically(tasks =>
+              tasks ? tasks.map(t => t.id.toString() === taskId ? { ...t, endDate } : t) : []
+            )
+            announceTaskUpdate()
+          } catch (error) {
+            if (typeof window !== 'undefined') {
+              window.alert('Failed to delete future occurrences. Please try again.')
+            }
+          }
+          return
+        }
       }
     }
 
@@ -713,6 +788,7 @@ export function useTaskMutations(
 
     updateDailyOptimistically(updater)
     updateAllOptimistically(updater)
+    announceTaskUpdate()
 
     const source = resolveTaskSource(taskId)
 
@@ -768,7 +844,7 @@ export function useTaskMutations(
       refetchAll()
       throw error
     }
-  }, [findTaskById, promptOccurrenceDecision, upsertOccurrenceException, dateStr, updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, resolveTaskSource, todoistConnectedRef, setTodoistConnected])
+  }, [findTaskById, promptOccurrenceDecision, upsertOccurrenceException, dateStr, updateDailyOptimistically, updateAllOptimistically, refetchDaily, refetchAll, resolveTaskSource, todoistConnectedRef, setTodoistConnected, announceTaskUpdate])
 
   return {
     createTask,

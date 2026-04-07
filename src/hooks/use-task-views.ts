@@ -43,6 +43,12 @@ export function useTaskViews(
       const due = new Date(`${dueDateStr}T00:00:00`)
       if (target < due) return false
 
+      // Respect recurrence end date: if endDate is set and differs from
+      // startDate, treat it as the last date the recurrence should appear
+      const taskEndDate = task.endDate
+      const taskStartDate = task.startDate ?? dueDateStr
+      if (taskEndDate && taskEndDate !== taskStartDate && todayStr > taskEndDate) return false
+
       const day = target.getDay()
       const dueDay = due.getDay()
       const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000))

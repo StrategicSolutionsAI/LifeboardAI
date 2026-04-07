@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-export type OccurrenceDecision = "single" | "all" | "cancel";
+export type OccurrenceDecision = "single" | "all" | "future" | "cancel";
 
 interface PromptOptions {
   actionDescription: string;
@@ -117,7 +117,7 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
               {actionDescription}.
             </p>
             <p className="mt-2 text-sm text-theme-text-subtle">
-              Would you like to apply this change to only this occurrence on the selected date or to the entire series?
+              Would you like to apply this change to only this occurrence, all future occurrences, or the entire series?
             </p>
           </div>
           <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6 flex flex-col gap-3">
@@ -130,6 +130,13 @@ export function TasksOccurrencePromptProvider({ children }: { children: ReactNod
                 This occurrence only
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => resolve("future")}
+              className="w-full rounded-lg border border-warm-200 bg-warm-50/60 text-warm-700 px-4 py-2.5 text-sm font-medium hover:bg-warm-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-warm-600"
+            >
+              All future occurrences
+            </button>
             <button
               type="button"
               onClick={() => resolve("all")}

@@ -107,7 +107,7 @@ const resolveTodayKey = () => format(new Date(), "yyyy-MM-dd");
 const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
   ({ availableBuckets = [], selectedBucket, getDefaultDate, bucketColors = {}, familyMembers = [] }, ref) => {
     const { allTasks } = useTaskData();
-    const { createTask, batchUpdateTasks, deleteTask, refetch } = useTaskActions();
+    const { createTask, batchUpdateTasks, deleteTask } = useTaskActions();
     const { toast } = useToast();
     const vvHeight = useVisualViewport();
 
@@ -338,7 +338,7 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       setIsSubmitting(true);
       try {
         if (!editTaskId) {
-          const task = await createTask(
+          await createTask(
             formContent.trim(),
             resolvedStartDate,
             isAllDayEvent ? null : hourNum,
@@ -352,11 +352,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
             }
           );
           resetState();
-          try {
-            await refetch();
-          } catch (error) {
-            console.error("Failed to refresh tasks after creation", error);
-          }
         } else {
           const updates: any = {
             content: formContent.trim(),
@@ -380,11 +375,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
           }]);
 
           resetState();
-          try {
-            await refetch();
-          } catch (error) {
-            console.error("Failed to refresh tasks after update", error);
-          }
         }
       } catch (error) {
         console.error("Failed to save task", error);
@@ -408,7 +398,6 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
       editTaskId,
       createTask,
       resetState,
-      refetch,
       batchUpdateTasks,
       toast,
     ]);
@@ -416,15 +405,13 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
     const handleDelete = useCallback(async () => {
       if (!editTaskId) return;
       try {
-        await deleteTask(editTaskId);
+        const occurrenceDate = startDate && startDate.trim() ? startDate : resolveDefaultDate();
+        await deleteTask(editTaskId, occurrenceDate);
         resetState();
-        try {
-          await refetch();
-        } catch {}
       } catch (error) {
         console.error("Failed to delete task", error);
       }
-    }, [editTaskId, deleteTask, resetState, refetch]);
+    }, [editTaskId, startDate, resolveDefaultDate, deleteTask, resetState]);
 
     const handleToggleShoppingList = useCallback(async () => {
       if (!editTaskId || isShoppingBusy) return;

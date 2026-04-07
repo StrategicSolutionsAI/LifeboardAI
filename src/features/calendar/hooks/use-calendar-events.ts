@@ -142,6 +142,7 @@ export function useCalendarEvents({
     const rEndMs = rangeEnd.getTime();
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const filterAll = selectedBucketFilters.includes('all');
+
     const assigneeFilters = selectedBucketFilters.filter(f => f.startsWith('assignee:')).map(f => f.slice(9));
     const hasAssigneeFilters = assigneeFilters.length > 0;
     // Pre-compute range boundary strings once instead of per-task
@@ -206,8 +207,10 @@ export function useCalendarEvents({
 
       const rule = task.repeatRule as string | undefined;
       if (!rule || rule === 'none') {
+        // For non-recurring tasks, endDate must be >= startDate (defensive guard)
+        const effectiveEnd = endRaw < startRaw ? startRaw : endRaw;
         const clampedStart = startRaw < rangeStartStr ? rangeStartStr : startRaw;
-        const clampedEnd = endRaw > rangeEndStr ? rangeEndStr : endRaw;
+        const clampedEnd = effectiveEnd > rangeEndStr ? rangeEndStr : effectiveEnd;
         if (clampedStart > clampedEnd) return;
 
         let cursor = new Date(`${clampedStart}T00:00:00`);
@@ -223,10 +226,14 @@ export function useCalendarEvents({
       const dueMs = due.getTime();
       if (dueMs > rEndMs) return;
 
+      // If endDate is set and differs from startDate, treat it as the recurrence end boundary
+      const recurrenceEndMs = (endRaw !== startRaw) ? new Date(`${endRaw}T23:59:59`).getTime() : rEndMs;
+      const effectiveEndMs = Math.min(rEndMs, recurrenceEndMs);
+
       switch (task.repeatRule) {
         case 'daily': {
           let cursor = dueMs >= rStartMs ? due : rangeStart;
-          while (cursor.getTime() <= rEndMs) {
+          while (cursor.getTime() <= effectiveEndMs) {
             buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
             cursor = addDays(cursor, 1);
           }
@@ -234,7 +241,7 @@ export function useCalendarEvents({
         }
         case 'weekdays': {
           let cursor = dueMs >= rStartMs ? due : rangeStart;
-          while (cursor.getTime() <= rEndMs) {
+          while (cursor.getTime() <= effectiveEndMs) {
             const day = cursor.getDay();
             if (day >= 1 && day <= 5) {
               buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
@@ -253,7 +260,7 @@ export function useCalendarEvents({
             if (diffFromDue % 7 !== 0) daysUntilMatch = 7;
           }
           cursor = addDays(cursor, daysUntilMatch);
-          while (cursor.getTime() <= rEndMs) {
+          while (cursor.getTime() <= effectiveEndMs) {
             buildEventForDate(task, toDayKey(cursor), startRaw, endRaw);
             cursor = addDays(cursor, 7);
           }
@@ -267,7 +274,7 @@ export function useCalendarEvents({
             const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
             const targetDateNum = dueDateNum > daysInMonth ? daysInMonth : dueDateNum;
             const candidate = new Date(month.getFullYear(), month.getMonth(), targetDateNum);
-            if (candidate.getTime() >= dueMs && candidate.getTime() >= rStartMs && candidate.getTime() <= rEndMs) {
+            if (candidate.getTime() >= dueMs && candidate.getTime() >= rStartMs && candidate.getTime() <= effectiveEndMs) {
               buildEventForDate(task, toDayKey(candidate), startRaw, endRaw);
             }
             month = new Date(month.getFullYear(), month.getMonth() + 1, 1);
