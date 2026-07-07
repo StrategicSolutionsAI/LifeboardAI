@@ -82,7 +82,7 @@ export interface TaskEditorModalHandle {
   close: () => void;
 }
 
-export interface FamilyMemberOption {
+interface FamilyMemberOption {
   id: string;
   name: string;
   avatarColor: string;

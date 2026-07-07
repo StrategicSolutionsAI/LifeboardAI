@@ -86,7 +86,3 @@ export function useFamilyMembers(): FamilyMemberOption[] {
   return members
 }
 
-/** Invalidate the module-level cache (call after editing family members). */
-export function invalidateFamilyMembersCache() {
-  _cache = null
-}

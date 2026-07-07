@@ -3,7 +3,7 @@ import { URLSearchParams } from 'url'
 const GOOGLE_AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
-export const GOOGLE_FIT_SCOPES = [
+const GOOGLE_FIT_SCOPES = [
   'https://www.googleapis.com/auth/fitness.activity.read',
   'https://www.googleapis.com/auth/fitness.body.read',
   // add more scopes if you need additional metrics
@@ -157,7 +157,7 @@ export async function fetchGoogleFitStepsWithRetry(accessToken: string, date: st
 }
 
 // Helper function to fetch steps across a date range
-export async function fetchGoogleFitStepsExtended(accessToken: string, startDate: string, endDate: string) {
+async function fetchGoogleFitStepsExtended(accessToken: string, startDate: string, endDate: string) {
   const [startYyyy, startMm, startDd] = startDate.split('-').map(Number)
   const [endYyyy, endMm, endDd] = endDate.split('-').map(Number)
   

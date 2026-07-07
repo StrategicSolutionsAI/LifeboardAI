@@ -3,7 +3,7 @@ import { URLSearchParams } from 'url';
 const FITBIT_AUTH_BASE = 'https://www.fitbit.com/oauth2/authorize';
 const FITBIT_TOKEN_URL = 'https://api.fitbit.com/oauth2/token';
 
-export const FITBIT_SCOPES = [
+const FITBIT_SCOPES = [
   'activity',
   'heartrate',
   'sleep',

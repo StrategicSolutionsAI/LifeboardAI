@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { QUERY_STALE_TIME_MS, QUERY_GC_TIME_MS } from '@/lib/cache-config'
 
-export function makeQueryClient() {
+function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {

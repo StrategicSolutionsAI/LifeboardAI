@@ -57,14 +57,6 @@ Runs Gemini 3.1 Pro and returns the complete response.
 
 **Returns:** Promise<string> - The model's response text
 
-### `streamGemini(options)`
-
-Streams Gemini 3.1 Pro responses for real-time output.
-
-**Parameters:** Same as `runGemini`
-
-**Returns:** AsyncIterable<string> - Streaming response chunks
-
 ## Error Handling
 
 If Replicate fails (network issues, rate limits, etc.), the chatbot automatically falls back to OpenAI's GPT-4o-mini to ensure uninterrupted service.

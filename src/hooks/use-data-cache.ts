@@ -49,10 +49,6 @@ export function invalidateIntegrationCaches(integrationId?: string) {
   })
 }
 
-export function invalidateAllCaches() {
-  const qc = getQueryClient()
-  qc.invalidateQueries()
-}
 
 /**
  * Seed the React Query cache before React mounts (e.g. at module evaluation time).

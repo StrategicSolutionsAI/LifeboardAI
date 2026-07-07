@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 
 // Google Calendar API scopes
-export const SCOPES = [
+const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/calendar.events',
 ];

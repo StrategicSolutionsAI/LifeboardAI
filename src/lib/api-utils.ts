@@ -9,7 +9,7 @@ import type { z } from 'zod'
  * Unified client factory — Bearer token takes priority, cookies as fallback.
  * Single source of truth; replaces the local copies in route files.
  */
-export function getClientFromRequest(req: NextRequest) {
+function getClientFromRequest(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth?.startsWith('Bearer ')) {
     return supabaseFromBearer(auth.slice(7))

@@ -107,7 +107,7 @@ export function renderMarkdown(text: string) {
 let _msgIdCounter = 0
 
 /** Generate a stable, unique ID for each chat message. */
-export function msgId(): string {
+function msgId(): string {
   return `msg-${++_msgIdCounter}-${Date.now()}`
 }
 

@@ -2,7 +2,7 @@ const FATSECRET_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token'
 const FATSECRET_API_BASE = 'https://platform.fatsecret.com/rest/server.api'
 
 // FatSecret scopes - basic is required for food search and nutrition data
-export const FATSECRET_SCOPES = ['basic']
+const FATSECRET_SCOPES = ['basic']
 
 export interface FatSecretTokenResponse {
   access_token: string
@@ -26,17 +26,6 @@ export interface FatSecretSearchResponse {
     page_number: string
     total_results: string
   }
-}
-
-export interface FatSecretNutrition {
-  calories: string
-  carbohydrate: string
-  fat: string
-  fiber?: string
-  protein: string
-  saturated_fat?: string
-  sodium?: string
-  sugar?: string
 }
 
 export interface FatSecretFoodDetail {
@@ -177,46 +166,4 @@ export async function getFoodDetails(
   return data as FatSecretFoodDetail
 }
 
-/**
- * Get nutrition summary for a food item (first serving)
- */
-export async function getFoodNutrition(
-  accessToken: string, 
-  foodId: string
-): Promise<FatSecretNutrition | null> {
-  try {
-    const foodDetail = await getFoodDetails(accessToken, foodId)
-    const firstServing = foodDetail.food.servings.serving[0]
-    
-    if (!firstServing) {
-      return null
-    }
 
-    return {
-      calories: firstServing.calories,
-      carbohydrate: firstServing.carbohydrate,
-      fat: firstServing.fat,
-      fiber: firstServing.fiber,
-      protein: firstServing.protein,
-      saturated_fat: firstServing.saturated_fat,
-      sodium: firstServing.sodium,
-      sugar: firstServing.sugar
-    }
-  } catch (error) {
-    console.error('Error fetching food nutrition:', error)
-    return null
-  }
-}
-
-/**
- * Check if access token is expired
- */
-export function isTokenExpired(tokenData: any, updatedAt: string): boolean {
-  if (!tokenData.expires_in || !updatedAt) {
-    return true
-  }
-
-  const updated = new Date(updatedAt).getTime()
-  const expiresAt = updated + tokenData.expires_in * 1000
-  return Date.now() > expiresAt - 60 * 1000 // 1 minute buffer
-}

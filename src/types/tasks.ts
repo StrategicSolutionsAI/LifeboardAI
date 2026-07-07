@@ -2,7 +2,7 @@ export type RepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly'
 export type RepeatOption = RepeatRule | 'none'
 export type KanbanStatus = 'todo' | 'in_progress' | 'done'
 
-export interface TaskDue {
+interface TaskDue {
   date?: string
   datetime?: string
   string?: string

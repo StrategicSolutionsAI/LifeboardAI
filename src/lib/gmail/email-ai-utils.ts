@@ -37,15 +37,6 @@ export interface EmailCategory {
   reason: string
 }
 
-export interface MarketingClassification {
-  messageId: string
-  isMarketing: boolean
-  confidence: number
-  reason: string
-  senderEmail: string
-  senderName: string
-}
-
 // ── Constants ────────────────────────────────────────────────────────────
 
 export const SPAM_BATCH_SIZE = 30

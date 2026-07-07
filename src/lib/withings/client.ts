@@ -5,7 +5,7 @@ const WITHINGS_TOKEN_URL = 'https://wbsapi.withings.net/v2/oauth2'
 const WITHINGS_MEASURE_URL = 'https://wbsapi.withings.net/measure'
 
 // Withings scopes – for weight and body composition data we need "user.metrics"
-export const WITHINGS_SCOPES = ['user.metrics']
+const WITHINGS_SCOPES = ['user.metrics']
 
 interface WithingsMeasure {
   value: number;

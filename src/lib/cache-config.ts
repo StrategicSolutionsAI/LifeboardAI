@@ -15,9 +15,6 @@ export const DATA_CACHE_DEFAULT_TTL_MS = 5 * 60 * 1000 // 5 min
 // ── Todoist in-memory task cache ─────────────────────────────────────────
 export const TODOIST_TASK_CACHE_TTL_MS = 15 * 1000      // 15 sec
 
-// ── Bucket colors (client-side) ──────────────────────────────────────────
-export const BUCKET_COLORS_CACHE_TTL_MS = 5 * 60 * 1000 // 5 min
-
 // ── Buckets snapshot ─────────────────────────────────────────────────────
 export const BUCKETS_CACHE_TTL_MS = 2 * 60 * 1000       // 2 min
 

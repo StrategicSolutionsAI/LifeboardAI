@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 import { useTasks } from "@/hooks/use-tasks";
 import { TasksOccurrencePromptProvider } from "./tasks-occurrence-prompt-context";
-import type { Task, TaskOccurrenceException } from "@/types/tasks";
+import type { Task } from "@/types/tasks";
 
 interface TasksProviderProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ interface TasksProviderProps {
 }
 
 // ── Data context (changes when task data changes) ──────────────────────
-export interface TaskDataContextValue {
+interface TaskDataContextValue {
   dailyTasks: Task[];
   allTasks: Task[];
   dailyVisibleTasks: Task[];
@@ -22,10 +22,10 @@ export interface TaskDataContextValue {
   error: Error | null;
 }
 
-export const TaskDataContext = createContext<TaskDataContextValue | null>(null);
+const TaskDataContext = createContext<TaskDataContextValue | null>(null);
 
 // ── Actions context (stable refs, never triggers re-renders) ───────────
-export interface TaskActionsContextValue {
+interface TaskActionsContextValue {
   createTask: ReturnType<typeof useTasks>["createTask"];
   toggleTaskCompletion: ReturnType<typeof useTasks>["toggleTaskCompletion"];
   batchUpdateTasks: ReturnType<typeof useTasks>["batchUpdateTasks"];
@@ -34,10 +34,7 @@ export interface TaskActionsContextValue {
   getTaskForOccurrence: ReturnType<typeof useTasks>["getTaskForOccurrence"];
 }
 
-export const TaskActionsContext = createContext<TaskActionsContextValue | null>(null);
-
-// ── Legacy combined context (for backward compat during migration) ─────
-export const TasksContext = createContext<ReturnType<typeof useTasks> | null>(null);
+const TaskActionsContext = createContext<TaskActionsContextValue | null>(null);
 
 function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
   const tasks = useTasks(selectedDate);
@@ -84,13 +81,11 @@ function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
   ]);
 
   return (
-    <TasksContext.Provider value={tasks}>
-      <TaskActionsContext.Provider value={stableActions}>
-        <TaskDataContext.Provider value={dataValue}>
-          {children}
-        </TaskDataContext.Provider>
-      </TaskActionsContext.Provider>
-    </TasksContext.Provider>
+    <TaskActionsContext.Provider value={stableActions}>
+      <TaskDataContext.Provider value={dataValue}>
+        {children}
+      </TaskDataContext.Provider>
+    </TaskActionsContext.Provider>
   );
 }
 
@@ -103,13 +98,6 @@ export function TasksProvider({ children, selectedDate }: TasksProviderProps) {
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────
-
-/** @deprecated Use useTaskData() and/or useTaskActions() for better performance */
-export function useTasksContext() {
-  const ctx = useContext(TasksContext);
-  if (!ctx) throw new Error("useTasksContext must be used within TasksProvider");
-  return ctx;
-}
 
 /** Only re-renders when task data changes. Use for components that display tasks. */
 export function useTaskData() {

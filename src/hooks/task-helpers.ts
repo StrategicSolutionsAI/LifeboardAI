@@ -57,10 +57,3 @@ export interface TaskSharedState {
   /** When true, the next fetch will bypass server-side Todoist cache */
   nocacheRef: MutableRefObject<boolean>
 }
-
-// ── Interfaces ───────────────────────────────────────────────────────
-
-export interface TaskUpdate {
-  taskId: string
-  updates: Partial<Task>
-}

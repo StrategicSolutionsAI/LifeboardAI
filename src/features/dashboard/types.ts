@@ -7,8 +7,6 @@ export interface ProgressEntry {
 
 // Re-export shared types from dashboard-utils for convenience
 export type {
-  ProfileNameRow,
-  WidgetLogEntry,
   DestructiveConfirmState,
   UndoState,
 } from "@/lib/dashboard-utils";

@@ -19,7 +19,7 @@ function getReplicate(): Replicate {
   return _replicate;
 }
 
-export interface GeminiMessage {
+interface GeminiMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
@@ -136,52 +136,6 @@ export async function runGeminiFlash(options: GeminiOptions): Promise<string> {
   });
 }
 
-/**
- * Stream Gemini 3.1 Pro responses via Replicate
- * @param options - Configuration for the Gemini 3.1 Pro model
- * @returns AsyncIterable for streaming responses
- */
-export async function* streamGemini(options: GeminiOptions) {
-  const {
-    messages,
-    temperature = 0.7,
-    max_tokens = 2048,
-    top_p = 0.95,
-    thinking_level = 'medium',
-  } = options;
-
-  try {
-    const replicate = getReplicate();
-    const { system_instruction, prompt } = convertMessagesToGeminiInput(messages);
-
-    const input: Record<string, unknown> = {
-      prompt,
-      temperature,
-      top_p,
-      thinking_level,
-    };
-
-    if (system_instruction) {
-      input.system_instruction = system_instruction;
-    }
-
-    if (typeof max_tokens === 'number') {
-      input.max_output_tokens = max_tokens;
-    }
-
-    const stream = await replicate.stream(
-      "google/gemini-3.1-pro" as any,
-      { input }
-    );
-
-    for await (const event of stream) {
-      yield event;
-    }
-  } catch (error) {
-    console.error('Error streaming Gemini 3.1 Pro:', error);
-    throw error;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Speech-to-Text (Whisper on Replicate)
@@ -273,7 +227,7 @@ export interface TTSOptions {
  * Emmanuel, Ethan, Evelyn, Gavin, Gordon, Ivan, Laura, Lucy,
  * Madison, Marisol, Meera, Walter
  */
-export const CHATTERBOX_VOICES = [
+const CHATTERBOX_VOICES = [
   'Aaron', 'Abigail', 'Anaya', 'Andy', 'Archer', 'Brian', 'Chloe', 'Dylan',
   'Emmanuel', 'Ethan', 'Evelyn', 'Gavin', 'Gordon', 'Ivan', 'Laura', 'Lucy',
   'Madison', 'Marisol', 'Meera', 'Walter',

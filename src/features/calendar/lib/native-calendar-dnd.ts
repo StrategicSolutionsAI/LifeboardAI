@@ -1,6 +1,6 @@
 "use client";
 
-export const NATIVE_CALENDAR_DND_MIME = "application/x-lifeboard-calendar-dnd";
+const NATIVE_CALENDAR_DND_MIME = "application/x-lifeboard-calendar-dnd";
 
 export type NativeCalendarDragPayload =
   | {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 
-export interface ApiError extends Error {
+interface ApiError extends Error {
   statusCode?: number
   code?: string
   details?: any

@@ -23,7 +23,7 @@ interface RateLimitEntry {
   timestamps: number[]
 }
 
-export class RateLimiter {
+class RateLimiter {
   private store = new Map<string, RateLimitEntry>()
   private readonly maxRequests: number
   private readonly windowMs: number

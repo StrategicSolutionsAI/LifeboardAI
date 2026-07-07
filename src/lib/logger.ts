@@ -10,7 +10,7 @@ export interface LogContext {
   [key: string]: any
 }
 
-export interface StructuredLogEntry {
+interface StructuredLogEntry {
   timestamp: string
   level: 'debug' | 'info' | 'warn' | 'error'
   message: string

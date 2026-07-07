@@ -10,7 +10,7 @@ import { useTaskViews } from './use-task-views'
 import type { Task } from '@/types/tasks'
 
 // Types re-exported for backward compatibility
-export type { RepeatRule, RepeatOption, KanbanStatus, TaskDue, Task, TaskOccurrenceException } from '@/types/tasks'
+export type { Task } from '@/types/tasks'
 
 export function useTasks(selectedDate?: Date) {
   const dateStr = format(selectedDate ?? new Date(), 'yyyy-MM-dd')

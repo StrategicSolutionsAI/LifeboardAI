@@ -5,9 +5,6 @@ export type CalendarRepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
 
 const REPEAT_WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR'];
 
-// Legacy bucket label retained for older calendar imports
-export const IMPORTED_CALENDAR_BUCKET = 'Imported Calendar';
-
 export function mapRruleToRepeatRule(rrule?: string | null): CalendarRepeatRule | null {
   if (!rrule) return null;
 
@@ -34,7 +31,7 @@ export function mapRruleToRepeatRule(rrule?: string | null): CalendarRepeatRule 
   return null;
 }
 
-export function mapRepeatRuleToRrule(rule?: CalendarRepeatRule | null): string | null {
+function mapRepeatRuleToRrule(rule?: CalendarRepeatRule | null): string | null {
   if (!rule) return null;
 
   switch (rule) {
@@ -66,7 +63,7 @@ export function isoToHourSlot(dateTime?: string | null): string | null {
   return `hour-${normalizedHour}${minuteSegment}${suffix}`;
 }
 
-export function hourSlotToIso(date?: string | null, hourSlot?: string | null): string | null {
+function hourSlotToIso(date?: string | null, hourSlot?: string | null): string | null {
   if (!date || !hourSlot) return null;
   const normalized = hourSlot.replace(/^hour-/, '');
   const match = normalized.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
@@ -136,7 +133,7 @@ export interface CalendarEventRow {
   task_id: string | null;
 }
 
-export function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
+function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
   if (!task?.id) return null;
 
   const startDate = task.start_date ?? task.due_date ?? null;

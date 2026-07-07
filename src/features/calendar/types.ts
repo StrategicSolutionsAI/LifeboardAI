@@ -201,7 +201,7 @@ export const toDayKey = (date: Date): string => {
   return `${y}-${m < 10 ? '0' : ''}${m}-${d < 10 ? '0' : ''}${d}`;
 };
 
-export const normalizeEventTitle = (title?: string) => (
+const normalizeEventTitle = (title?: string) => (
   (title ?? '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -209,7 +209,7 @@ export const normalizeEventTitle = (title?: string) => (
     .trim()
 );
 
-export const normalizeEventTimeKey = (event: DayEvent) => {
+const normalizeEventTimeKey = (event: DayEvent) => {
   if (event.allDay || !event.time) return 'all-day';
   const parsed = new Date(event.time);
   if (Number.isNaN(parsed.getTime())) return (event.time ?? '').toLowerCase();

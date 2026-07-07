@@ -83,9 +83,6 @@ export const themeColors: ThemeColor[] = [
   }
 ]
 
-export function getThemeColors(themeId: string = "lifeboard"): ThemeColor {
-  return themeColors.find(theme => theme.id === themeId) || themeColors[0]
-}
 
 export function applyTheme(theme: ThemeColor) {
   if (typeof window === 'undefined') return
@@ -191,7 +188,7 @@ export function saveCustomTheme(theme: ThemeColor) {
   }
 }
 
-export function getCustomThemes(): ThemeColor[] {
+function getCustomThemes(): ThemeColor[] {
   if (typeof window === 'undefined') return []
   
   try {

@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server'
 // Types
 // ---------------------------------------------------------------------------
 
-export type LifeboardCommand =
+type LifeboardCommand =
   | { action: 'create_task'; content: string; due_date?: string; hour_slot?: number; bucket?: string }
   | { action: 'complete_task'; task_name: string }
   | { action: 'delete_task'; task_name: string }
@@ -26,7 +26,7 @@ export interface CommandContext {
   origin: string
 }
 
-export interface CommandResult {
+interface CommandResult {
   success: boolean
   message: string
   createdTask?: any
@@ -109,7 +109,7 @@ CAPABILITIES:
 const CMD_REGEX = /\[LIFEBOARD_CMD\]([\s\S]*?)\[\/LIFEBOARD_CMD\]/g
 
 /** Extract all command blocks from an AI reply. */
-export function parseCommands(reply: string): LifeboardCommand[] {
+function parseCommands(reply: string): LifeboardCommand[] {
   if (process.env.LIFEBOARD_TASK_CMDS === 'false') return []
   const commands: LifeboardCommand[] = []
   let match: RegExpExecArray | null
@@ -127,7 +127,7 @@ export function parseCommands(reply: string): LifeboardCommand[] {
 }
 
 /** Remove all command blocks from a reply string. */
-export function stripCommandBlocks(reply: string): string {
+function stripCommandBlocks(reply: string): string {
   return reply.replace(/\[LIFEBOARD_CMD\][\s\S]*?\[\/LIFEBOARD_CMD\]/g, '').trim()
 }
 

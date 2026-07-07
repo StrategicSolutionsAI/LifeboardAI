@@ -152,6 +152,7 @@ export const surface = {
 // BORDER — Border color tokens
 // -----------------------------------------------------------------------------
 
+/** @public Documented design-system token (STYLE_GUIDE.md) — keep even while unreferenced */
 export const border = {
   default: 'border-theme-neutral-300',
   subtle: 'border-theme-neutral-300/50',
@@ -199,6 +200,7 @@ export const card = {
 // LAYOUT — Spacing tokens for padding, gap, and section sizing
 // -----------------------------------------------------------------------------
 
+/** @public Documented design-system token (STYLE_GUIDE.md) — keep even while unreferenced */
 export const layout = {
   padding: {
     compact: 'p-3',

@@ -36,7 +36,7 @@ export interface StickerOption {
   colorLight: string;
 }
 
-export const STICKER_OPTIONS: StickerOption[] = [
+const STICKER_OPTIONS: StickerOption[] = [
   { id: "holiday",     label: "Holiday",     icon: TreePine,      color: "#34d399", colorDark: "#059669", colorLight: "#d1fae5" },
   { id: "birthday",    label: "Birthday",    icon: Cake,          color: "#f472b6", colorDark: "#db2777", colorLight: "#fce7f3" },
   { id: "travel",      label: "Travel",      icon: Plane,         color: "#38bdf8", colorDark: "#0284c7", colorLight: "#e0f2fe" },
@@ -51,14 +51,14 @@ export const STICKER_OPTIONS: StickerOption[] = [
   { id: "family",      label: "Family",      icon: Users,         color: "#22d3ee", colorDark: "#0891b2", colorLight: "#ecfeff" },
 ];
 
-export const STICKER_LOOKUP: Record<string, StickerOption> = Object.fromEntries(
+const STICKER_LOOKUP: Record<string, StickerOption> = Object.fromEntries(
   STICKER_OPTIONS.map((opt) => [opt.id, opt]),
 );
 
 export const VALID_STICKER_IDS = new Set(STICKER_OPTIONS.map((o) => o.id));
 
-export const STICKER_PALETTE_WIDTH = 300;
-export const STICKER_PALETTE_HEIGHT = 420;
+const STICKER_PALETTE_WIDTH = 300;
+const STICKER_PALETTE_HEIGHT = 420;
 
 // ---------------------------------------------------------------------------
 // Shared sticker style builders
