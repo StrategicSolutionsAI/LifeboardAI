@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { runGemini, runTTS } from '@/lib/replicate/client'
+import { runTTS } from '@/lib/replicate/client'
+import { runClaude } from '@/lib/anthropic/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { handleApiError } from '@/lib/api-error-handler'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
@@ -50,8 +51,8 @@ export async function POST(req: NextRequest) {
     const currentYear = todayIso.slice(0,4)
     const lifeboardInstruction = getCommandsPrompt(todayIso, currentYear)
 
-    // Use Gemini 3.1 Pro via Replicate
-    const geminiMessages = [
+    // Primary model: Claude Fable 5 via the Anthropic API
+    const chatMessages = [
       { role: 'system' as const, content: lifeboardInstruction },
       ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
       ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
@@ -59,18 +60,17 @@ export async function POST(req: NextRequest) {
 
     let reply: string | undefined
     try {
-      reply = await runGemini({
-        messages: geminiMessages,
+      reply = await runClaude({
+        messages: chatMessages,
         max_tokens: 2048,
-        temperature: 0.7,
       })
     } catch (error) {
-      console.error('Gemini 3.1 Pro error:', error instanceof Error ? error.message : String(error))
+      console.error('Claude Fable 5 error:', error instanceof Error ? error.message : String(error))
       try {
         const openai = getOpenAI()
         const completion = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
-          messages: geminiMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+          messages: chatMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
           max_tokens: 1024,
           temperature: 0.7,
         })

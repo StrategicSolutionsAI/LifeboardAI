@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { runGeminiFlash, runWhisper, runTTS } from '@/lib/replicate/client'
+import { runWhisper, runTTS } from '@/lib/replicate/client'
+import { runClaude } from '@/lib/anthropic/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
 import { buildChatContext } from '@/lib/chat-context'
@@ -70,7 +71,8 @@ export async function POST(req: NextRequest) {
     const lifeboardInstruction = getCommandsPrompt(todayIso, currentYear)
 
     // Ask the assistant using transcript as the user message, with conversation history
-    const geminiMessages = [
+    const chatMessages = [
+      { role: 'system' as const, content: lifeboardInstruction },
       ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
       ...conversationHistory.map(m => ({
         role: m.role as 'user' | 'assistant',
@@ -81,17 +83,14 @@ export async function POST(req: NextRequest) {
 
     let reply: string
     try {
-      // Use Gemini 2.5 Flash for voice — ~3.5x faster than Pro
-      reply = await runGeminiFlash({
-        messages: [
-          { role: 'system', content: lifeboardInstruction },
-          ...geminiMessages,
-        ],
+      // Claude Fable 5 at 'low' effort — keeps voice responsive
+      reply = await runClaude({
+        messages: chatMessages,
         max_tokens: 2048,
-        temperature: 0.7,
+        effort: 'low',
       })
-    } catch (geminiErr) {
-      console.error('Gemini Flash error (voice):', geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
+    } catch (claudeErr) {
+      console.error('Claude Fable 5 error (voice):', claudeErr instanceof Error ? claudeErr.message : String(claudeErr))
       // Fall back to OpenAI
       const openai = getOpenAI()
       const completion = await openai.chat.completions.create({
