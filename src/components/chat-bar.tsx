@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MessageSquare, WifiOff } from "lucide-react"
+import { MessageSquare, Square, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
 import { useVisualViewport } from "@/hooks/use-visual-viewport"
 import type { Message } from "./chat/chat-types"
@@ -43,6 +43,10 @@ export function ChatBar() {
   const [silenceProgress, setSilenceProgress] = useState(0)
   const silenceStartRef = useRef<number>(0)
   const lastFailedInputRef = useRef<string>('')
+  // In-flight chat/voice request — lets the Stop button abort it
+  const sendAbortRef = useRef<AbortController | null>(null)
+  // Distinguishes a user-initiated Stop from the 90s timeout abort
+  const userStoppedRef = useRef<boolean>(false)
   const [showSettings, setShowSettings] = useState(false)
   const [ttsVoice, setTtsVoice] = useState<string>('Chloe')
   const [ttsRate, setTtsRate] = useState<number>(1.0)
@@ -1236,6 +1240,7 @@ export function ChatBar() {
       // Send to API for processing
       setProcessingStage('transcribing')
       const controller = new AbortController()
+      sendAbortRef.current = controller
       const timer = setTimeout(() => controller.abort(), 90000) // 90s for STT + LLM + TTS pipeline
       const res = await fetch("/api/chat/voice", {
         method: "POST",
@@ -1259,6 +1264,9 @@ export function ChatBar() {
           return
         }
         console.error('❌ API error:', errorData)
+        if (res.status === 401) {
+          throw new Error("Your session has expired. Please refresh the page and sign in again.")
+        }
         if ((errorData as any).reply && String((errorData as any).reply).toLowerCase().includes('quota')) {
           throw new Error("Voice service quota exceeded. Please try again later.")
         }
@@ -1305,6 +1313,8 @@ export function ChatBar() {
                   audio: undefined,
                   timestamp: Date.now(),
                   createdTask: chunk.createdTask || null,
+                  // Server marks the canned LLM-failure fallback so it renders as an error
+                  ...(chunk.isError ? { isError: true } : {}),
                 }
                 setMessages([...updatedUserMessages, assistantMessage])
                 setIsProcessing(false)
@@ -1407,6 +1417,13 @@ export function ChatBar() {
         }
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError' && userStoppedRef.current) {
+        // User pressed Stop — reset quietly, no error bubble, no auto-restart
+        userStoppedRef.current = false
+        setIsProcessing(false)
+        setProcessingStage(null)
+        return
+      }
       console.error('Voice message error:', err)
       console.error('Error details:', err.message)
       const errorMessage = err.message || "Sorry, I couldn't process your voice message."
@@ -1425,6 +1442,16 @@ export function ChatBar() {
         }, 1000)
       }
     }
+  }
+
+  /** Stop button: abort the in-flight chat/voice request and any playing TTS. */
+  function handleStop() {
+    userStoppedRef.current = true
+    sendAbortRef.current?.abort()
+    sendAbortRef.current = null
+    cancelTTS()
+    setIsProcessing(false)
+    setProcessingStage(null)
   }
 
   function cancelTTS() {
@@ -1475,6 +1502,7 @@ export function ChatBar() {
 
     try {
       const controller = new AbortController()
+      sendAbortRef.current = controller
       const timer = setTimeout(() => controller.abort(), 90000) // Increased to 90s for GPT-5 Pro (cold starts can be slow)
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -1487,6 +1515,11 @@ export function ChatBar() {
         }),
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
+      if (res.status === 401) {
+        setMessages([...newMessages, { role: "assistant", content: "Your session has expired. Please refresh the page and sign in again.", isError: true, timestamp: Date.now() }])
+        setIsProcessing(false)
+        return
+      }
       if (!res.ok) throw new Error("Chat request failed")
 
       // Read streaming NDJSON — text arrives immediately, audio follows
@@ -1515,6 +1548,8 @@ export function ChatBar() {
                   content: chunk.reply,
                   timestamp: Date.now(),
                   createdTask: chunk.createdTask || null,
+                  // Server marks the canned LLM-failure fallback so it renders as an error
+                  ...(chunk.isError ? { isError: true } : {}),
                 }
                 setMessages([...newMessages, assistantMessage])
                 setIsProcessing(false)
@@ -1580,6 +1615,12 @@ export function ChatBar() {
         }
       }
     } catch (err) {
+      if ((err as any)?.name === 'AbortError' && userStoppedRef.current) {
+        // User pressed Stop — reset quietly, no error bubble
+        userStoppedRef.current = false
+        setIsProcessing(false)
+        return
+      }
       console.error(err)
       lastFailedInputRef.current = newMessages[newMessages.length - 1]?.content || ''
       setMessages([...newMessages, { role: "assistant", content: "Sorry, something went wrong. Tap retry to try again.", isError: true, timestamp: Date.now() }])
@@ -1741,6 +1782,14 @@ export function ChatBar() {
                        processingStage === 'speaking' ? 'Generating audio...' :
                        'Thinking...'}
                     </span>
+                    <button
+                      onClick={handleStop}
+                      aria-label="Stop generating"
+                      className="ml-1 flex items-center gap-1 rounded-full border border-theme-neutral-300 bg-white px-2 py-0.5 text-[11px] text-theme-text-tertiary hover:bg-theme-surface-selected transition"
+                    >
+                      <Square className="w-2.5 h-2.5 fill-current" />
+                      Stop
+                    </button>
                   </div>
                 </div>
               </div>
