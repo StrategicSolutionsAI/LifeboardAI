@@ -24,12 +24,12 @@ export default function OnboardingStep6Client() {
         <div className="text-6xl mb-4">🎉</div>
         <div className="space-y-4">
           <div className="bg-green-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-green-800 mb-2">Your Profile is Complete</h3>
-            <p className="text-green-600 text-sm">We've set up your personalized dashboard based on your preferences and chosen theme.</p>
+            <h3 className="font-semibold text-green-800 mb-2">Your Dashboard is Ready</h3>
+            <p className="text-green-600 text-sm">Your life buckets and theme are saved to your account and follow you across devices.</p>
           </div>
           <div className="bg-warm-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-warm-800 mb-2">AI Insights Ready</h3>
-            <p className="text-warm-600 text-sm">Our AI will start generating personalized insights as you track your data.</p>
+            <h3 className="font-semibold text-warm-800 mb-2">AI Assistant On Board</h3>
+            <p className="text-warm-600 text-sm">Ask the assistant on your dashboard to add tasks, check your schedule, or update your lists.</p>
           </div>
           <div className="bg-amber-50 p-4 rounded-lg">
             <h3 className="font-semibold text-amber-800 mb-2">Start Tracking Today</h3>
