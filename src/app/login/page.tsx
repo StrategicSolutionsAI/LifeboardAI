@@ -6,7 +6,16 @@ import { surface, form } from '@/lib/styles'
 
 export const dynamic = 'force-dynamic' // avoid static build for auth
 
-export default function Login() {
+// Next has already URL-decoded searchParams — decoding again would corrupt
+// messages containing literal %-sequences.
+function friendlyLoginError(message: string): string {
+  if (message === 'Invalid login credentials') {
+    return 'Incorrect email or password.'
+  }
+  return message
+}
+
+export default function Login({ searchParams }: { searchParams: { error?: string; message?: string; redirect?: string } }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={surface.pageBgStyle}>
       <SectionLoadTimer name="/login" />
@@ -30,6 +39,9 @@ export default function Login() {
 
         {/* Email */}
         <form action={emailLogin} className="space-y-4">
+          {searchParams.redirect && (
+            <input type="hidden" name="redirect" value={searchParams.redirect} />
+          )}
           <input
             name="email"
             type="email"
@@ -48,6 +60,18 @@ export default function Login() {
             Continue
           </Button>
         </form>
+
+        {searchParams.error && (
+          <p className="text-theme-error text-sm text-center">
+            {friendlyLoginError(searchParams.error)}
+          </p>
+        )}
+
+        {searchParams.message && !searchParams.error && (
+          <p className="text-theme-text-secondary text-sm text-center">
+            {searchParams.message}
+          </p>
+        )}
 
         <div className="text-center space-y-2 text-sm">
           <p className="text-theme-text-secondary">

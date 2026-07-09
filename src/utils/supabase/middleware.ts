@@ -4,40 +4,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+// Pages reachable without a session. Everything else redirects to /login.
+// The /auth/ prefix must stay public — the OAuth callback at /auth/callback
+// runs before cookies carry a user, so gating it would break Google login.
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/privacy', '/terms', '/error']
+const PUBLIC_PREFIXES = ['/auth/']
+
+function isPublicPath(pathname: string): boolean {
+  return (
+    PUBLIC_PATHS.includes(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  )
+}
+
 export async function updateSession(request: NextRequest) {
   const nonce = generateNonce()
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-nonce', nonce)
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  let response = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
+        getAll() {
+          return request.cookies.getAll()
         },
-        // The `set` and `remove` helpers accept an `opts` bag for expiry, path, etc.
-        // The `cookies.set()` typings currently only allow 2 params, so we suppress here.
-        set(name: string, value: string, opts: any) {
-          // eslint-disable-next-line
-          (request.cookies as any).set(name, value, opts)
-          // eslint-disable-next-line
-          (response.cookies as any).set(name, value, opts)
-        },
-        remove(name: string, opts: any) {
-          // eslint-disable-next-line
-          (request.cookies as any).set(name, '', opts)
-          // eslint-disable-next-line
-          (response.cookies as any).set(name, '', opts)
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          // Rebuild the response so it carries the updated request cookies,
+          // then write the refreshed auth cookies onto it.
+          response = NextResponse.next({ request: { headers: requestHeaders } })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
-  await supabase.auth.getSession()
+  // getUser() (not getSession()) — validates the token with Supabase instead
+  // of trusting the cookie, which is required now that we gate on the result.
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  // A network failure (offline Electron, Supabase outage) makes the session
+  // unverifiable, not absent — fail open rather than locking out valid users.
+  const authUnreachable = authError?.name === 'AuthRetryableFetchError'
+
+  if (!user && !authUnreachable && !isPublicPath(request.nextUrl.pathname)) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/login'
+    loginUrl.search = ''
+    // Preserve the intended destination so login can return to it
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search)
+    const redirect = NextResponse.redirect(loginUrl)
+    // Carry over any cookies getUser() refreshed so the work isn't lost
+    response.cookies.getAll().forEach((cookie) => {
+      redirect.cookies.set(cookie)
+    })
+    return redirect
+  }
+
   response.headers.set('x-nonce', nonce)
   response.headers.set('Content-Security-Policy', buildContentSecurityPolicy(nonce))
   return response

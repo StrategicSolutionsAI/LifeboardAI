@@ -38,20 +38,38 @@ export async function signUpWithGoogle() {
   redirect(data.url)
 }
 
+// Only allow same-origin path redirects — anything else could be used to
+// bounce a freshly logged-in user to an attacker-chosen site.
+function sanitizeRedirect(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+    return null
+  }
+  return value
+}
+
 // Email password login
 export async function emailLogin(formData: FormData): Promise<void> {
+  const redirectTo = sanitizeRedirect(formData.get('redirect'))
+  // Keep the deep link through error round-trips back to /login.
+  // (Explicit `never` annotation on the const lets TS narrow after calls.)
+  const loginError: (message: string) => never = (message) => {
+    const params = new URLSearchParams({ error: message })
+    if (redirectTo) params.set('redirect', redirectTo)
+    redirect(`/login?${params.toString()}`)
+  }
+
   const supabase = supabaseServer()
   const { error } = await supabase.auth.signInWithPassword({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   })
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`)
+    loginError(error.message)
   }
 
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) {
-    redirect('/login?error=Unable to load account profile')
+    loginError('Unable to load account profile')
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -61,7 +79,7 @@ export async function emailLogin(formData: FormData): Promise<void> {
     .maybeSingle()
 
   if (profileError) {
-    redirect(`/login?error=${encodeURIComponent(profileError.message)}`)
+    loginError(profileError.message)
   }
 
   if (!profile) {
@@ -70,25 +88,30 @@ export async function emailLogin(formData: FormData): Promise<void> {
       .insert({ id: user.id, onboarded: false })
 
     if (createProfileError) {
-      redirect(`/login?error=${encodeURIComponent(createProfileError.message)}`)
+      loginError(createProfileError.message)
     }
 
     redirect('/onboarding/0')
   }
 
-  redirect('/dashboard')
+  redirect(redirectTo ?? '/dashboard')
 }
 
 // Simple email sign-up
 
 export async function emailSignUp(formData: FormData): Promise<void> {
   const supabase = supabaseServer()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   })
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`)
+  }
+  if (!data.session) {
+    // Email confirmation is enabled — there is no session yet, so /onboarding
+    // would just bounce back to /login. Tell the user what to do instead.
+    redirect(`/login?message=${encodeURIComponent('Check your email to confirm your account, then sign in.')}`)
   }
   redirect('/onboarding/0')
 }
