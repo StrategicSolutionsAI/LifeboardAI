@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { X, Plus, Trash2, Pencil } from 'lucide-react'
-import * as Icons from 'lucide-react'
+import { getCategoryIcon, ICON_OPTIONS } from './category-icons'
 import { card, button, form } from '@/lib/styles'
 import type { BudgetCategory } from '@/types/budget'
 
@@ -13,19 +13,6 @@ interface Props {
   onDelete: (id: string) => Promise<void>
   onClose: () => void
 }
-
-function getCategoryIcon(iconName: string) {
-  const Icon = (Icons as any)[iconName]
-  return Icon ?? Icons.Circle
-}
-
-const ICON_OPTIONS = [
-  'Home', 'ShoppingCart', 'Car', 'Zap', 'Shield', 'Heart',
-  'UtensilsCrossed', 'Film', 'ShoppingBag', 'Sparkles',
-  'GraduationCap', 'CreditCard', 'PiggyBank', 'Gift',
-  'MoreHorizontal', 'Circle', 'Briefcase', 'Plane',
-  'Phone', 'Music', 'Dumbbell', 'Dog',
-]
 
 const COLOR_OPTIONS = [
   '#6366f1', '#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6',

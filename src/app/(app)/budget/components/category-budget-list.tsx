@@ -1,21 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import * as Icons from 'lucide-react'
 import { card } from '@/lib/styles'
 import { formatCurrency } from '@/lib/budget-utils'
 import { BudgetProgressBar } from './budget-progress-bar'
+import { getCategoryIcon } from './category-icons'
 import type { CategoryBudgetSummary } from '@/types/budget'
 
 interface Props {
   categories: CategoryBudgetSummary[]
   month: string
   onUpsertBudget: (data: { categoryId: string; month: string; amount: number }) => Promise<void>
-}
-
-function getCategoryIcon(iconName: string) {
-  const Icon = (Icons as any)[iconName]
-  return Icon ?? Icons.Circle
 }
 
 export function CategoryBudgetList({ categories, month, onUpsertBudget }: Props) {
