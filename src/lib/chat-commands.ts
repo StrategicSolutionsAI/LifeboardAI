@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server'
 // Types
 // ---------------------------------------------------------------------------
 
-type LifeboardCommand =
+export type LifeboardCommand =
   | { action: 'create_task'; content: string; due_date?: string; hour_slot?: number; bucket?: string }
   | { action: 'complete_task'; task_name: string }
   | { action: 'delete_task'; task_name: string }
@@ -431,7 +431,7 @@ function fixYear(dateStr: string | undefined | null): string | null {
 // Command execution
 // ---------------------------------------------------------------------------
 
-async function executeCommand(cmd: LifeboardCommand, ctx: CommandContext): Promise<CommandResult> {
+export async function executeCommand(cmd: LifeboardCommand, ctx: CommandContext): Promise<CommandResult> {
   switch (cmd.action) {
     // -----------------------------------------------------------------------
     // CREATE TASK

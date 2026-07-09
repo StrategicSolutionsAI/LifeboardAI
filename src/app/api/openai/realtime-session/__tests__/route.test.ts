@@ -26,6 +26,12 @@ jest.mock('@/lib/rate-limit', () => ({
   getRateLimitKey: (...args: unknown[]) => getRateLimitKey(...args),
 }))
 
+const buildChatContext = jest.fn()
+
+jest.mock('@/lib/chat-context', () => ({
+  buildChatContext: (...args: unknown[]) => buildChatContext(...args),
+}))
+
 describe('/api/openai/realtime-session', () => {
   const originalEnv = process.env
   const fetchMock = jest.fn()
@@ -39,6 +45,7 @@ describe('/api/openai/realtime-session', () => {
     }
     checkRateLimit.mockReturnValue(null)
     getRateLimitKey.mockReturnValue('user:test-user-id')
+    buildChatContext.mockResolvedValue({ systemContext: 'Tasks: call John', userId: 'test-user-id' })
     global.fetch = fetchMock as typeof fetch
   })
 
@@ -70,7 +77,7 @@ describe('/api/openai/realtime-session', () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
-        client_secret: { value: 'ephemeral-secret' },
+        value: 'ephemeral-secret',
       }),
     })
 
@@ -90,14 +97,48 @@ describe('/api/openai/realtime-session', () => {
     expect(getRateLimitKey).toHaveBeenCalledWith(request, 'test-user-id')
     expect(checkRateLimit).toHaveBeenCalledWith('user:test-user-id')
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/realtime/sessions',
+      'https://api.openai.com/v1/realtime/client_secrets',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
           Authorization: 'Bearer test-openai-key',
+          'OpenAI-Safety-Identifier': 'test-user-id',
         }),
       })
     )
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sentBody.session.type).toBe('realtime')
+    expect(sentBody.session.model).toBe('gpt-4o-realtime-preview')
+    expect(sentBody.session.audio.output.voice).toBe('alloy')
+    expect(sentBody.session.instructions).toContain('Tasks: call John')
+    const toolNames = sentBody.session.tools.map((tool: { name: string }) => tool.name)
+    expect(toolNames).toEqual(expect.arrayContaining(['create_task', 'complete_task', 'add_calendar_event', 'refresh_context']))
+  })
+
+  it('still creates a session when dashboard context fails to build', async () => {
+    supabaseMockInstance.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'test-user-id' } },
+      error: null,
+    })
+    buildChatContext.mockRejectedValue(new Error('context blew up'))
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ value: 'ephemeral-secret' }),
+    })
+
+    const request = new NextRequest('http://localhost:3000/api/openai/realtime-session', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.client_secret).toBe('ephemeral-secret')
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sentBody.session.instructions).not.toContain('Current dashboard state')
   })
 
   it('returns 429 when the caller exceeds the realtime session limit', async () => {

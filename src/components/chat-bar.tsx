@@ -10,7 +10,6 @@ import {
   getFollowUpChips,
   loadStoredMessages,
   ensureIds,
-  cleanAssistantContent,
   CHAT_STORAGE_KEY,
 } from "./chat/chat-utils"
 import { ChatHeader } from "./chat/chat-header"
@@ -103,10 +102,6 @@ export function ChatBar() {
   const [rtGatheringState, setRtGatheringState] = useState<string>('')
   const [rtReconnecting, setRtReconnecting] = useState(false)
   const rtDCRef = useRef<RTCDataChannel | null>(null)
-  const rtTextBufferRef = useRef<string>('')
-  const rtLastTranscriptRef = useRef<string>('')
-  const rtCreateLockRef = useRef<boolean>(false)
-  const rtAudioTranscriptRef = useRef<string>('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const settingsPanelRef = useRef<HTMLDivElement | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -694,10 +689,6 @@ export function ChatBar() {
 
     if (isVoiceMode) {
       // Exit voice mode
-      // Reset Realtime state guards
-      rtTextBufferRef.current = ''
-      rtLastTranscriptRef.current = ''
-      rtCreateLockRef.current = false
       setIsVoiceMode(false)
       setIsSpeaking(false)
       setIsProcessing(false)
@@ -714,10 +705,6 @@ export function ChatBar() {
       }
     } else {
       // Enter voice mode
-      // Reset guards for a clean session
-      rtTextBufferRef.current = ''
-      rtLastTranscriptRef.current = ''
-      rtCreateLockRef.current = false
       setIsVoiceMode(true)
       if (useRealtime) {
         // Prefer Realtime agent; fallback to classic STT if it fails
@@ -741,7 +728,7 @@ export function ChatBar() {
         body: JSON.stringify({ voice: ttsVoice })
       })
       if (!sessRes.ok) throw new Error('Failed to create realtime session')
-      const { client_secret, model } = await sessRes.json()
+      const { client_secret } = await sessRes.json()
       if (!client_secret) throw new Error('Missing client_secret')
 
       // 2) Capture mic - try specific device first, fallback to default
@@ -844,320 +831,68 @@ export function ChatBar() {
         }
       }
 
-      // 6) Data channel for Realtime events (text transcripts, etc.)
+      // 6) Data channel for Realtime events (transcripts and tool calls)
       const dc = pc.createDataChannel('oai-events')
       rtDCRef.current = dc
       dc.onmessage = async (evt) => {
-        const data = evt.data
-        const lines = typeof data === 'string' ? data.split('\n') : []
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const frame = JSON.parse(line)
-            const t = frame?.type
-            try {
-              if (typeof t === 'string' && (/^response\./.test(t) || /^input_/.test(t))) {
-              }
-            } catch {}
-            // Capture user speech transcript if available and try immediate parse
-            if (t === 'input_audio_transcription.completed' && typeof frame.transcript === 'string') {
-              const transcript: string = String(frame.transcript || '')
-              rtLastTranscriptRef.current = transcript
-              // Opportunistic immediate creation from transcript (so we aren't dependent on model text frames)
-              try {
-                if (!rtCreateLockRef.current) {
-                  const triggers = /(add\s+(a\s+)?task|add\s+to\s+tasks|create\s+task)/i
-                    if (triggers.test(transcript)) {
-                      const now = new Date()
-                      let due_date: string | null = null
-                      let hour_slot: number | undefined
-                    if (/\b(today|tonight)\b/i.test(transcript)) {
-                      due_date = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                      // Heuristic: tonight ≈ 8pm local time
-                      if (/\btonight\b/i.test(transcript)) {
-                        hour_slot = 20
-                      }
-                    } else if (/\b(tomorrow)\b/i.test(transcript)) {
-                      const t2 = new Date(now); t2.setDate(t2.getDate()+1)
-                      due_date = new Date(t2.getTime() - t2.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                    }
-                    const timeMatch = transcript.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
-                    if (timeMatch) {
-                      let h = parseInt(timeMatch[1], 10)
-                      const mer = (timeMatch[3] || '').toLowerCase()
-                      if (mer === 'pm' && h < 12) h += 12
-                      if (mer === 'am' && h === 12) h = 0
-                      if (h >= 0 && h <= 23) hour_slot = h
-                    }
-                    let bucket: string | undefined
-                    const bucketMatch = transcript.match(/\bin\s+(work|personal|health|home|family|household)\b/i)
-                    if (bucketMatch) bucket = bucketMatch[1]
-                    let content = transcript
-                      .replace(/\b(add\s+(a\s+)?task(\s+to)?|create\s+task)\b/i, '')
-                      .replace(/\bfor\s+(today|tomorrow|tonight)\b/ig, '')
-                      .replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/ig, '')
-                      .replace(/\bin\s+(work|personal|health|home|family|household)\b/ig, '')
-                      .replace(/\s+/g, ' ')
-                      .trim()
-                    content = cleanAssistantContent(content)
-                    if (content) {
-                      rtCreateLockRef.current = true
-                      const res = await fetch('/api/integrations/todoist/tasks', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content, due_date, hour_slot, bucket })
-                      })
-                      if (res.ok) {
-                        const json = await res.json().catch(() => ({}))
-                        // Add a minimal assistant message immediately for feedback
-                        const confirmText = `✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`
-                        setMessages(prev => [...prev, { role: 'assistant', content: confirmText, createdTask: json.task || null }])
-                        notifyTasksUpdated()
-                      } else {
-                        console.warn('⚠️ Realtime transcript task create failed', res.status)
-                        rtCreateLockRef.current = false
-                      }
-                    }
-                  }
-                }
-              } catch {}
-            }
+        let frame: any
+        try { frame = JSON.parse(typeof evt.data === 'string' ? evt.data : '') } catch { return }
+        const t = frame?.type
 
-            // Accumulate assistant audio transcript as a fallback source of text
-            if (t === 'response.audio_transcript.delta' && typeof frame.delta === 'string') {
-              rtAudioTranscriptRef.current += frame.delta
-            }
-            if (t === 'response.audio_transcript.done') {
-              const aText = (rtAudioTranscriptRef.current || '').trim()
-              rtAudioTranscriptRef.current = ''
-              if (aText && !rtCreateLockRef.current) {
-                try {
-                  // 0) Try to salvage a JSON command printed in speech text
-                  const jsonCmdMatch = aText.match(/\{\s*"action"\s*:\s*"create_task"[\s\S]*?\}/)
-                  if (jsonCmdMatch) {
-                    try {
-                      const cmd = JSON.parse(jsonCmdMatch[0]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
-                      if (cmd && cmd.action === 'create_task' && cmd.content) {
-                        const res = await fetch('/api/integrations/todoist/tasks', {
-                          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ content: cmd.content, due_date: cmd.due_date || null, hour_slot: typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined, bucket: cmd.bucket || undefined })
-                        })
-                        if (res.ok) {
-                          const json = await res.json().catch(() => ({}))
-                          rtCreateLockRef.current = true
-                          setMessages(prev => [...prev, { role: 'assistant', content: `✅ I added “${cmd.content}”${cmd.due_date ? ` for ${cmd.due_date}` : ''}.`, createdTask: json.task || null }])
-                          notifyTasksUpdated()
-                          return
-                        }
-                      }
-                    } catch {}
-                  }
-
-                  // 1) Natural language fallback on assistant transcript
-                  const candidate = aText
-                  const triggers = /(\badd\b|\bschedule\b|\bcreate\b|\bmake\b|\bset\b|\bput\b|\bremind\b|\bi\s*(?:just\s*)?added\b|\bi(?:'|’)ve\s+added\b|\bit(?:'|’)s\s+added\b|\badded\s+it\b|\bi(?:'|’)ll\s*add\b)/i
-                  const quotedAny = (candidate.match(/[“\"']([^”\"']+)[”\"']/) || [])[1]
-                  const userTextNL = (rtLastTranscriptRef.current || '').trim()
-                  // Require either quoted content or a user transcript; don't create from assistant filler alone
-                  if (!(quotedAny || userTextNL)) {
-                    return
-                  }
-                  if (triggers.test(candidate) || quotedAny) {
-                    const now = new Date()
-                    let due_date: string | null = null
-                    let hour_slot: number | undefined
-                    if (/\b(today|tonight)\b/i.test(candidate)) {
-                      due_date = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                      if (/\btonight\b/i.test(candidate)) {
-                        hour_slot = 20
-                      }
-                    } else if (/\b(tomorrow)\b/i.test(candidate)) {
-                      const t2 = new Date(now); t2.setDate(t2.getDate()+1)
-                      due_date = new Date(t2.getTime() - t2.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                    }
-                    const timeMatch = candidate.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
-                    if (timeMatch) {
-                      let h = parseInt(timeMatch[1], 10)
-                      const mer = (timeMatch[3] || '').toLowerCase()
-                      if (mer === 'pm' && h < 12) h += 12
-                      if (mer === 'am' && h === 12) h = 0
-                      if (h >= 0 && h <= 23) hour_slot = h
-                    }
-                    let bucket: string | undefined
-                    const bucketMatch = candidate.match(/\bin\s+(work|personal|health|home|family|household)\b/i)
-                    if (bucketMatch) bucket = bucketMatch[1]
-                    let content = ''
-                    const quoted = candidate.match(/[“\"']([^”\"']+)[”\"']/)
-                    if (quoted && quoted[1]) content = quoted[1].trim()
-                    if (!content && userTextNL) {
-                      // Prefer user transcript text when available
-                      content = userTextNL
-                    }
-                    if (!content) content = candidate
-                      .replace(/\b(add\s+(a\s+)?task(\s+to)?|create\s+task)\b/i, '')
-                      .replace(/\b(add|schedule|create|make|set|put|remind)\b/ig, '')
-                      .replace(/\b(i\s*(?:just\s*)?added\b|i(?:'|’)ve\s+added\b|it(?:'|’)s\s+added\b|added\s+it\b|i(?:'|’)ll\s*add\b)/ig, '')
-                      .replace(/\bfor\s+(today|tomorrow|tonight)\b/ig, '')
-                      .replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/ig, '')
-                      .replace(/\bin\s+(work|personal|health|home|family|household)\b/ig, '')
-                      .replace(/\s+/g, ' ')
-                      .trim()
-                    content = cleanAssistantContent(content)
-                    if (content && content.length > 2) {
-                      const res = await fetch('/api/integrations/todoist/tasks', {
-                        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ content, due_date, hour_slot, bucket })
-                      })
-                      if (res.ok) {
-                        const json = await res.json().catch(() => ({}))
-                        rtCreateLockRef.current = true
-                        setMessages(prev => [...prev, { role: 'assistant', content: `✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`, createdTask: json.task || null }])
-                        notifyTasksUpdated()
-                      } else {
-                        console.warn('⚠️ Realtime assistant transcript task create failed', res.status)
-                      }
-                    }
-                  }
-                } catch {}
-              }
-            }
-            if (t === 'response.output_text.delta' && typeof frame.delta === 'string') {
-              rtTextBufferRef.current += frame.delta
-            }
-            if (t === 'response.output_text.done' || t === 'response.completed') {
-              const text = rtTextBufferRef.current.trim()
-              rtTextBufferRef.current = ''
-              if (text) {
-                // Add assistant message to UI and try to execute any task command
-                let createdTask: any = null
-                // Detect LIFEBOARD_CMD
-                const cmdMatch = text.match(/\[LIFEBOARD_CMD\]([\s\S]*?)\[\/LIFEBOARD_CMD\]/)
-                let finalText = text
-                if (cmdMatch) {
-                  try {
-                    const cmd = JSON.parse(cmdMatch[1]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
-                    if (cmd.action === 'create_task' && cmd.content) {
-                      const res = await fetch('/api/integrations/todoist/tasks', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          content: cmd.content,
-                          due_date: cmd.due_date || null,
-                          hour_slot: typeof cmd.hour_slot === 'number' ? cmd.hour_slot : undefined,
-                          bucket: cmd.bucket || undefined,
-                        })
-                      })
-                      if (res.ok) {
-                        const json = await res.json()
-                        createdTask = json.task || null
-                        finalText = text.replace(cmdMatch[0], `\n\n✅ I added “${cmd.content}”${cmd.due_date ? ` for ${cmd.due_date}` : ''}.`)
-                        // Broadcast update
-                        notifyTasksUpdated()
-                      } else {
-                        finalText = text.replace(cmdMatch[0], `\n\n⚠️ I couldn’t create the task (auth or server error).`)
-                      }
-                    }
-                  } catch {
-                    finalText = text.replace(cmdMatch[0], '')
-                  }
-                }
-
-                // Fallback when no LIFEBOARD_CMD is present: parse natural language or quoted text
-                if (!cmdMatch && !rtCreateLockRef.current) {
-                  try {
-                    // 0) Try to extract a JSON command object printed without tags
-                    const jsonCmdMatch = text.match(/\{\s*"action"\s*:\s*"create_task"[\s\S]*?\}/)
-                    if (jsonCmdMatch) {
-                      try {
-                        const cmd2 = JSON.parse(jsonCmdMatch[0]) as { action?: string; content?: string; due_date?: string; hour_slot?: number; bucket?: string }
-                        if (cmd2 && cmd2.action === 'create_task' && cmd2.content) {
-                          const res = await fetch('/api/integrations/todoist/tasks', {
-                            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ content: cmd2.content, due_date: cmd2.due_date || null, hour_slot: typeof cmd2.hour_slot === 'number' ? cmd2.hour_slot : undefined, bucket: cmd2.bucket || undefined })
-                          })
-                          if (res.ok) {
-                            const json = await res.json().catch(() => ({}))
-                            createdTask = json.task || null
-                            finalText = `${text}\n\n✅ I added “${cmd2.content}”${cmd2.due_date ? ` for ${cmd2.due_date}` : ''}.`
-                            notifyTasksUpdated()
-                            rtCreateLockRef.current = true
-                          }
-                        }
-                      } catch {}
-                    }
-
-                    // 1) Liberal triggers: allow "add", "schedule", "remind", etc., not only "task"
-                    const triggers = /(\badd\b|\bschedule\b|\bcreate\b|\bmake\b|\bset\b|\bput\b|\bremind\b|\bi\s*(?:just\s*)?added\b|\bi(?:'|’)ve\s+added\b|\bit(?:'|’)s\s+added\b|\badded\s+it\b|\bi(?:'|’)ll\s*add\b)/i
-                    const sourceAssistant = text
-                    const sourceUser = rtLastTranscriptRef.current || ''
-                    const candidate = triggers.test(sourceUser) ? sourceUser : (triggers.test(sourceAssistant) ? sourceAssistant : '')
-                    // Also accept if there is a quoted content even without triggers
-                    const quotedAny = (candidate.match(/[“\"']([^”\"']+)[”\"']/) || [])[1]
-                    if (triggers.test(candidate) || quotedAny) {
-                      const now = new Date()
-                      let due_date: string | null = null
-                      if (/\b(today|tonight)\b/i.test(candidate)) {
-                        due_date = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                      } else if (/\b(tomorrow)\b/i.test(candidate)) {
-                        const t2 = new Date(now); t2.setDate(t2.getDate()+1)
-                        due_date = new Date(t2.getTime() - t2.getTimezoneOffset()*60000).toISOString().slice(0,10)
-                      }
-                      let hour_slot: number | undefined
-                      const timeMatch = candidate.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
-                      if (timeMatch) {
-                        let h = parseInt(timeMatch[1], 10)
-                        const mer = (timeMatch[3] || '').toLowerCase()
-                        if (mer === 'pm' && h < 12) h += 12
-                        if (mer === 'am' && h === 12) h = 0
-                        if (h >= 0 && h <= 23) hour_slot = h
-                      }
-                      let bucket: string | undefined
-                      const bucketMatch = candidate.match(/\bin\s+(work|personal|health|home|family|household)\b/i)
-                      if (bucketMatch) bucket = bucketMatch[1]
-                      // Try quoted content first (e.g., I added "call Alex")
-                      let content = ''
-                      const quoted = candidate.match(/[“\"']([^”\"']+)[”\"']/)
-                      if (quoted && quoted[1]) {
-                        content = quoted[1].trim()
-                      }
-                      if (!content) content = candidate
-                        .replace(/\b(add\s+(a\s+)?task(\s+to)?|create\s+task)\b/i, '')
-                        .replace(/\b(i\s*(?:just\s*)?added\b|i(?:'|’)ve\s+added\b|it(?:'|’)s\s+added\b|added\s+it\b|i(?:'|’)ll\s*add\b)/ig, '')
-                        .replace(/\b(add|schedule|create|make|set|put|remind)\b/ig, '')
-                        .replace(/\bfor\s+(today|tomorrow|tonight)\b/ig, '')
-                        .replace(/\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?/ig, '')
-                        .replace(/\bin\s+(work|personal|health|home|family|household)\b/ig, '')
-                        .replace(/\s+/g, ' ')
-                        .trim()
-                      if (content) {
-                        const res = await fetch('/api/integrations/todoist/tasks', {
-                          method: 'POST',
-                          credentials: 'same-origin',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ content, due_date, hour_slot, bucket })
-                        })
-                        if (res.ok) {
-                          const json = await res.json()
-                          createdTask = json.task || null
-                          finalText = `${text}\n\n✅ I added “${content}”${due_date ? ` for ${due_date}` : ''}.`
-                          notifyTasksUpdated()
-                          rtCreateLockRef.current = true
-                        } else {
-                          console.warn('⚠️ Realtime fallback task create failed', res.status)
-                        }
-                      }
-                    }
-                  } catch {}
-                }
-
-                setMessages(prev => [...prev, { role: 'assistant', content: finalText, createdTask }])
-              }
-            }
-          } catch {
-            // ignore parse errors
+        // Show what the user said once the server transcribes it
+        if (t === 'conversation.item.input_audio_transcription.completed') {
+          const transcript = String(frame.transcript || '').trim()
+          if (transcript) {
+            setMessages(prev => [...prev, { role: 'user', content: transcript, timestamp: Date.now() }])
           }
+          return
+        }
+
+        // Assistant reply text: transcript of the spoken audio (or text-only fallback)
+        if (t === 'response.output_audio_transcript.done' || t === 'response.output_text.done') {
+          const text = String(frame.transcript ?? frame.text ?? '').trim()
+          if (text) {
+            setMessages(prev => [...prev, { role: 'assistant', content: text, timestamp: Date.now() }])
+          }
+          return
+        }
+
+        // Native tool calls: execute each via the server, return the results
+        // over the data channel, then ask the model to continue speaking.
+        if (t === 'response.done') {
+          const items = Array.isArray(frame?.response?.output) ? frame.response.output : []
+          const calls = items.filter((item: any) => item?.type === 'function_call' && item.call_id && item.name)
+          if (calls.length === 0) return
+          for (const call of calls) {
+            let result: { success: boolean; message: string }
+            try {
+              let args: Record<string, unknown> = {}
+              try { args = JSON.parse(call.arguments || '{}') } catch {}
+              const res = await fetch('/api/chat/execute-command', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: call.name, ...args }),
+              })
+              result = res.ok
+                ? await res.json()
+                : { success: false, message: `Command failed (${res.status})` }
+            } catch {
+              result = { success: false, message: 'Command failed (network error)' }
+            }
+            if (result.success && call.name !== 'refresh_context') {
+              notifyTasksUpdated([1000, 3000])
+            }
+            // Channel may close mid-call if the user exits voice mode
+            try {
+              dc.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: { type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) },
+              }))
+            } catch {}
+          }
+          // One continuation after all outputs — the model speaks the confirmation
+          try { dc.send(JSON.stringify({ type: 'response.create' })) } catch {}
         }
       }
 
@@ -1165,13 +900,13 @@ export function ChatBar() {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
-      // 8) Send to OpenAI Realtime with ephemeral secret
-      const resp = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+      // 8) Send to OpenAI Realtime with ephemeral secret (GA API: the session
+      // and its model are bound to the ephemeral key, so no model param)
+      const resp = await fetch('https://api.openai.com/v1/realtime/calls', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${client_secret}`,
           'Content-Type': 'application/sdp',
-          'OpenAI-Beta': 'realtime=v1',
         },
         body: offer.sdp || ''
       })
