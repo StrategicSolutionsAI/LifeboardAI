@@ -6,15 +6,17 @@ import { OnboardingLayout } from "@/components/onboarding-layout"
 import { cn } from "@/lib/utils"
 import { Check, Plus } from "lucide-react"
 import { themeColors, ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme } from "@/lib/theme"
+import { updateUserPreferenceFields } from "@/lib/user-preferences"
+import { getContrastText } from "@/lib/dashboard-utils"
 
 export default function OnboardingStep3() {
   const router = useRouter()
-  const [selectedTheme, setSelectedTheme] = useState<string>("indigo") // Default to indigo
+  const [selectedTheme, setSelectedTheme] = useState<string>(themeColors[0].id)
   const [showCustomColorForm, setShowCustomColorForm] = useState(false)
   const [customThemeName, setCustomThemeName] = useState('')
-  const [customPrimary, setCustomPrimary] = useState('#5271F8')
-  const [customSecondary, setCustomSecondary] = useState('#7482FE')
-  const [customAccent, setCustomAccent] = useState('#909CFF')
+  const [customPrimary, setCustomPrimary] = useState('#B1916A')
+  const [customSecondary, setCustomSecondary] = useState('#bb9e7b')
+  const [customAccent, setCustomAccent] = useState('#dbd6cf')
   const [allThemes, setAllThemes] = useState<ThemeColor[]>(getAllThemes())
 
   const handleCreateCustomTheme = () => {
@@ -33,9 +35,9 @@ export default function OnboardingStep3() {
     
     // Reset form
     setCustomThemeName('')
-    setCustomPrimary('#5271F8')
-    setCustomSecondary('#7482FE')
-    setCustomAccent('#909CFF')
+    setCustomPrimary('#B1916A')
+    setCustomSecondary('#bb9e7b')
+    setCustomAccent('#dbd6cf')
     setShowCustomColorForm(false)
   }
 
@@ -43,11 +45,14 @@ export default function OnboardingStep3() {
     // Store selected theme in localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('user_theme', selectedTheme)
-      
+
       // Store the full theme object for easier access
       const selectedThemeData = allThemes.find(theme => theme.id === selectedTheme)
       if (selectedThemeData) {
         localStorage.setItem('theme_colors', JSON.stringify(selectedThemeData))
+        // Fire-and-forget sync so the choice survives across devices
+        // (same pattern as ThemeProvider.setTheme)
+        void updateUserPreferenceFields({ selected_theme: selectedThemeData })
       }
     }
     router.push("/onboarding/4")
@@ -56,6 +61,8 @@ export default function OnboardingStep3() {
   const handleBack = () => {
     router.push("/onboarding/2")
   }
+
+  const previewTheme = allThemes.find(t => t.id === selectedTheme) ?? themeColors[0]
 
   return (
     <OnboardingLayout
@@ -81,7 +88,7 @@ export default function OnboardingStep3() {
               className={cn(
                 "w-full p-4 rounded-lg border-2 transition-all text-left",
                 selectedTheme === theme.id
-                  ? "border-theme-primary bg-theme-primary bg-opacity-10"
+                  ? "border-theme-primary bg-theme-brand-tint"
                   : "border-[#E5E7EB] bg-white hover:border-[#D1D5DB]"
               )}
             >
@@ -223,21 +230,21 @@ export default function OnboardingStep3() {
               <div className="mt-4 p-4 bg-white rounded-lg border">
                 <h5 className="text-sm font-medium text-theme-text-body mb-3">Preview</h5>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div 
-                    className="px-4 py-2 rounded-full text-white text-sm font-medium"
-                    style={{ backgroundColor: customPrimary }}
+                  <div
+                    className="px-4 py-2 rounded-full text-sm font-medium"
+                    style={{ backgroundColor: customPrimary, color: getContrastText(customPrimary) }}
                   >
                     Primary
                   </div>
-                  <div 
-                    className="px-4 py-2 rounded-full text-white text-sm font-medium"
-                    style={{ backgroundColor: customSecondary }}
+                  <div
+                    className="px-4 py-2 rounded-full text-sm font-medium"
+                    style={{ backgroundColor: customSecondary, color: getContrastText(customSecondary) }}
                   >
                     Secondary
                   </div>
-                  <div 
-                    className="px-4 py-2 rounded-full text-white text-sm font-medium"
-                    style={{ backgroundColor: customAccent }}
+                  <div
+                    className="px-4 py-2 rounded-full text-sm font-medium"
+                    style={{ backgroundColor: customAccent, color: getContrastText(customAccent) }}
                   >
                     Accent
                   </div>
@@ -267,21 +274,21 @@ export default function OnboardingStep3() {
         <div className="flex flex-col gap-3 mt-4 p-4 bg-[#F9FAFB] rounded-lg border">
           <h3 className="text-[16px] font-medium text-[#171A1F]">Preview</h3>
           <div className="flex items-center gap-3">
-            <div 
-              className="px-4 py-2 rounded-full text-white text-sm font-medium"
-              style={{ backgroundColor: allThemes.find(t => t.id === selectedTheme)?.primary }}
+            <div
+              className="px-4 py-2 rounded-full text-sm font-medium"
+              style={{ backgroundColor: previewTheme.primary, color: getContrastText(previewTheme.primary) }}
             >
               Primary Button
             </div>
-            <div 
-              className="px-4 py-2 rounded-full text-white text-sm font-medium"
-              style={{ backgroundColor: allThemes.find(t => t.id === selectedTheme)?.secondary }}
+            <div
+              className="px-4 py-2 rounded-full text-sm font-medium"
+              style={{ backgroundColor: previewTheme.secondary, color: getContrastText(previewTheme.secondary) }}
             >
               Secondary
             </div>
-            <div 
-              className="px-4 py-2 rounded-full text-white text-sm font-medium"
-              style={{ backgroundColor: allThemes.find(t => t.id === selectedTheme)?.accent }}
+            <div
+              className="px-4 py-2 rounded-full text-sm font-medium"
+              style={{ backgroundColor: previewTheme.accent, color: getContrastText(previewTheme.accent) }}
             >
               Accent
             </div>
