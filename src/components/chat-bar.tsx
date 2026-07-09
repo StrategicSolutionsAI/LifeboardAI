@@ -1229,9 +1229,11 @@ export function ChatBar() {
       formData.append('voice', ttsVoice)
       formData.append('speak', speakReplies ? '1' : '0')
 
-      // Send conversation history so the voice AI can follow up on prior exchanges
+      // Send conversation history so the voice AI can follow up on prior
+      // exchanges. Error bubbles ("session expired", "something went wrong")
+      // are UI-only — never feed them back as assistant turns.
       const history = messages
-        .filter(m => m.content && m.content !== '🎤 Voice message')
+        .filter(m => m.content && m.content !== '🎤 Voice message' && !m.isError)
         .map(m => ({ role: m.role, content: m.content }))
       if (history.length > 0) {
         formData.append('history', JSON.stringify(history))
@@ -1514,7 +1516,8 @@ export function ChatBar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          // Error bubbles are UI-only — never feed them back as assistant turns.
+          messages: newMessages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content })),
           // Only request server TTS (a paid chatterbox-turbo prediction) when
           // the speak-replies toggle is on. Rate is applied via playbackRate.
           ...(speakReplies ? { tts: { voice: ttsVoice } } : {})
