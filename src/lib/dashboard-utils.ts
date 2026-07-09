@@ -1,9 +1,11 @@
 import type { User } from "@supabase/supabase-js";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import { widgetTemplates } from "@/lib/widget-templates";
+import { dateStr } from "@/lib/date-utils";
 
-// Re-export icons from dedicated module (keeps backward compat for existing imports)
-export { iconMap, getIconComponent } from "@/lib/dashboard-icons";
+// Re-export so existing `import { dateStr } from '@/lib/dashboard-utils'`
+// call sites keep working — the implementation lives in date-utils.ts.
+export { dateStr };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,8 +42,6 @@ export interface UndoState {
 // Constants
 // ---------------------------------------------------------------------------
 
-// iconMap is now in @/lib/dashboard-icons — re-exported above
-
 export const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
   progress: "bg-theme-info",
   integration: "bg-theme-success",
@@ -54,7 +54,7 @@ export const LOG_KIND_DOT_CLASS: Record<WidgetLogEntry["kind"], string> = {
 // Pure utility functions
 // ---------------------------------------------------------------------------
 
-export const extractFirstWord = (value: unknown): string | null => {
+const extractFirstWord = (value: unknown): string | null => {
   if (typeof value !== "string") {
     return null;
   }
@@ -101,9 +101,7 @@ export const deriveGreetingName = (profile: ProfileNameRow | null, supabaseUser:
   return "there";
 };
 
-// getIconComponent is now in @/lib/dashboard-icons — re-exported above
-
-export const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
   const clean = hex.replace('#', '');
   return {
     r: parseInt(clean.slice(0, 2), 16),
@@ -134,9 +132,14 @@ export const getWidgetColorStyles = (hex: string) => {
   };
 };
 
-export const dateStr = (d: Date) => d.toISOString().slice(0, 10);
-export const todayStrGlobal = dateStr(new Date());
-export const yesterdayStrGlobal = dateStr(new Date(Date.now() - 86400000));
+// Functions, not module-level constants — the app (especially Electron) stays
+// open across midnight, so "today" has to be computed at call time.
+export const todayStrGlobal = () => dateStr(new Date());
+export const yesterdayStrGlobal = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return dateStr(d);
+};
 
 export function withRetry<T>(loader: () => Promise<T>, retries = 2, delayMs = 1500) {
   return async () => {

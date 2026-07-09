@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
+import { normalizeHourSlot } from '@/lib/date-utils'
 import { syncTaskToCalendarEvent } from '@/lib/calendar-sync'
 
 export const POST = withAuth(async (req, { supabase, user }) => {
@@ -18,18 +19,6 @@ export const POST = withAuth(async (req, { supabase, user }) => {
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (typeof patch.content === 'string') updateData.content = patch.content
     if (typeof patch.completed === 'boolean') updateData.completed = patch.completed
-    const normalizeHourSlot = (value: unknown): string | null => {
-      if (typeof value === 'string' && value.trim().length > 0) {
-        const trimmed = value.trim()
-        return trimmed.startsWith('hour-') ? trimmed : `hour-${trimmed}`
-      }
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        const h = Math.max(0, Math.min(23, value))
-        const display = h === 0 ? '12AM' : (h < 12 ? `${h}AM` : (h === 12 ? '12PM' : `${h - 12}PM`))
-        return `hour-${display}`
-      }
-      return null
-    }
 
     if (patch.startDate !== undefined) updateData.start_date = patch.startDate ?? null
     if (patch.endDate !== undefined) updateData.end_date = patch.endDate ?? null
@@ -43,8 +32,11 @@ export const POST = withAuth(async (req, { supabase, user }) => {
       updateData.due_date = patch.startDate ?? null
     }
 
-    if (patch.hourSlot !== undefined) updateData.hour_slot = normalizeHourSlot(patch.hourSlot)
-    if (patch.endHourSlot !== undefined) updateData.end_hour_slot = normalizeHourSlot(patch.endHourSlot)
+    // `?? null` matters: the shared normalizer returns undefined for empty
+    // input, but this route relies on writing null to CLEAR the column
+    // (undefined would be dropped from the update and skip the clear).
+    if (patch.hourSlot !== undefined) updateData.hour_slot = normalizeHourSlot(patch.hourSlot) ?? null
+    if (patch.endHourSlot !== undefined) updateData.end_hour_slot = normalizeHourSlot(patch.endHourSlot) ?? null
     if (patch.allDay !== undefined) updateData.all_day = patch.allDay
     if (patch.bucket !== undefined) updateData.bucket = patch.bucket ?? null
     if (patch.repeatRule !== undefined) updateData.repeat_rule = patch.repeatRule ?? null
