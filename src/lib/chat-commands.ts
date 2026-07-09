@@ -190,11 +190,22 @@ function stripCommandBlocks(reply: string): string {
 // Name matching
 // ---------------------------------------------------------------------------
 
-function matchByName(
+export interface NameMatch {
+  item: any
+  /**
+   * `true` for an exact / substring / reverse-substring match (tiers 1-3) —
+   * safe to auto-execute. `false` for a fuzzy word-overlap match (tier 4),
+   * which must be confirmed before any destructive action so "delete the
+   * dentist thing" can't silently nuke an unrelated task.
+   */
+  strong: boolean
+}
+
+export function matchByName(
   items: any[],
   searchName: string,
   contentField: string,
-): any | null {
+): NameMatch | null {
   const needle = searchName.toLowerCase().trim()
   if (!needle) return null
 
@@ -202,17 +213,17 @@ function matchByName(
 
   // 1. Exact match
   const exact = items.find(i => getField(i).trim() === needle)
-  if (exact) return exact
+  if (exact) return { item: exact, strong: true }
 
   // 2. Item contains search string
   const contains = items.find(i => getField(i).includes(needle))
-  if (contains) return contains
+  if (contains) return { item: contains, strong: true }
 
   // 3. Search string contains item name
   const reverse = items.find(i => needle.includes(getField(i).trim()))
-  if (reverse) return reverse
+  if (reverse) return { item: reverse, strong: true }
 
-  // 4. Word overlap scoring
+  // 4. Word overlap scoring — a weak, ambiguous match
   const needleWords = needle.split(/\s+/).filter(Boolean)
   let bestMatch: any | null = null
   let bestScore = 0
@@ -230,14 +241,16 @@ function matchByName(
     }
   }
 
-  return bestMatch
+  return bestMatch ? { item: bestMatch, strong: false } : null
 }
 
-/** Find a task by name across Supabase and (optionally) Todoist. */
+/** Find a task by name across Supabase and (optionally) Todoist. `strong` is
+ * false when only a fuzzy word-overlap match was found — destructive callers
+ * must confirm before acting on a weak match. */
 async function findTaskByName(
   ctx: CommandContext,
   taskName: string,
-): Promise<{ id: string; content: string; source: 'supabase' | 'todoist' } | null> {
+): Promise<{ id: string; content: string; source: 'supabase' | 'todoist'; strong: boolean } | null> {
   // Try lifeboard_tasks first
   const { data: tasks } = await ctx.supabase
     .from('lifeboard_tasks')
@@ -249,7 +262,7 @@ async function findTaskByName(
 
   if (tasks && tasks.length > 0) {
     const match = matchByName(tasks, taskName, 'content')
-    if (match) return { id: match.id, content: match.content, source: 'supabase' }
+    if (match) return { id: match.item.id, content: match.item.content, source: 'supabase', strong: match.strong }
   }
 
   // Try Todoist if connected
@@ -268,7 +281,7 @@ async function findTaskByName(
       if (res.ok) {
         const todoistTasks: any[] = await res.json()
         const match = matchByName(todoistTasks, taskName, 'content')
-        if (match) return { id: match.id, content: match.content, source: 'todoist' }
+        if (match) return { id: match.item.id, content: match.item.content, source: 'todoist', strong: match.strong }
       }
     } catch (e) {
       console.error('Todoist task lookup failed:', e)
@@ -292,7 +305,8 @@ async function findShoppingItemByName(
     .limit(100)
 
   if (!items || items.length === 0) return null
-  return matchByName(items, itemName, 'name')
+  const match = matchByName(items, itemName, 'name')
+  return match ? match.item : null
 }
 
 // ---------------------------------------------------------------------------
@@ -446,6 +460,11 @@ async function executeCommand(cmd: LifeboardCommand, ctx: CommandContext): Promi
     case 'complete_task': {
       const task = await findTaskByName(ctx, cmd.task_name)
       if (!task) return { success: false, message: `\n\n⚠️ I couldn't find a task matching "${cmd.task_name}".` }
+      // Only a strong (exact/substring) match auto-executes. A fuzzy match is
+      // ambiguous — confirm the exact task rather than act on a guess.
+      if (!task.strong) {
+        return { success: false, message: `\n\n🤔 Did you mean "${task.content}"? Tell me the exact name and I'll mark it complete.` }
+      }
 
       let ok = false
       if (task.source === 'todoist') {
@@ -465,6 +484,11 @@ async function executeCommand(cmd: LifeboardCommand, ctx: CommandContext): Promi
     case 'delete_task': {
       const task = await findTaskByName(ctx, cmd.task_name)
       if (!task) return { success: false, message: `\n\n⚠️ I couldn't find a task matching "${cmd.task_name}".` }
+      // Never delete on a fuzzy guess — deletion is irreversible here. Require a
+      // strong (exact/substring) match; otherwise confirm the exact task first.
+      if (!task.strong) {
+        return { success: false, message: `\n\n🤔 Did you mean "${task.content}"? To avoid deleting the wrong task, tell me the exact name and I'll remove it.` }
+      }
 
       let ok = false
       if (task.source === 'todoist') {

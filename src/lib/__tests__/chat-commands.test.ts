@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { displayableStreamPrefix, finalizeStreamedText } from '@/lib/chat-commands'
+import { displayableStreamPrefix, finalizeStreamedText, matchByName } from '@/lib/chat-commands'
 
 const OPEN = '[LIFEBOARD_CMD]'
 const CLOSE = '[/LIFEBOARD_CMD]'
@@ -58,5 +58,40 @@ describe('finalizeStreamedText', () => {
 
   it('keeps completed blocks intact for command execution', () => {
     expect(finalizeStreamedText(`Done ${BLOCK}`)).toBe(`Done ${BLOCK}`)
+  })
+})
+
+describe('matchByName', () => {
+  const tasks = [
+    { id: '1', content: 'Call the dentist' },
+    { id: '2', content: 'Buy groceries' },
+    { id: '3', content: 'Call mom about dinner' },
+  ]
+
+  it('returns null when nothing matches', () => {
+    expect(matchByName(tasks, 'file taxes', 'content')).toBeNull()
+    expect(matchByName(tasks, '  ', 'content')).toBeNull()
+  })
+
+  it('flags an exact match as strong', () => {
+    const m = matchByName(tasks, 'Buy groceries', 'content')
+    expect(m).toMatchObject({ item: { id: '2' }, strong: true })
+  })
+
+  it('flags a substring (item contains needle) match as strong', () => {
+    const m = matchByName(tasks, 'dentist', 'content')
+    expect(m).toMatchObject({ item: { id: '1' }, strong: true })
+  })
+
+  it('flags a reverse (needle contains item) match as strong', () => {
+    const m = matchByName(tasks, 'please buy groceries today', 'content')
+    expect(m).toMatchObject({ item: { id: '2' }, strong: true })
+  })
+
+  it('flags a fuzzy word-overlap match as weak — the case that must be confirmed', () => {
+    // "call dad" shares only the word "call" with two tasks: a dangerous guess
+    const m = matchByName(tasks, 'call dad', 'content')
+    expect(m).not.toBeNull()
+    expect(m!.strong).toBe(false)
   })
 })
