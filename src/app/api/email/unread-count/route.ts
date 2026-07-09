@@ -32,7 +32,9 @@ export const GET = withAuth(async (req: NextRequest, { supabase, user }) => {
   const { data: integration, error: integrationError } = await query.maybeSingle()
 
   if (integrationError || !integration?.token_data) {
-    return NextResponse.json({ unreadCount: 0 })
+    // connected:false tells the sidebar badge to stop its 2-minute poll —
+    // no point asking for unread counts while Gmail isn't linked.
+    return NextResponse.json({ unreadCount: 0, connected: false })
   }
 
   const gmail = await getGmailClient(integration.token_data, { userId: user.id, supabase })

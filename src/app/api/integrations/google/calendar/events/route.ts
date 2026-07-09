@@ -36,8 +36,14 @@ async function handler(request: Request) {
     .eq('provider', 'google')
     .maybeSingle();
 
-  if (error || !integration?.token_data) {
-    return NextResponse.json({ error: 'Google Calendar integration not found' }, { status: 404 });
+  if (error) {
+    return NextResponse.json({ error: 'Error fetching Google Calendar integration' }, { status: 500 });
+  }
+
+  if (!integration?.token_data) {
+    // Calendar views fetch Google events unconditionally — an unconnected
+    // account is a normal empty state, not a 404 in every user's console.
+    return NextResponse.json({ events: [], connected: false });
   }
 
   // Create a calendar client with the user's tokens

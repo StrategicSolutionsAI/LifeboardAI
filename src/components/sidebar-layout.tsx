@@ -140,10 +140,18 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   // Fetch unread email count
   useEffect(() => {
     let cancelled = false
+    // Once the API says Gmail isn't connected, skip the 2-minute poll; an
+    // 'email-unread-changed' event (fired after connecting) resumes it.
+    let gmailConnected = true
     const fetchUnread = () => {
+      if (!gmailConnected) return
       fetch('/api/email/unread-count')
         .then((r) => r.json())
-        .then((data) => { if (!cancelled) setEmailUnread(data.unreadCount ?? 0) })
+        .then((data) => {
+          if (cancelled) return
+          if (data.connected === false) gmailConnected = false
+          setEmailUnread(data.unreadCount ?? 0)
+        })
         .catch(() => {})
     }
     fetchUnread()
@@ -154,6 +162,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       if (typeof count === 'number') {
         setEmailUnread(count)
       } else {
+        gmailConnected = true
         fetchUnread()
       }
     }

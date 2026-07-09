@@ -120,13 +120,20 @@ async function _fetchPreferencesClient() {
   };
 
   try {
+    // maybeSingle: .single() answers with an HTTP 406 when the row doesn't
+    // exist yet, which shows up as a failed request for every new user.
     const { data, error } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code === 'PGRST116') {
+    if (error) {
+      console.error('Error fetching user preferences:', error);
+      return defaults;
+    }
+
+    if (!data) {
       // No rows found — return defaults immediately and create row in background
       void supabase
         .from('user_preferences')
@@ -137,11 +144,6 @@ async function _fetchPreferencesClient() {
           if (insertError) console.error('Error creating initial preferences:', insertError);
         });
 
-      return defaults;
-    }
-
-    if (error) {
-      console.error('Error fetching user preferences:', error);
       return defaults;
     }
 

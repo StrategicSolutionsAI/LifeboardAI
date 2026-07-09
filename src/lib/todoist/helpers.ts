@@ -72,7 +72,7 @@ export const buildDueString = (rule: RepeatRule, startDate?: string | null) => {
 export async function getTodoistToken(
   supabase: any,
   userId: string
-): Promise<{ token: string } | { response: NextResponse }> {
+): Promise<{ token: string } | { response: NextResponse; notConnected?: boolean }> {
   const { data: integration, error } = await supabase
     .from('user_integrations')
     .select('access_token')
@@ -86,7 +86,9 @@ export async function getTodoistToken(
   }
 
   if (!integration?.access_token) {
-    return { response: NextResponse.json({ error: 'Todoist not connected' }, { status: 400 }) }
+    // notConnected lets read-only routes answer with an empty 200 instead of
+    // an error — "no Todoist" is a normal state for most users, not a failure.
+    return { response: NextResponse.json({ error: 'Todoist not connected' }, { status: 400 }), notConnected: true }
   }
 
   return { token: integration.access_token }

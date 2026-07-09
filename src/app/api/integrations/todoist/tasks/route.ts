@@ -135,7 +135,14 @@ export const GET = withAuth(async (req, { supabase, user }) => {
 
   // Get Todoist access token
   const tokenResult = await getTodoistToken(supabase, user.id)
-  if ('response' in tokenResult) return tokenResult.response
+  if ('response' in tokenResult) {
+    if (tokenResult.notConnected) {
+      // Dashboards fetch tasks unconditionally; an unconnected Todoist is a
+      // normal empty state, not an error worth a 400 in every user's console.
+      return NextResponse.json({ tasks: [], connected: false })
+    }
+    return tokenResult.response
+  }
   const accessToken = tokenResult.token
 
   const respondWithTasks = (tasks: TodoistApiTask[]) => {
