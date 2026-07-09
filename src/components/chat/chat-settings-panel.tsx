@@ -4,6 +4,10 @@ import { X } from 'lucide-react'
 interface ChatSettingsPanelProps {
   panelRef: React.Ref<HTMLDivElement>
   onClose: () => void
+  speakVoiceReplies: boolean
+  onSpeakVoiceRepliesChange: (v: boolean) => void
+  speakTypedReplies: boolean
+  onSpeakTypedRepliesChange: (v: boolean) => void
   useRealtime: boolean
   onRealtimeChange: (v: boolean) => void
   onDetectDevices: () => void
@@ -30,6 +34,10 @@ const VOICE_OPTIONS = ['Chloe','Evelyn','Laura','Madison','Anaya','Abigail','Mee
 export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
   panelRef,
   onClose,
+  speakVoiceReplies,
+  onSpeakVoiceRepliesChange,
+  speakTypedReplies,
+  onSpeakTypedRepliesChange,
   useRealtime,
   onRealtimeChange,
   onDetectDevices,
@@ -53,7 +61,7 @@ export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
   return (
     <div ref={panelRef} className="absolute bottom-14 right-3 bg-white border shadow-warm-lg rounded-md p-3 w-64 z-50">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-medium text-theme-text-body">Voice Settings</div>
+        <div className="text-xs font-medium text-theme-text-body">Audio Settings</div>
         <button
           onClick={onClose}
           className="text-theme-text-tertiary hover:text-theme-text-body p-0.5 rounded transition-colors"
@@ -61,6 +69,27 @@ export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
         >
           <X className="w-3.5 h-3.5" />
         </button>
+      </div>
+      <div className="mb-3 space-y-2">
+        <label className="flex items-center justify-between text-xs text-theme-text-body">
+          <span>Speak voice replies</span>
+          <input
+            type="checkbox"
+            checked={speakVoiceReplies}
+            onChange={(e) => onSpeakVoiceRepliesChange(e.target.checked)}
+          />
+        </label>
+        <label className="flex items-center justify-between text-xs text-theme-text-body">
+          <span>Read typed replies aloud</span>
+          <input
+            type="checkbox"
+            checked={speakTypedReplies}
+            onChange={(e) => onSpeakTypedRepliesChange(e.target.checked)}
+          />
+        </label>
+        <p className="text-2xs text-theme-text-tertiary">
+          Typed replies are silent by default.
+        </p>
       </div>
       <label className="flex items-center justify-between mb-3 text-xs text-theme-text-body">
         <span>Realtime voice (beta)</span>

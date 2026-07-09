@@ -37,7 +37,11 @@ export function ChatBar() {
   const [processingStage, setProcessingStage] = useState<'transcribing' | 'thinking' | 'speaking' | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [isVoiceMode, setIsVoiceMode] = useState(false)
-  const [speakReplies, setSpeakReplies] = useState(true)
+  // Voice replies remain spoken by default. Typed replies are an explicit
+  // opt-in so a normal text chat never starts a paid TTS prediction by default.
+  const [speakVoiceReplies, setSpeakVoiceReplies] = useState(true)
+  const [speakTypedReplies, setSpeakTypedReplies] = useState(false)
+  const [hasLoadedVoiceSettings, setHasLoadedVoiceSettings] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
   const [silenceProgress, setSilenceProgress] = useState(0)
@@ -105,6 +109,11 @@ export function ChatBar() {
   const rtAudioTranscriptRef = useRef<string>('')
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const settingsPanelRef = useRef<HTMLDivElement | null>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
+  // Async handlers capture state from the time a request starts. These refs
+  // keep the final playback decision aligned with a later mute action.
+  const speakVoiceRepliesRef = useRef(true)
+  const speakTypedRepliesRef = useRef(false)
 
   const notifyTasksUpdated = useCallback((retryDelays?: number[]) => {
     if (typeof window === 'undefined') return
@@ -132,9 +141,21 @@ export function ChatBar() {
     }
   }, [])
 
-  // Load persisted TTS settings
+  // Load persisted voice settings
   useEffect(() => {
     try {
+      const speakVoice = localStorage.getItem('chat_speak_voice_replies')
+      if (speakVoice != null) {
+        const enabled = speakVoice === '1'
+        speakVoiceRepliesRef.current = enabled
+        setSpeakVoiceReplies(enabled)
+      }
+      const speakTyped = localStorage.getItem('chat_speak_typed_replies')
+      if (speakTyped != null) {
+        const enabled = speakTyped === '1'
+        speakTypedRepliesRef.current = enabled
+        setSpeakTypedReplies(enabled)
+      }
       const v = localStorage.getItem('chat_tts_voice')
       const r = localStorage.getItem('chat_tts_rate')
       if (v) setTtsVoice(v)
@@ -145,19 +166,32 @@ export function ChatBar() {
       const sid = localStorage.getItem('chat_speaker_device_id')
       if (mid) setMicDeviceId(mid)
       if (sid) setSpeakerDeviceId(sid)
-    } catch {}
+    } catch {} finally {
+      setHasLoadedVoiceSettings(true)
+    }
   }, [])
 
-  // Persist TTS settings
+  // Persist voice settings
   useEffect(() => {
+    if (!hasLoadedVoiceSettings) return
     try {
+      localStorage.setItem('chat_speak_voice_replies', speakVoiceReplies ? '1' : '0')
+      localStorage.setItem('chat_speak_typed_replies', speakTypedReplies ? '1' : '0')
       localStorage.setItem('chat_tts_voice', ttsVoice)
       localStorage.setItem('chat_tts_rate', String(ttsRate))
       localStorage.setItem('chat_use_realtime', useRealtime ? '1' : '0')
       localStorage.setItem('chat_mic_device_id', micDeviceId || '')
       localStorage.setItem('chat_speaker_device_id', speakerDeviceId || '')
     } catch {}
-  }, [ttsVoice, ttsRate, micDeviceId, speakerDeviceId, useRealtime])
+  }, [hasLoadedVoiceSettings, speakVoiceReplies, speakTypedReplies, ttsVoice, ttsRate, micDeviceId, speakerDeviceId, useRealtime])
+
+  useEffect(() => {
+    speakVoiceRepliesRef.current = speakVoiceReplies
+  }, [speakVoiceReplies])
+
+  useEffect(() => {
+    speakTypedRepliesRef.current = speakTypedReplies
+  }, [speakTypedReplies])
 
   // Enumerate audio devices and optionally ask for permission to reveal labels
   const enumerateAudioDevices = useCallback(async (requestPermission: boolean = false) => {
@@ -210,7 +244,10 @@ export function ChatBar() {
   useEffect(() => {
     if (!showSettings) return
     const handleClick = (e: MouseEvent) => {
-      if (settingsPanelRef.current && !settingsPanelRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const clickedPanel = settingsPanelRef.current?.contains(target)
+      const clickedToggle = settingsButtonRef.current?.contains(target)
+      if (!clickedPanel && !clickedToggle) {
         setShowSettings(false)
       }
     }
@@ -764,8 +801,8 @@ export function ChatBar() {
         console.warn('Realtime: remote audio element not available')
       } else {
         remoteAudio.autoplay = true
-        remoteAudio.muted = !speakReplies
-        remoteAudio.volume = speakReplies ? 1 : 0
+        remoteAudio.muted = !speakVoiceReplies
+        remoteAudio.volume = speakVoiceReplies ? 1 : 0
         try {
           if (speakerDeviceId && typeof (remoteAudio as any).setSinkId === 'function') {
             await (remoteAudio as any).setSinkId(speakerDeviceId)
@@ -1227,7 +1264,7 @@ export function ChatBar() {
       // (each chatterbox-turbo run is a paid prediction). Rate is applied
       // client-side via audio.playbackRate, so no speed is sent.
       formData.append('voice', ttsVoice)
-      formData.append('speak', speakReplies ? '1' : '0')
+      formData.append('speak', speakVoiceReplies ? '1' : '0')
 
       // Send conversation history so the voice AI can follow up on prior
       // exchanges. Error bubbles ("session expired", "something went wrong")
@@ -1364,7 +1401,7 @@ export function ChatBar() {
 
       // Play audio when it arrives (may already be available or arrive shortly after text)
       const audioUrl = audioData?.audioUrl
-      if (audioUrl && speakReplies) {
+      if (audioUrl && speakVoiceRepliesRef.current) {
         console.log('[Voice] Got audioUrl, length:', audioUrl.length, 'prefix:', audioUrl.slice(0, 30))
 
         // Stop any existing audio before playing new audio (prevents overlap)
@@ -1487,6 +1524,7 @@ export function ChatBar() {
     setIsVoiceMode(false)
     setIsProcessing(false)
     setIsSpeaking(false)
+    setShowSettings(false)
     setIsOpen(false)
   }
 
@@ -1518,9 +1556,9 @@ export function ChatBar() {
         body: JSON.stringify({
           // Error bubbles are UI-only — never feed them back as assistant turns.
           messages: newMessages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content })),
-          // Only request server TTS (a paid chatterbox-turbo prediction) when
-          // the speak-replies toggle is on. Rate is applied via playbackRate.
-          ...(speakReplies ? { tts: { voice: ttsVoice } } : {})
+          // Typed replies are silent unless the user has explicitly opted in.
+          // Rate is applied client-side via audio.playbackRate.
+          ...(speakTypedReplies ? { tts: { voice: ttsVoice } } : {})
         }),
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
@@ -1601,9 +1639,10 @@ export function ChatBar() {
         }
       }
 
-      // Play TTS audio if present (and the speak-replies toggle is still on)
+      // Play TTS audio only if the typed-reply opt-in is still on. The ref
+      // prevents a response sent before a mute action from starting playback.
       const audioUrl = audioData?.audioUrl
-      if (audioUrl && speakReplies) {
+      if (audioUrl && speakTypedRepliesRef.current) {
         try {
           cancelTTS()
           setIsSpeaking(true)
@@ -1611,6 +1650,13 @@ export function ChatBar() {
           // Speaking-rate slider: applied at playback (pitch is preserved by default)
           audio.playbackRate = ttsRate
           currentAudioRef.current = audio
+          try {
+            if (speakerDeviceId && typeof (audio as any).setSinkId === 'function') {
+              await (audio as any).setSinkId(speakerDeviceId)
+            }
+          } catch (e) {
+            console.warn('[Chat] Failed to set output device', e)
+          }
           audio.onended = () => {
             setIsSpeaking(false)
             currentAudioRef.current = null
@@ -1689,18 +1735,30 @@ export function ChatBar() {
     } catch {}
   }, [setMessages])
 
-  const handleToggleSpeakReplies = useCallback(() => {
-    setSpeakReplies(prev => {
-      const next = !prev
-      if (!next) cancelTTS()
-      // In realtime mode, mute/unmute the remote audio
-      if (rtRemoteAudioRef.current) {
-        rtRemoteAudioRef.current.muted = !next
-        rtRemoteAudioRef.current.volume = next ? 1 : 0
-      }
-      return next
-    })
+  const updateSpeakVoiceReplies = useCallback((next: boolean) => {
+    speakVoiceRepliesRef.current = next
+    setSpeakVoiceReplies(next)
+    if (!next) cancelTTS()
+    // In realtime mode, mute/unmute the remote audio.
+    if (rtRemoteAudioRef.current) {
+      rtRemoteAudioRef.current.muted = !next
+      rtRemoteAudioRef.current.volume = next ? 1 : 0
+    }
   }, [])
+
+  const updateSpeakTypedReplies = useCallback((next: boolean) => {
+    speakTypedRepliesRef.current = next
+    setSpeakTypedReplies(next)
+    if (!next) cancelTTS()
+  }, [])
+
+  const handleToggleSpeakReplies = useCallback(() => {
+    if (isVoiceMode) {
+      updateSpeakVoiceReplies(!speakVoiceRepliesRef.current)
+    } else {
+      updateSpeakTypedReplies(!speakTypedRepliesRef.current)
+    }
+  }, [isVoiceMode, updateSpeakTypedReplies, updateSpeakVoiceReplies])
 
   const handleToggleSettings = useCallback(() => {
     setShowSettings(s => !s)
@@ -1827,8 +1885,9 @@ export function ChatBar() {
             isSpeaking={isSpeaking}
             processingStage={processingStage}
             inputRef={inputRef}
+            settingsButtonRef={settingsButtonRef}
             onToggleSettings={handleToggleSettings}
-            speakReplies={speakReplies}
+            speakReplies={isVoiceMode ? speakVoiceReplies : speakTypedReplies}
             onToggleSpeakReplies={handleToggleSpeakReplies}
             onToggleVoiceMode={toggleVoiceMode}
             onSend={handleSend}
@@ -1841,6 +1900,10 @@ export function ChatBar() {
             <ChatSettingsPanel
               panelRef={settingsPanelRef}
               onClose={() => setShowSettings(false)}
+              speakVoiceReplies={speakVoiceReplies}
+              onSpeakVoiceRepliesChange={updateSpeakVoiceReplies}
+              speakTypedReplies={speakTypedReplies}
+              onSpeakTypedRepliesChange={updateSpeakTypedReplies}
               useRealtime={useRealtime}
               onRealtimeChange={setUseRealtime}
               onDetectDevices={() => enumerateAudioDevices(true)}

@@ -13,6 +13,7 @@ interface ChatInputProps {
   isSpeaking: boolean
   processingStage: 'transcribing' | 'thinking' | 'speaking' | null
   inputRef: React.Ref<HTMLTextAreaElement>
+  settingsButtonRef: React.Ref<HTMLButtonElement>
   onToggleSettings: () => void
   speakReplies: boolean
   onToggleSpeakReplies: () => void
@@ -32,6 +33,7 @@ export const ChatInput = React.memo(function ChatInput({
   isSpeaking,
   processingStage,
   inputRef,
+  settingsButtonRef,
   onToggleSettings,
   speakReplies,
   onToggleSpeakReplies,
@@ -103,10 +105,11 @@ export const ChatInput = React.memo(function ChatInput({
       )}
       {/* Settings Toggle */}
       <button
+        ref={settingsButtonRef}
         onClick={onToggleSettings}
         className="text-theme-text-tertiary/70 hover:text-theme-primary-600"
-        aria-label="TTS settings"
-        title="Voice settings"
+        aria-label="Audio settings"
+        title="Audio settings"
       >
         <Settings className="w-4 h-4" />
       </button>
