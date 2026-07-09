@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
     const res = NextResponse.json({
       exceptions: (data || []).map(mapRow),
     });
-    res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    // no-store: refetched right after occurrence edits — HTTP caching would
+    // serve the pre-write response and revert the edit in the UI.
+    res.headers.set('Cache-Control', 'no-store');
     return res;
   } catch (error) {
     console.error('GET /api/task-occurrence-exceptions error', error);

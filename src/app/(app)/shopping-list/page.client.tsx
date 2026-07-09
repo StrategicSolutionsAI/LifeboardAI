@@ -35,6 +35,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import type { WidgetInstance } from "@/types/widgets";
 import { useWidgets } from "@/hooks/use-widgets";
 import { hexToRgba } from "@/lib/dashboard-utils";
+import { getCurrentLocalDate } from "@/lib/date-utils";
 import { card, form, interactive, surface, text } from "@/lib/styles";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useFamilyMembers, type FamilyMemberOption } from "@/hooks/use-family-members";
@@ -1208,7 +1209,7 @@ function ShoppingListLayout() {
   useEffect(() => {
     if (!convertOpen || !convertItem) return;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getCurrentLocalDate();
     const defaultDate = convertItem.neededBy ?? today;
     const fallbackBucket =
       convertItem.bucket && convertItem.bucket !== UNASSIGNED_BUCKET_ID

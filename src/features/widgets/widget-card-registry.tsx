@@ -10,7 +10,7 @@ import { Flame, Check, Circle } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-export type WidgetColorStyles = ReturnType<typeof getWidgetColorStyles>;
+type WidgetColorStyles = ReturnType<typeof getWidgetColorStyles>;
 
 export interface CardBodyRenderProps {
   widget: WidgetInstance;
@@ -36,7 +36,7 @@ export interface WidgetCardEntry {
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Returns the semantic progress fill class based on completion percentage */
-export function getProgressFillClass(pct: number): string {
+function getProgressFillClass(pct: number): string {
   if (pct >= 100) return progressStyles.fill.complete;
   if (pct >= 75) return progressStyles.fill.brand;
   if (pct >= 50) return progressStyles.fill.high;
@@ -821,7 +821,7 @@ function renderCycleTrackingBody({
   styles: wStyles,
 }: CardBodyRenderProps) {
   const cycleEntries = w.cycleData?.entries || [];
-  const todayEntry = cycleEntries.find((e) => e.date === todayStrGlobal);
+  const todayEntry = cycleEntries.find((e) => e.date === todayStrGlobal());
   const periodStarts = cycleEntries
     .filter((e) => e.periodStart)
     .map((e) => e.date)

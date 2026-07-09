@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { updateUserPreferenceFields, invalidatePreferencesCache } from "@/lib/user-preferences";
+import { updateUserPreferenceFields } from "@/lib/user-preferences";
 import { ensureCacheOwner } from "@/lib/auth-cleanup";
 import { useWeather } from "@/features/dashboard/hooks/use-weather";
 import { useAuth } from "@/features/dashboard/hooks/use-auth";
@@ -389,30 +389,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         bucketsRef.current = [];
       }
 
-      // Load data — if user changed, check for corrupted Supabase data first
       void (async () => {
-        if (ownerChanged) {
-          // Check if this is a genuinely new user whose Supabase data was
-          // corrupted by a previous user's stale caches being pushed.
-          // A new user will have onboarded === false in their profile.
-          try {
-            const res = await fetch('/api/user/profile', { credentials: 'same-origin' });
-            if (res.ok) {
-              const { profile } = await res.json();
-              if (profile && profile.onboarded === false) {
-                await fetch('/api/user/preferences', {
-                  method: 'DELETE',
-                  credentials: 'same-origin',
-                });
-                invalidatePreferencesCache();
-              }
-            }
-          } catch (err) {
-            console.error('Failed to check/reset corrupted preferences:', err);
-          }
-        }
-
-        // Now load fresh data (after any cleanup)
         await Promise.all([
           loadBuckets({ fetchFromSupabase: true }),
           loadWidgets(),

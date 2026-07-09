@@ -10,6 +10,7 @@ import SectionLoadTimer from '@/components/section-load-timer'
 import { CalendarFileUpload, type UploadResult } from '@/features/calendar/components/calendar-file-upload'
 import { useBuckets } from '@/hooks/use-buckets'
 import { useFamilyMembers } from '@/hooks/use-family-members'
+import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }
 interface Integration { id: string; name: string; description: string; icon: string; status?: IntegrationStatus; authUrl?: string }
@@ -352,7 +353,7 @@ export default function IntegrationsPageClient() {
   }
 
   const fetchIntegrationData = async (integrationId: string) => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getCurrentLocalDate()
     let endpoint = ''
     let params = ''
     switch (integrationId) {

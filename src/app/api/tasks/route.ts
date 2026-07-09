@@ -3,20 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createTaskSchema, updateTaskSchema } from '@/lib/validations';
 import { TASK_SELECT_COLUMNS as SELECT_COLUMNS, mapRowToTask } from '@/repositories/tasks';
 import { withAuth, withAuthAndBody } from '@/lib/api-utils';
-
-// hour_slot normalizer (supports number 0–23 or display strings)
-function normalizeHourSlot(value?: number | string): string | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const h = Math.max(0, Math.min(23, value));
-    const display =
-      h === 0 ? '12AM' : h < 12 ? `${h}AM` : h === 12 ? '12PM' : `${h - 12}PM`;
-    return `hour-${display}`;
-  }
-  if (typeof value === 'string' && value.trim().length > 0) {
-    return value.startsWith('hour-') ? value : `hour-${value.trim()}`;
-  }
-  return undefined;
-}
+import { normalizeHourSlot } from '@/lib/date-utils';
 
 export const GET = withAuth(async (req, { supabase, user }) => {
   const sp = req.nextUrl.searchParams;
@@ -65,7 +52,9 @@ export const GET = withAuth(async (req, { supabase, user }) => {
 
   const tasks = (data || []).map(mapRowToTask);
 
-  return NextResponse.json({ tasks }, { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' } });
+  // no-store: clients refetch this list ~120ms after mutations, so any HTTP
+  // caching serves the pre-write response and makes new tasks vanish briefly.
+  return NextResponse.json({ tasks }, { headers: { 'Cache-Control': 'no-store' } });
 }, 'GET /api/tasks');
 
 export const POST = withAuthAndBody(createTaskSchema, async (req, { supabase, user, body }) => {

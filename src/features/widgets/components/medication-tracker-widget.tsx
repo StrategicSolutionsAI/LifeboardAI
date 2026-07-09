@@ -17,6 +17,7 @@ import {
   Settings
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCurrentLocalDate } from "@/lib/date-utils"
 
 interface Medication {
   id: string
@@ -84,7 +85,7 @@ export function MedicationTrackerWidget({ className, compact = false }: Medicati
   const [isAddMedicationOpen, setIsAddMedicationOpen] = useState(false)
 
   // Get today's date string
-  const today = new Date().toISOString().split('T')[0]
+  const today = getCurrentLocalDate()
   const currentTime = new Date()
 
   // Calculate today's adherence
@@ -333,7 +334,7 @@ function AddMedicationForm({ onSave, onCancel }: {
     dosage: '',
     frequency: 'Once daily',
     times: ['08:00'],
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: getCurrentLocalDate(),
     instructions: '',
     color: 'blue',
     totalPills: '',

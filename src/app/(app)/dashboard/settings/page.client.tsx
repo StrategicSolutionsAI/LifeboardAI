@@ -7,6 +7,7 @@ import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
 import { getUserPreferencesClient, saveUserPreferences, UserPreferences } from '@/lib/user-preferences'
 import { invalidateBucketColorCache } from '@/lib/bucket-colors'
+import { getCurrentLocalDate } from '@/lib/date-utils'
 
 /** Curated palette from the Calidoraplanner-codex design system */
 const PALETTE_COLORS = [
@@ -262,7 +263,7 @@ export default function SettingsPageClient() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `lifeboard-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `lifeboard-backup-${getCurrentLocalDate()}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

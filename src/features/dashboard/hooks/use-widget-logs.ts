@@ -69,12 +69,12 @@ export function useWidgetLogs({
 
         if (typeof syncedValue === "number") {
           logs.push({
-            id: `integration-${widget.instanceId}-${todayStrGlobal}`,
+            id: `integration-${widget.instanceId}-${todayStrGlobal()}`,
             widgetInstanceId: widget.instanceId,
             widgetName: widget.name,
             message: `Synced from ${widget.dataSource === "fitbit" ? "Fitbit" : "Google Fit"}`,
             details: `${syncedValue.toLocaleString()} ${widget.unit || ""}`.trim(),
-            occurredAt: `${todayStrGlobal}T12:00:00`,
+            occurredAt: `${todayStrGlobal()}T12:00:00`,
             kind: "integration",
           });
         }

@@ -7,7 +7,7 @@ import { todayStrGlobal } from '@/lib/dashboard-utils'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-export interface ModalRenderProps {
+interface ModalRenderProps {
   widget: WidgetInstance | null
   onUpdate: (updates: Partial<WidgetInstance>) => void
   progress: { value: number; streak: number; isToday: boolean }
@@ -35,12 +35,12 @@ export interface WidgetModalEntry {
 export function computeProgress(
   progressEntry: ProgressEntry | undefined,
 ) {
-  const today = todayStrGlobal
+  const today = todayStrGlobal()
   if (!progressEntry || progressEntry.date !== today) return { value: 0, streak: progressEntry?.streak || 0, isToday: false }
   return { value: progressEntry.value, streak: progressEntry.streak, isToday: true }
 }
 
-export const HOME_PROJECTS_STATIC_WIDGET: WidgetInstance = {
+const HOME_PROJECTS_STATIC_WIDGET: WidgetInstance = {
   id: 'home-projects-modal',
   instanceId: 'home-projects-modal',
   name: 'Home Projects',

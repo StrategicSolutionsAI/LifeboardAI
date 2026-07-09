@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { button, form, card } from '@/lib/styles'
 import type { BudgetCategory, BudgetExpense } from '@/types/budget'
+import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface Props {
   categories: BudgetCategory[]
@@ -17,7 +18,7 @@ export function AddExpenseModal({ categories, onSubmit, onUpdate, editingExpense
   const isEdit = Boolean(editingExpense)
   const [categoryId, setCategoryId] = useState(editingExpense?.categoryId ?? (categories[0]?.id ?? ''))
   const [amount, setAmount] = useState(editingExpense ? String(editingExpense.amount) : '')
-  const [date, setDate] = useState(editingExpense?.date ?? new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(editingExpense?.date ?? getCurrentLocalDate())
   const [note, setNote] = useState(editingExpense?.note ?? '')
   const [saving, setSaving] = useState(false)
 

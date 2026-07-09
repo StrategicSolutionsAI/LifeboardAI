@@ -5,6 +5,7 @@ import { Hammer, Settings, Wrench, Sparkles, Calendar, Home, CheckCircle, Clock,
 import { RefinedWidgetBase } from './refined-widget-base'
 import { HomeProjectsEditor } from './home-projects-editor'
 import { cn } from '@/lib/utils'
+import { dateStr } from '@/lib/dashboard-utils'
 import type { WidgetInstance } from '@/types/widgets'
 import type { HomeProject, ProjectCategory, ProjectPriority, ProjectStatus } from '@/types/home-projects'
 import { PROJECT_CATEGORIES, PROJECT_PRIORITIES, PROJECT_STATUS, PROJECT_TEMPLATES } from '@/types/home-projects'
@@ -247,7 +248,7 @@ export function HomeProjectsWidget({
     
     const updatedProjects = projects.map(p => 
       p.id === projectId 
-        ? { ...p, dueDate: snoozeDate.toISOString().split('T')[0], updatedAt: new Date().toISOString() }
+        ? { ...p, dueDate: dateStr(snoozeDate), updatedAt: new Date().toISOString() }
         : p
     )
     setProjects(updatedProjects)
