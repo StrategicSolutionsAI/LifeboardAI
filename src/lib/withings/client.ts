@@ -90,7 +90,7 @@ export async function refreshWithingsToken(refreshToken: string) {
   const clientId = requireEnvVar('WITHINGS_CLIENT_ID');
   const clientSecret = requireEnvVar('WITHINGS_CLIENT_SECRET');
   const params = new URLSearchParams({
-    action: 'refresh_token',
+    action: 'requesttoken', // Withings requires action=requesttoken for ALL token grants; grant_type selects the flow
     grant_type: 'refresh_token',
     client_id: clientId,
     client_secret: clientSecret,
@@ -112,14 +112,20 @@ export async function refreshWithingsToken(refreshToken: string) {
 
   const data = await response.json()
   if (data.status !== 0) {
-    // Handle specific Withings error codes
-    if (data.status === 2554) {
-      throw new Error('REFRESH_TOKEN_EXPIRED')
-    } else if (data.status === 401) {
+    const errorText = String(data.error || '')
+    // Observed Withings responses (2026-07-09, live API):
+    //   503 "Invalid Params: invalid refresh_token" → refresh token is dead (reconnect required)
+    //   2554 "Not implemented" → wrong action param (request bug, NOT a dead token)
+    // Only a genuinely rejected refresh token may surface as permanent —
+    // anything else misclassified as permanent makes callers wipe stored
+    // tokens and force a reconnect.
+    const refreshTokenRejected =
+      data.status === 401 ||
+      (data.status === 503 && errorText.toLowerCase().includes('refresh_token'))
+    if (refreshTokenRejected) {
       throw new Error('INVALID_REFRESH_TOKEN')
-    } else {
-      throw new Error(`Withings token refresh error status: ${data.status} - ${data.error || 'Unknown error'}`)
     }
+    throw new Error(`Withings token refresh error status: ${data.status} - ${errorText || 'Unknown error'}`)
   }
   return data.body
 }
