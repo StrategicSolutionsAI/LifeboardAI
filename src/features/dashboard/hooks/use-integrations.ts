@@ -3,7 +3,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { WidgetInstance } from "@/types/widgets";
 import type { ProgressEntry } from "@/features/dashboard/types";
-import { todayStrGlobal, yesterdayStrGlobal } from "@/lib/dashboard-utils";
+import { dateStr, todayStrGlobal, yesterdayStrGlobal } from "@/lib/dashboard-utils";
+import { useTodayStr } from "@/hooks/use-today-str";
 import type { DropResult } from "@hello-pangea/dnd";
 
 interface UseIntegrationsOptions {
@@ -29,6 +30,9 @@ export function useIntegrations({
   saveWidgets,
   batchUpdateTasks,
 }: UseIntegrationsOptions) {
+  // Reactive local "today" — keeps date-keyed memos correct across midnight
+  const todayStr = useTodayStr();
+
   // ------------------------------------------------------------------
   // State
   // ------------------------------------------------------------------
@@ -113,7 +117,10 @@ export function useIntegrations({
       if (needFitbit) {
         refreshPromises.push((async () => {
           try {
-            const res = await fetch(`/api/integrations/fitbit/metrics?cb=${Date.now()}`);
+            // Pass the client-local date explicitly: the route's default is
+            // server-local "today" (UTC on Vercel), which is tomorrow during
+            // evening hours west of Greenwich and would sync 0s over real data.
+            const res = await fetch(`/api/integrations/fitbit/metrics?date=${todayStrGlobal()}&cb=${Date.now()}`);
             if (!res.ok) return;
 
             const data = await res.json();
@@ -125,7 +132,7 @@ export function useIntegrations({
             setFitbitData(obj);
 
             try {
-              const todayStr = todayStrGlobal;
+              const todayStr = todayStrGlobal();
               const fitbitWidgets = Object.values(widgetsByBucketRef.current)
                 .flat()
                 .filter(
@@ -177,12 +184,12 @@ export function useIntegrations({
                   const fwCopy = [...fitbitWidgets];
                   void (async () => {
                     try {
-                      const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal}`);
+                      const resY = await fetch(`/api/integrations/fitbit/metrics?date=${yesterdayStrGlobal()}`);
                       if (resY.ok) {
                         const dataY = await resY.json();
                         const rowsY = fwCopy.map((w) => ({
                           widget_instance_id: w.instanceId,
-                          date: yesterdayStrGlobal,
+                          date: yesterdayStrGlobal(),
                           value: w.id === "water" ? (dataY.water ?? 0) : (dataY.steps ?? 0),
                         }));
                         if (rowsY.length) {
@@ -246,7 +253,7 @@ export function useIntegrations({
                       weightData: {
                         ...w.weightData,
                         currentWeight: val,
-                        lastEntryDate: new Date().toISOString().split('T')[0],
+                        lastEntryDate: todayStrGlobal(),
                         unit,
                       },
                     } as typeof w;
@@ -267,7 +274,7 @@ export function useIntegrations({
                 const val = wUnit === 'lbs' ? parseFloat((kg * 2.20462).toFixed(1)) : parseFloat(kg.toFixed(2));
                 return {
                   widget_instance_id: w.instanceId,
-                  date: todayStrGlobal,
+                  date: todayStrGlobal(),
                   value: val,
                 };
               });
@@ -295,7 +302,8 @@ export function useIntegrations({
       if (needGoogleFit) {
         refreshPromises.push((async () => {
           try {
-            const res = await fetch(`/api/integrations/googlefit/metrics?cb=${Date.now()}`);
+            // Client-local date for the same reason as the Fitbit fetch above
+            const res = await fetch(`/api/integrations/googlefit/metrics?date=${todayStrGlobal()}&cb=${Date.now()}`);
             if (!res.ok) {
               console.error('Failed to fetch Google Fit metrics');
               return;
@@ -311,7 +319,7 @@ export function useIntegrations({
 
             // Update progress for each Google Fit widget
             try {
-              const todayStr = todayStrGlobal;
+              const todayStr = todayStrGlobal();
               const googleFitWidgets = Object.values(widgetsByBucketRef.current)
                 .flat()
                 .filter((w) => w.dataSource === "googlefit" && ["water", "steps"].includes(w.id));
@@ -472,8 +480,8 @@ export function useIntegrations({
   );
 
   const upcomingTaskGroups = useMemo(() => {
-    const todayMs = new Date(todayStrGlobal + 'T00:00:00').getTime();
-    const upcoming = allTodoistTasks.filter((t: any) => t.due?.date && t.due.date > todayStrGlobal);
+    const todayMs = new Date(todayStr + 'T00:00:00').getTime();
+    const upcoming = allTodoistTasks.filter((t: any) => t.due?.date && t.due.date > todayStr);
     const groups = {
       next7Days: [] as any[],
       next2Weeks: [] as any[],
@@ -494,7 +502,7 @@ export function useIntegrations({
     });
 
     return groups;
-  }, [allTodoistTasks]);
+  }, [allTodoistTasks, todayStr]);
 
   // ------------------------------------------------------------------
   // updateTaskDueDate / updateTaskDuration
@@ -746,11 +754,11 @@ export function useIntegrations({
       nextMonth.setDate(nextMonth.getDate() + 30);
 
       if (destination.droppableId === 'next7Days') {
-        newDueDate = tomorrow.toISOString().split('T')[0];
+        newDueDate = dateStr(tomorrow);
       } else if (destination.droppableId === 'next2Weeks') {
-        newDueDate = nextWeek.toISOString().split('T')[0];
+        newDueDate = dateStr(nextWeek);
       } else if (destination.droppableId === 'later') {
-        newDueDate = nextMonth.toISOString().split('T')[0];
+        newDueDate = dateStr(nextMonth);
       } else if (destination.droppableId === 'noDueDate') {
         newDueDate = null;
       } else if (destination.droppableId === 'dailyTasks') {

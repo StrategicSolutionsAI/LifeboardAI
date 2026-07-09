@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
+import { dateStr, todayStrGlobal } from '@/lib/dashboard-utils';
 import SectionLoadTimer from '@/components/section-load-timer';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Scale, Activity, Target, Calendar } from "lucide-react";
@@ -80,10 +81,12 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
 
         const byDate = new Map<string, number>();
         for (const m of measurements) {
-          const dateStr = m.measuredAt.slice(0, 10);
+          // Local date of the measurement instant — measuredAt is UTC ISO, and
+          // slicing it directly keys evening weigh-ins under tomorrow's date
+          const dayKey = dateStr(new Date(m.measuredAt));
           const value = (weightUnit === 'kg') ? m.weightKg : m.weightLbs;
-          if (!byDate.has(dateStr)) {
-            byDate.set(dateStr, parseFloat(value.toFixed(1)));
+          if (!byDate.has(dayKey)) {
+            byDate.set(dayKey, parseFloat(value.toFixed(1)));
           }
         }
 
@@ -96,7 +99,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
         for (let i = 0; i < days; i++) {
           const d = new Date();
           d.setDate(d.getDate() - ((days - 1) - i));
-          const ds = d.toISOString().slice(0, 10);
+          const ds = dateStr(d);
           const measured = byDate.get(ds);
           if (measured !== undefined) {
             lastKnown = measured;
@@ -108,7 +111,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
         setData(result);
       } else {
         const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(`/api/trends/${instanceId}?days=${days}`, { headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {} });
+        const res = await fetch(`/api/trends/${instanceId}?days=${days}&end=${todayStrGlobal()}`, { headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {} });
         if (!res.ok) throw new Error(await res.text());
         const json = await res.json();
         setData(json.data);

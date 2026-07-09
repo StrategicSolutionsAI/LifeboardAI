@@ -57,9 +57,26 @@ export async function GET(_req: Request, { params }: { params: { instanceId: str
   const allowed = [7, 30, 90, 365];
   const days = allowed.includes(daysParam) ? daysParam : 30;
 
-  const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  const sinceStr = since.toISOString().slice(0, 10);
+  // Anchor the axis on the CLIENT's local "today" (?end=YYYY-MM-DD): progress
+  // rows are written with client-local dates, so a server-derived (UTC) axis
+  // runs a day ahead of the newest rows during evening hours west of
+  // Greenwich. Server-local today stays the fallback for callers without it.
+  const endParam = url.searchParams.get('end');
+  const endDate = endParam && /^\d{4}-\d{2}-\d{2}$/.test(endParam)
+    ? new Date(`${endParam}T00:00:00Z`)
+    : (() => {
+        const now = new Date();
+        return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+      })();
+
+  // Whole-day steps in UTC space keep the anchor date free of timezone drift
+  const axisDate = (i: number): string => {
+    const d = new Date(endDate);
+    d.setUTCDate(d.getUTCDate() - ((days - 1) - i));
+    return d.toISOString().slice(0, 10);
+  };
+
+  const sinceStr = axisDate(0);
 
   const { data, error } = await supabase
     .from('widget_progress_history')
@@ -77,9 +94,7 @@ export async function GET(_req: Request, { params }: { params: { instanceId: str
   // Fill missing dates with 0
   const result: { date: string; value: number }[] = [];
   for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - ((days - 1) - i));
-    const ds = d.toISOString().slice(0, 10);
+    const ds = axisDate(i);
     const row = (data ?? []).find((r: Record<string, unknown>) => (r.date as string).slice(0, 10) === ds);
     result.push({ date: ds, value: row?.value ?? 0 });
   }

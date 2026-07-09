@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { card, form } from "@/lib/styles";
 import { EmojiPickerButton } from "@/components/ui/emoji-picker-button";
 import { DEFAULT_MILESTONES } from "@/lib/habit-utils";
+import { getCurrentLocalDate } from "@/lib/date-utils";
 
 // Calidora-aligned colour palette
 const COLORS = [
@@ -626,7 +627,7 @@ export default function WidgetEditorSheet({
                   <textarea
                     value={draft.journalData?.todaysEntry || ''}
                     onChange={e => {
-                      const today = new Date().toISOString().split('T')[0];
+                      const today = getCurrentLocalDate();
                       setDraft(p => p ? {
                         ...p,
                         journalData: {
@@ -667,7 +668,7 @@ export default function WidgetEditorSheet({
                         onClick={() => {
                           const currentEntry = draft.journalData?.todaysEntry || '';
                           const newEntry = currentEntry + (currentEntry ? '\n\n' : '') + prompt + '\n';
-                          const today = new Date().toISOString().split('T')[0];
+                          const today = getCurrentLocalDate();
                           setDraft(p => p ? {
                             ...p,
                             journalData: {
@@ -704,7 +705,7 @@ export default function WidgetEditorSheet({
                             gratitudeData: {
                               ...p.gratitudeData,
                               gratitudeItems: newItems,
-                              lastEntryDate: new Date().toISOString().split('T')[0],
+                              lastEntryDate: getCurrentLocalDate(),
                               entryCount: p.gratitudeData?.entryCount || 1
                             }
                           } : p);
@@ -721,7 +722,7 @@ export default function WidgetEditorSheet({
                             gratitudeData: {
                               ...p.gratitudeData,
                               gratitudeItems: newItems,
-                              lastEntryDate: newItems.length > 0 ? new Date().toISOString().split('T')[0] : p.gratitudeData?.lastEntryDate,
+                              lastEntryDate: newItems.length > 0 ? getCurrentLocalDate() : p.gratitudeData?.lastEntryDate,
                               entryCount: p.gratitudeData?.entryCount || 1
                             }
                           } : p);
@@ -743,7 +744,7 @@ export default function WidgetEditorSheet({
                           gratitudeData: {
                             ...p.gratitudeData,
                             gratitudeItems: [...currentItems, ''],
-                            lastEntryDate: new Date().toISOString().split('T')[0],
+                            lastEntryDate: getCurrentLocalDate(),
                             entryCount: p.gratitudeData?.entryCount || 1
                           }
                         } : p);
@@ -774,7 +775,7 @@ export default function WidgetEditorSheet({
                         habitTrackerData: {
                           habitName: name,
                           habitDescription: p.habitTrackerData?.habitDescription || '',
-                          startDate: p.habitTrackerData?.startDate || new Date().toISOString().split('T')[0],
+                          startDate: p.habitTrackerData?.startDate || getCurrentLocalDate(),
                           bestStreak: p.habitTrackerData?.bestStreak || 0,
                           totalCompletions: p.habitTrackerData?.totalCompletions || 0,
                           completionHistory: p.habitTrackerData?.completionHistory || [],
@@ -978,9 +979,18 @@ export default function WidgetEditorSheet({
                         <button
                           type="button"
                           onClick={() => {
-                            const today = new Date().toISOString().split('T')[0];
-                            const quitDate = new Date(draft.quitHabitData?.quitDate || '');
-                            const daysSince = Math.floor((new Date().getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+                            const today = getCurrentLocalDate();
+                            const quitDateRaw = draft.quitHabitData?.quitDate;
+                            // Parse as local midnight — bare YYYY-MM-DD parses as
+                            // UTC and shifts the day count west of Greenwich
+                            const quitDate = quitDateRaw
+                              ? new Date(quitDateRaw.includes('T') ? quitDateRaw : `${quitDateRaw}T00:00:00`)
+                              : null;
+                            if (!quitDate || isNaN(quitDate.getTime())) {
+                              alert('Set your quit date first, then check in.');
+                              return;
+                            }
+                            const daysSince = Math.floor((Date.now() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
 
                             // Add check-in milestone
                             setDraft(p => p ? {
@@ -1014,7 +1024,7 @@ export default function WidgetEditorSheet({
                         <button
                           type="button"
                           onClick={() => {
-                            const today = new Date().toISOString().split('T')[0];
+                            const today = getCurrentLocalDate();
                             const confirmed = window.confirm('Reset your quit date to today? This will start your counter over.');
                             if (confirmed) {
                               setDraft(p => p ? {
@@ -1175,7 +1185,7 @@ export default function WidgetEditorSheet({
                         const input = document.getElementById('quick-weight-input') as HTMLInputElement;
                         const weight = parseFloat(input.value);
                         if (weight > 0) {
-                          const today = new Date().toISOString().split('T')[0];
+                          const today = getCurrentLocalDate();
                           setDraft(p => p ? {
                             ...p,
                             weightData: {

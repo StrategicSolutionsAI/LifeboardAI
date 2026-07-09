@@ -10,6 +10,7 @@ import { MODAL_WIDGET_IDS } from "@/features/dashboard/constants";
 import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences";
 import { buildTogglePayload } from "@/lib/habit-utils";
 import { todayStrGlobal, yesterdayStrGlobal, debounce, migrateWidgetsToTemplates } from "@/lib/dashboard-utils";
+import { useTodayStr } from "@/hooks/use-today-str";
 import { ListChecks } from "lucide-react";
 import type { DropResult } from "@hello-pangea/dnd";
 
@@ -44,6 +45,9 @@ export function useDashboardWidgets({
   deleteTask,
   contextCreateTask,
 }: UseDashboardWidgetsOptions) {
+  // Reactive local "today" — keeps date-keyed memos correct across midnight
+  const todayStr = useTodayStr();
+
   // ── State ──────────────────────────────────────────────────────────────
   const [widgetsByBucket, setWidgetsByBucket] = useState<Record<string, WidgetInstance[]>>(() => {
     if (typeof window === 'undefined') return {};
@@ -120,7 +124,7 @@ export function useDashboardWidgets({
     let notStarted = 0;
     activeWidgets.forEach(w => {
       const prog = progressByWidget[w.instanceId];
-      const val = prog && prog.date === todayStrGlobal ? prog.value : 0;
+      const val = prog && prog.date === todayStr ? prog.value : 0;
       const target = w.target && w.target > 0 ? w.target : 1;
       if (val >= target) completed++;
       else if (val > 0) inProgress++;
@@ -128,7 +132,7 @@ export function useDashboardWidgets({
     });
     const pct = activeWidgets.length > 0 ? Math.round((completed / activeWidgets.length) * 100) : 0;
     return { completed, inProgress, notStarted, pct, total: activeWidgets.length };
-  }, [activeWidgets, progressByWidget]);
+  }, [activeWidgets, progressByWidget, todayStr]);
 
   const activeWidgetMap = useMemo(() => {
     return new Map(activeWidgets.map((widget) => [widget.instanceId, widget]));
@@ -215,22 +219,26 @@ export function useDashboardWidgets({
   // ── Progress ──────────────────────────────────────────────────────────
   const incrementProgress = useCallback(async (w: WidgetInstance) => {
     isDirtyRef.current = true;
+    // Compute "today" fresh at click time (not from the hook state, which can
+    // lag up to a minute after midnight) and reuse it for state and POST.
+    const today = todayStrGlobal();
+    const yesterday = yesterdayStrGlobal();
     setProgressByWidget(prev => {
-      const entry = prev[w.instanceId] ?? { value: 0, date: todayStrGlobal, streak: 0, lastCompleted: '' };
+      const entry = prev[w.instanceId] ?? { value: 0, date: today, streak: 0, lastCompleted: '' };
       let { value, streak, lastCompleted } = entry;
-      if (entry.date !== todayStrGlobal) {
+      if (entry.date !== today) {
         value = 0;
       }
       value += 1;
       let newLast = lastCompleted;
       let newStreak = streak;
       if (value >= w.target) {
-        if (lastCompleted === yesterdayStrGlobal) {
+        if (lastCompleted === yesterday) {
           newStreak = streak + 1;
-        } else if (lastCompleted !== todayStrGlobal) {
+        } else if (lastCompleted !== today) {
           newStreak = 1;
         }
-        newLast = todayStrGlobal;
+        newLast = today;
 
         if (value === w.target && typeof window !== 'undefined') {
           import('canvas-confetti').then((mod) => {
@@ -244,9 +252,14 @@ export function useDashboardWidgets({
         }
       }
 
-      return { ...prev, [w.instanceId]: { value, date: todayStrGlobal, streak: newStreak, lastCompleted: newLast } };
+      return { ...prev, [w.instanceId]: { value, date: today, streak: newStreak, lastCompleted: newLast } };
     });
 
+    // The ref still holds pre-update state here (it syncs on render), so the
+    // POST value must apply the same date-rollover reset as the updater above
+    // — otherwise the first increment after midnight posts yesterday's count + 1.
+    const prevEntry = progressByWidgetRef.current[w.instanceId];
+    const postValue = (prevEntry && prevEntry.date === today ? prevEntry.value : 0) + 1;
     try {
       await fetch('/api/widgets/progress', {
         method: 'POST',
@@ -255,8 +268,8 @@ export function useDashboardWidgets({
         body: JSON.stringify({
           rows: [{
             widget_instance_id: w.instanceId,
-            date: todayStrGlobal,
-            value: (progressByWidgetRef.current[w.instanceId]?.value ?? 0) + 1,
+            date: today,
+            value: postValue,
           }],
         }),
       });
@@ -422,7 +435,7 @@ export function useDashboardWidgets({
       ...progressByWidgetRef.current,
       [widget.instanceId]: {
         value: 0,
-        date: todayStrGlobal,
+        date: todayStrGlobal(),
         streak: 0,
         lastCompleted: "",
       },

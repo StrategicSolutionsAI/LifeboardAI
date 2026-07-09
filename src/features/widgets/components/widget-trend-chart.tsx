@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/utils/supabase/client';
+import { dateStr, todayStrGlobal } from '@/lib/dashboard-utils';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus, ExternalLink, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
@@ -83,10 +84,13 @@ export default function WidgetTrendChart({
         if (measurements.length > 0) {
           const byDate = new Map<string, number>();
           for (const m of measurements) {
-            const dateStr = m.measuredAt.slice(0, 10);
+            // Local date of the measurement instant — measuredAt is UTC ISO,
+            // and slicing it keys evening weigh-ins under tomorrow's date,
+            // which never matches the local axis below
+            const dayKey = dateStr(new Date(m.measuredAt));
             const value = (unit === 'kg') ? m.weightKg : m.weightLbs;
-            if (!byDate.has(dateStr)) {
-              byDate.set(dateStr, parseFloat(value.toFixed(1)));
+            if (!byDate.has(dayKey)) {
+              byDate.set(dayKey, parseFloat(value.toFixed(1)));
             }
           }
 
@@ -98,7 +102,7 @@ export default function WidgetTrendChart({
           for (let i = 0; i < rangeDays; i++) {
             const d = new Date();
             d.setDate(d.getDate() - ((rangeDays - 1) - i));
-            const ds = d.toISOString().slice(0, 10);
+            const ds = dateStr(d);
             const measured = byDate.get(ds);
             if (measured !== undefined) {
               lastKnown = measured;
@@ -111,7 +115,7 @@ export default function WidgetTrendChart({
         } else {
           // Fallback: load from generic widget_progress_history
           const { data: { session } } = await supabase.auth.getSession();
-          const res = await fetch(`/api/trends/${instanceId}?days=${rangeDays}`, {
+          const res = await fetch(`/api/trends/${instanceId}?days=${rangeDays}&end=${todayStrGlobal()}`, {
             headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
           });
           if (!res.ok) throw new Error(await res.text());
@@ -120,7 +124,7 @@ export default function WidgetTrendChart({
         }
       } else {
         const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(`/api/trends/${instanceId}?days=${rangeDays}`, {
+        const res = await fetch(`/api/trends/${instanceId}?days=${rangeDays}&end=${todayStrGlobal()}`, {
           headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
         });
         if (!res.ok) throw new Error(await res.text());

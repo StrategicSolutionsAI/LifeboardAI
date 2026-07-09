@@ -12,7 +12,8 @@ import {
 import type { WidgetInstance } from "@/types/widgets";
 import type { ProgressEntry } from "@/features/dashboard/types";
 import { getIconComponent } from "@/lib/dashboard-icons";
-import { getWidgetColorStyles, todayStrGlobal } from "@/lib/dashboard-utils";
+import { getWidgetColorStyles } from "@/lib/dashboard-utils";
+import { useTodayStr } from "@/hooks/use-today-str";
 import { Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -75,6 +76,9 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
     }
   }, [linkedTaskData?.dueDate]);
 
+  // Reactive "today" so the memo below rolls over at midnight
+  const today = useTodayStr();
+
   // Memoized progress calculation — avoids .filter().reduce() on every render
   const todayVal = useMemo(() => {
     if (isLinkedTask) {
@@ -83,7 +87,6 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
     if (integrationValue !== undefined) {
       return integrationValue;
     }
-    const today = todayStrGlobal;
     if (w.id === "water" && w.waterData?.entries?.length) {
       return w.waterData.entries
         .filter((e: { date: string; amount: number }) => e.date === today)
@@ -106,7 +109,7 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
       return w.cycleData.entries.some((e) => e.date === today) ? 1 : 0;
     }
     return progressEntry && progressEntry.date === today ? progressEntry.value : 0;
-  }, [w.id, w.target, w.waterData?.entries, w.stepsData?.entries, w.heartRateData?.entries, w.caffeineData?.entries, w.cycleData?.entries, isLinkedTask, linkedTaskCompleted, integrationValue, progressEntry]);
+  }, [w.id, w.target, w.waterData?.entries, w.stepsData?.entries, w.heartRateData?.entries, w.caffeineData?.entries, w.cycleData?.entries, isLinkedTask, linkedTaskCompleted, integrationValue, progressEntry, today]);
 
   const normalizedTarget = w.target && w.target > 0 ? w.target : 1;
   const pct = isLinkedTask

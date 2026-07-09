@@ -3,6 +3,7 @@
 import { WidgetInstance } from "@/types/widgets";
 import React from "react";
 import { iconMap } from "@/lib/dashboard-icons";
+import { getCurrentLocalDate } from "@/lib/date-utils";
 
 // Local colour utility (same as widget-library)
 const colorClassMap: Record<string, string> = {
@@ -208,10 +209,19 @@ export function WidgetPreview({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        const today = new Date().toISOString().split('T')[0];
-                        const quitDate = new Date(widget.quitHabitData?.quitDate || '');
-                        const daysSince = Math.floor((new Date().getTime() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
-                        
+                        const today = getCurrentLocalDate();
+                        const quitDateRaw = widget.quitHabitData?.quitDate;
+                        // Parse as local midnight — bare YYYY-MM-DD parses as
+                        // UTC and shifts the day count west of Greenwich
+                        const quitDate = quitDateRaw
+                          ? new Date(quitDateRaw.includes('T') ? quitDateRaw : `${quitDateRaw}T00:00:00`)
+                          : null;
+                        if (!quitDate || isNaN(quitDate.getTime())) {
+                          alert('Set your quit date first, then check in.');
+                          return;
+                        }
+                        const daysSince = Math.floor((Date.now() - quitDate.getTime()) / (1000 * 60 * 60 * 24));
+
                         // Add check-in milestone
                         const updatedWidget = {
                           ...widget,
@@ -296,7 +306,7 @@ export function WidgetPreview({
                         e.stopPropagation();
                         const weight = prompt(`Enter today's weight (${widget.weightData?.unit || widget.unit || 'lbs'}):`);
                         if (weight && !isNaN(parseFloat(weight))) {
-                          const today = new Date().toISOString().split('T')[0];
+                          const today = getCurrentLocalDate();
                           const newWeight = parseFloat(weight);
                           
                           const updatedWidget = {
