@@ -1,0 +1,11 @@
+# Per-request Supabase auth round-trip removed with a validated-token cache
+
+**Problem** — Warm page navigations took ~135ms TTFB and every API call ~215-270ms even though queries were already optimized; "the app feels slow switching pages and loading content."
+
+**Approach** — Measured before touching code: curl TTFB on public vs authenticated pages showed a fixed ~110ms gap; a Node script timing `auth.getUser()` (~90ms) vs a head-count query (~90-250ms) against the live Supabase project split each request's cost. Grep showed the middleware plus 37 API route files each re-validated the same JWT with a network call per request. Chokepoints found: `withAuth` in `src/lib/api-utils.ts` (41 routes) and `updateSession` in `src/utils/supabase/middleware.ts`.
+
+**Solution** — `src/lib/server-auth-cache.ts`: `getUserCached(supabase, token?)`, a drop-in for `supabase.auth.getUser()` returning the same `{ data: { user }, error }` shape. In-memory Map keyed by access token, TTL `AUTH_CACHE_TTL_MS` (30s), only caches tokens Supabase itself validated, always calls through within 60s of token expiry so cookie refresh still runs. Wired into `withAuth`, the middleware, and `src/app/api/user/preferences/route.ts`. Result: page TTFB ~135ms → ~22ms; APIs ~90ms faster each.
+
+**Rule** — When every request performs the same external validation, cache the *positive* result keyed by the exact credential for a short TTL — never cache failures, and bypass the cache near credential expiry so refresh side effects still happen. Justify the TTL against the system's existing trust model (PostgREST already accepts the JWT until expiry without asking the auth server, so 30s adds no new risk class).
+
+**Dead ends** — Local JWT verification via `getClaims()`/JWKS: this project's tokens are legacy HS256 (checked the JWT header `alg`), so there is no public key to verify against without a dashboard key-migration. Monkey-patching `client.auth.getUser` in the `supabaseServer()` factory: rejected as hidden behavior; the explicit helper at the chokepoints is the same diff size. Test mocks broke first (`getSession is not a function`) — mocks of the supabase client must include `getSession` returning `{ data: { session: null } }` to exercise the uncached path.
