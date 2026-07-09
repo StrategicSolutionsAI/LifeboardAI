@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { supabaseFromBearer } from '@/utils/supabase/bearer'
 import { handleApiError } from '@/lib/api-error-handler'
+import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired'
 import { parseBody } from '@/lib/validations'
 import type { z } from 'zod'
 
@@ -48,7 +49,10 @@ export function withAuth(handler: AuthedHandler, routeName?: string) {
       const supabase = getClientFromRequest(req)
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401, headers: { [SESSION_EXPIRED_HEADER]: '1' } }
+        )
       }
       return await handler(req, { supabase, user }, routeContext)
     } catch (error) {

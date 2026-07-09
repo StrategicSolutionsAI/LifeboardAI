@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
+import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired'
 
 interface ApiError extends Error {
   statusCode?: number
@@ -54,12 +55,19 @@ export function handleApiError(error: unknown, context?: string): NextResponse {
   // Handle different error types
   if (error instanceof CustomApiError) {
     return NextResponse.json(
-      { 
-        error: error.message, 
+      {
+        error: error.message,
         code: error.code,
         ...(process.env.NODE_ENV === 'development' && error.details && { details: error.details })
       },
-      { status: error.statusCode }
+      {
+        status: error.statusCode,
+        // AUTH_REQUIRED 401s mean the app session is gone — mark them so the
+        // client fetch wrapper can redirect to /login.
+        ...(error.statusCode === 401 && error.code === 'AUTH_REQUIRED'
+          ? { headers: { [SESSION_EXPIRED_HEADER]: '1' } }
+          : {}),
+      }
     )
   }
 

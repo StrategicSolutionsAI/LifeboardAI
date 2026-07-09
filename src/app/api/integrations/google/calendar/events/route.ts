@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { getCalendarClient } from '@/lib/google/client';
 import { withErrorHandling } from '@/lib/api-error-handler';
+import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs'
@@ -21,7 +22,10 @@ async function handler(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'User not authenticated' },
+      { status: 401, headers: { [SESSION_EXPIRED_HEADER]: '1' } }
+    );
   }
 
   // Get the user's Google Calendar integration

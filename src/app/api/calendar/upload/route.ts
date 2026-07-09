@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired';
 import {
   calculateDurationMinutes,
   isoToHourSlot,
@@ -304,7 +305,7 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { [SESSION_EXPIRED_HEADER]: '1' } });
     }
     currentUserId = user.id;
 
@@ -649,7 +650,7 @@ export async function GET(request: NextRequest) {
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { [SESSION_EXPIRED_HEADER]: '1' } });
     }
 
     // Get uploaded calendar events for the user
