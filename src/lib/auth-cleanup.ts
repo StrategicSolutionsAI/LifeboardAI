@@ -69,7 +69,16 @@ export function ensureCacheOwner(userId: string): boolean {
   const storedOwner = localStorage.getItem(OWNER_KEY)
   if (storedOwner === userId) return false
 
-  // Different user (or first visit) — purge everything
+  if (storedOwner === null) {
+    // No previous owner: either sign-out already purged everything, or the
+    // data was created on this device before any sign-in (offline/local
+    // tasks awaiting sync). Purging here would destroy those tasks before
+    // the sync effect can POST them — just claim ownership.
+    localStorage.setItem(OWNER_KEY, userId)
+    return false
+  }
+
+  // Different user — purge everything
   clearAllUserCaches()
   localStorage.setItem(OWNER_KEY, userId)
   return true

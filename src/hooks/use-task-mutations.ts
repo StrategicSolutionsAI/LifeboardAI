@@ -6,6 +6,8 @@ import {
   ensureTasksSource,
 } from './task-helpers'
 import type { TaskSharedState } from './task-helpers'
+import { normalizeHourSlot } from '@/lib/date-utils'
+import { useToast } from '@/components/ui/use-toast'
 import type { Task, RepeatRule, RepeatOption, KanbanStatus, TaskOccurrenceExceptionUpsertInput } from '@/types/tasks'
 
 interface FetcherResult {
@@ -46,6 +48,7 @@ export function useTaskMutations(
   } = fetcher
 
   const { upsertOccurrenceException } = occurrences
+  const { toast } = useToast()
 
   // ── Shared helper: announce task update to other components ────────
   const announceTaskUpdate = useCallback(() => {
@@ -81,21 +84,6 @@ export function useTaskMutations(
     }
     const repeatRule = repeat !== 'none' ? repeat : undefined
     const { endDate: explicitEndDate, endHourSlot, allDay, duration: explicitDuration } = options ?? {}
-
-    const normalizeHourSlot = (value?: number | string | null): string | undefined => {
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        const hh = Math.max(0, Math.min(23, value))
-        if (hh === 0) return 'hour-12AM'
-        if (hh < 12) return `hour-${hh}AM`
-        if (hh === 12) return 'hour-12PM'
-        return `hour-${hh - 12}PM`
-      }
-      if (typeof value === 'string' && value.trim().length > 0) {
-        const trimmedValue = value.trim()
-        return trimmedValue.startsWith('hour-') ? trimmedValue : `hour-${trimmedValue}`
-      }
-      return undefined
-    }
 
     const normalizedHourSlot = normalizeHourSlot(hourSlot)
     const normalizedEndHourSlot = normalizeHourSlot(endHourSlot)
@@ -214,6 +202,10 @@ export function useTaskMutations(
     }
 
     // ── Step 1: Always write to Supabase first ──
+    // A hard 4xx (validation etc.) means the server actively rejected this
+    // payload — saving it locally would just re-fail on every sync attempt,
+    // so the local fallback is reserved for network errors / 5xx / auth.
+    let serverRejected = false
     try {
       const supaRes = await fetch('/api/tasks', {
         method: 'POST',
@@ -263,6 +255,10 @@ export function useTaskMutations(
       // Supabase write failed — log and try Todoist as fallback
       const supaError = await supaRes.text().catch(() => '')
       console.warn('Supabase task creation failed:', supaRes.status, supaError)
+      serverRejected =
+        supaRes.status >= 400 &&
+        supaRes.status < 500 &&
+        ![401, 408, 429].includes(supaRes.status)
     } catch (supaErr) {
       console.warn('Supabase task creation network error:', supaErr)
     }
@@ -338,15 +334,31 @@ export function useTaskMutations(
     }
 
     // ── Step 4: Both failed — local storage as last resort ──
-    console.warn('Both Supabase and Todoist failed — creating local task')
-    const local = createLocalTask()
-    if (local) {
-      replaceTempWithReal(local)
-      return local
+    // Skipped when the server rejected the payload: "will sync once online"
+    // would be a lie for a task the server 400s on every attempt.
+    if (!serverRejected) {
+      console.warn('Both Supabase and Todoist failed — creating local task')
+      const local = createLocalTask()
+      if (local) {
+        replaceTempWithReal(local)
+        toast({
+          type: 'warning',
+          title: 'Saved on this device only',
+          description: "Couldn't reach the server — this task will sync automatically once you're back online.",
+        })
+        return local
+      }
     }
     revertOptimistic()
+    toast({
+      type: 'error',
+      title: 'Task not saved',
+      description: serverRejected
+        ? 'The server rejected this task. Check the task details and try again.'
+        : 'Something went wrong and the task could not be saved. Please try again.',
+    })
     throw new Error('Failed to create task: all persistence methods failed')
-  }, [dateStr, updateDailyOptimistically, updateAllOptimistically, announceTaskUpdate, todoistConnectedRef, setTodoistConnected])
+  }, [dateStr, updateDailyOptimistically, updateAllOptimistically, announceTaskUpdate, todoistConnectedRef, setTodoistConnected, toast])
 
   // ── Toggle task completion ─────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useDataCache } from './use-data-cache'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
+import { useToast } from '@/components/ui/use-toast'
 import {
   ensureTaskSource,
   ensureTasksSource,
@@ -11,6 +12,13 @@ import type { TaskSharedState } from './task-helpers'
 import type { Task } from '@/types/tasks'
 
 const SHARED_RESULT_TTL = 30_000
+
+// Module-level guard: several components mount this hook at once, and each
+// mount kicks off the local-task sync. Without the guard they race and POST
+// the same localStorage tasks multiple times, creating server duplicates.
+// This flag only covers one tab — cross-tab exclusion (localStorage is
+// shared) comes from the Web Lock taken where the sync runs.
+let localSyncInFlight = false
 
 export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
   const {
@@ -24,6 +32,7 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
 
   const lastSeenUpdateRef = useRef<number>(0)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { toast } = useToast()
 
   const dailyCacheKey = `tasks-daily-${dateStr}`
   const allCacheKey = 'tasks-all-open'
@@ -279,6 +288,8 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const syncLocalTasks = async () => {
+      if (localSyncInFlight) return
+      localSyncInFlight = true
       try {
         const raw = window.localStorage.getItem('lifeboard_local_tasks')
         if (!raw) return
@@ -286,8 +297,15 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
         if (!Array.isArray(localTasks) || localTasks.length === 0) return
 
         const synced: string[] = []
+        // Dropped without syncing: tasks the server rejected outright (hard
+        // 4xx — they would re-fail on every mount forever) and tasks completed
+        // while local (filtered from every view, so they only accumulate).
+        const dropped: string[] = []
         for (const task of localTasks) {
-          if (task.completed) continue
+          if (task.completed) {
+            dropped.push(task.id)
+            continue
+          }
           try {
             const res = await fetch('/api/tasks', {
               method: 'POST',
@@ -307,30 +325,55 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
             })
             if (res.ok) {
               synced.push(task.id)
+            } else if (
+              res.status >= 400 &&
+              res.status < 500 &&
+              ![401, 408, 429].includes(res.status)
+            ) {
+              dropped.push(task.id)
             }
           } catch {
-            // Individual sync failure — skip this task, try others
+            // Network failure — keep the task, try again next mount
           }
         }
 
-        if (synced.length > 0) {
-          const remaining = localTasks.filter(t => !synced.includes(t.id))
+        if (synced.length > 0 || dropped.length > 0) {
+          const remaining = localTasks.filter(
+            t => !synced.includes(t.id) && !dropped.includes(t.id)
+          )
           if (remaining.length === 0) {
             window.localStorage.removeItem('lifeboard_local_tasks')
           } else {
             window.localStorage.setItem('lifeboard_local_tasks', JSON.stringify(remaining))
           }
+        }
+
+        if (synced.length > 0) {
           sharedFetchRef.current = null
           sharedResultRef.current = null
           try { refetchDaily() } catch {}
           try { refetchAll() } catch {}
+          toast({
+            type: 'success',
+            title: synced.length === 1 ? 'Task synced' : `${synced.length} tasks synced`,
+            description: 'Tasks saved on this device are now backed up to your account.',
+          })
         }
       } catch {
         // Non-critical — will try again next mount
+      } finally {
+        localSyncInFlight = false
       }
     }
-    syncLocalTasks()
-  }, [refetchDaily, refetchAll, sharedFetchRef, sharedResultRef])
+    // Web Lock = cross-tab mutual exclusion (two tabs share localStorage and
+    // would otherwise both POST the same tasks). A queued second holder
+    // re-reads localStorage and no-ops once the first tab has cleared it.
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      void navigator.locks.request('lifeboard_local_task_sync', syncLocalTasks)
+    } else {
+      void syncLocalTasks()
+    }
+  }, [refetchDaily, refetchAll, sharedFetchRef, sharedResultRef, toast])
 
   // Cleanup refresh timer on unmount
   useEffect(() => {
