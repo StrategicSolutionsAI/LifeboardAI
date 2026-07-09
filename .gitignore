@@ -21,6 +21,9 @@
 *.log
 Screenshot*.png
 
+# local run telemetry
+.replicode/
+
 # local env files
 .env*.local
 .env
