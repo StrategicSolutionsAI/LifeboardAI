@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { supabaseFromBearer } from '@/utils/supabase/bearer'
 import { handleApiError } from '@/lib/api-error-handler'
+import { getUserCached } from '@/lib/server-auth-cache'
 import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired'
 import { parseBody } from '@/lib/validations'
 import type { z } from 'zod'
@@ -9,13 +10,15 @@ import type { z } from 'zod'
 /**
  * Unified client factory — Bearer token takes priority, cookies as fallback.
  * Single source of truth; replaces the local copies in route files.
+ * Also surfaces the bearer token so auth validation can be cached per token.
  */
 function getClientFromRequest(req: NextRequest) {
   const auth = req.headers.get('authorization')
   if (auth?.startsWith('Bearer ')) {
-    return supabaseFromBearer(auth.slice(7))
+    const token = auth.slice(7)
+    return { supabase: supabaseFromBearer(token), token }
   }
-  return supabaseServer()
+  return { supabase: supabaseServer(), token: null }
 }
 
 type SupabaseClient = ReturnType<typeof supabaseServer>
@@ -25,11 +28,13 @@ interface AuthContext {
   user: { id: string; email?: string; [key: string]: any }
 }
 
+// Handlers may return a plain Response (streaming routes like /api/chat)
+// alongside the usual NextResponse.
 type AuthedHandler = (
   req: NextRequest,
   ctx: AuthContext,
   routeContext?: { params: Promise<Record<string, string>> }
-) => Promise<NextResponse>
+) => Promise<NextResponse | Response>
 
 /**
  * Wraps a route handler with auth check + error handling.
@@ -44,10 +49,10 @@ export function withAuth(handler: AuthedHandler, routeName?: string) {
   return async (
     req: NextRequest,
     routeContext?: { params: Promise<Record<string, string>> }
-  ): Promise<NextResponse> => {
+  ): Promise<NextResponse | Response> => {
     try {
-      const supabase = getClientFromRequest(req)
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      const { supabase, token } = getClientFromRequest(req)
+      const { data: { user }, error: authError } = await getUserCached(supabase, token)
       if (authError || !user) {
         return NextResponse.json(
           { error: 'Not authenticated' },
@@ -65,7 +70,7 @@ type AuthedBodyHandler<T> = (
   req: NextRequest,
   ctx: AuthContext & { body: T },
   routeContext?: { params: Promise<Record<string, string>> }
-) => Promise<NextResponse>
+) => Promise<NextResponse | Response>
 
 /**
  * Convenience wrapper that also parses + validates the JSON body with Zod.

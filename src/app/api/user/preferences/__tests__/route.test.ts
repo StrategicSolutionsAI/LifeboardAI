@@ -25,6 +25,8 @@ const upsertChain = {
 const supabaseMockInstance = {
   auth: {
     getUser: jest.fn(),
+    // No session → getUserCached always falls through to getUser
+    getSession: jest.fn(async () => ({ data: { session: null } })),
   },
   from: jest.fn(() => ({
     select: jest.fn(() => selectChain),

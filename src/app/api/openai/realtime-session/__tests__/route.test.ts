@@ -7,6 +7,8 @@ import { POST } from '../route'
 const supabaseMockInstance = {
   auth: {
     getUser: jest.fn(),
+    // No session → getUserCached always falls through to getUser
+    getSession: jest.fn(async () => ({ data: { session: null } })),
   },
 }
 

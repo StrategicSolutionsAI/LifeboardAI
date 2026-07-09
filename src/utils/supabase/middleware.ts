@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 // Pages reachable without a session. Everything else redirects to /login.
 // The /auth/ prefix must stay public — the OAuth callback at /auth/callback
@@ -45,9 +46,11 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // getUser() (not getSession()) — validates the token with Supabase instead
-  // of trusting the cookie, which is required now that we gate on the result.
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // getUserCached wraps getUser() (not getSession()) — the token is validated
+  // with Supabase rather than trusted from the cookie, which is required now
+  // that we gate on the result. Repeat requests with the same already-validated
+  // token skip the ~90ms auth round-trip for AUTH_CACHE_TTL_MS.
+  const { data: { user }, error: authError } = await getUserCached(supabase)
 
   // A network failure (offline Electron, Supabase outage) makes the session
   // unverifiable, not absent — fail open rather than locking out valid users.
