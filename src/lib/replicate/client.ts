@@ -138,6 +138,57 @@ export async function runGeminiFlash(options: GeminiOptions): Promise<string> {
 
 
 // ---------------------------------------------------------------------------
+// Chat (Claude Fable 5 on Replicate)
+// ---------------------------------------------------------------------------
+
+// Claude Fable 5 — Anthropic's most capable model, served through Replicate so
+// it bills against REPLICATE_API_TOKEN (no direct Anthropic API key needed).
+// Replicate input schema: { prompt, system_prompt, max_tokens } — no
+// sampling/effort/thinking params are exposed.
+const CLAUDE_MODEL = 'anthropic/claude-fable-5'
+// Same-provider fallback if Fable 5 errors or returns empty.
+const CLAUDE_FALLBACK_MODEL = 'anthropic/claude-4.5-sonnet'
+
+export interface ClaudeOptions {
+  messages: GeminiMessage[]
+  max_tokens?: number
+}
+
+async function runClaudeModel(model: string, options: ClaudeOptions): Promise<string> {
+  const { messages, max_tokens = 2048 } = options
+  const replicate = getReplicate()
+
+  // Same flattening as Gemini: system turns → system_prompt, convo → prompt
+  const { system_instruction, prompt } = convertMessagesToGeminiInput(messages)
+
+  const input: Record<string, unknown> = { prompt, max_tokens }
+  if (system_instruction) input.system_prompt = system_instruction
+
+  const output = await replicate.run(model as `${string}/${string}`, { input }) as unknown
+  const text = extractText(output).trim()
+  if (!text) throw new Error(`${model} returned an empty response`)
+  return text
+}
+
+/**
+ * Run a chat completion on Claude Fable 5 via Replicate, retrying once on
+ * Claude 4.5 Sonnet so a single-model hiccup doesn't take down chat.
+ * @returns the assistant's reply text
+ * @throws if both models fail or return empty
+ */
+export async function runClaude(options: ClaudeOptions): Promise<string> {
+  try {
+    return await runClaudeModel(CLAUDE_MODEL, options)
+  } catch (error) {
+    console.error(
+      `❌ ${CLAUDE_MODEL} failed, retrying on ${CLAUDE_FALLBACK_MODEL}:`,
+      error instanceof Error ? error.message : String(error)
+    )
+    return runClaudeModel(CLAUDE_FALLBACK_MODEL, options)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Speech-to-Text (Whisper on Replicate)
 // ---------------------------------------------------------------------------
 
@@ -217,8 +268,6 @@ export interface TTSOptions {
   text: string
   /** Voice name — accepts legacy names (mapped) or Chatterbox voice names directly */
   voice?: string
-  /** Speed multiplier — mapped to temperature (lower temp = more consistent/faster feel) */
-  speed?: number
 }
 
 /**
@@ -251,10 +300,15 @@ const VOICE_MAP: Record<string, string> = {
 /**
  * Generate speech audio using Chatterbox Turbo (Resemble AI) on Replicate.
  * Produces natural, human-like speech with 20 preset voices.
- * @returns URL to the generated WAV audio file
+ *
+ * Text longer than 500 chars is split at sentence boundaries; all chunks are
+ * synthesized in parallel, fetched, and concatenated into one WAV buffer so
+ * long replies are spoken in full (each chunk is a paid prediction, so the
+ * chunk count is capped to bound worst-case cost).
+ * @returns Buffer containing the complete WAV audio
  */
-export async function runTTS(options: TTSOptions): Promise<string> {
-  const { text, voice = 'Chloe', speed } = options
+export async function runTTS(options: TTSOptions): Promise<Buffer> {
+  const { text, voice = 'Chloe' } = options
   const replicate = getReplicate()
 
   // Resolve voice: check legacy map first, then check if it's a valid Chatterbox name, else default
@@ -263,22 +317,20 @@ export async function runTTS(options: TTSOptions): Promise<string> {
 
   // Chatterbox has a 500-char limit — for longer text, chunk and concatenate
   const maxLen = 500
-  const chunks = text.length <= maxLen
+  const MAX_TTS_CHUNKS = 6 // hard cost cap: at most 6 predictions (~3000 chars) per reply
+  let chunks = text.length <= maxLen
     ? [text]
     : splitTextIntoChunks(text, maxLen)
+  if (chunks.length > MAX_TTS_CHUNKS) {
+    console.warn(`[TTS] Reply needs ${chunks.length} chunks; capping at ${MAX_TTS_CHUNKS} to bound cost`)
+    chunks = chunks.slice(0, MAX_TTS_CHUNKS)
+  }
 
-  // Map speed to temperature: lower speed → lower temperature (more focused/consistent)
-  // speed 1.0 → temp 0.8 (default), speed 0.5 → temp 0.4, speed 1.5 → temp 1.2
-  const temperature = speed
-    ? Math.max(0.05, Math.min(2.0, 0.8 * speed))
-    : 0.8
-
-  const audioUrls: string[] = []
-  for (const chunk of chunks) {
+  // Synthesize all chunks in parallel and fetch each WAV
+  const wavBuffers = await Promise.all(chunks.map(async (chunk) => {
     const input: Record<string, unknown> = {
       text: chunk,
       voice: resolvedVoice,
-      temperature,
     }
 
     const output = await replicate.run('resemble-ai/chatterbox-turbo', { input }) as any
@@ -301,12 +353,43 @@ export async function runTTS(options: TTSOptions): Promise<string> {
     if (!audioUrl || audioUrl === '[object Object]') {
       throw new Error('Chatterbox Turbo returned unexpected output format')
     }
-    audioUrls.push(audioUrl)
+
+    const res = await fetch(audioUrl)
+    if (!res.ok) {
+      throw new Error(`TTS audio fetch failed: ${res.status} ${res.statusText}`)
+    }
+    return Buffer.from(await res.arrayBuffer())
+  }))
+
+  return concatWavBuffers(wavBuffers)
+}
+
+/**
+ * Concatenate multiple WAV buffers (same format) into a single WAV,
+ * rewriting the RIFF and `data` sub-chunk sizes in the header.
+ * Falls back to the first buffer if any input has an unexpected layout.
+ */
+function concatWavBuffers(buffers: Buffer[]): Buffer {
+  if (buffers.length === 1) return buffers[0]
+
+  let header: Buffer | null = null
+  const dataParts: Buffer[] = []
+  for (const buf of buffers) {
+    // Locate the 'data' sub-chunk (search after the 12-byte RIFF/WAVE header)
+    const idx = buf.indexOf('data', 12, 'ascii')
+    if (idx === -1 || idx + 8 > buf.length) {
+      console.warn('[TTS] Unexpected WAV layout while concatenating — returning first chunk only')
+      return buffers[0]
+    }
+    if (!header) header = buf.subarray(0, idx + 8) // header + 'data' marker + size field
+    dataParts.push(buf.subarray(idx + 8))
   }
 
-  // For single chunks, return the URL directly
-  // For multiple chunks, return the first (caller fetches & concatenates audio buffers)
-  return audioUrls[0]
+  const totalData = dataParts.reduce((sum, b) => sum + b.length, 0)
+  const out = Buffer.concat([header!, ...dataParts])
+  out.writeUInt32LE(out.length - 8, 4) // RIFF chunk size = file size - 8
+  out.writeUInt32LE(totalData, header!.length - 4) // 'data' sub-chunk size
+  return out
 }
 
 /** Split text into chunks at sentence boundaries, respecting maxLen */

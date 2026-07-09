@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { runWhisper, runTTS } from '@/lib/replicate/client'
-import { runClaude } from '@/lib/anthropic/client'
+import { runWhisper, runTTS, runClaude } from '@/lib/replicate/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
 import { buildChatContext } from '@/lib/chat-context'
@@ -10,17 +8,6 @@ import { chatLimiter, getRateLimitKey } from '@/lib/rate-limit'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 120
-
-// Module-level singleton — reused across warm invocations
-let _openai: OpenAI | null = null
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) throw new Error('Missing OPENAI_API_KEY')
-    _openai = new OpenAI({ apiKey, timeout: 30_000, maxRetries: 1 })
-  }
-  return _openai
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,8 +24,9 @@ export async function POST(req: NextRequest) {
     }
 
     const requestedVoice = (formData.get('voice') as string | null) || undefined
-    const requestedSpeedRaw = (formData.get('speed') as string | null)
-    const requestedSpeed = requestedSpeedRaw ? Number(requestedSpeedRaw) : undefined
+    // 'speak' gates server-side TTS (each synthesis is a paid chatterbox-turbo
+    // prediction). Defaults to on when absent for backward compatibility.
+    const speakReplies = (formData.get('speak') as string | null) !== '0'
 
     // Parse conversation history for multi-turn context
     let conversationHistory: { role: string; content: string }[] = []
@@ -83,27 +71,15 @@ export async function POST(req: NextRequest) {
 
     let reply: string
     try {
-      // Claude Fable 5 at 'low' effort — keeps voice responsive
+      // Claude Fable 5 on Replicate (retries on Claude 4.5 Sonnet internally)
       reply = await runClaude({
         messages: chatMessages,
         max_tokens: 2048,
-        effort: 'low',
       })
     } catch (claudeErr) {
-      console.error('Claude Fable 5 error (voice):', claudeErr instanceof Error ? claudeErr.message : String(claudeErr))
-      // Fall back to OpenAI
-      const openai = getOpenAI()
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: lifeboardInstruction },
-          ...(systemContext ? [{ role: 'system' as const, content: systemContext }] : []),
-          { role: 'user', content: transcript },
-        ],
-        max_tokens: 1024,
-        temperature: 0.7,
-      })
-      reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+      // runClaude already retried on Claude 4.5 Sonnet — this is a full-chain failure
+      console.error('Claude (Replicate) error (voice):', claudeErr instanceof Error ? claudeErr.message : String(claudeErr))
+      reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
     }
 
     // Execute all commands in the reply (create tasks, complete tasks, add events, etc.)
@@ -135,22 +111,19 @@ export async function POST(req: NextRequest) {
           JSON.stringify({ type: 'text', reply, createdTask, commandsExecuted }) + '\n'
         ))
 
-        // Chunk 3: TTS audio (generated in background, streamed when ready)
+        // Chunk 3: TTS audio (generated in background, streamed when ready) —
+        // skipped entirely when the speak-replies toggle is off (saves a paid prediction)
+        if (!speakReplies) {
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: 'audio', audioUrl: null, skipped: true }) + '\n'
+          ))
+          controller.close()
+          return
+        }
         try {
           const ttsVoice = requestedVoice || process.env.TTS_VOICE || 'Chloe'
           console.log(`[TTS] Starting synthesis: voice=${ttsVoice}, text length=${reply.length}`)
-          const ttsFileUrl = await runTTS({
-            text: reply,
-            voice: ttsVoice,
-            speed: typeof requestedSpeed === 'number' && !Number.isNaN(requestedSpeed) ? requestedSpeed : undefined,
-          })
-          console.log(`[TTS] Got file URL: ${ttsFileUrl.slice(0, 80)}...`)
-          const audioRes = await fetch(ttsFileUrl)
-          if (!audioRes.ok) {
-            console.error(`[TTS] Failed to fetch audio: ${audioRes.status} ${audioRes.statusText}`)
-            throw new Error(`TTS audio fetch failed: ${audioRes.status}`)
-          }
-          const audioBuf = Buffer.from(await audioRes.arrayBuffer())
+          const audioBuf = await runTTS({ text: reply, voice: ttsVoice })
           console.log(`[TTS] Audio buffer size: ${audioBuf.length} bytes`)
           const b64 = audioBuf.toString('base64')
           const audioUrl = `data:audio/wav;base64,${b64}`
@@ -184,10 +157,11 @@ export async function POST(req: NextRequest) {
     console.error('Voice chat route error:', errMsg)
     if (errStack) console.error(errStack)
 
-    // Map common quota/auth errors to a structured reply the client can detect
-    const status = /quota/i.test(errMsg) ? 402 : 500
-    const body = /quota/i.test(errMsg)
-      ? { reply: 'OpenAI quota exceeded. Please add credits or switch to browser speech.' }
+    // Map common quota/credit errors to a structured reply the client can detect
+    const isQuota = /quota|credit/i.test(errMsg)
+    const status = isQuota ? 402 : 500
+    const body = isQuota
+      ? { reply: 'AI credits exhausted. Please add Replicate credits or switch to browser speech.' }
       : { error: process.env.NODE_ENV === 'development' ? errMsg : 'Internal error' }
 
     return NextResponse.json(body, { status })

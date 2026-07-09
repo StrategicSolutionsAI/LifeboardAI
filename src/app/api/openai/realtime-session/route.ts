@@ -5,6 +5,48 @@ import { getRateLimitKey, realtimeLimiter } from '@/lib/rate-limit'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+/** Voices accepted by the OpenAI Realtime API */
+const OPENAI_REALTIME_VOICES = new Set([
+  'alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse',
+])
+
+/**
+ * The chat settings panel stores Chatterbox Turbo voice names (used by the
+ * Replicate TTS path). OpenAI Realtime rejects those, so map each Chatterbox
+ * voice to its closest OpenAI equivalent (inverse of VOICE_MAP in
+ * lib/replicate/client.ts, plus nearest matches for the unmapped voices).
+ */
+const CHATTERBOX_TO_OPENAI: Record<string, string> = {
+  Chloe: 'alloy',
+  Ethan: 'ash',
+  Evelyn: 'ballad',
+  Madison: 'coral',
+  Gordon: 'echo',
+  Laura: 'sage',
+  Anaya: 'shimmer',
+  Brian: 'verse',
+  Abigail: 'coral',
+  Aaron: 'ash',
+  // Remaining Chatterbox voices — nearest by character
+  Andy: 'ash',
+  Archer: 'echo',
+  Dylan: 'verse',
+  Emmanuel: 'echo',
+  Gavin: 'ash',
+  Ivan: 'echo',
+  Lucy: 'shimmer',
+  Marisol: 'coral',
+  Meera: 'sage',
+  Walter: 'echo',
+}
+
+/** Resolve any stored voice name to one OpenAI Realtime accepts */
+function resolveRealtimeVoice(requested: string | undefined): string {
+  const voice = requested || process.env.TTS_VOICE || 'alloy'
+  if (OPENAI_REALTIME_VOICES.has(voice)) return voice
+  return CHATTERBOX_TO_OPENAI[voice] || 'alloy'
+}
+
 export const POST = withAuth(async (req: NextRequest, { user }) => {
   const rateLimitKey = getRateLimitKey(req, user.id)
   const rateLimited = realtimeLimiter.check(rateLimitKey)
@@ -40,7 +82,7 @@ Important rules:
     },
     body: JSON.stringify({
       model,
-      voice: voice || process.env.TTS_VOICE || 'alloy',
+      voice: resolveRealtimeVoice(voice),
       modalities: ['audio', 'text'],
       turn_detection: { type: 'server_vad' },
       input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },

@@ -1219,9 +1219,11 @@ export function ChatBar() {
       }]
       setMessages(newMessages)
 
-      // Include TTS preferences for server TTS
+      // Include TTS preferences — 'speak' gates server-side synthesis
+      // (each chatterbox-turbo run is a paid prediction). Rate is applied
+      // client-side via audio.playbackRate, so no speed is sent.
       formData.append('voice', ttsVoice)
-      formData.append('speed', String(ttsRate))
+      formData.append('speak', speakReplies ? '1' : '0')
 
       // Send conversation history so the voice AI can follow up on prior exchanges
       const history = messages
@@ -1344,7 +1346,7 @@ export function ChatBar() {
 
       // Play audio when it arrives (may already be available or arrive shortly after text)
       const audioUrl = audioData?.audioUrl
-      if (audioUrl) {
+      if (audioUrl && speakReplies) {
         console.log('[Voice] Got audioUrl, length:', audioUrl.length, 'prefix:', audioUrl.slice(0, 30))
 
         // Stop any existing audio before playing new audio (prevents overlap)
@@ -1356,6 +1358,8 @@ export function ChatBar() {
         // The <audio controls> element in JSX is for user recordings only.
         // Playing via new Audio() avoids duplicate playback from both sources.
         const audio = new Audio(audioUrl)
+        // Speaking-rate slider: applied at playback (pitch is preserved by default)
+        audio.playbackRate = ttsRate
         currentAudioRef.current = audio
 
         // Set output device if selected
@@ -1475,9 +1479,11 @@ export function ChatBar() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          tts: { voice: ttsVoice, speed: ttsRate }
+          // Only request server TTS (a paid chatterbox-turbo prediction) when
+          // the speak-replies toggle is on. Rate is applied via playbackRate.
+          ...(speakReplies ? { tts: { voice: ttsVoice } } : {})
         }),
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
@@ -1542,13 +1548,15 @@ export function ChatBar() {
         }
       }
 
-      // Play TTS audio if present
+      // Play TTS audio if present (and the speak-replies toggle is still on)
       const audioUrl = audioData?.audioUrl
-      if (audioUrl) {
+      if (audioUrl && speakReplies) {
         try {
           cancelTTS()
           setIsSpeaking(true)
           const audio = new Audio(audioUrl)
+          // Speaking-rate slider: applied at playback (pitch is preserved by default)
+          audio.playbackRate = ttsRate
           currentAudioRef.current = audio
           audio.onended = () => {
             setIsSpeaking(false)
