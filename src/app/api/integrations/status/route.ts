@@ -3,7 +3,7 @@ import { supabaseServer } from '@/utils/supabase/server';
 import { withErrorHandling } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 import { refreshWithingsToken } from '@/lib/withings/client';
-import { withRefreshLock } from '@/lib/token-refresh-lock';
+import { createIntegrationErrorHandler } from '@/lib/integration-error-handler';
 
 export const dynamic = 'force-dynamic'
 
@@ -73,40 +73,23 @@ async function handler(request: Request) {
         expiresAt: new Date(expiresAt).toISOString(),
       })
 
-      try {
-        await withRefreshLock(integration.id, async () => {
-          // Re-check freshness inside the lock
-          const { data: freshRow } = await supabase
-            .from('user_integrations')
-            .select('access_token, refresh_token, token_data, updated_at')
-            .eq('id', integration.id)
-            .maybeSingle()
-
-          if (freshRow?.updated_at) {
-            const freshTokenData = (freshRow.token_data || {}) as { expires_in?: number }
-            const freshUpdated = new Date(freshRow.updated_at).getTime()
-            const freshExpires = freshUpdated + (freshTokenData.expires_in ?? 3600) * 1000
-            if (Date.now() < freshExpires - 60_000 && freshRow.access_token) {
-              scoped.info('Token already refreshed by another request', { integrationId: integration.id })
-              return // already fresh
-            }
-          }
-
-          const latestRefresh = freshRow?.refresh_token || integration.refresh_token
-          const newTokens = await refreshFn(latestRefresh!)
-          await supabase
-            .from('user_integrations')
-            .update({
-              access_token: newTokens.access_token,
-              refresh_token: newTokens.refresh_token || latestRefresh,
-              token_data: newTokens,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', integration.id)
-          scoped.info('Token refreshed proactively', { integrationId: integration.id })
-        })
-      } catch (e) {
-        scoped.warn('Proactive token refresh failed', { integrationId: integration.id }, e as Error)
+      // Shared handler = same lock, persistence, and wipe policy as the
+      // metrics and history routes (Withings refresh tokens are single-use).
+      const errorHandler = createIntegrationErrorHandler({
+        provider,
+        userId: user.id,
+        integrationId: integration.id,
+        operation: 'status-proactive-refresh',
+      })
+      const result = await errorHandler.handleTokenRefresh(
+        refreshFn,
+        integration.refresh_token,
+        integration.id
+      )
+      if (result.success) {
+        scoped.info('Token refreshed proactively', { integrationId: integration.id })
+      } else {
+        scoped.warn('Proactive token refresh failed', { integrationId: integration.id })
         tokenFresh = false
       }
     }

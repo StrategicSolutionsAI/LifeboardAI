@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { fetchWithingsWeightHistory, refreshWithingsToken } from '@/lib/withings/client'
-import { withRefreshLock } from '@/lib/token-refresh-lock'
+import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,46 +41,23 @@ async function fetchFromWithingsApi(
   const integration = integrations[0]
   let accessToken = integration.access_token
 
-  // Helper to refresh the token using the shared lock (prevents race conditions
-  // when metrics + history routes both try to refresh simultaneously).
+  // Refresh via the shared handler (same lock, persistence, and wipe policy
+  // as the metrics and status routes — single-use Withings refresh tokens
+  // must never be refreshed by competing code paths).
   async function refreshTokenSafe(): Promise<string | null> {
     if (!integration.refresh_token) return null
-    try {
-      const result = await withRefreshLock(integration.id, async () => {
-        // Re-read the latest refresh token from DB inside the lock
-        const { data: freshRow } = await supabase
-          .from('user_integrations')
-          .select('access_token, refresh_token, token_data, updated_at')
-          .eq('id', integration.id)
-          .maybeSingle()
-
-        // Check if another request already refreshed
-        if (freshRow?.updated_at) {
-          const tokenData = (freshRow.token_data || {}) as { expires_in?: number }
-          const updatedMs = new Date(freshRow.updated_at).getTime()
-          const expiresIn = (tokenData.expires_in ?? 3600) * 1000
-          if (Date.now() < updatedMs + expiresIn - 60_000 && freshRow.access_token) {
-            return freshRow.access_token
-          }
-        }
-
-        const latestRefresh = freshRow?.refresh_token || integration.refresh_token
-        const refreshResult = await refreshWithingsToken(latestRefresh!)
-        await supabase
-          .from('user_integrations')
-          .update({
-            access_token: refreshResult.access_token,
-            refresh_token: refreshResult.refresh_token,
-            token_data: refreshResult,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', integration.id)
-        return refreshResult.access_token as string
-      })
-      return result
-    } catch {
-      return null
-    }
+    const errorHandler = createIntegrationErrorHandler({
+      provider: 'withings',
+      userId,
+      integrationId: integration.id,
+      operation: 'history-token-refresh',
+    })
+    const result = await errorHandler.handleTokenRefresh(
+      refreshWithingsToken,
+      integration.refresh_token,
+      integration.id
+    )
+    return result.success && result.newTokens ? result.newTokens.access_token : null
   }
 
   // Check if token needs refresh
