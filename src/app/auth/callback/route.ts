@@ -3,10 +3,21 @@ export const dynamic = 'force-dynamic'
 import { NextResponse, NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
+// Same-origin path only — an absolute or protocol-relative `next` could
+// bounce a freshly authenticated user to an attacker-chosen site.
+function sanitizeNext(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return null
+  }
+  return value
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')
+  // e.g. /reset-password for the password-recovery flow
+  const next = sanitizeNext(requestUrl.searchParams.get('next'))
   
   
   // Handle OAuth errors from Google
@@ -76,11 +87,13 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .maybeSingle()
 
-  let destination = '/dashboard'
+  // A `next` deep link (password recovery) wins over the default landing.
+  let destination = next ?? '/dashboard'
 
   if (!profile) {
     await supabase.from('profiles').insert({ id: user.id, onboarded: false }).throwOnError()
-    destination = '/onboarding/0'
+    // Password recovery still wins — the user came to set a password, not to onboard.
+    destination = next ?? '/onboarding/0'
 
     // Auto-join household if this email was invited
     if (user.email) {

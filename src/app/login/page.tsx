@@ -56,6 +56,14 @@ export default function Login({ searchParams }: { searchParams: { error?: string
             placeholder="Password"
             className={`${form.authInput} font-['Manrope',sans-serif]`}
           />
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-theme-text-tertiary hover:text-theme-primary"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Button type="submit" className="w-full text-white bg-theme-primary hover:bg-theme-primary-600">
             Continue
           </Button>

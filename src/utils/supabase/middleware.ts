@@ -8,7 +8,7 @@ import { getUserCached } from '@/lib/server-auth-cache'
 // Pages reachable without a session. Everything else redirects to /login.
 // The /auth/ prefix must stay public — the OAuth callback at /auth/callback
 // runs before cookies carry a user, so gating it would break Google login.
-const PUBLIC_PATHS = ['/', '/login', '/signup', '/privacy', '/terms', '/error']
+const PUBLIC_PATHS = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/error']
 const PUBLIC_PREFIXES = ['/auth/']
 
 function isPublicPath(pathname: string): boolean {
