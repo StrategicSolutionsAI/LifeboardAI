@@ -60,6 +60,16 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
       } catch {}
     }
 
+    // Dashboard context does not depend on the transcription, so load it
+    // alongside Whisper instead of adding its latency to every voice turn.
+    const tCtx = Date.now()
+    const contextPromise = buildChatContext(req)
+      .then((context) => ({ context, ctxMs: Date.now() - tCtx }))
+      .catch((error) => {
+        console.error('Failed to build voice chat context:', error instanceof Error ? error.message : String(error))
+        return { context: { systemContext: '', userId: null }, ctxMs: Date.now() - tCtx }
+      })
+
     // Transcribe audio to text via Whisper on Replicate
     const tStt = Date.now()
     const buf = Buffer.from(await audioFile.arrayBuffer())
@@ -68,11 +78,8 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     if (!transcript) {
       return NextResponse.json({ error: 'Empty transcription' }, { status: 422 })
     }
+    const { context: { systemContext }, ctxMs } = await contextPromise
 
-    // Fetch comprehensive user context via shared builder (uses Promise.allSettled)
-    const tCtx = Date.now()
-    const { systemContext } = await buildChatContext(req)
-    const ctxMs = Date.now() - tCtx
     const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
 
     // Build system prompt with all available commands
