@@ -6,11 +6,10 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   Calendar,
-  UserCircle2,
   ListChecks,
   FolderOpen,
-  History,
   Settings,
+  Wallet,
   Zap,
   Menu,
   ShoppingCart,
@@ -41,17 +40,18 @@ interface SidebarLayoutProps {
   children: ReactNode
 }
 
+// Only working destinations belong here — coming-soon pages (/profile,
+// /history) stay reachable by URL but must not occupy primary nav.
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/calendar", icon: Calendar, label: "Calendar" },
   { href: "/tasks", icon: ListChecks, label: "Tasks" },
+  { href: "/budget", icon: Wallet, label: "Budget" },
   { href: "/folders", icon: FolderOpen, label: "Folders" },
   { href: "/email", icon: Mail, label: "Email" },
   { href: "/integrations", icon: Zap, label: "Integrations" },
   { href: "/shopping-list", icon: ShoppingCart, label: "Shopping" },
   { href: "/notes", icon: StickyNote, label: "Notes" },
-  { href: "/profile", icon: UserCircle2, label: "Profile" },
-  { href: "/history", icon: History, label: "History" },
 ]
 
 const mobileNavItems = [
@@ -76,6 +76,16 @@ const routeContext = [
     match: (path: string) => path.startsWith("/tasks"),
     title: "Tasks",
     description: "Organize work into buckets and ship high-impact items first.",
+  },
+  {
+    match: (path: string) => path.startsWith("/budget"),
+    title: "Budget",
+    description: "Track spending and stay on top of your monthly budget.",
+  },
+  {
+    match: (path: string) => path.startsWith("/trends"),
+    title: "Trends",
+    description: "See how your tracked metrics change over time.",
   },
   {
     match: (path: string) => path.startsWith("/folders"),
