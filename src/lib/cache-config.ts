@@ -18,6 +18,9 @@ export const TODOIST_TASK_CACHE_TTL_MS = 15 * 1000      // 15 sec
 // ── Buckets snapshot ─────────────────────────────────────────────────────
 export const BUCKETS_CACHE_TTL_MS = 2 * 60 * 1000       // 2 min
 
+// ── Folder stats ─────────────────────────────────────────────────────────
+export const FOLDER_STATS_CACHE_TTL_MS = 60_000          // 60 sec
+
 // ── Auth & preferences caches ────────────────────────────────────────────
 export const AUTH_CACHE_TTL_MS = 30_000                  // 30 sec
 export const PREFS_CACHE_TTL_MS = 60_000                 // 60 sec

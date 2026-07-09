@@ -12,6 +12,8 @@ import { CSSFolder } from "@/features/folders/components/css-folder"
 import { useBuckets } from "@/hooks/use-buckets"
 import { getBucketColorSync, BUCKET_COLOR_PALETTE } from "@/lib/bucket-colors"
 import { getUserPreferencesClient, updateUserPreferenceFields } from "@/lib/user-preferences"
+import { useDataCache } from "@/hooks/use-data-cache"
+import { FOLDER_STATS_CACHE_TTL_MS } from "@/lib/cache-config"
 import type { BucketStatsData } from "@/features/folders/components/folder-stats"
 
 const COLOR_PALETTE = [
@@ -346,6 +348,13 @@ function FolderEditModal({
   )
 }
 
+async function fetchFolderStats(): Promise<Record<string, BucketStatsData>> {
+  const res = await fetch("/api/folder-stats", { credentials: "same-origin" })
+  if (!res.ok) return {}
+  const json = await res.json()
+  return json.stats ?? {}
+}
+
 /* ── Main page ── */
 export default function FoldersPage() {
   const { buckets, loading } = useBuckets()
@@ -389,13 +398,17 @@ export default function FoldersPage() {
     })
   }, [])
 
-  // Fetch per-bucket stats (tasks, widgets, shopping, calendar)
+  // Per-bucket stats (tasks, widgets, shopping, calendar), cached across
+  // visits. Rename migration below mutates the local copy, so sync the
+  // cache into state instead of rendering the cache directly.
+  const { data: cachedBucketStats } = useDataCache<Record<string, BucketStatsData>>(
+    "folder-stats",
+    fetchFolderStats,
+    { ttl: FOLDER_STATS_CACHE_TTL_MS }
+  )
   useEffect(() => {
-    fetch("/api/folder-stats", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : { stats: {} }))
-      .then((json) => setBucketStats(json.stats ?? {}))
-      .catch(() => {})
-  }, [])
+    if (cachedBucketStats) setBucketStats(cachedBucketStats)
+  }, [cachedBucketStats])
 
   useEffect(() => {
     if (showModal) {
