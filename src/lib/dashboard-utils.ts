@@ -66,9 +66,12 @@ const extractFirstWord = (value: unknown): string | null => {
   return first || null;
 };
 
+// Returns "" when no human name is available — callers render a nameless
+// greeting rather than falling back to something machine-y like the email
+// localpart ("Welcome back, claude-ux-review").
 export const deriveGreetingName = (profile: ProfileNameRow | null, supabaseUser: User | null): string => {
   if (!supabaseUser) {
-    return "there";
+    return "";
   }
 
   const metadata = (supabaseUser.user_metadata ?? {}) as Record<string, unknown>;
@@ -91,14 +94,7 @@ export const deriveGreetingName = (profile: ProfileNameRow | null, supabaseUser:
     }
   }
 
-  if (typeof supabaseUser.email === "string" && supabaseUser.email.includes("@")) {
-    const [localPart] = supabaseUser.email.split("@");
-    if (localPart) {
-      return localPart;
-    }
-  }
-
-  return "there";
+  return "";
 };
 
 const hexToRgb = (hex: string): { r: number; g: number; b: number } => {

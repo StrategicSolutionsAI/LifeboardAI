@@ -468,7 +468,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         <section className="flex items-center justify-between mb-6">
           <div>
             <h1 className=" text-[24px] text-theme-text-primary tracking-tight">
-              Welcome back, {greetingName || 'there'}
+              {greetingName ? `Welcome back, ${greetingName}` : 'Welcome back'}
             </h1>
             <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>
