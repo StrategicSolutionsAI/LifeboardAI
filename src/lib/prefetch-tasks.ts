@@ -17,6 +17,24 @@ const FETCH_TIMEOUT_MS = PREFETCH_TASKS_TIMEOUT_MS
  * When useTasks later calls useDataCache('tasks-all-open', ...), it finds
  * either resolved data or an in-flight promise and skips its own fetch.
  */
+let tasksViewChunksPrefetched = false
+
+/**
+ * Warm the ssr:false view chunks for /tasks (list, board, kanban) ahead of
+ * navigation. dynamic() chunks are not covered by <Link> prefetch, so without
+ * this they only start downloading after the click commits.
+ */
+export async function prefetchTasksExperience(): Promise<void> {
+  if (tasksViewChunksPrefetched) return
+  tasksViewChunksPrefetched = true
+
+  await Promise.allSettled([
+    import('@/features/tasks/components/task-list-view'),
+    import('@/features/tasks/components/TasksBoard'),
+    import('@/features/tasks/components/task-kanban-board'),
+  ])
+}
+
 export function prefetchAllTasks(): void {
   if (typeof window === 'undefined') return
 

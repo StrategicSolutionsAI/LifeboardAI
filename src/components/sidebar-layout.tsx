@@ -24,7 +24,9 @@ import { supabase } from "@/utils/supabase/client"
 import { clearAllUserCaches } from "@/lib/auth-cleanup"
 import { Button } from "@/components/ui/button"
 import { prefetchCalendarExperience } from "@/lib/prefetch-calendar"
-import { prefetchAllTasks } from "@/lib/prefetch-tasks"
+import { prefetchDashboardExperience } from "@/lib/prefetch-dashboard"
+import { prefetchNotes } from "@/lib/prefetch-notes"
+import { prefetchAllTasks, prefetchTasksExperience } from "@/lib/prefetch-tasks"
 import { prefetchUserPreferences, prefetchGreetingName } from "@/lib/prefetch-user-prefs"
 
 // Sheet is only used for mobile hamburger menu — lazy-load to keep Radix Dialog out of desktop bundle
@@ -199,6 +201,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   const warmDashboardNavigation = useCallback(() => {
     router.prefetch("/dashboard")
+    void prefetchDashboardExperience()
     prefetchAllTasks()
     prefetchUserPreferences()
     prefetchGreetingName()
@@ -206,7 +209,13 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
   const warmTasksNavigation = useCallback(() => {
     router.prefetch("/tasks")
+    void prefetchTasksExperience()
     prefetchAllTasks()
+  }, [router])
+
+  const warmNotesNavigation = useCallback(() => {
+    router.prefetch("/notes")
+    prefetchNotes()
   }, [router])
 
   const getPrefetchHandlers = useCallback(
@@ -232,9 +241,16 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           onTouchStart: warmTasksNavigation,
         }
       }
+      if (href === "/notes") {
+        return {
+          onMouseEnter: warmNotesNavigation,
+          onFocus: warmNotesNavigation,
+          onTouchStart: warmNotesNavigation,
+        }
+      }
       return {}
     },
-    [warmCalendarNavigation, warmDashboardNavigation, warmTasksNavigation]
+    [warmCalendarNavigation, warmDashboardNavigation, warmTasksNavigation, warmNotesNavigation]
   )
 
   return (
