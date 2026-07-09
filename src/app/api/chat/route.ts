@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runTTS, runClaude } from '@/lib/replicate/client'
+import { runTTS, runClaudeStream } from '@/lib/replicate/client'
 import { withAuth } from '@/lib/api-utils'
-import { getCommandsPrompt, processReplyCommands } from '@/lib/chat-commands'
+import { getCommandsPrompt, processReplyCommands, displayableStreamPrefix, finalizeStreamedText } from '@/lib/chat-commands'
 import { buildChatContext } from '@/lib/chat-context'
 import { chatLimiter, getRateLimitKey } from '@/lib/rate-limit'
 
@@ -57,62 +57,74 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     ...messages.map(({ role, content }) => ({ role: role as 'user' | 'assistant', content }))
   ]
 
-  let reply = ''
-  let llmFailed = false
-  const tLlm = Date.now()
-  try {
-    reply = await runClaude({
-      messages: chatMessages,
-      max_tokens: 2048,
-    })
-  } catch (error) {
-    // runClaude already retried on Claude 4.5 Sonnet — this is a full-chain failure
-    console.error('Claude (Replicate) error:', error instanceof Error ? error.message : String(error))
-  }
-  const llmMs = Date.now() - tLlm
-  if (!reply) {
-    llmFailed = true
-    reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
-  }
-
-  // Execute all commands in the reply (create tasks, complete tasks, add events, etc.)
-  // Skipped on LLM failure: the canned fallback never contains commands.
-  let createdTask: any | undefined
-  let commandsExecuted = false
-  const tCmd = Date.now()
-  if (!llmFailed) {
-    const cmdResult = await processReplyCommands(reply, {
-      supabase,
-      userId: user.id,
-      req,
-      origin,
-    })
-    reply = cmdResult.cleanReply
-    createdTask = cmdResult.createdTask
-    commandsExecuted = cmdResult.commandsExecuted
-  }
-  const cmdMs = Date.now() - tCmd
-
-  // Stream response: send text immediately, then TTS audio when ready
+  // Stream response: emit reply tokens as they arrive (type:'delta'), then an
+  // authoritative type:'text' frame once the full reply is known, then TTS.
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
-      // Chunk 1: text reply (sent immediately). isError lets the client style
-      // the fallback as an error instead of a normal assistant reply.
-      controller.enqueue(encoder.encode(
-        JSON.stringify({ type: 'text', reply, createdTask, commandsExecuted, ...(llmFailed && { isError: true }) }) + '\n'
-      ))
+      const enqueue = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
 
-      // Chunk 2: TTS audio (generated in background) — only when the client
+      // --- Stream LLM tokens. Command blocks are held back from display
+      // (displayableStreamPrefix) so a [LIFEBOARD_CMD] sentinel never flashes;
+      // actions are executed from the full text afterward, staying atomic. ---
+      let raw = ''
+      let emittedLen = 0
+      let streamErrored = false
+      const tLlm = Date.now()
+      try {
+        for await (const piece of runClaudeStream({ messages: chatMessages, max_tokens: 2048 })) {
+          raw += piece
+          const safe = displayableStreamPrefix(raw)
+          if (safe.length > emittedLen) {
+            enqueue({ type: 'delta', text: safe.slice(emittedLen) })
+            emittedLen = safe.length
+          }
+        }
+      } catch (error) {
+        // Both models failed, or a mid-stream error after partial tokens
+        streamErrored = true
+        console.error('Claude (Replicate) stream error:', error instanceof Error ? error.message : String(error))
+      }
+      const llmMs = Date.now() - tLlm
+
+      let llmFailed = false
+      let reply = streamErrored ? finalizeStreamedText(raw) : raw
+      if (!reply.trim()) {
+        llmFailed = true
+        reply = "I'm currently experiencing technical difficulties. The AI service is taking longer than expected to respond. Please try again in a moment."
+      }
+
+      // Execute all commands in the reply (create tasks, complete tasks, etc.)
+      // on the FULL text. Skipped on LLM failure: the fallback has no commands.
+      let createdTask: any | undefined
+      let commandsExecuted = false
+      const tCmd = Date.now()
+      if (!llmFailed) {
+        const cmdResult = await processReplyCommands(reply, {
+          supabase,
+          userId: user.id,
+          req,
+          origin,
+        })
+        reply = cmdResult.cleanReply
+        createdTask = cmdResult.createdTask
+        commandsExecuted = cmdResult.commandsExecuted
+      }
+      const cmdMs = Date.now() - tCmd
+
+      // Authoritative text frame: the canonical cleaned/trimmed reply plus
+      // command side-effect metadata. Replaces whatever streamed via deltas.
+      // isError lets the client style the fallback as an error.
+      enqueue({ type: 'text', reply, createdTask, commandsExecuted, ...(llmFailed && { isError: true }) })
+
+      // TTS audio (generated in background) — only when the client
       // requested speech. Skipping this saves a chatterbox-turbo prediction
       // (real money) for every typed message with speak-replies off.
       // Also skipped on LLM failure: never spend a paid prediction reading
       // an error message aloud.
       let ttsMs = 0
       if (!body.tts || llmFailed) {
-        controller.enqueue(encoder.encode(
-          JSON.stringify({ type: 'audio', audioUrl: null, skipped: true }) + '\n'
-        ))
+        enqueue({ type: 'audio', audioUrl: null, skipped: true })
       } else {
         const tTts = Date.now()
         try {
@@ -123,21 +135,17 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
           const b64 = buf.toString('base64')
           const audioUrl = `data:audio/wav;base64,${b64}`
           console.log(`[TTS] /api/chat: Success`)
-          controller.enqueue(encoder.encode(
-            JSON.stringify({ type: 'audio', audioUrl }) + '\n'
-          ))
+          enqueue({ type: 'audio', audioUrl })
         } catch (e) {
           console.error('[TTS] /api/chat: Server TTS failed:', e instanceof Error ? e.message : String(e))
           if (e instanceof Error && e.stack) console.error('[TTS] Stack:', e.stack)
-          controller.enqueue(encoder.encode(
-            JSON.stringify({
-              type: 'audio',
-              audioUrl: null,
-              ...(process.env.NODE_ENV !== 'production' && {
-                error: e instanceof Error ? e.message : String(e),
-              }),
-            }) + '\n'
-          ))
+          enqueue({
+            type: 'audio',
+            audioUrl: null,
+            ...(process.env.NODE_ENV !== 'production' && {
+              error: e instanceof Error ? e.message : String(e),
+            }),
+          })
         }
         ttsMs = Date.now() - tTts
       }

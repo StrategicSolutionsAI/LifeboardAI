@@ -107,6 +107,61 @@ CAPABILITIES:
 // ---------------------------------------------------------------------------
 
 const CMD_REGEX = /\[LIFEBOARD_CMD\]([\s\S]*?)\[\/LIFEBOARD_CMD\]/g
+const CMD_OPEN = '[LIFEBOARD_CMD]'
+const CMD_CLOSE = '[/LIFEBOARD_CMD]'
+
+/**
+ * Given the full raw model text streamed so far, return the prefix safe to show
+ * the user: any completed [LIFEBOARD_CMD]…[/LIFEBOARD_CMD] block removed, and the
+ * tail truncated at the first character of an unclosed command block or a partial
+ * opening marker — so a command sentinel never flashes on screen while the model
+ * is still emitting it. Actions are executed from the full text via
+ * processReplyCommands, so nothing user-visible is lost by holding these back.
+ * The result grows monotonically as `raw` grows, so callers can diff against the
+ * length already emitted to get the next delta.
+ */
+export function displayableStreamPrefix(raw: string): string {
+  let out = ''
+  let i = 0
+  for (;;) {
+    const open = raw.indexOf(CMD_OPEN, i)
+    if (open === -1) break
+    out += raw.slice(i, open)
+    const close = raw.indexOf(CMD_CLOSE, open)
+    if (close === -1) return out // unclosed block: hold back everything from here
+    i = close + CMD_CLOSE.length
+  }
+  // Remainder after the last complete block, minus a trailing partial that could
+  // be the start of a new opening marker.
+  let tail = raw.slice(i)
+  for (let len = Math.min(tail.length, CMD_OPEN.length - 1); len > 0; len--) {
+    if (CMD_OPEN.startsWith(tail.slice(tail.length - len))) {
+      tail = tail.slice(0, tail.length - len)
+      break
+    }
+  }
+  return out + tail
+}
+
+/**
+ * Repair raw text from a stream that ended MID-token (a model error partway
+ * through): drop a dangling unclosed command block or a trailing partial opening
+ * marker so neither leaks into the displayed reply. Only meaningful on the error
+ * path — a normally-completed reply never ends inside a marker, and prose that
+ * merely ends in "[" must be left alone.
+ */
+export function finalizeStreamedText(raw: string): string {
+  const lastOpen = raw.lastIndexOf(CMD_OPEN)
+  if (lastOpen !== -1 && raw.indexOf(CMD_CLOSE, lastOpen) === -1) {
+    return raw.slice(0, lastOpen).trimEnd()
+  }
+  for (let len = Math.min(raw.length, CMD_OPEN.length - 1); len > 0; len--) {
+    if (CMD_OPEN.startsWith(raw.slice(raw.length - len))) {
+      return raw.slice(0, raw.length - len).trimEnd()
+    }
+  }
+  return raw
+}
 
 /** Extract all command blocks from an AI reply. */
 function parseCommands(reply: string): LifeboardCommand[] {

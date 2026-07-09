@@ -154,37 +154,56 @@ export interface ClaudeOptions {
   max_tokens?: number
 }
 
-async function runClaudeModel(model: string, options: ClaudeOptions): Promise<string> {
+function buildClaudeInput(options: ClaudeOptions): Record<string, unknown> {
   const { messages, max_tokens = 2048 } = options
-  const replicate = getReplicate()
-
   // Same flattening as Gemini: system turns → system_prompt, convo → prompt
   const { system_instruction, prompt } = convertMessagesToGeminiInput(messages)
-
   const input: Record<string, unknown> = { prompt, max_tokens }
   if (system_instruction) input.system_prompt = system_instruction
+  return input
+}
 
-  const output = await replicate.run(model as `${string}/${string}`, { input }) as unknown
-  const text = extractText(output).trim()
-  if (!text) throw new Error(`${model} returned an empty response`)
-  return text
+/** Stream one model's output tokens as they arrive over Replicate's SSE. */
+async function* streamClaudeModel(model: string, options: ClaudeOptions): AsyncGenerator<string> {
+  const replicate = getReplicate()
+  const input = buildClaudeInput(options)
+  for await (const event of replicate.stream(model as `${string}/${string}`, { input })) {
+    // Replicate SSE contract: 'output' carries a token/chunk, 'error' aborts the
+    // stream, 'done' terminates it.
+    if (event.event === 'error') {
+      throw new Error(typeof event.data === 'string' && event.data ? event.data : `${model} stream error`)
+    }
+    if (event.event === 'done') break
+    if (event.event === 'output' && typeof event.data === 'string' && event.data.length > 0) {
+      yield event.data
+    }
+  }
 }
 
 /**
- * Run a chat completion on Claude Fable 5 via Replicate, retrying once on
- * Claude 4.5 Sonnet so a single-model hiccup doesn't take down chat.
- * @returns the assistant's reply text
- * @throws if both models fail or return empty
+ * Stream a chat completion from Claude Fable 5 via Replicate, yielding text
+ * deltas as they arrive so callers can render tokens progressively.
+ *
+ * Falls back to Claude 4.5 Sonnet only if the primary model errors *before*
+ * emitting any tokens — once partial text has streamed to the caller there is
+ * no clean way to switch models, so a mid-stream error propagates instead.
+ * @throws if the primary model fails before any token (and the fallback also
+ *   fails), or if the primary model fails mid-stream.
  */
-export async function runClaude(options: ClaudeOptions): Promise<string> {
+export async function* runClaudeStream(options: ClaudeOptions): AsyncGenerator<string> {
+  let emitted = 0
   try {
-    return await runClaudeModel(CLAUDE_MODEL, options)
+    for await (const piece of streamClaudeModel(CLAUDE_MODEL, options)) {
+      emitted += piece.length
+      yield piece
+    }
   } catch (error) {
+    if (emitted > 0) throw error
     console.error(
-      `❌ ${CLAUDE_MODEL} failed, retrying on ${CLAUDE_FALLBACK_MODEL}:`,
+      `❌ ${CLAUDE_MODEL} stream failed, retrying on ${CLAUDE_FALLBACK_MODEL}:`,
       error instanceof Error ? error.message : String(error)
     )
-    return runClaudeModel(CLAUDE_FALLBACK_MODEL, options)
+    yield* streamClaudeModel(CLAUDE_FALLBACK_MODEL, options)
   }
 }
 

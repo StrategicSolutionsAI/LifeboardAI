@@ -1273,12 +1273,14 @@ export function ChatBar() {
         throw new Error(`Voice chat request failed: ${res.status} ${res.statusText}`)
       }
 
-      // Read streaming NDJSON response — transcript → text → audio
+      // Read streaming NDJSON response — transcript → reply tokens (delta) →
+      // authoritative text → audio.
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
       let textData: any = null
       let audioData: any = null
       let updatedUserMessages = newMessages // track messages with transcription update
+      let streamedReply = '' // accumulates delta tokens for progressive display
       let buffer = ''
 
       if (reader) {
@@ -1303,6 +1305,10 @@ export function ChatBar() {
                     : m
                 )
                 setMessages(updatedUserMessages)
+              } else if (chunk.type === 'delta' && typeof chunk.text === 'string') {
+                // Reply tokens streaming in — show them as they arrive
+                streamedReply += chunk.text
+                setMessages([...updatedUserMessages, { role: "assistant", content: streamedReply, timestamp: Date.now() }])
               } else if (chunk.type === 'text') {
                 textData = chunk
                 // Show text reply immediately — don't wait for audio
@@ -1522,11 +1528,13 @@ export function ChatBar() {
       }
       if (!res.ok) throw new Error("Chat request failed")
 
-      // Read streaming NDJSON — text arrives immediately, audio follows
+      // Read streaming NDJSON — reply tokens (delta) stream in, then the
+      // authoritative text frame, then audio.
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
       let textData: any = null
       let audioData: any = null
+      let streamedReply = '' // accumulates delta tokens for progressive display
       let buffer = ''
 
       if (reader) {
@@ -1541,10 +1549,17 @@ export function ChatBar() {
             if (!line.trim()) continue
             try {
               const chunk = JSON.parse(line)
-              if (chunk.type === 'text') {
+              if (chunk.type === 'delta' && typeof chunk.text === 'string') {
+                // First token: drop the thinking indicator and start showing text
+                if (!streamedReply) setIsProcessing(false)
+                streamedReply += chunk.text
+                setMessages([...newMessages, { role: "assistant", content: streamedReply, timestamp: Date.now() }])
+              } else if (chunk.type === 'text') {
                 textData = chunk
                 const assistantMessage: Message = {
                   role: "assistant" as const,
+                  // Authoritative reply (command blocks stripped, trimmed) —
+                  // replaces whatever streamed via deltas.
                   content: chunk.reply,
                   timestamp: Date.now(),
                   createdTask: chunk.createdTask || null,
