@@ -1,0 +1,11 @@
+# Offline-fallback queues need rejection handling, cross-tab locks, and purge safety
+
+**Problem** — The localStorage task queue (`lifeboard_local_tasks`) had three failure modes: server-rejected (4xx) tasks were re-POSTed on every mount forever with a "will sync when online" toast that was a lie; two open tabs both synced the same tasks (module-level boolean guards only cover one JS realm); and `ensureCacheOwner` purged the queue on *first* sign-in — destroying offline-created tasks before the sync could run.
+
+**Approach** — For any client-side retry queue ask three questions: (1) what happens to an entry the server will never accept — is there an exit path or does it retry forever? (2) what is the actual concurrency domain — same-tab mounts, or shared storage across tabs? A module flag only covers the former; localStorage is cross-tab. (3) who else deletes this storage key — grep for the key name and check each deleter's trigger against the queue's flush timing.
+
+**Solution** — In `src/hooks/use-task-fetcher.ts`: hard 4xx (except 401/408/429) and completed-while-local tasks are dropped from the queue; the sync runs inside `navigator.locks.request('lifeboard_local_task_sync', ...)` so a queued second tab re-reads storage and no-ops. In `src/hooks/use-task-mutations.ts`: the local fallback (and its offline toast) is skipped when the server actively rejected the payload — the user gets an honest "server rejected this task" error instead. In `src/lib/auth-cleanup.ts`: `ensureCacheOwner` no longer purges when there is no previous owner (nobody to protect against; sign-out already purges), only on an actual owner change.
+
+**Rule** — Every client retry queue needs: a permanent-failure exit (drop hard 4xx), cross-tab mutual exclusion via the Web Locks API when the queue lives in shared storage, and an audit of every other code path that deletes the storage key. Never show "will sync later" for a payload the server has already rejected.
+
+**Dead ends** — A promise-sharing in-flight guard (the repo's `withRefreshLock` pattern) still only dedups within one tab. Clearing the localStorage key *before* POSTing narrows the cross-tab race but loses tasks if the tab dies mid-sync; the Web Lock is the correct primitive.
