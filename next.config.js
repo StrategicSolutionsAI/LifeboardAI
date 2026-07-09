@@ -29,6 +29,14 @@ const nextConfig = {
       'framer-motion',
       'recharts',
     ],
+    // Keep visited dynamic pages in the client router cache for 5 minutes
+    // (default is 30s). Every (app) page is a static client shell whose data
+    // comes from client-side caches, so re-navigation can skip the RSC round
+    // trip. Session expiry stays safe: API calls still 401 and set the
+    // x-session-expired header.
+    staleTimes: {
+      dynamic: 300,
+    },
   },
   async headers() {
     return [
