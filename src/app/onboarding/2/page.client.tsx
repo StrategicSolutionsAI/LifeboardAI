@@ -69,7 +69,7 @@ export default function OnboardingStep2Client() {
           <div className="flex flex-wrap gap-1.5">
             {selectedBuckets.length > 0 ? (
               selectedBuckets.map((bucket) => (
-                <div key={bucket} className="py-3.5 px-3 bg-theme-primary bg-opacity-10 text-theme-primary rounded" onClick={() => toggleBucket(bucket)}>
+                <div key={bucket} className="py-3.5 px-3 bg-theme-brand-tint text-theme-primary ring-1 ring-inset ring-theme-primary rounded" onClick={() => toggleBucket(bucket)}>
                   <span className="text-xs font-medium">{bucket}</span>
                 </div>
               ))
@@ -82,7 +82,7 @@ export default function OnboardingStep2Client() {
           <h3 className="text-[16px] font-medium text-[#171A1F]">Suggestions</h3>
           <div className="flex flex-wrap gap-1.5">
             {suggestedBuckets.map((bucket) => (
-              <button key={bucket} onClick={() => toggleBucket(bucket)} className={cn("py-3.5 px-3 rounded transition-all", selectedBuckets.includes(bucket) ? "bg-theme-primary bg-opacity-10 text-theme-primary" : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]")}> 
+              <button key={bucket} onClick={() => toggleBucket(bucket)} className={cn("py-3.5 px-3 rounded transition-all", selectedBuckets.includes(bucket) ? "bg-theme-brand-tint text-theme-primary ring-1 ring-inset ring-theme-primary" : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]")}>
                 <span className="text-xs font-medium">{bucket}</span>
               </button>
             ))}

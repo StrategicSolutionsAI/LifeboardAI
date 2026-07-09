@@ -68,7 +68,7 @@ export default function OnboardingStep1() {
               className={cn(
                 "py-3.5 px-3 rounded transition-all",
                 selectedBuckets.includes(bucket)
-                  ? "bg-theme-primary bg-opacity-10 text-theme-primary"
+                  ? "bg-theme-brand-tint text-theme-primary ring-1 ring-inset ring-theme-primary"
                   : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]"
               )}
             >

@@ -227,7 +227,7 @@ export default function OnboardingStep4() {
                 integration.comingSoon 
                   ? "opacity-70 cursor-not-allowed bg-[#F9F9FB]" 
                   : selectedIntegrations.includes(integration.id)
-                    ? "border-theme-primary bg-theme-primary bg-opacity-10" 
+                    ? "border-theme-primary bg-theme-brand-tint"
                     : "cursor-pointer hover:border-[#D1D5DB] bg-white"
               )}
             >
