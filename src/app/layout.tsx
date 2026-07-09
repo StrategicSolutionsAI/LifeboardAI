@@ -21,6 +21,12 @@ const inter = Inter({
   display: 'swap',
 })
 
+// The middleware sets a per-request nonce CSP on every page response.
+// Statically prerendered HTML is baked at build time without that nonce, so
+// browsers block all its inline scripts and pages never hydrate. Nonce-based
+// CSP therefore requires every page to render per request.
+export const dynamic = 'force-dynamic'
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lifeboard.ai'
 
 export const metadata: Metadata = {
