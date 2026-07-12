@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
 import { buildChatContext } from '@/lib/chat-context'
+// Generated from the command catalog — the single source shared with
+// executeCommandSchema, so tool names and parameter shapes match what
+// /api/chat/execute-command validates by construction.
+import { REALTIME_TOOLS } from '@/lib/chat-command-catalog'
 import { getRateLimitKey, realtimeLimiter } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -47,135 +51,6 @@ function resolveRealtimeVoice(requested: string | undefined): string {
   if (OPENAI_REALTIME_VOICES.has(voice)) return voice
   return CHATTERBOX_TO_OPENAI[voice] || 'marin'
 }
-
-/**
- * Native tool definitions mirroring the LifeboardCommand union in
- * chat-commands.ts (plus refresh_context). The client executes each call via
- * POST /api/chat/execute-command, so `name` must equal the command `action`
- * and parameter shapes must satisfy executeCommandSchema in validations.ts.
- */
-const REALTIME_TOOLS = [
-  {
-    type: 'function',
-    name: 'create_task',
-    description: "Create a new task on the user's dashboard. Use whenever the user asks to add a task, a to-do, or a reminder to do something.",
-    parameters: {
-      type: 'object',
-      properties: {
-        content: { type: 'string', description: 'The task text, without the word "task"' },
-        due_date: { type: 'string', description: 'Due date as YYYY-MM-DD, if the user gave one' },
-        hour_slot: { type: 'integer', minimum: 0, maximum: 23, description: 'Hour of day 0-23 if a time was given (e.g. 3pm = 15)' },
-        bucket: { type: 'string', description: 'Bucket/category name if clearly implied (e.g. Work, Personal, Household)' },
-      },
-      required: ['content'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'complete_task',
-    description: 'Mark an existing task as done. Use the task name exactly as it appears in the dashboard context.',
-    parameters: {
-      type: 'object',
-      properties: {
-        task_name: { type: 'string', description: 'Name of the task to complete, as shown in the dashboard context' },
-      },
-      required: ['task_name'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'delete_task',
-    description: 'Delete an existing task. Only when the user explicitly asks to delete/remove a task (not complete it).',
-    parameters: {
-      type: 'object',
-      properties: {
-        task_name: { type: 'string', description: 'Name of the task to delete, as shown in the dashboard context' },
-      },
-      required: ['task_name'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'reschedule_task',
-    description: 'Move an existing task to a different date and/or time.',
-    parameters: {
-      type: 'object',
-      properties: {
-        task_name: { type: 'string', description: 'Name of the task to move, as shown in the dashboard context' },
-        new_due_date: { type: 'string', description: 'New due date as YYYY-MM-DD' },
-        hour_slot: { type: 'integer', minimum: 0, maximum: 23, description: 'New hour of day 0-23, if a time was given' },
-      },
-      required: ['task_name', 'new_due_date'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'edit_task',
-    description: "Change an existing task's text, date, time, or bucket.",
-    parameters: {
-      type: 'object',
-      properties: {
-        task_name: { type: 'string', description: 'Current name of the task, as shown in the dashboard context' },
-        new_content: { type: 'string', description: 'Updated task text, if the user wants it renamed' },
-        due_date: { type: 'string', description: 'Updated due date as YYYY-MM-DD' },
-        hour_slot: { type: 'integer', minimum: 0, maximum: 23, description: 'Updated hour of day 0-23' },
-        bucket: { type: 'string', description: 'Updated bucket/category name' },
-      },
-      required: ['task_name'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'add_calendar_event',
-    description: "Add an event to the user's calendar (meetings, appointments, anything with a date, unlike tasks which are to-dos).",
-    parameters: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: 'Event title' },
-        date: { type: 'string', description: 'Event date as YYYY-MM-DD' },
-        time: { type: 'string', description: 'Start time as HH:MM (24-hour), omit for all-day events' },
-        duration_minutes: { type: 'integer', minimum: 1, maximum: 1440, description: 'Duration in minutes, if given' },
-        all_day: { type: 'boolean', description: 'True if this is an all-day event' },
-        bucket: { type: 'string', description: 'Bucket/category name if clearly implied' },
-        description: { type: 'string', description: 'Extra details, if given' },
-      },
-      required: ['title', 'date'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'add_shopping_item',
-    description: "Add an item to the user's shopping list.",
-    parameters: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Item name' },
-        quantity: { type: 'string', description: 'Amount, e.g. "2" or "1 dozen", if given' },
-        bucket: { type: 'string', description: 'Bucket/category name if clearly implied' },
-        notes: { type: 'string', description: 'Extra details, if given' },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'remove_shopping_item',
-    description: 'Remove an item from the shopping list. Use the item name exactly as it appears in the dashboard context.',
-    parameters: {
-      type: 'object',
-      properties: {
-        item_name: { type: 'string', description: 'Name of the item to remove, as shown in the dashboard context' },
-      },
-      required: ['item_name'],
-    },
-  },
-  {
-    type: 'function',
-    name: 'refresh_context',
-    description: "Fetch the user's current dashboard state (tasks, calendar, shopping list). Call before answering questions about current state if it may have changed since the conversation started.",
-    parameters: { type: 'object', properties: {} },
-  },
-]
 
 function buildInstructions(todayIso: string, currentYear: string, systemContext: string): string {
   return `You are Lifeboard's voice assistant, embedded in the user's personal dashboard. Today's date is ${todayIso}.

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestOrigin, withAuthAndBody } from '@/lib/api-utils'
-import { executeCommandSchema } from '@/lib/validations'
+import { executeCommandSchema, isMutatingAction } from '@/lib/chat-command-catalog'
 import { executeCommand } from '@/lib/chat-commands'
 import { buildChatContext } from '@/lib/chat-context'
 import { apiLimiter, getRateLimitKey } from '@/lib/rate-limit'
@@ -31,5 +31,5 @@ export const POST = withAuthAndBody(executeCommandSchema, async (req, { supabase
   }
 
   const result = await executeCommand(body, { supabase, userId: user.id, req, origin: getRequestOrigin(req) })
-  return NextResponse.json({ ...result, mutated: result.success })
+  return NextResponse.json({ ...result, mutated: result.success && isMutatingAction(body.action) })
 }, 'POST /api/chat/execute-command')

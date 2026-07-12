@@ -176,78 +176,40 @@ export const upsertMonthlyBudgetSchema = z.object({
   amount: z.number().min(0, 'amount must be non-negative'),
 })
 
-// ---------- Chat command execution (realtime voice tool calls) ----------
-
-// executeCommand() expects a plain 0-23 number (unlike task routes' hourSlot,
-// which also accepts display strings)
-const commandHourSlot = z.number().int().min(0).max(23)
-const bucketName = z.string().min(1).max(100)
-
-/**
- * One Lifeboard command, as sent by the realtime voice client when the model
- * calls a tool. Mirrors the LifeboardCommand union in chat-commands.ts, plus
- * `refresh_context` which re-reads dashboard state instead of mutating it.
- */
-export const executeCommandSchema = z.discriminatedUnion('action', [
-  z.object({
-    action: z.literal('create_task'),
-    content: z.string().min(1).max(500),
-    due_date: dateString.optional(),
-    hour_slot: commandHourSlot.optional(),
-    bucket: bucketName.optional(),
-  }),
-  z.object({ action: z.literal('complete_task'), task_name: z.string().min(1).max(500) }),
-  z.object({ action: z.literal('delete_task'), task_name: z.string().min(1).max(500) }),
-  z.object({
-    action: z.literal('reschedule_task'),
-    task_name: z.string().min(1).max(500),
-    new_due_date: dateString,
-    hour_slot: commandHourSlot.optional(),
-  }),
-  z.object({
-    action: z.literal('edit_task'),
-    task_name: z.string().min(1).max(500),
-    new_content: z.string().min(1).max(500).optional(),
-    due_date: dateString.optional(),
-    hour_slot: commandHourSlot.optional(),
-    bucket: bucketName.optional(),
-  }),
-  z.object({
-    action: z.literal('add_calendar_event'),
-    title: z.string().min(1).max(300),
-    date: dateString,
-    time: z.string().regex(/^\d{1,2}:\d{2}$/, 'Must be HH:MM format').optional(),
-    duration_minutes: z.number().int().positive().max(1440).optional(),
-    all_day: z.boolean().optional(),
-    bucket: bucketName.optional(),
-    description: z.string().max(2000).optional(),
-  }),
-  z.object({
-    action: z.literal('add_shopping_item'),
-    name: z.string().min(1).max(300),
-    quantity: z.string().max(50).optional(),
-    bucket: bucketName.optional(),
-    notes: z.string().max(500).optional(),
-  }),
-  z.object({ action: z.literal('remove_shopping_item'), item_name: z.string().min(1).max(300) }),
-  z.object({ action: z.literal('refresh_context') }),
-])
+// The chat-command schema (realtime voice tool calls) lives in
+// chat-command-catalog.ts — the single source that also generates the
+// OpenAI Realtime tool definitions.
 
 // ---------- Helpers ----------
+
+/** Validation failure shape shared by classic zod and zod/v4. */
+export interface ValidationError {
+  issues: Array<{ path: PropertyKey[]; message: string }>
+}
+
+/**
+ * Minimal structural schema contract satisfied by both classic zod and
+ * zod/v4 schemas, so route wrappers work with either.
+ */
+export interface BodySchema<T> {
+  safeParse(
+    data: unknown
+  ): { success: true; data: T } | { success: false; error: ValidationError }
+}
 
 /**
  * Parse and validate request body with a Zod schema.
  * Returns { data } on success or { error, response } on failure.
  */
-export function parseBody<T extends z.ZodType>(
-  schema: T,
+export function parseBody<T>(
+  schema: BodySchema<T>,
   body: unknown
-): { data: z.infer<T>; error?: never; response?: never } | { data?: never; error: z.ZodError; response: NextResponse } {
+): { data: T; error?: never; response?: never } | { data?: never; error: ValidationError; response: NextResponse } {
   const result = schema.safeParse(body)
   if (result.success) {
     return { data: result.data }
   }
-  const messages = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+  const messages = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
   return {
     error: result.error,
     response: NextResponse.json(

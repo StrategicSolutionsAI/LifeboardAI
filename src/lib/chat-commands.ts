@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import type { LifeboardCommand } from './chat-command-catalog'
 
 /**
  * Shared chat command infrastructure for LifeboardAI.
@@ -9,15 +10,9 @@ import { NextRequest } from 'next/server'
 // Types
 // ---------------------------------------------------------------------------
 
-export type LifeboardCommand =
-  | { action: 'create_task'; content: string; due_date?: string; hour_slot?: number; bucket?: string }
-  | { action: 'complete_task'; task_name: string }
-  | { action: 'delete_task'; task_name: string }
-  | { action: 'reschedule_task'; task_name: string; new_due_date: string; hour_slot?: number }
-  | { action: 'edit_task'; task_name: string; new_content?: string; due_date?: string; hour_slot?: number; bucket?: string }
-  | { action: 'add_calendar_event'; title: string; date: string; time?: string; duration_minutes?: number; all_day?: boolean; bucket?: string; description?: string }
-  | { action: 'add_shopping_item'; name: string; quantity?: string; bucket?: string; notes?: string }
-  | { action: 'remove_shopping_item'; item_name: string }
+// Inferred from the command catalog — the single source shared with
+// executeCommandSchema and the realtime tool definitions.
+export type { LifeboardCommand }
 
 export interface CommandContext {
   supabase: any            // SupabaseClient — uses `any` at boundary (project convention)

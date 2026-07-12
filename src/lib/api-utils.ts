@@ -4,8 +4,7 @@ import { supabaseFromBearer } from '@/utils/supabase/bearer'
 import { handleApiError } from '@/lib/api-error-handler'
 import { getUserCached } from '@/lib/server-auth-cache'
 import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired'
-import { parseBody } from '@/lib/validations'
-import type { z } from 'zod'
+import { parseBody, type BodySchema } from '@/lib/validations'
 
 /**
  * Origin for building absolute URLs back to our own API routes.
@@ -92,9 +91,9 @@ type AuthedBodyHandler<T> = (
  *     return NextResponse.json({ ... })
  *   }, 'POST /api/tasks')
  */
-export function withAuthAndBody<T extends z.ZodType>(
-  schema: T,
-  handler: AuthedBodyHandler<z.infer<T>>,
+export function withAuthAndBody<T>(
+  schema: BodySchema<T>,
+  handler: AuthedBodyHandler<T>,
   routeName?: string
 ) {
   return withAuth(async (req, ctx, routeContext) => {
