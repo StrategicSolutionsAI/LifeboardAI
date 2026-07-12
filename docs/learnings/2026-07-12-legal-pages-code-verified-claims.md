@@ -1,0 +1,11 @@
+# Legal pages are code-derived documents — verify every claim, bracket every unknown
+
+**Problem** — /privacy and /terms were three-sentence stubs; Google won't verify the Gmail OAuth app (restricted scopes) without a real privacy policy containing the Limited Use disclosure.
+
+**Approach** — Before writing a single policy sentence, pulled the facts from code: exact OAuth scopes per Google client (`src/lib/gmail/client.ts`, `google/client.ts`, `googlefit/client.ts`), what disconnect actually does (`api/integrations/disconnect` deletes the `user_integrations` row → "disconnecting deletes our stored tokens" is true), whether email content is stored (it isn't — only tokens + address; checked the gmail migration), what flows to AI providers (`buildChatContext`: tasks, calendar events, shopping, steps — no Gmail data), and whether account deletion exists (it doesn't — so the policy offers email-based deletion instead of promising an in-app flow). Verified /privacy and /terms answer 200 unauthenticated (Google's reviewers browse logged-out).
+
+**Solution** — Rewrote `src/app/privacy/page.tsx` and `src/app/terms/page.tsx` with per-service access lists, the verbatim Limited Use statement, AI-processing disclosure, and health/AI disclaimers. Business facts nobody can derive from code (legal entity, contact email, jurisdiction, pricing) left as visible `[BRACKETED]` placeholders.
+
+**Rule** — A privacy policy is a claims document about the codebase: every sentence about scopes, storage, retention, deletion, or data flows must be verified against the code first (grep the scope constants, read the disconnect/delete routes, trace what reaches third parties). Never promise a capability that has no route, and never invent business facts — bracket them visibly for the owner. For Google verification specifically: include the Limited Use statement verbatim, enumerate each scope's user-facing purpose, state the AI/model-training position explicitly, and keep the page publicly accessible.
+
+**Dead ends** — Writing from the README's integration table: it was stale (claimed OAuth handlers under `src/app/api/auth/*`; they live under `api/integrations/*/auth`) and says nothing about what's stored vs fetched live — only the migrations and routes do.
