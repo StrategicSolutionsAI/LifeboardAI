@@ -67,7 +67,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
       .then((context) => ({ context, ctxMs: Date.now() - tCtx }))
       .catch((error) => {
         console.error('Failed to build voice chat context:', error instanceof Error ? error.message : String(error))
-        return { context: { systemContext: '', userId: null }, ctxMs: Date.now() - tCtx }
+        return { context: { systemContext: '' }, ctxMs: Date.now() - tCtx }
       })
 
     // Transcribe audio to text via Whisper on Replicate

@@ -744,16 +744,18 @@ export function ChatBar() {
         }
       })()
 
-      const [sessionResult, micResult] = await Promise.allSettled([sessionPromise, micPromise])
-      // Mic errors first — they carry the permission guidance shown below
-      if (micResult.status === 'rejected') throw micResult.reason
-      const local = micResult.value
-      if (sessionResult.status === 'rejected') {
+      // Mic denial (the common failure) should surface immediately instead of
+      // waiting out the slow session fetch; keep its rejection handled meanwhile
+      sessionPromise.catch(() => {})
+      const local = await micPromise
+      let client_secret: string
+      try {
+        client_secret = await sessionPromise
+      } catch (sessionError) {
         // Don't leak a live mic stream when session creation failed
         local.getTracks().forEach(t => t.stop())
-        throw sessionResult.reason
+        throw sessionError
       }
-      const client_secret = sessionResult.value
 
       setHasRequestedDeviceAccess(true)
       enumerateAudioDevices(false)
@@ -776,8 +778,6 @@ export function ChatBar() {
       pc.onicegatheringstatechange = () => {
         const s = pc.iceGatheringState
         setRtGatheringState(s)
-      }
-      pc.onicecandidate = (e) => {
       }
 
       // 4) Attach local mic track
@@ -922,7 +922,6 @@ export function ChatBar() {
 
     } catch (e: any) {
       console.error('❌ Realtime voice error:', e)
-      setIsRealtimeActive(false)
       stopRealtime()
       
       // Provide helpful error message for microphone permission issues

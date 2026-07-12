@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { getUserCached } from '@/lib/server-auth-cache'
 import {
   fetchFitbitDailySummary,
   refreshFitbitToken,
@@ -16,9 +17,11 @@ export async function GET(request: NextRequest) {
   const dateStr = dateParam ?? `${yyyy}-${mm}-${dd}`
 
   const supabase = supabaseServer()
+  // Cached validation — on the chat-context hot path this token was already
+  // verified by the calling route's wrapper
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await getUserCached(supabase)
 
   if (!user) {
     return NextResponse.json(

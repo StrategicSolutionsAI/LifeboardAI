@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
+import { getRequestOrigin } from '@/lib/api-utils'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -7,7 +8,7 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state')
 
   // Compute origin from env or request (so localhost port mismatches don't break OAuth)
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}`
+  const origin = getRequestOrigin(request)
 
   // If no code, redirect to Todoist OAuth
   if (!code) {

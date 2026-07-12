@@ -205,7 +205,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
   // shopping. Non-fatal: a context failure should not block voice chat.
   const { systemContext } = await buildChatContext(req).catch((error) => {
     console.error('Failed to build realtime context:', error instanceof Error ? error.message : String(error))
-    return { systemContext: '', userId: null }
+    return { systemContext: '' }
   })
 
   const todayIso = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)

@@ -24,7 +24,6 @@ interface ChatContextData {
 
 export interface ChatContextResult {
   systemContext: string
-  userId: string | null
 }
 
 export async function buildChatContext(
@@ -42,24 +41,10 @@ export async function buildChatContext(
   let systemContext = ''
 
   try {
-    const prefs = await getUserPreferencesServer()
-    if (!prefs) return { systemContext, userId: user?.id ?? null }
-
-    const bucketSummary = Object.entries(prefs.widgets_by_bucket || {})
-      .map(
-        ([b, w]) => {
-          const widgets = Array.isArray(w) ? w : []
-          return `${b}: ${widgets.map((x: any) => x.name || x.type || 'widget').join(', ')}`
-        }
-      )
-      .join('; ')
-
-    const contextData: ChatContextData = {}
-
-    if (user) {
-      // Use allSettled so one failing query doesn't take down the rest
-      const [tasksResult, calendarResult, shoppingResult] =
-        await Promise.allSettled([
+    // Prefs and the dashboard queries are independent — run them concurrently
+    const prefsPromise = getUserPreferencesServer()
+    const batchPromise = user
+      ? Promise.allSettled([
           supabase
             .from('lifeboard_tasks')
             .select(
@@ -86,6 +71,61 @@ export async function buildChatContext(
             .order('created_at', { ascending: true })
             .limit(30),
         ])
+      : null
+
+    const prefs = await prefsPromise
+    if (!prefs) return { systemContext }
+
+    const bucketSummary = Object.entries(prefs.widgets_by_bucket || {})
+      .map(
+        ([b, w]) => {
+          const widgets = Array.isArray(w) ? w : []
+          return `${b}: ${widgets.map((x: any) => x.name || x.type || 'widget').join(', ')}`
+        }
+      )
+      .join('; ')
+
+    const contextData: ChatContextData = {}
+
+    // Steps depend only on prefs — start the metrics fetch now so it overlaps
+    // the dashboard-query batch instead of running after it
+    let stepsDataSource: 'fitbit' | 'googlefit' | null = null
+    for (const widgets of Object.values(prefs.widgets_by_bucket)) {
+      for (const w of widgets as any[]) {
+        if ((w as any).id === 'steps') {
+          const ds = (w as any).dataSource ?? 'fitbit'
+          stepsDataSource = ds === 'googlefit' ? 'googlefit' : 'fitbit'
+          break
+        }
+      }
+      if (stepsDataSource) break
+    }
+
+    const stepsPromise = stepsDataSource
+      ? (async (ds: 'fitbit' | 'googlefit') => {
+          try {
+            const metricsRes = await fetch(
+              `${origin}/api/integrations/${ds}/metrics?date=${today}`,
+              {
+                headers: { cookie: req.headers.get('cookie') || '' },
+                cache: 'no-store',
+              }
+            )
+            if (metricsRes.ok) {
+              const metricsJson = await metricsRes.json()
+              if (typeof metricsJson.steps === 'number') {
+                return metricsJson.steps as number
+              }
+            }
+          } catch (err) {
+            console.error(`Failed fetching ${ds} metrics for chat context`, err)
+          }
+          return undefined
+        })(stepsDataSource)
+      : null
+
+    if (batchPromise) {
+      const [tasksResult, calendarResult, shoppingResult] = await batchPromise
 
       if (
         tasksResult.status === 'fulfilled' &&
@@ -121,38 +161,9 @@ export async function buildChatContext(
       }
     }
 
-    // Detect steps widget and fetch metrics
-    let stepsDataSource: 'fitbit' | 'googlefit' | null = null
-    for (const widgets of Object.values(prefs.widgets_by_bucket)) {
-      for (const w of widgets as any[]) {
-        if ((w as any).id === 'steps') {
-          const ds = (w as any).dataSource ?? 'fitbit'
-          stepsDataSource = ds === 'googlefit' ? 'googlefit' : 'fitbit'
-          break
-        }
-      }
-      if (stepsDataSource) break
-    }
-
-    if (stepsDataSource) {
-      try {
-        const metricsUrl = `${origin}/api/integrations/${stepsDataSource}/metrics?date=${today}`
-        const metricsRes = await fetch(metricsUrl, {
-          headers: { cookie: req.headers.get('cookie') || '' },
-          cache: 'no-store',
-        })
-        if (metricsRes.ok) {
-          const metricsJson = await metricsRes.json()
-          if (typeof metricsJson.steps === 'number') {
-            contextData.steps = metricsJson.steps
-          }
-        }
-      } catch (err) {
-        console.error(
-          `Failed fetching ${stepsDataSource} metrics for chat context`,
-          err
-        )
-      }
+    if (stepsPromise) {
+      const steps = await stepsPromise
+      if (steps !== undefined) contextData.steps = steps
     }
 
     // Assemble the context string
@@ -225,5 +236,5 @@ export async function buildChatContext(
     console.error('Failed to build chat system context', e)
   }
 
-  return { systemContext, userId: user?.id ?? null }
+  return { systemContext }
 }
