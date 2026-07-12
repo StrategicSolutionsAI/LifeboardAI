@@ -100,7 +100,7 @@ describe('/api/chat/execute-command', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data).toEqual({ success: true, message: 'Task created: Call John' })
+    expect(data).toEqual({ success: true, mutated: true, message: 'Task created: Call John' })
     expect(executeCommand).toHaveBeenCalledWith(
       body,
       expect.objectContaining({ userId: 'test-user-id', supabase: supabaseMockInstance })
@@ -120,7 +120,7 @@ describe('/api/chat/execute-command', () => {
     const data = await response.json()
 
     expect(response.status).toBe(200)
-    expect(data).toEqual({ success: true, message: 'Tasks: call John' })
+    expect(data).toEqual({ success: true, mutated: false, message: 'Tasks: call John' })
     expect(executeCommand).not.toHaveBeenCalled()
   })
 

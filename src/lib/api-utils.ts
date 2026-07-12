@@ -8,6 +8,17 @@ import { parseBody } from '@/lib/validations'
 import type { z } from 'zod'
 
 /**
+ * Origin for building absolute URLs back to our own API routes.
+ * NEXT_PUBLIC_SITE_URL wins; falls back to the proxy-forwarded host.
+ */
+export function getRequestOrigin(req: NextRequest): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+  )
+}
+
+/**
  * Unified client factory — Bearer token takes priority, cookies as fallback.
  * Single source of truth; replaces the local copies in route files.
  * Also surfaces the bearer token so auth validation can be cached per token.

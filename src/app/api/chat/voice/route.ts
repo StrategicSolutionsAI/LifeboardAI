@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runWhisper, runTTS, runClaudeStream } from '@/lib/replicate/client'
-import { withAuth } from '@/lib/api-utils'
+import { getRequestOrigin, withAuth } from '@/lib/api-utils'
 import { getCommandsPrompt, processReplyCommands, displayableStreamPrefix, finalizeStreamedText } from '@/lib/chat-commands'
 import { buildChatContext } from '@/lib/chat-context'
 import { chatLimiter, getRateLimitKey } from '@/lib/rate-limit'
@@ -80,7 +80,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     }
     const { context: { systemContext }, ctxMs } = await contextPromise
 
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+    const origin = getRequestOrigin(req)
 
     // Build system prompt with all available commands
     const todayIso = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)

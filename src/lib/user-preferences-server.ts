@@ -1,9 +1,10 @@
 import { supabaseServer } from "@/utils/supabase/server";
+import { getUserCached } from "@/lib/server-auth-cache";
 import type { UserPreferences } from "@/lib/user-preferences";
 
 export async function getUserPreferencesServer() {
   const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserCached(supabase);
   
   if (!user) {
     return null;

@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
+import { getRequestOrigin } from '@/lib/api-utils'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
+import { getUserCached } from '@/lib/server-auth-cache'
 import { supabaseServer } from '@/utils/supabase/server'
 
 /**
@@ -28,15 +30,14 @@ export interface ChatContextResult {
 export async function buildChatContext(
   req: NextRequest
 ): Promise<ChatContextResult> {
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    `${req.headers.get('x-forwarded-proto') || 'http'}://${req.headers.get('host')}`
+  const origin = getRequestOrigin(req)
   const today = new Date().toISOString().split('T')[0]
 
   const supabase = supabaseServer()
+  // Cached validation — the route wrapper already verified this token
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await getUserCached(supabase)
 
   let systemContext = ''
 

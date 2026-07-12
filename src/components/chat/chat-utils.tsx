@@ -137,15 +137,13 @@ export function ensureIds(msgs: Message[]): Message[] {
   return msgs.map((m) => (m.id ? m : { ...m, id: msgId() }))
 }
 
-/** Clean filler phrases from assistant text to avoid phantom task creation */
-export function cleanAssistantContent(raw: string): string {
-  let s = raw
-    .replace(/\b(all\s*set|got\s*it|no\s*problem|okay|ok|sure|done|noted)\b[.!]?\s*/ig, ' ')
-    .replace(/\byou(?:'|')?ve\s+got\s+a\s+reminder(?:\s+for)?\b/ig, ' ')
-    .replace(/\bi(?:'|')?ll\s+note\s+(?:that|this)(?:\s+down)?(?:\s+for\s+you)?\b[.!]?\s*/ig, ' ')
-    .replace(/^\s*all\s*[.!]?\s*/i, ' ')
-    .replace(/\s*[.?!]\s*/g, ' ') // collapse stray punctuation
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-  return s
+/** Route an audio element's output to the selected speaker, when supported. */
+export async function applySpeakerDevice(audio: HTMLAudioElement, deviceId: string): Promise<void> {
+  try {
+    if (deviceId && typeof (audio as any).setSinkId === 'function') {
+      await (audio as any).setSinkId(deviceId)
+    }
+  } catch (e) {
+    console.warn('Failed to set output device (setSinkId)', e)
+  }
 }

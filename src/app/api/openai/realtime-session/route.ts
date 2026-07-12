@@ -248,5 +248,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
     return NextResponse.json({ error: 'No client secret in response' }, { status: 500 })
   }
 
-  return NextResponse.json({ client_secret: clientSecret, model })
+  // GA API: the session and its model are bound to the ephemeral key, so
+  // the client only needs the secret.
+  return NextResponse.json({ client_secret: clientSecret })
 }, 'POST /api/openai/realtime-session')

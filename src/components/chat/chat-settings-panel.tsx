@@ -1,5 +1,6 @@
 import React from 'react'
 import { X } from 'lucide-react'
+import { applySpeakerDevice } from './chat-utils'
 
 interface ChatSettingsPanelProps {
   panelRef: React.Ref<HTMLDivElement>
@@ -152,9 +153,7 @@ export const ChatSettingsPanel = React.memo(function ChatSettingsPanel({
             onClick={async () => {
               try {
                 const a = new Audio('data:audio/wav;base64,UklGRkQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQwAAAAA//8AAP//AAD//wAA//8AAP//AAD//wAA')
-                if (speakerDeviceId && typeof (a as any).setSinkId === 'function') {
-                  await (a as any).setSinkId(speakerDeviceId)
-                }
+                await applySpeakerDevice(a, speakerDeviceId)
                 await a.play()
               } catch (e) { console.warn('Test beep failed', e) }
             }}

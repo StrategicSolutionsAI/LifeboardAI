@@ -92,7 +92,6 @@ describe('/api/openai/realtime-session', () => {
     expect(response.status).toBe(200)
     expect(data).toEqual({
       client_secret: 'ephemeral-secret',
-      model: 'gpt-4o-realtime-preview',
     })
     expect(getRateLimitKey).toHaveBeenCalledWith(request, 'test-user-id')
     expect(checkRateLimit).toHaveBeenCalledWith('user:test-user-id')

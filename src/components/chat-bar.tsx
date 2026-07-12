@@ -5,8 +5,10 @@ import { motion, AnimatePresence } from "framer-motion"
 import { MessageSquare, Square, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
 import { useVisualViewport } from "@/hooks/use-visual-viewport"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import type { Message } from "./chat/chat-types"
 import {
+  applySpeakerDevice,
   getFollowUpChips,
   loadStoredMessages,
   ensureIds,
@@ -40,7 +42,6 @@ export function ChatBar() {
   // opt-in so a normal text chat never starts a paid TTS prediction by default.
   const [speakVoiceReplies, setSpeakVoiceReplies] = useState(true)
   const [speakTypedReplies, setSpeakTypedReplies] = useState(false)
-  const [hasLoadedVoiceSettings, setHasLoadedVoiceSettings] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
   const [silenceProgress, setSilenceProgress] = useState(0)
@@ -161,14 +162,11 @@ export function ChatBar() {
       const sid = localStorage.getItem('chat_speaker_device_id')
       if (mid) setMicDeviceId(mid)
       if (sid) setSpeakerDeviceId(sid)
-    } catch {} finally {
-      setHasLoadedVoiceSettings(true)
-    }
+    } catch {}
   }, [])
 
   // Persist voice settings
   useEffect(() => {
-    if (!hasLoadedVoiceSettings) return
     try {
       localStorage.setItem('chat_speak_voice_replies', speakVoiceReplies ? '1' : '0')
       localStorage.setItem('chat_speak_typed_replies', speakTypedReplies ? '1' : '0')
@@ -178,15 +176,7 @@ export function ChatBar() {
       localStorage.setItem('chat_mic_device_id', micDeviceId || '')
       localStorage.setItem('chat_speaker_device_id', speakerDeviceId || '')
     } catch {}
-  }, [hasLoadedVoiceSettings, speakVoiceReplies, speakTypedReplies, ttsVoice, ttsRate, micDeviceId, speakerDeviceId, useRealtime])
-
-  useEffect(() => {
-    speakVoiceRepliesRef.current = speakVoiceReplies
-  }, [speakVoiceReplies])
-
-  useEffect(() => {
-    speakTypedRepliesRef.current = speakTypedReplies
-  }, [speakTypedReplies])
+  }, [speakVoiceReplies, speakTypedReplies, ttsVoice, ttsRate, micDeviceId, speakerDeviceId, useRealtime])
 
   // Enumerate audio devices and optionally ask for permission to reveal labels
   const enumerateAudioDevices = useCallback(async (requestPermission: boolean = false) => {
@@ -721,34 +711,50 @@ export function ChatBar() {
   async function startRealtime() {
     if (isRealtimeActive) return
     try {
-      // 1) Create ephemeral session on the server
-      const sessRes = await fetch('/api/openai/realtime-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice: ttsVoice })
-      })
-      if (!sessRes.ok) throw new Error('Failed to create realtime session')
-      const { client_secret } = await sessRes.json()
-      if (!client_secret) throw new Error('Missing client_secret')
+      // 1+2) Create the ephemeral session and capture the mic in parallel —
+      // they're independent, and the session fetch (dashboard context build +
+      // OpenAI handshake) is the slow leg.
+      const sessionPromise = (async (): Promise<string> => {
+        const sessRes = await fetch('/api/openai/realtime-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voice: ttsVoice })
+        })
+        if (!sessRes.ok) throw new Error('Failed to create realtime session')
+        const { client_secret } = await sessRes.json()
+        if (!client_secret) throw new Error('Missing client_secret')
+        return client_secret
+      })()
 
-      // 2) Capture mic - try specific device first, fallback to default
-      let local: MediaStream | null = null
-      try {
-        local = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: micDeviceId ? { exact: micDeviceId } : undefined, echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
-        })
-      } catch (deviceError: any) {
-        console.warn('⚠️ Realtime: Failed with specific device, trying default microphone:', deviceError)
-        // If specific device fails, try without device constraint
-        local = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
-        })
-        // Clear the saved device ID since it's not working
-        setMicDeviceId('')
+      // Capture mic - try specific device first, fallback to default
+      const micPromise = (async (): Promise<MediaStream> => {
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: micDeviceId ? { exact: micDeviceId } : undefined, echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+          })
+        } catch (deviceError: any) {
+          console.warn('⚠️ Realtime: Failed with specific device, trying default microphone:', deviceError)
+          // If specific device fails, try without device constraint
+          const fallback = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+          })
+          // Clear the saved device ID since it's not working
+          setMicDeviceId('')
+          return fallback
+        }
+      })()
+
+      const [sessionResult, micResult] = await Promise.allSettled([sessionPromise, micPromise])
+      // Mic errors first — they carry the permission guidance shown below
+      if (micResult.status === 'rejected') throw micResult.reason
+      const local = micResult.value
+      if (sessionResult.status === 'rejected') {
+        // Don't leak a live mic stream when session creation failed
+        local.getTracks().forEach(t => t.stop())
+        throw sessionResult.reason
       }
-      
-      if (!local) throw new Error('Failed to get microphone stream')
-      
+      const client_secret = sessionResult.value
+
       setHasRequestedDeviceAccess(true)
       enumerateAudioDevices(false)
       rtLocalStreamRef.current = local
@@ -790,13 +796,7 @@ export function ChatBar() {
         remoteAudio.autoplay = true
         remoteAudio.muted = !speakVoiceReplies
         remoteAudio.volume = speakVoiceReplies ? 1 : 0
-        try {
-          if (speakerDeviceId && typeof (remoteAudio as any).setSinkId === 'function') {
-            await (remoteAudio as any).setSinkId(speakerDeviceId)
-          }
-        } catch (e) {
-          console.warn('Failed to set output device (setSinkId)', e)
-        }
+        await applySpeakerDevice(remoteAudio, speakerDeviceId)
       }
 
       let gotTrack = false
@@ -863,34 +863,40 @@ export function ChatBar() {
           const items = Array.isArray(frame?.response?.output) ? frame.response.output : []
           const calls = items.filter((item: any) => item?.type === 'function_call' && item.call_id && item.name)
           if (calls.length === 0) return
-          for (const call of calls) {
-            let result: { success: boolean; message: string }
-            try {
-              let args: Record<string, unknown> = {}
-              try { args = JSON.parse(call.arguments || '{}') } catch {}
-              const res = await fetch('/api/chat/execute-command', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: call.name, ...args }),
-              })
-              result = res.ok
-                ? await res.json()
-                : { success: false, message: `Command failed (${res.status})` }
-            } catch {
-              result = { success: false, message: 'Command failed (network error)' }
-            }
-            if (result.success && call.name !== 'refresh_context') {
-              notifyTasksUpdated([1000, 3000])
-            }
+          // Independent commands — execute in parallel so the model's spoken
+          // confirmation isn't delayed by serial round trips.
+          const results: { success: boolean; message: string; mutated?: boolean }[] = await Promise.all(
+            calls.map(async (call: any) => {
+              try {
+                let args: Record<string, unknown> = {}
+                try { args = JSON.parse(call.arguments || '{}') } catch {}
+                const res = await fetchWithTimeout('/api/chat/execute-command', {
+                  method: 'POST',
+                  credentials: 'same-origin',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: call.name, ...args }),
+                })
+                return res.ok
+                  ? await res.json()
+                  : { success: false, message: `Command failed (${res.status})` }
+              } catch {
+                return { success: false, message: 'Command failed (network error)' }
+              }
+            })
+          )
+          // One dashboard refresh no matter how many commands mutated data
+          if (results.some(r => r.success && r.mutated)) {
+            notifyTasksUpdated([1000, 3000])
+          }
+          calls.forEach((call: any, i: number) => {
             // Channel may close mid-call if the user exits voice mode
             try {
               dc.send(JSON.stringify({
                 type: 'conversation.item.create',
-                item: { type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result) },
+                item: { type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(results[i]) },
               }))
             } catch {}
-          }
+          })
           // One continuation after all outputs — the model speaks the confirmation
           try { dc.send(JSON.stringify({ type: 'response.create' })) } catch {}
         }
@@ -1153,13 +1159,7 @@ export function ChatBar() {
         currentAudioRef.current = audio
 
         // Set output device if selected
-        try {
-          if (speakerDeviceId && typeof (audio as any).setSinkId === 'function') {
-            await (audio as any).setSinkId(speakerDeviceId)
-          }
-        } catch (e) {
-          console.warn('[Voice] Failed to set output device', e)
-        }
+        await applySpeakerDevice(audio, speakerDeviceId)
 
         const restartRecordingAfterPlayback = () => {
           setIsSpeaking(false)
@@ -1385,13 +1385,7 @@ export function ChatBar() {
           // Speaking-rate slider: applied at playback (pitch is preserved by default)
           audio.playbackRate = ttsRate
           currentAudioRef.current = audio
-          try {
-            if (speakerDeviceId && typeof (audio as any).setSinkId === 'function') {
-              await (audio as any).setSinkId(speakerDeviceId)
-            }
-          } catch (e) {
-            console.warn('[Chat] Failed to set output device', e)
-          }
+          await applySpeakerDevice(audio, speakerDeviceId)
           audio.onended = () => {
             setIsSpeaking(false)
             currentAudioRef.current = null
