@@ -4,9 +4,11 @@ Personal life-dashboard: Next.js 14 App Router + Supabase (auth/DB) + Electron d
 
 ## Commands
 - `npm run dev` — dev server on port 3000 (see dev-server rules below)
-- `npx tsc --noEmit` — required after every change; do not rationalize away type errors
+- `npx tsc --noEmit` — required after every change; do not rationalize away type errors. Does NOT cover `electron/` (excluded in root tsconfig) — desktop code typechecks via `tsc -p electron/tsconfig.json`.
 - `npm run build` — required for significant changes (catches prerender/bundling issues)
-- `npm run test` (Jest, colocated `__tests__/`), `npm run test:e2e` (Playwright, `tests/`), `npm run test:all` before proposing a merge
+- `npm run test` (Jest, colocated `__tests__/`); single test: `npx jest src/path/__tests__/route.test.ts` or `npx jest -t "test name"`
+- `npm run test:e2e` (Playwright, `tests/`); single spec: `npx playwright test tests/<file>.spec.ts`. `npm run test:all` before proposing a merge.
+- `npm run electron:dev` / `npm run electron:build:mac` — desktop app (`electron/`: main, preload, tray, oauth-handler, updater)
 - Commits: Conventional Commits scoped by domain — `fix(calendar): …`, `feat(tasks): …`
 
 ## 1. Think before coding
@@ -69,15 +71,6 @@ Define success criteria, then loop until verified. Don't just follow steps.
 - Never commit secrets, credentials, or `.env` files.
 - Do not create documentation files unless explicitly requested.
 
-## Gotchas
-
-- Iridescent (`--iri-*`) tokens may appear in exactly five places (retrofit §3);
-  do not add more. `[BRACKETED]` placeholders must stay visibly unfinished —
-  never invent prices, clients, metrics, or quotes.
-- Reveal styles hide content only under `html.js`; keep the `anim-fallback`
-  safety classes intact or a JS failure blanks the page.
-- Exactly one pinned scene (§5.5 process). Don't pin anything else.
-
 ---
 
 ### Maintaining this file
@@ -99,7 +92,7 @@ Define success criteria, then loop until verified. Don't just follow steps.
 
 ## Conventions (follow these; the code already does)
 - **Data access goes through `src/repositories/`**: explicit `*_SELECT_COLUMNS` constants and `mapRowToX()` snake_case→camelCase mappers. Never `select('*')` in new code; never let raw Supabase rows leak past the repository layer.
-- **API routes** (`src/app/api/*/route.ts`): wrap handlers with `withErrorHandling`, throw `createApiError(message, status, code)`, auth-check via `supabaseServer().auth.getUser()` first. Rate limiting via `src/lib/rate-limit.ts` on expensive/external routes.
+- **API routes** (`src/app/api/*/route.ts`): wrap handlers with `withAuth`/`withAuthAndBody` (or `withErrorHandling`), throw `createApiError(message, status, code)`; auth outside the wrappers uses `getUserCached` — never raw `auth.getUser()` (mistake 17). Rate limiting via `src/lib/rate-limit.ts` on expensive/external routes.
 - **Styling is a 3-layer token system** (see STYLE_GUIDE.md): CSS variables → Tailwind `theme-*` classes → composed tokens in `src/lib/styles.ts`. Import `card`, `text`, `surface`, `form` from `@/lib/styles` and compose with `cn()`. Brand primary is **#B1916A warm golden brown — not purple**. Never hardcode hex values or raw Tailwind palette colors (`bg-amber-500`) in components.
 - Feature code lives in `src/features/<domain>/` (tasks, calendar, dashboard, folders, widgets); shared UI in `src/components/`; cross-cutting logic in `src/lib/`. Files kebab-case, components PascalCase, hooks `use*`, named exports.
 - Server Components by default; `use client` only where interaction demands it.
