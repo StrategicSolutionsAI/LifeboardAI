@@ -98,7 +98,7 @@ Suggested sequencing: M1 alone (one session), M2+M3 (one session), M4 per-page (
 ## Progress
 
 - [x] 2026-07-16 — Full-app audit complete (34 screenshots, console traces, 11 root-caused defects). This plan.
-- [ ] M1 bug fixes
+- [x] 2026-07-16 — M1 bug fixes shipped: A1 (nonce + suppressHydrationWarning on layout scripts), A2 (migration + regression test — **SQL still needs to run on live Supabase**), A3 (decodeHtmlEntities at parser chokepoint + tests), A5 (button.brand token given padding/radius — healed all 5 call sites), A6 (flushSync moved to fresh task), A7 (geolocation=(self)). Verified: console clean on dashboard/calendar/budget/email at desktop+mobile except the A2 500 which persists until the migration runs; tsc, 99 Jest tests, and production build all pass; budget button visually verified both widths.
 - [ ] M2 dead weight + truth
 - [ ] M3 IA consolidation
 - [ ] M4 page layouts

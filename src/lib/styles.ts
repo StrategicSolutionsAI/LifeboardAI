@@ -313,7 +313,7 @@ export const iconBox = {
 // -----------------------------------------------------------------------------
 
 export const button = {
-  brand: 'bg-theme-primary text-white hover:bg-theme-primary-600 transition-colors',
+  brand: 'px-4 py-2 rounded-lg bg-theme-primary text-white text-sm font-medium hover:bg-theme-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors',
   brandSm: 'h-8 px-3 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors',
   ghost: 'text-theme-text-tertiary hover:text-theme-text-primary hover:bg-theme-hover transition-colors',
   outline: 'border border-theme-neutral-300 bg-theme-surface-raised hover:bg-theme-surface-alt transition-colors',

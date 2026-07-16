@@ -255,9 +255,12 @@ export default function OptimizedCalendarView() {
   // and its Droppable/Draggable children mount. Using flushSync forces the
   // state update to render synchronously, preventing React 18's concurrent
   // rendering from tearing DnD context during recoverFromConcurrentError.
+  // flushSync must run in its own task — calling it inside the effect body
+  // (React's commit phase) is a lifecycle violation React warns about.
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    flushSync(() => { setReady(true); });
+    const t = setTimeout(() => { flushSync(() => { setReady(true); }); }, 0);
+    return () => clearTimeout(t);
   }, []);
 
   return (

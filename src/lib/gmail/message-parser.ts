@@ -38,6 +38,24 @@ export function getHeader(
 }
 
 /**
+ * Decode the HTML entities Gmail leaves in snippets (&#39;, &amp;, &hellip;…)
+ * so list views render plain text. `&amp;` is decoded last so encoded
+ * sequences like `&amp;#39;` don't get double-decoded.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+  lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…',
+  mdash: '—', ndash: '–', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+}
+
+export function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m)
+    .replace(/&amp;/g, '&')
+}
+
+/**
  * Decode a base64url-encoded string (as returned by the Gmail API).
  */
 function decodeBase64Url(encoded: string): string {
@@ -119,7 +137,7 @@ export function parseGmailMessage(
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
     subject: getHeader(headers, 'Subject'),
-    snippet: message.snippet ?? '',
+    snippet: decodeHtmlEntities(message.snippet ?? ''),
     labelIds: message.labelIds ?? [],
     isUnread: message.labelIds?.includes('UNREAD') ?? false,
     textBody: includeBody ? walked.textBody : '',
@@ -144,7 +162,7 @@ export function parseGmailMessageSummary(
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
     subject: getHeader(headers, 'Subject'),
-    snippet: message.snippet ?? '',
+    snippet: decodeHtmlEntities(message.snippet ?? ''),
     labelIds: message.labelIds ?? [],
     isUnread: message.labelIds?.includes('UNREAD') ?? false,
     attachments: [],
