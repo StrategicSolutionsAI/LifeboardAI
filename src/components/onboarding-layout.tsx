@@ -94,16 +94,18 @@ export function OnboardingLayout({
           </Button>
         </div>
 
-        {/* Skip option */}
-        <div className="w-full flex justify-center pb-6">
-          <button
-            type="button"
-            onClick={onNext}
-            className="text-sm text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
-          >
-            Skip for now
-          </button>
-        </div>
+        {/* Skip option — meaningless on the completion step */}
+        {!isLastStep && (
+          <div className="w-full flex justify-center pb-6">
+            <button
+              type="button"
+              onClick={onNext}
+              className="text-sm text-theme-text-tertiary hover:text-theme-text-secondary transition-colors"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

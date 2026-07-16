@@ -99,7 +99,7 @@ Suggested sequencing: M1 alone (one session), M2+M3 (one session), M4 per-page (
 
 - [x] 2026-07-16 — Full-app audit complete (34 screenshots, console traces, 11 root-caused defects). This plan.
 - [x] 2026-07-16 — M1 bug fixes shipped: A1 (nonce + suppressHydrationWarning on layout scripts), A2 (migration + regression test — **SQL still needs to run on live Supabase**), A3 (decodeHtmlEntities at parser chokepoint + tests), A5 (button.brand token given padding/radius — healed all 5 call sites), A6 (flushSync moved to fresh task), A7 (geolocation=(self)). Verified: console clean on dashboard/calendar/budget/email at desktop+mobile except the A2 500 which persists until the migration runs; tsc, 99 Jest tests, and production build all pass; budget button visually verified both widths.
-- [ ] M2 dead weight + truth
+- [x] 2026-07-16 — M2 (partial): A9 (server-side redirect for /onboarding/5), A10 (suggestions filter out selected buckets), A11 (amber "Needs sync" badge when last sync >7 days), fake claims removed ("50,000+ organizers" → brand line; "4.9 user rating" → "24/7 AI assistant"), "Skip for now" hidden on completion step (it was also mislabeled — it calls onNext, same as Continue; true skip-to-dashboard deferred to M4). Verified: 307 redirect, screenshots of onboarding 2/6 + integrations, landing DOM free of fabricated claims, tsc + 99 tests pass. **Remaining M2 (needs user decisions):** pricing section real-vs-removed; /profile + /history stub removal; Board/Kanban merge; hide Assignee column.
 - [ ] M3 IA consolidation
 - [ ] M4 page layouts
 - [ ] M5 design-system sweep

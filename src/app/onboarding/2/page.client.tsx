@@ -6,7 +6,6 @@ import { OnboardingLayout } from "@/components/onboarding-layout"
 import { PlusCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
 import { supabase } from "@/utils/supabase/client"
 
 const suggestedBuckets = ["Travel","Learning","Side Projects","Pets","Home","Volunteering"]
@@ -81,8 +80,8 @@ export default function OnboardingStep2Client() {
         <div className="flex flex-col gap-2 mt-2">
           <h3 className="text-[16px] font-medium text-[#171A1F]">Suggestions</h3>
           <div className="flex flex-wrap gap-1.5">
-            {suggestedBuckets.map((bucket) => (
-              <button key={bucket} onClick={() => toggleBucket(bucket)} className={cn("py-3.5 px-3 rounded transition-all", selectedBuckets.includes(bucket) ? "bg-theme-brand-tint text-theme-primary ring-1 ring-inset ring-theme-primary" : "bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]")}>
+            {suggestedBuckets.filter((bucket) => !selectedBuckets.includes(bucket)).map((bucket) => (
+              <button key={bucket} onClick={() => toggleBucket(bucket)} className="py-3.5 px-3 rounded transition-all bg-[#F5F5FA] text-[#2E3D62] hover:bg-[#EAEAF0]">
                 <span className="text-xs font-medium">{bucket}</span>
               </button>
             ))}

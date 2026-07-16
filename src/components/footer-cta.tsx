@@ -9,7 +9,7 @@ export function FooterCTA() {
         START NOW
       </h2>
       <p className="text-2xl text-theme-text-tertiary mb-12 font-light">
-        Join 50,000+ obsessive organizers.
+        Your life, one dashboard.
       </p>
       <Link href="/signup">
         <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white text-black font-bold text-xl hover:scale-125 transition-transform duration-300">

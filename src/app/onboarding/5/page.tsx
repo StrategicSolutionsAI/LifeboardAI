@@ -1,21 +1,6 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-
+// Step 5 was consolidated into step 4; keep old URLs working.
 export default function OnboardingStep5() {
-  const router = useRouter()
-
-  useEffect(() => {
-    // Step 5 is now consolidated into step 4, redirect to completion
-    router.replace("/onboarding/6")
-  }, [router])
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-theme-text-subtle">Redirecting...</p>
-      </div>
-    </div>
-  )
+  redirect("/onboarding/6")
 }

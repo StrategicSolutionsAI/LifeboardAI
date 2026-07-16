@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   ArrowRight, Calendar, Zap, Brain,
-  Activity, CheckCircle, Star,
+  Activity, CheckCircle,
   BarChart3, Link2, MessageCircle, Mic,
   LayoutGrid, List, Columns3, Droplets,
   Moon, Heart, Dumbbell, Coffee,
@@ -306,7 +306,7 @@ export default function Page() {
           <StatItem value="30+" label="Tracking widgets" />
           <StatItem value="3" label="Task views" />
           <StatItem value="5+" label="Integrations" />
-          <StatItem value="4.9" label="User rating" icon={Star} />
+          <StatItem value="24/7" label="AI assistant" />
         </div>
       </section>
 

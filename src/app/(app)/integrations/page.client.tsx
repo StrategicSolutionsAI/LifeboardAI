@@ -630,6 +630,13 @@ export default function IntegrationsPageClient() {
             const status = integrationStatuses[integration.id]
             const isLoading = refreshing === integration.id
             const isComingSoon = !integration.authUrl
+            // "Active" with a months-old sync is a lie — flag connections
+            // that haven't synced in over a week.
+            const STALE_SYNC_MS = 7 * 24 * 60 * 60 * 1000
+            const isStale = Boolean(
+              status?.connected && status?.lastUpdated &&
+              Date.now() - new Date(status.lastUpdated).getTime() > STALE_SYNC_MS
+            )
             return (
               <Card key={integration.id} className={`relative transition-all ${isComingSoon ? 'opacity-60' : ''} ${isLoading ? 'scale-[0.99]' : ''}`}>
                 <CardHeader className="pb-4">
@@ -643,7 +650,9 @@ export default function IntegrationsPageClient() {
                     </div>
                     {!isComingSoon && (
                       <div className="ml-2">
-                        {isLoading ? (<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />) : status?.connected ? (
+                        {isLoading ? (<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />) : status?.connected && isStale ? (
+                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white"><Clock className="h-3 w-3 mr-1" />Needs sync</Badge>
+                        ) : status?.connected ? (
                           <Badge className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>
                         ) : (
                           <Badge variant="outline" className="text-muted-foreground"><XCircle className="h-3 w-3 mr-1" />Not Connected</Badge>
