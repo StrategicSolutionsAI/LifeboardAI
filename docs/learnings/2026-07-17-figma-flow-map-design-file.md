@@ -1,0 +1,11 @@
+# Drawing a flow map (boxes + arrows) in a Figma *design* file via the Plugin API
+
+**Problem** — "Create a flow map in the same Figma file": FigJam's `generate_diagram`/ConnectorNode can't be used because the target is a design file, and arrows must be accurate to the app's real navigation.
+
+**Approach** — (1) Derive edges from code, not memory: grep nav components (`sidebar-layout.tsx` navItems), server actions (`login/actions.ts` redirects), `auth/callback` destination logic, and `router.push` calls per route — this surfaced non-obvious truths (auth forks on onboarding state; `/onboarding/5` intentionally skipped; `/profile`, `/history`, `/trends/[id]`, `/integrations/amazon` have **zero** inbound links by design). (2) Build on a new page in one `use_figma` call: helper fns for zone frames, auto-layout node boxes, text labels; a 4-point `createPolygon` is the decision diamond. (3) Arrows: `createVector` + `setVectorNetworkAsync` with per-vertex `strokeCap` — `'ARROW_EQUILATERAL'` on the last vertex only (both ends for bidirectional) — this is the only way to get single-ended arrows in a design file; LineNode's strokeCap hits both ends. (4) Avoid N×N sidebar spaghetti: draw the app shell as a *container* holding the nav pages ("membership = mutual navigation") instead of a hub with 10 crossing arrows. (5) Screenshot the page id directly (`get_screenshot` accepts a page node id) and actually look at it.
+
+**Solution** — Page "Flow Map" (36:2) in file SXgUxnZ3zp3FBiUsnKjr1V; 82 nodes; one fix pass for label collisions and a clipped legend.
+
+**Rule** — In design files, flow-chart arrows are vector networks with per-vertex strokeCap (never LineNode, never ConnectorNode); auto-layout frames you create with `layoutMode` then `resize()` end up FIXED — set `primaryAxisSizingMode`/`counterAxisSizingMode` to `'AUTO'` explicitly or text children clip (the legend bug); and always grep `href=`/`router.push`/`redirect(` per route before drawing an edge — absence of an inbound link is itself a finding worth annotating on the map.
+
+**Dead ends** — zsh silently expands unquoted `--include=*.tsx` globs inside `for` loops ("no matches found" from the *glob*, not grep) — quote them. Placing edge labels at fixed offsets without checking box bounds caused two overlaps caught only by the screenshot.
