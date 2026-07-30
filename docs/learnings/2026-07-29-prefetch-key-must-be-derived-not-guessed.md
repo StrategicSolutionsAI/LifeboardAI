@@ -39,9 +39,32 @@ finding the consumer's key expression and confirming it is the identical call �
 key is a hardcoded guess about default state is worse than no prefetch, because it costs a request
 and silently delivers nothing.
 
+**The second half of the same bug** — fixing the `view` segment moved the defect to the `date`
+segment, and only adversarial review caught it. `useCalendarNavigation` prefers its
+`propSelectedDate` over the stored date, and `OptimizedCalendarView` *always* passes one
+(`useState(new Date())`), so reading the stored date was wrong too: anyone who had left the calendar
+on another day got a miss again. The prefetch and that `useState` now share one
+`initialCalendarDate()` in the same file. Lesson: when a consumer's state has a prop-over-storage
+precedence, the prefetch must mirror the precedence, not just the storage.
+
+**Making the key live also made the prefetch's error handling load-bearing** — the fetcher swallowed
+failures into `[]`, which React Query stores as a *successful* result for the full 5-minute
+staleTime. Harmless while the key was dead; with a live key a single 500 or 5 s timeout hid every
+Google Calendar event for five minutes with no retry. All three prefetches in the file now let
+failures reject, so React Query records an error, caches nothing, and the mounting hook refetches
+with its own fetcher — the one that knows a 401 means "not connected" rather than "broken".
+Pinned by `src/hooks/__tests__/use-data-cache-prefetch.test.tsx`.
+
+**Rule (addendum)** — Whenever you make a previously-dead prefetch key live, re-read its fetcher's
+error paths first. A `catch { return [] }` in a prefetch is a cache-poisoning bug the moment
+something reads the key.
+
 **Dead ends**
 - Reading the prefetch and concluding it worked because the key "looks like" the consumer's format.
   The format was right; the `view` segment was wrong.
-- Planning to replicate the mobile auto-switch-to-agenda rule in the prefetch too. Unnecessary:
-  `handleViewChange` persists that switch, so the stored view is already `agenda` on the second and
-  later mobile visits, and reading the stored value covers the steady state on both form factors.
+- Replicating the mobile auto-switch-to-agenda rule in the prefetch. Two reviewers flagged the
+  prefetch as "wasted on mobile" because `use-calendar-display` switches a <=640px viewport to
+  agenda right after mount. It is not wasted, but not for the reason first assumed (that the stored
+  view is already `agenda`): the hook's *first* render still uses the stored view and fetches that
+  key, then the switch fetches the agenda key. Two requests happen either way, so prefetching
+  either key saves exactly one. Predicting the switch buys nothing.

@@ -28,28 +28,28 @@ import { CalendarTaskList } from "@/features/calendar/components/calendar-task-l
 // ── Prefetch calendar data at module load time ──────────────────────────
 // These fire as soon as the JS chunk evaluates, overlapping with React
 // hydration rather than waiting until useQuery mounts inside the component tree.
+//
+// Every key below is one the hook really reads, so a prefetch that swallowed a
+// failure into `[]` would store that as a SUCCESSFUL result for the 5-minute
+// staleTime and the mounted hook would render an empty calendar without ever
+// retrying. Let failures reject instead: React Query records an error, caches no
+// data, and the hook refetches on mount with its own fetcher (which is the one
+// that knows a 401 means "not connected" rather than "broken").
+async function prefetchList(url: string, pick: (payload: any) => unknown[], init?: RequestInit) {
+  const resp = await fetchWithTimeout(url, init);
+  if (!resp.ok) throw new Error(`Prefetch ${url} failed: ${resp.status}`);
+  const payload = await resp.json();
+  const list = pick(payload);
+  return Array.isArray(list) ? list : [];
+}
 
-prefetchToGlobalCache('uploaded-calendar-events-0', async () => {
-  try {
-    const resp = await fetchWithTimeout('/api/calendar/upload', { cache: 'no-store' });
-    if (!resp.ok) return [];
-    const payload = await resp.json();
-    return Array.isArray(payload.events) ? payload.events : [];
-  } catch {
-    return [];
-  }
-});
+prefetchToGlobalCache('uploaded-calendar-events-0', () =>
+  prefetchList('/api/calendar/upload', (p) => p?.events, { cache: 'no-store' }),
+);
 
-prefetchToGlobalCache('cycle-tracking-calendar', async () => {
-  try {
-    const resp = await fetchWithTimeout('/api/widgets/cycle-tracking?limit=90', { cache: 'no-store' });
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return Array.isArray(data?.entries) ? data.entries : [];
-  } catch {
-    return [];
-  }
-});
+prefetchToGlobalCache('cycle-tracking-calendar', () =>
+  prefetchList('/api/widgets/cycle-tracking?limit=90', (p) => p?.entries, { cache: 'no-store' }),
+);
 
 // The date the calendar mounts on. useCalendarNavigation prefers its
 // propSelectedDate over the stored date, and this component always supplies one,
@@ -65,23 +65,18 @@ const initialCalendarDate = () => new Date();
   const view = readStoredCalendarView();
   const range = calendarDateRange(view, initialCalendarDate());
 
-  prefetchToGlobalCache(googleEventsCacheKey(view, range), async () => {
-    try {
-      const params = new URLSearchParams({
-        timeMin: range.start.toISOString(),
-        timeMax: range.end.toISOString(),
-        maxResults: '500',
-      });
-      const resp = await fetchWithTimeout(
-        `/api/integrations/google/calendar/events?${params.toString()}`
-      );
-      if (!resp.ok) return [];
-      const payload = await resp.json();
-      return Array.isArray(payload.events) ? payload.events : [];
-    } catch {
-      return [];
-    }
+  const params = new URLSearchParams({
+    timeMin: range.start.toISOString(),
+    timeMax: range.end.toISOString(),
+    maxResults: '500',
   });
+
+  prefetchToGlobalCache(googleEventsCacheKey(view, range), () =>
+    prefetchList(
+      `/api/integrations/google/calendar/events?${params.toString()}`,
+      (p) => p?.events,
+    ),
+  );
 }
 
 interface CalendarContentProps {
