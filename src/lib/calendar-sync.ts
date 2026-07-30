@@ -239,6 +239,18 @@ export class MissingTasksTableError extends Error {
   }
 }
 
+/**
+ * PostgREST round trips (~90-250ms each) dominate an ICS import, and every event
+ * needs two of them. Running events in bounded-concurrency waves keeps a
+ * 500-event import inside a serverless budget instead of taking 2 x 500 serial
+ * round trips. Distinct events touch distinct rows, so the waves do not race:
+ * each create inserts its own task, and each update targets that event's own
+ * task_id and mirrors back onto that event's own calendar_events row.
+ */
+const SYNC_CONCURRENCY = 25;
+
+type SyncOutcome = 'created' | 'updated' | 'error';
+
 export async function syncEventsToTasks(
   supabase: GenericSupabaseClient,
   userId: string,
@@ -248,10 +260,10 @@ export async function syncEventsToTasks(
   let updated = 0;
   let errors = 0;
 
-  for (const event of events) {
+  const syncEvent = async (event: CalendarEventRow): Promise<SyncOutcome | null> => {
     const rawTitle = event.content ?? event.title ?? '';
     const title = rawTitle.trim();
-    if (!title) continue;
+    if (!title) return null;
 
     const startDate = event.start_date ?? event.due_date ?? (event.start_time ? event.start_time.slice(0, 10) : null);
     const endDate = event.end_date ?? (event.end_time ? event.end_time.slice(0, 10) : startDate);
@@ -293,16 +305,14 @@ export async function syncEventsToTasks(
         if (taskError.code === '42P01') {
           throw new MissingTasksTableError();
         }
-        errors++;
         console.error('Failed to create task for calendar event', { eventId: event.id, taskError });
-        continue;
+        return 'error';
       }
 
       const newTaskId = taskData?.id;
       if (!newTaskId) {
-        errors++;
         console.error('Task creation response missing id', { eventId: event.id });
-        continue;
+        return 'error';
       }
 
       const { error: linkError } = await supabase
@@ -332,14 +342,12 @@ export async function syncEventsToTasks(
         if (linkError.code === '42P01') {
           throw new MissingTasksTableError();
         }
-        errors++;
         console.error('Failed to link task to calendar event', { eventId: event.id, linkError });
-        continue;
+        return 'error';
       }
 
       event.task_id = newTaskId;
-      created++;
-      continue;
+      return 'created';
     }
 
     const { error: updateError, data: taskData } = await supabase
@@ -364,9 +372,8 @@ export async function syncEventsToTasks(
       if (updateError.code === '42P01') {
         throw new MissingTasksTableError();
       }
-      errors++;
       console.error('Failed to update task from calendar event', { eventId: event.id, taskId: event.task_id, updateError });
-      continue;
+      return 'error';
     }
 
     const { error: mirrorError } = await supabase
@@ -395,7 +402,16 @@ export async function syncEventsToTasks(
       console.error('Failed to mirror task changes onto calendar event', { eventId: event.id, taskId: event.task_id, mirrorError });
     }
 
-    updated++;
+    return 'updated';
+  };
+
+  for (let i = 0; i < events.length; i += SYNC_CONCURRENCY) {
+    const outcomes = await Promise.all(events.slice(i, i + SYNC_CONCURRENCY).map(syncEvent));
+    for (const outcome of outcomes) {
+      if (outcome === 'created') created++;
+      else if (outcome === 'updated') updated++;
+      else if (outcome === 'error') errors++;
+    }
   }
 
   return { created, updated, errors };
