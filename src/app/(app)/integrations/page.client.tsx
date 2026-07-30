@@ -148,17 +148,25 @@ export default function IntegrationsPageClient() {
     const statuses: Record<string, IntegrationStatus> = {}
     if (invalidateCache) invalidateIntegrationCaches()
     try {
-      const promises = integrations.map(async (integration) => {
-        try {
-          const response = await fetch(`/api/integrations/status?provider=${integration.id}`)
-          if (!response.ok) throw new Error(`HTTP ${response.status}`)
-          const data = await response.json()
-          statuses[integration.id] = data
-        } catch (error) {
-          statuses[integration.id] = { connected: false, error: `Unable to check status` }
+      // One batched request for every connectable provider. Providers without an
+      // authUrl (Slack, "Coming Soon") have no row to check, so asking for them
+      // was a wasted round trip.
+      const connectable = integrations.filter((i) => i.authUrl).map((i) => i.id)
+      for (const integration of integrations) {
+        if (!integration.authUrl) statuses[integration.id] = { connected: false }
+      }
+      try {
+        const response = await fetch(`/api/integrations/status?providers=${connectable.join(',')}`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json()
+        for (const id of connectable) {
+          statuses[id] = data?.statuses?.[id] ?? { connected: false, error: `Unable to check status` }
         }
-      })
-      await Promise.all(promises)
+      } catch (error) {
+        for (const id of connectable) {
+          statuses[id] = { connected: false, error: `Unable to check status` }
+        }
+      }
       setIntegrationStatuses(statuses)
     } catch (error) {
       setGlobalError('Unable to load integration statuses. Please refresh the page.')
