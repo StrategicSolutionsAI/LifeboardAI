@@ -6,7 +6,6 @@ import { ensureCacheOwner } from "@/lib/auth-cleanup";
 import { useWeather } from "@/features/dashboard/hooks/use-weather";
 import { useAuth } from "@/features/dashboard/hooks/use-auth";
 import { useDashboardBuckets } from "@/features/dashboard/hooks/use-dashboard-buckets";
-import { useHourlyPlanner } from "@/features/dashboard/hooks/use-hourly-planner";
 import { useDailyReset } from "@/features/dashboard/hooks/use-daily-reset";
 import { useDashboardWidgets } from "@/features/dashboard/hooks/use-dashboard-widgets";
 import { useIntegrations } from "@/features/dashboard/hooks/use-integrations";
@@ -52,7 +51,8 @@ const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.Dr
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTaskData, useTaskActions } from '@/contexts/tasks-context';
 import { Skeleton } from "@/components/ui/skeleton";
-import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import TaskEditorModal from "@/features/tasks/components/lazy-task-editor-modal";
+import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import { useFamilyMembers } from "@/hooks/use-family-members";
 const WidgetModalsContainer = dynamic(
   () => import("./WidgetModalsContainer").then(m => m.WidgetModalsContainer),
@@ -433,11 +433,12 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
     };
   }, []);
 
-  // Hourly planner hook
-  const {
-    hourlyPlan, setHourlyPlan, hours, currentHourDisplay,
-    plannerRef, resizingTask, startResize,
-  } = useHourlyPlanner({ selectedDate, isPlannerCollapsed, updateTaskDuration });
+  // The hourly planner rendered on this page is the calendar's
+  // (features/calendar/components/hourly-planner.tsx), which derives its plan
+  // from scheduled tasks. useHourlyPlanner's return was destructured here and
+  // never read, so calling it only cost a getUserPreferencesClient() fetch plus
+  // a debounced preferences PATCH — which invalidates every preferences cache —
+  // on each dashboard mount and each date change.
 
   // Convenience: tasks in planner so we can hide them from the daily list
   const assignedTaskIds = useMemo(() => {

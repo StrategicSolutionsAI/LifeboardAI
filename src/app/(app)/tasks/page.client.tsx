@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import { TasksProvider, useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
 import type { Bucket as BoardBucket, Task as BoardTask } from "@/features/tasks/components/TasksBoard";
-import TaskEditorModal, { type TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
+import TaskEditorModal from "@/features/tasks/components/lazy-task-editor-modal";
+import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
 import type { ListTask } from "@/features/tasks/components/task-list-view";
 import type { KanbanTask } from "@/features/tasks/components/task-kanban-board";
 import type { KanbanStatus } from "@/types/tasks";
@@ -24,13 +25,47 @@ import { prefetchAllTasks } from "@/lib/prefetch-tasks";
 // cached by the time the component tree mounts and calls useTasks.
 prefetchAllTasks();
 
-// Eagerly start downloading chunks at module evaluation time.
-// TaskListView is the default tab, so preload it first.
+// TaskListView is the default tab, so start its chunk at module evaluation
+// time — it is needed for first paint.
 const taskListChunk = import("@/features/tasks/components/task-list-view");
-const tasksBoardChunk = import("@/features/tasks/components/TasksBoard");
-const kanbanChunk = import("@/features/tasks/components/task-kanban-board");
 
-const TasksBoard = dynamic(() => tasksBoardChunk, {
+// Board and Kanban render only behind their tabs. Downloading them at module
+// scope too made them compete with the List chunk and the task data for
+// bandwidth on every visit, delaying the view the user actually landed on.
+// Warm them once the browser goes idle instead, so switching tabs is still
+// instant without paying for it up front.
+let tasksBoardChunk: ReturnType<typeof importTasksBoard> | null = null;
+let kanbanChunk: ReturnType<typeof importKanban> | null = null;
+
+function importTasksBoard() {
+  return import("@/features/tasks/components/TasksBoard");
+}
+function importKanban() {
+  return import("@/features/tasks/components/task-kanban-board");
+}
+
+function loadTasksBoard() {
+  if (!tasksBoardChunk) tasksBoardChunk = importTasksBoard();
+  return tasksBoardChunk;
+}
+function loadKanban() {
+  if (!kanbanChunk) kanbanChunk = importKanban();
+  return kanbanChunk;
+}
+
+if (typeof window !== "undefined") {
+  const warmHiddenTabs = () => {
+    void loadTasksBoard();
+    void loadKanban();
+  };
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(warmHiddenTabs, { timeout: 4000 });
+  } else {
+    window.setTimeout(warmHiddenTabs, 2000);
+  }
+}
+
+const TasksBoard = dynamic(() => loadTasksBoard(), {
   ssr: false,
   loading: () => (
     <div className="h-full rounded-xl border border-theme-neutral-300 bg-white p-4">
@@ -52,7 +87,7 @@ const TaskListView = dynamic(
 );
 
 const TaskKanbanBoard = dynamic(
-  () => kanbanChunk.then((m) => ({ default: m.TaskKanbanBoard })),
+  () => loadKanban().then((m) => ({ default: m.TaskKanbanBoard })),
   {
     ssr: false,
     loading: () => (

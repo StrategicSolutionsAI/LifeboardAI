@@ -1066,4 +1066,18 @@ const TaskEditorModal = forwardRef<TaskEditorModalHandle, TaskEditorModalProps>(
 
 TaskEditorModal.displayName = "TaskEditorModal";
 
+export type { TaskEditorModalProps };
+
+/**
+ * Ref-as-a-prop variant. `next/dynamic` returns a plain function component and
+ * does not forward refs, so the lazy wrapper in lazy-task-editor-modal.tsx
+ * hands the handle down through this prop instead.
+ */
+export function TaskEditorModalWithInnerRef({
+  innerRef,
+  ...props
+}: TaskEditorModalProps & { innerRef?: React.Ref<TaskEditorModalHandle> }) {
+  return <TaskEditorModal ref={innerRef} {...props} />;
+}
+
 export default TaskEditorModal;

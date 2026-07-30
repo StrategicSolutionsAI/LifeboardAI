@@ -144,20 +144,15 @@ export const DraggableWidgetCard = React.memo(function DraggableWidgetCard({
           }}
           onClick={() => onCardClick(w)}
         >
-          {/* Goal completion badge */}
-          <AnimatePresence>
-            {goalMet && !hideTaskConvert && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                className="absolute top-2 right-2 z-20 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm"
-              >
-                <Check className="h-3 w-3 text-white" strokeWidth={3} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Goal completion badge — animated with tailwindcss-animate rather
+              than framer-motion: this card renders for every widget on mount,
+              so importing framer here put it on the dashboard's hydration
+              path for a 20px checkmark. */}
+          {goalMet && !hideTaskConvert && (
+            <div className="absolute top-2 right-2 z-20 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm animate-in zoom-in-50 fade-in duration-200">
+              <Check className="h-3 w-3 text-white" strokeWidth={3} />
+            </div>
+          )}
 
           {/* Drag handle */}
           <div
