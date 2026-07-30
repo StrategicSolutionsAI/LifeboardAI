@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { gmail } from 'googleapis/build/src/apis/gmail'
 import { getGmailOAuth2Client } from '@/lib/gmail/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     // Fetch the Gmail user's email address for multi-account support
     const oauth2ClientForProfile = getGmailOAuth2Client(origin)
     oauth2ClientForProfile.setCredentials(tokens)
-    const gmailClient = google.gmail({ version: 'v1', auth: oauth2ClientForProfile })
+    const gmailClient = gmail({ version: 'v1', auth: oauth2ClientForProfile })
     let providerUserId = ''
     try {
       const profile = await gmailClient.users.getProfile({ userId: 'me' })

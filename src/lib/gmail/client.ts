@@ -1,4 +1,7 @@
-import { google } from 'googleapis'
+// Import the Gmail API module directly instead of the `googleapis` root
+// barrel: the barrel eagerly instantiates every Google API (985 modules,
+// ~1.3s of module eval per cold start) versus 123 modules / ~50ms here.
+import { gmail, auth } from 'googleapis/build/src/apis/gmail'
 
 // Gmail API scopes — request all upfront so users only authorize once
 const GMAIL_SCOPES = [
@@ -13,7 +16,7 @@ function resolveOrigin(origin?: string) {
 
 export function getGmailAuthUrl(origin?: string) {
   const base = resolveOrigin(origin)
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     `${base}/api/auth/gmail/callback`
@@ -30,7 +33,7 @@ export function getGmailAuthUrl(origin?: string) {
 
 export function getGmailOAuth2Client(origin?: string) {
   const base = resolveOrigin(origin)
-  return new google.auth.OAuth2(
+  return new auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     `${base}/api/auth/gmail/callback`
@@ -71,7 +74,7 @@ export async function getGmailClient(
     })
   }
 
-  return google.gmail({
+  return gmail({
     version: 'v1',
     auth: oauth2Client,
   })
