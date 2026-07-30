@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { supabaseServer } from '@/utils/supabase/server'
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
 import { parseBody } from '@/lib/validations'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 const bucketDeleteSchema = z.object({
   bucket: z.string().min(1, 'bucket name required').max(200),
@@ -10,7 +11,7 @@ const bucketDeleteSchema = z.object({
 
 async function postHandler(request: Request) {
   const supabase = supabaseServer()
-  const authResult = await supabase.auth.getUser()
+  const authResult = await getUserCached(supabase)
   const user = authResult?.data?.user
 
   if (!user) {

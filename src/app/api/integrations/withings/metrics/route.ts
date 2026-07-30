@@ -4,6 +4,7 @@ import { fetchWithingsLatestWeight, refreshWithingsToken } from '@/lib/withings/
 import { logger } from '@/lib/logger'
 import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
 import { withErrorHandling } from '@/lib/api-error-handler'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,7 +19,7 @@ async function handler(request: Request) {
   const supabase = supabaseServer()
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await getUserCached(supabase)
 
   let effectiveUser = user
 

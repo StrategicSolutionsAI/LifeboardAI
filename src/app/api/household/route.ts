@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
 import { parseBody, createHouseholdSchema } from '@/lib/validations'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 // GET — Fetch current user's household + members
 async function getHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   // Find the user's household via household_members
@@ -48,7 +49,7 @@ async function getHandler(request: NextRequest) {
 // POST — Create a household, auto-add creator as admin
 async function postHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   // Check if user already has a household

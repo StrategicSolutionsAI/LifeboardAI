@@ -75,19 +75,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // The two Fitbit calls are independent, so overlap them — the route used to
+    // pay summary + water in series. allSettled keeps the existing semantics:
+    // a summary failure is fatal, a water failure is not.
+    const [summaryResult, waterResult] = await Promise.allSettled([
+      fetchFitbitDailySummary(accessToken, dateStr),
+      fetchFitbitWater(accessToken, dateStr),
+    ])
+
     // Always attempt to fetch steps & calories
-    const summary = await fetchFitbitDailySummary(accessToken, dateStr)
+    if (summaryResult.status === 'rejected') throw summaryResult.reason
+    const summary = summaryResult.value
     const steps = summary.summary?.steps ?? 0
     const calories = summary.summary?.caloriesOut ?? 0
 
-    // Fetch water separately – if Fitbit rate-limits (429) or user has no nutrition scope,
-    // don't fail the whole request. Default to 0 cups and surface a warning instead.
+    // If Fitbit rate-limits (429) or the user has no nutrition scope, don't fail
+    // the whole request. Default to 0 cups and surface a warning instead.
     let waterCups = 0
-    try {
-      const waterJson = await fetchFitbitWater(accessToken, dateStr)
-      const waterMl = waterJson.summary?.water ?? 0
+    if (waterResult.status === 'fulfilled') {
+      const waterMl = waterResult.value.summary?.water ?? 0
       waterCups = +(waterMl / 236.588).toFixed(1)
-    } catch (err) {
+    } else {
+      const err = waterResult.reason
       console.warn('Fitbit water fetch failed (non-fatal)', err instanceof Error ? err.message : err)
     }
 

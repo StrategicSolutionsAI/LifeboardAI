@@ -4,6 +4,7 @@ import { getCalendarClient } from '@/lib/google/client';
 import { withErrorHandling } from '@/lib/api-error-handler';
 import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired';
 import { logger } from '@/lib/logger';
+import { getUserCached } from '@/lib/server-auth-cache';
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,7 @@ async function handler(request: Request) {
 
   // Get the current user
   const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUserCached(supabase);
 
   if (!user) {
     return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/utils/supabase/server";
+import { getUserCached } from '@/lib/server-auth-cache';
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ async function requireUser() {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await getUserCached(supabase);
   if (error || !user) {
     return { supabase, user: null };
   }

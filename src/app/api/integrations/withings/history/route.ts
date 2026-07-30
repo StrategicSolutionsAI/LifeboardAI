@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { fetchWithingsWeightHistory, refreshWithingsToken } from '@/lib/withings/client'
 import { createIntegrationErrorHandler } from '@/lib/integration-error-handler'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
   const supabase = supabaseServer()
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await getUserCached(supabase)
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

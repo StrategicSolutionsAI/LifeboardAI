@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
 import { parseBody, updateHouseholdMemberSchema } from '@/lib/validations'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 // GET — List household members (active + pending)
 async function getHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   // Find user's household
@@ -40,7 +41,7 @@ async function getHandler(request: NextRequest) {
 // PATCH — Update a member (role, display_name)
 async function patchHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   const body = await request.json()
@@ -93,7 +94,7 @@ async function patchHandler(request: NextRequest) {
 // DELETE — Remove a member
 async function deleteHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   const { searchParams } = new URL(request.url)

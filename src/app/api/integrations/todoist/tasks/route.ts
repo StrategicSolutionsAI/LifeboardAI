@@ -133,18 +133,6 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     return NextResponse.json({ error: 'Missing date parameter' }, { status: 400 })
   }
 
-  // Get Todoist access token
-  const tokenResult = await getTodoistToken(supabase, user.id)
-  if ('response' in tokenResult) {
-    if (tokenResult.notConnected) {
-      // Dashboards fetch tasks unconditionally; an unconnected Todoist is a
-      // normal empty state, not an error worth a 400 in every user's console.
-      return NextResponse.json({ tasks: [], connected: false })
-    }
-    return tokenResult.response
-  }
-  const accessToken = tokenResult.token
-
   const respondWithTasks = (tasks: TodoistApiTask[]) => {
     if (date && !allParam) {
       return NextResponse.json({ tasks: filterTasksByDate(tasks, date) })
@@ -176,6 +164,21 @@ export const GET = withAuth(async (req, { supabase, user }) => {
       throw err
     }
   }
+
+  // Read the token only once we know we have to call Todoist. The task fetcher
+  // hits this route on every dashboard/calendar/tasks mount against a 15s cache,
+  // so on a cache hit this DB round trip was pure overhead. The disconnect route
+  // clears the cache, so a hit can't outlive the token it was fetched with.
+  const tokenResult = await getTodoistToken(supabase, user.id)
+  if ('response' in tokenResult) {
+    if (tokenResult.notConnected) {
+      // Dashboards fetch tasks unconditionally; an unconnected Todoist is a
+      // normal empty state, not an error worth a 400 in every user's console.
+      return NextResponse.json({ tasks: [], connected: false })
+    }
+    return tokenResult.response
+  }
+  const accessToken = tokenResult.token
 
   const fetchPromise = (async () => {
     const todoistRes = await fetch(TODOIST_TASKS_ENDPOINT, {

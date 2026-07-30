@@ -19,22 +19,24 @@ const EXPORT_TABLES = [
  * GET /api/data-backup — export all user data as JSON
  */
 export const GET = withAuth(async (_req, { supabase, user }) => {
-  const backup: Record<string, any[]> = {}
+  // The 11 exports are independent, so fetch them concurrently instead of
+  // paying the Supabase round-trip floor once per table in sequence.
+  const exports = await Promise.all(
+    EXPORT_TABLES.map(async (table) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .eq('user_id', user.id)
 
-  for (const table of EXPORT_TABLES) {
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error(`Failed to export ${table}`, error)
-      // Continue with other tables — partial export is better than none
-      backup[table] = []
-    } else {
-      backup[table] = data ?? []
-    }
-  }
+      if (error) {
+        console.error(`Failed to export ${table}`, error)
+        // Continue with other tables — partial export is better than none
+        return [table, [] as any[]] as const
+      }
+      return [table, data ?? []] as const
+    })
+  )
+  const backup: Record<string, any[]> = Object.fromEntries(exports)
 
   const payload = {
     version: 1,

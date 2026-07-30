@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { handleApiError } from '@/lib/api-error-handler'
+import { invalidateTodoistTaskCache } from '@/lib/todoist-task-cache'
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +46,12 @@ export async function POST(request: NextRequest) {
     if (deleteError) {
       console.error('Failed to disconnect integration:', deleteError)
       return NextResponse.json({ error: 'Failed to disconnect integration' }, { status: 500 })
+    }
+
+    // Drop the cached task list too — the tasks route answers cache hits without
+    // re-reading the token, so a stale entry would outlive the disconnect.
+    if (provider === 'todoist') {
+      invalidateTodoistTaskCache(user.id)
     }
 
     return NextResponse.json({

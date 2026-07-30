@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
+import { getUserCached } from '@/lib/server-auth-cache';
 import {
   syncEventsToTasks,
   MissingTasksTableError,
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await getUserCached(supabase);
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

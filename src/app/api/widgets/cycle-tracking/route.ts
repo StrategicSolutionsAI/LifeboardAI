@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler';
+import { getUserCached } from '@/lib/server-auth-cache';
 
 async function getHandler(request: Request) {
   const supabase = supabaseServer();
-  const authResult = await supabase.auth.getUser();
+  const authResult = await getUserCached(supabase);
   const user = authResult?.data?.user;
 
   if (!user) {
@@ -32,7 +33,7 @@ async function getHandler(request: Request) {
 
 async function postHandler(request: Request) {
   const supabase = supabaseServer();
-  const authResult = await supabase.auth.getUser();
+  const authResult = await getUserCached(supabase);
   const user = authResult?.data?.user;
 
   if (!user) {
@@ -70,7 +71,7 @@ async function postHandler(request: Request) {
 
 async function deleteHandler(request: Request) {
   const supabase = supabaseServer();
-  const authResult = await supabase.auth.getUser();
+  const authResult = await getUserCached(supabase);
   const user = authResult?.data?.user;
 
   if (!user) {

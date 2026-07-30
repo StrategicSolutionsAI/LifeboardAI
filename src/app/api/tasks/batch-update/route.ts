@@ -9,7 +9,11 @@ export const POST = withAuth(async (req, { supabase, user }) => {
     return NextResponse.json({ error: 'updates array required' }, { status: 400 })
   }
 
-  const results: Record<string, unknown>[] = []
+  // Build every column patch first — it's pure work, and separating it from the
+  // writes lets the writes overlap. Callers pass the whole list on a reorder
+  // (use-task-ordering maps every task to its new position), so this route used
+  // to issue 2-3 sequential Supabase round trips per task in the list.
+  const jobs: { taskId: string; updateData: Record<string, unknown> }[] = []
   for (const u of updates) {
     const taskId = u.taskId?.toString?.()
     const patch = u.updates || {}
@@ -56,38 +60,52 @@ export const POST = withAuth(async (req, { supabase, user }) => {
       updateData.end_date = updateData.start_date
     }
 
-    const { data, error } = await supabase
-      .from('lifeboard_tasks')
-      .update(updateData)
-      .eq('id', taskId)
-      .eq('user_id', user.id)
-      .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status, assignee_id')
-      .single()
-    if (error) {
-      console.warn('Supabase batch update error for', taskId, error)
-    }
-    if (!error && data) {
-      try {
-        await syncTaskToCalendarEvent(supabase, user.id, {
-          id: data.id,
-          content: data.content,
-          due_date: data.due_date,
-          start_date: data.start_date,
-          end_date: data.end_date,
-          hour_slot: data.hour_slot,
-          end_hour_slot: data.end_hour_slot,
-          duration: data.duration,
-          repeat_rule: data.repeat_rule,
-          bucket: data.bucket,
-          completed: data.completed,
-          position: data.position,
-          all_day: data.all_day,
-        })
-      } catch (syncError) {
-        console.error('Failed to sync calendar event after task update', { taskId, syncError })
-      }
-    }
-    results.push({ id: taskId, ok: !error, error: error?.message })
+    jobs.push({ taskId, updateData })
+  }
+
+  // Each job targets a distinct task row, so the writes don't contend and can
+  // overlap. Bounded waves rather than one Promise.all over the whole list: a
+  // large batch would otherwise open hundreds of simultaneous PostgREST calls.
+  const CONCURRENCY = 25
+  const results: Record<string, unknown>[] = []
+  for (let i = 0; i < jobs.length; i += CONCURRENCY) {
+    const wave = await Promise.all(
+      jobs.slice(i, i + CONCURRENCY).map(async ({ taskId, updateData }) => {
+        const { data, error } = await supabase
+          .from('lifeboard_tasks')
+          .update(updateData)
+          .eq('id', taskId)
+          .eq('user_id', user.id)
+          .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status, assignee_id')
+          .single()
+        if (error) {
+          console.warn('Supabase batch update error for', taskId, error)
+        }
+        if (!error && data) {
+          try {
+            await syncTaskToCalendarEvent(supabase, user.id, {
+              id: data.id,
+              content: data.content,
+              due_date: data.due_date,
+              start_date: data.start_date,
+              end_date: data.end_date,
+              hour_slot: data.hour_slot,
+              end_hour_slot: data.end_hour_slot,
+              duration: data.duration,
+              repeat_rule: data.repeat_rule,
+              bucket: data.bucket,
+              completed: data.completed,
+              position: data.position,
+              all_day: data.all_day,
+            })
+          } catch (syncError) {
+            console.error('Failed to sync calendar event after task update', { taskId, syncError })
+          }
+        }
+        return { id: taskId, ok: !error, error: error?.message }
+      })
+    )
+    results.push(...wave)
   }
 
   const allOk = results.every(r => r.ok)

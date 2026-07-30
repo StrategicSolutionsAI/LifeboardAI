@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { getUserCached } from '@/lib/server-auth-cache';
 
 // Reusable helper to create a Supabase client that does **not** attempt to parse
 // any cookies (we only use Bearer tokens for auth in this route)
@@ -43,8 +44,10 @@ export async function GET(_req: Request, { params }: { params: { instanceId: str
     },
   );
 
-  // Basic sanity check that the token is valid
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  // Basic sanity check that the token is valid. Cached by bearer token: a
+  // dashboard with several trend widgets fires this route once per widget, and
+  // each call was its own round trip to Supabase Auth.
+  const { data: userData, error: userErr } = await getUserCached(supabase, token);
   if (userErr || !userData?.user) {
     return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   }

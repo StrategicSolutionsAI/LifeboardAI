@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/utils/supabase/server'
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
 import { parseBody, inviteHouseholdMemberSchema } from '@/lib/validations'
+import { getUserCached } from '@/lib/server-auth-cache'
 
 // POST — Invite by email: creates a pending household_members row
 async function postHandler(request: NextRequest) {
   const supabase = supabaseServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getUserCached(supabase)
   if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
 
   const body = await request.json()
