@@ -1,24 +1,15 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MedicationTrackerWidget } from '@/features/widgets/components/medication-tracker-widget'
+import { MedicationTrackerWidget } from '@/features/widgets/components/medication-tracker-simple'
 
-// Mock Supabase client
-jest.mock('@/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn(),
-      getUser: jest.fn(),
-      signOut: jest.fn(),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => Promise.resolve({ data: [], error: null })),
-      })),
-    })),
-  },
-}))
+// This suite used to import medication-tracker-widget.tsx — a prototype that
+// nothing rendered. The widget registry binds `medication` to
+// medication-tracker-simple, so the old tests passed against dead code while
+// the shipped component had no coverage at all. They now run against the real
+// one, which starts with an empty medication list (the prototype seeded mock
+// Lisinopril/Metformin rows, so those assertions are gone).
 
-describe('MedicationTrackerWidget', () => {
+describe('MedicationTrackerWidget (the one the registry renders)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
@@ -28,33 +19,28 @@ describe('MedicationTrackerWidget', () => {
     expect(screen.getByText('Medication Tracker')).toBeInTheDocument()
   })
 
-  it('displays default medications', () => {
+  it('starts with no medications', () => {
     render(<MedicationTrackerWidget />)
-    expect(screen.getAllByText('Lisinopril').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Metformin').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Lisinopril')).not.toBeInTheDocument()
   })
 
-  it('shows medication dosages', () => {
+  it('reports 100% adherence when nothing is due', () => {
     render(<MedicationTrackerWidget />)
-    expect(screen.getAllByText('10mg').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('500mg').length).toBeGreaterThan(0)
-  })
-
-  it('displays adherence percentage', () => {
-    render(<MedicationTrackerWidget />)
-    // Should show today's adherence percentage
-    expect(screen.getByText(/\d+%/)).toBeInTheDocument()
+    expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
   it('shows add medication button', () => {
     render(<MedicationTrackerWidget />)
-    expect(screen.getByRole('button', { name: /add medication/i })).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /add medication/i }).length
+    ).toBeGreaterThan(0)
   })
 
   it('opens add medication sheet when button is clicked', () => {
     render(<MedicationTrackerWidget />)
-    const addButton = screen.getByRole('button', { name: /add medication/i })
-    fireEvent.click(addButton)
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /add medication/i })[0]
+    )
     expect(screen.getByText('Add New Medication')).toBeInTheDocument()
   })
 
@@ -64,7 +50,9 @@ describe('MedicationTrackerWidget', () => {
   })
 
   it('applies custom className', () => {
-    const { container } = render(<MedicationTrackerWidget className="custom-class" />)
+    const { container } = render(
+      <MedicationTrackerWidget className="custom-class" />
+    )
     expect(container.firstChild).toHaveClass('custom-class')
   })
 })
