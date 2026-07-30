@@ -2,15 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-
-// Lazy-loaded Sentry — avoids pulling ~1000 modules into every page's bundle
-let _sentry: Promise<typeof import('@sentry/nextjs')> | null = null;
-function getSentry() {
-  if (!_sentry) {
-    _sentry = import('@sentry/nextjs');
-  }
-  return _sentry;
-}
+import { ensureSentry } from "@/lib/sentry-lazy";
 
 export default function PerfObserver() {
   const pathname = usePathname();
@@ -20,7 +12,7 @@ export default function PerfObserver() {
 
     // Helper to send a breadcrumb for quick visibility in Sentry
     const log = (name: string, data: Record<string, unknown>) => {
-      getSentry().then(Sentry => {
+      ensureSentry().then(Sentry => {
         Sentry.addBreadcrumb({
           category: "performance",
           message: `${name} (${page})`,

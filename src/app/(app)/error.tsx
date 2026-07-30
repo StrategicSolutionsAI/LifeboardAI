@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import * as Sentry from '@sentry/nextjs'
+import { ensureSentry } from '@/lib/sentry-lazy'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, RotateCcw, Home } from 'lucide-react'
 import Link from 'next/link'
@@ -13,7 +13,7 @@ interface ErrorProps {
 
 export default function AppError({ error, reset }: ErrorProps) {
   useEffect(() => {
-    Sentry.captureException(error)
+    ensureSentry().then(Sentry => Sentry.captureException(error))
   }, [error])
 
   return (

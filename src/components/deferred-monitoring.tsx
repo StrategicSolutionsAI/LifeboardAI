@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { isElectron } from '@/lib/is-electron'
+import { ensureSentry } from '@/lib/sentry-lazy'
 
 const PerfObserver = dynamic(() => import('@/components/perf-observer'), { ssr: false })
 const SpeedInsights = dynamic(
@@ -25,7 +26,7 @@ export function DeferredMonitoring() {
   // bundle (~30 KB) out of the critical shared chunk.
   useEffect(() => {
     if (inElectron) return
-    import('@sentry/nextjs').then(Sentry => {
+    ensureSentry().then(Sentry => {
       const client = Sentry.getClient()
       if (client && !client.getIntegrationByName('Replay')) {
         Sentry.addIntegration(Sentry.replayIntegration({

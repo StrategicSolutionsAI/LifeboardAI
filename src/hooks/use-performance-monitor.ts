@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { ensureSentry } from '@/lib/sentry-lazy'
 
 interface PerformanceMetrics {
   operationName: string
@@ -10,15 +11,6 @@ interface PerformanceMetrics {
 }
 
 const SLOW_OPERATION_THRESHOLD_MS = 1000
-
-// Lazy-loaded Sentry reference — avoids pulling ~1000 modules into the main bundle
-let _sentry: Promise<typeof import('@sentry/nextjs')> | null = null
-function getSentry() {
-  if (!_sentry) {
-    _sentry = import('@sentry/nextjs')
-  }
-  return _sentry
-}
 
 export function usePerformanceMonitor(operationName: string, metadata?: Record<string, any>) {
   const metricsRef = useRef<PerformanceMetrics>({
@@ -57,7 +49,7 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
       }
 
       // Track cleanup without completion for visibility
-      getSentry().then(Sentry => {
+      ensureSentry().then(Sentry => {
         Sentry.addBreadcrumb({
           message: `Performance cleanup: ${operationName}`,
           level: 'info',
@@ -92,7 +84,7 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
     if (duration > SLOW_OPERATION_THRESHOLD_MS) {
       console.warn(`Slow operation detected: ${operationName} took ${duration.toFixed(2)}ms`)
 
-      getSentry().then(Sentry => {
+      ensureSentry().then(Sentry => {
         Sentry.addBreadcrumb({
           message: `Slow operation: ${operationName}`,
           level: 'warning',
@@ -107,7 +99,7 @@ export function usePerformanceMonitor(operationName: string, metadata?: Record<s
     }
 
     // Track in Sentry
-    getSentry().then(Sentry => {
+    ensureSentry().then(Sentry => {
       Sentry.addBreadcrumb({
         message: `Operation completed: ${operationName}`,
         level: 'info',
