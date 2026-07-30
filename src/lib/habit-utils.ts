@@ -6,18 +6,17 @@
  */
 
 import type { WidgetInstance } from '@/types/widgets'
+import { dateStr } from '@/lib/date-utils'
 
 // ---------------------------------------------------------------------------
 // Date helpers
 // ---------------------------------------------------------------------------
 
-/** Returns `YYYY-MM-DD` in the user's **local** timezone. */
-export function getDateKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+/**
+ * Returns `YYYY-MM-DD` in the user's **local** timezone.
+ * Alias of `dateStr` — date-utils owns the single implementation.
+ */
+export const getDateKey = dateStr
 
 /** Returns an array of 7 date keys from 6 days ago through today (local time). */
 export function getLast7Days(): string[] {

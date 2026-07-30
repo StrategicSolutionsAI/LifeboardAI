@@ -17,6 +17,7 @@ import {
   CupSoda,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -51,8 +52,6 @@ const BEVERAGES = [
   { id: "other", label: "Other", icon: "🧋", mgPerCup: 50 },
 ] as const
 
-const getDateKey = (d: Date = new Date()) => d.toISOString().split("T")[0]
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -69,7 +68,7 @@ function calculateStreak(
   let current = 0
   let best = 0
   let streak = 0
-  const today = getDateKey()
+  const today = getDateKey(new Date())
   let expectedDate = today
 
   for (const d of sortedDates) {
@@ -321,7 +320,7 @@ export function CaffeineTrackerWidget({
   const [customCups, setCustomCups] = useState("")
   const [showHistory, setShowHistory] = useState(false)
 
-  const today = getDateKey()
+  const today = getDateKey(new Date())
   const todayEntries = useMemo(
     () => entries.filter((e) => e.date === today),
     [entries, today]

@@ -268,7 +268,7 @@ function renderMoodBody({ widget: w }: CardBodyRenderProps) {
 }
 
 function renderJournalBody({ widget: w }: CardBodyRenderProps) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStrGlobal();
   const hasEntryToday = w.journalData?.lastEntryDate === today;
   const entryPreview = w.journalData?.todaysEntry
     ? w.journalData.todaysEntry.substring(0, 100) +
@@ -310,7 +310,11 @@ function renderJournalBody({ widget: w }: CardBodyRenderProps) {
     "What's on your mind?",
     "Describe your day in three words.",
   ];
-  const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+  // Keyed off the date, not Math.random(): this runs in a render body, so a
+  // random pick swapped the prompt on every re-render (hover, tick, sibling
+  // state change). One stable prompt per day instead.
+  const dayOffset = Number(today.replace(/-/g, "")) || 0;
+  const randomPrompt = prompts[dayOffset % prompts.length];
   return (
     <div className="mt-3">
       <div className="text-center">
@@ -332,7 +336,7 @@ function renderJournalBody({ widget: w }: CardBodyRenderProps) {
 }
 
 function renderGratitudeBody({ widget: w }: CardBodyRenderProps) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStrGlobal();
   const hasEntryToday = w.gratitudeData?.lastEntryDate === today;
   if (hasEntryToday && w.gratitudeData?.gratitudeItems?.length) {
     return (
@@ -629,7 +633,7 @@ function renderHabitTrackerBody({
 
 function renderSleepBody({ widget: w, styles: wStyles }: CardBodyRenderProps) {
   const entries = w.sleepData?.entries || [];
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayStrGlobal();
   const todayEntry = entries.find((e) => e.date === today);
   const lastEntry = entries.length > 0 ? entries[entries.length - 1] : null;
   const displayEntry = todayEntry || lastEntry;

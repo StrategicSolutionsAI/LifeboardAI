@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useDataCache } from '@/hooks/use-data-cache'
+import { getCurrentLocalDate } from '@/lib/date-utils'
 
 // Types
 interface FatSecretServing {
@@ -53,7 +54,7 @@ export function useNutritionTracker() {
   const mealsCache = useDataCache<DailyMeals>(
     'nutrition-meals',
     async () => {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getCurrentLocalDate()
       const response = await fetch(`/api/nutrition/meals?date=${today}`)
       if (!response.ok) throw new Error('Failed to load meals')
       return response.json()

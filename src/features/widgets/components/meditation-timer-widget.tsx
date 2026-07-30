@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -32,10 +33,6 @@ interface MeditationTimerWidgetProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
 
 function formatTime(totalSeconds: number): string {
   const mins = Math.floor(totalSeconds / 60)

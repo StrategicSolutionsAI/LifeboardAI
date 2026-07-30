@@ -16,6 +16,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -32,10 +33,6 @@ interface SleepTrackerWidgetProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
 
 function calculateSleepDuration(bedtime: string, wakeTime: string): number {
   const [bh, bm] = bedtime.split(":").map(Number)

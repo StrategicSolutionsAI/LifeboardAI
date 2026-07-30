@@ -17,6 +17,7 @@ import {
   Activity,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -55,8 +56,6 @@ const QUICK_ADD_PRESETS = [
   { label: "Custom", value: 0 },
 ]
 
-const getDateKey = (d: Date = new Date()) => d.toISOString().split("T")[0]
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -73,7 +72,7 @@ function calculateStreak(
   let current = 0
   let best = 0
   let streak = 0
-  const today = getDateKey()
+  const today = getDateKey(new Date())
   let expectedDate = today
 
   for (const d of sortedDates) {
@@ -286,7 +285,7 @@ export function StepsTrackerWidget({
   const [customAmount, setCustomAmount] = useState("")
   const [showHistory, setShowHistory] = useState(false)
 
-  const today = getDateKey()
+  const today = getDateKey(new Date())
   const todayEntries = useMemo(
     () => entries.filter((e) => e.date === today),
     [entries, today]

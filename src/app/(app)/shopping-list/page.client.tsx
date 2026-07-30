@@ -339,7 +339,7 @@ function AddItemDialog({
       // Reset quick actions
       setQaCreateEvent(false);
       setQaEventBucket(widgetBucketOptions[0] ?? "");
-      setQaEventDate(new Date().toISOString().split("T")[0]);
+      setQaEventDate(getCurrentLocalDate());
       setQaEventTime("");
       setQaEventAllDay(true);
       setQaEventDuration("60");

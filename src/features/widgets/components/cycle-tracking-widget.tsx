@@ -15,6 +15,7 @@ import {
   Check,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -78,10 +79,6 @@ const SPRING_TRANSITION = { type: "spring" as const, stiffness: 300, damping: 30
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
 
 function calculateStreak(entries: CycleEntry[]): number {
   if (!entries.length) return 0

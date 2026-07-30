@@ -14,6 +14,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -78,10 +79,6 @@ const BREATHING_PATTERNS: Record<string, BreathingPattern> = {
 type PatternKey = keyof typeof BREATHING_PATTERNS
 
 const PATTERN_KEYS: PatternKey[] = ["4-7-8", "4-4-4-4", "4-2-6"]
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
 
 function calculateStreak(history: Array<{ date: string }> | undefined): number {
   if (!history?.length) return 0

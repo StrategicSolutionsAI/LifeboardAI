@@ -13,6 +13,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import type { WidgetInstance } from "@/types/widgets"
+import { dateStr as getDateKey } from "@/lib/date-utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 // ---------------------------------------------------------------------------
@@ -50,10 +51,6 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function getDateKey(d: Date): string {
-  return d.toISOString().split("T")[0]
-}
 
 function calculateStreak(entries: Array<{ date: string }>): number {
   if (!entries.length) return 0

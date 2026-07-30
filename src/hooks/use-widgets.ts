@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useGlobalCache } from './use-data-cache'
+import { todayStrGlobal, yesterdayStrGlobal } from '@/lib/dashboard-utils'
 import { getUserPreferencesClient, saveUserPreferences, updateUserPreferenceFields } from '@/lib/user-preferences'
 import type { WidgetInstance } from '@/types/widgets'
 import type { ProgressEntry } from '@/features/dashboard/types'
@@ -185,13 +186,15 @@ export function useWidgets() {
   
   // Update progress
   const updateProgress = useCallback((widgetId: string, value: number) => {
-    const today = new Date().toISOString().split('T')[0]
-    
+    const today = todayStrGlobal()
+
     setProgressByWidget(prev => {
       const current = prev[widgetId]
       const lastDate = current?.date
       const isToday = lastDate === today
-      const isYesterday = lastDate === new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      // Calendar-day arithmetic, not a fixed 86_400_000ms subtraction — the
+      // latter lands on the wrong day across a DST transition.
+      const isYesterday = lastDate === yesterdayStrGlobal()
       
       return {
         ...prev,
@@ -221,7 +224,7 @@ export function useWidgets() {
   // Get progress for a widget
   const getProgressForWidget = useCallback((widgetId: string) => {
     const progress = progressByWidget[widgetId]
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayStrGlobal()
     
     if (!progress || progress.date !== today) {
       return { value: 0, streak: progress?.streak || 0, isToday: false }
