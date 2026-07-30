@@ -7,6 +7,17 @@ import {
   readStoredCalendarView,
 } from '../date-range'
 
+// Several assertions below read the clock twice (the prefetch key vs the mounted
+// key, and the "falls back to today" cases). Pin it, or a run that straddles
+// midnight compares two different days and fails for no reason.
+beforeAll(() => {
+  jest.useFakeTimers({ now: new Date(2026, 6, 29, 12, 0, 0) })
+})
+
+afterAll(() => {
+  jest.useRealTimers()
+})
+
 describe('calendarDateRange', () => {
   const wed = new Date(2026, 6, 29) // Wednesday 2026-07-29
 
