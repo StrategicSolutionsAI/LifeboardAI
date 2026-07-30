@@ -48,6 +48,7 @@ import {
 } from 'lucide-react'
 import { interactive } from '@/lib/styles'
 import type { ParsedEmail, AttachmentMeta } from '@/lib/gmail/message-parser'
+import { extractSenderName, extractSenderEmail } from '@/lib/gmail/message-parser'
 import type { SenderGroup } from '@/app/api/email/inbox-cleaner/scan/route'
 import type { MarketingSenderGroup } from '@/app/api/email/ai/marketing/route'
 import type { TaskExtraction } from '@/lib/gmail/email-ai-utils'
@@ -81,15 +82,9 @@ interface ComposeState {
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-function extractSenderName(from: string): string {
-  const match = from.match(/^"?([^"<]+)"?\s*</)
-  return match?.[1]?.trim() || from.split('@')[0]
-}
-
-function extractEmail(from: string): string {
-  const match = from.match(/<([^>]+)>/)
-  return match?.[1] || from
-}
+// extractSenderName / extractSenderEmail live in @/lib/gmail/message-parser —
+// this file had byte-identical copies of both, and only the shared ones are
+// covered by message-parser.test.ts.
 
 function extractInitial(from: string): string {
   const name = extractSenderName(from)
@@ -2037,6 +2032,12 @@ export default function EmailPageClient() {
     refetch,
   } = useDataCache<MessagesResponse>(`gmail-messages-${selectedAccount}-${activeLabel}-${activeQuery}`, fetchMessages, {
     ttl: 300_000,
+    // Hold the fetch until the connection check resolves. Firing on mount used
+    // the pre-resolution selectedAccount, so the whole list (1 list call + one
+    // get per message) was fetched twice per visit — and once for users who
+    // have no Gmail connected at all. setIsConnected and setSelectedAccount are
+    // set in the same batch, so selectedAccount is final by the time this flips.
+    enabled: isConnected === true,
   })
 
   // Sync cache data into allMessages

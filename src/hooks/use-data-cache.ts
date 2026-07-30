@@ -9,6 +9,8 @@ interface CacheOptions {
   ttl?: number
   prefetch?: boolean
   optimisticUpdate?: boolean
+  /** React Query enabled — hold the fetch until its inputs are resolved */
+  enabled?: boolean
   /** React Query refetchInterval — automatic refetch on a timer */
   refetchInterval?: number | false
   /** React Query refetchOnWindowFocus — refetch when the browser tab regains focus */
@@ -76,7 +78,7 @@ export function useDataCache<T>(
   fetcher: () => Promise<T>,
   options: CacheOptions = {},
 ) {
-  const { ttl = DEFAULT_TTL } = options
+  const { ttl = DEFAULT_TTL, enabled } = options
   const queryClient = useQueryClient()
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<T>({
@@ -84,6 +86,7 @@ export function useDataCache<T>(
     queryFn: fetcher,
     staleTime: ttl,
     gcTime: ttl * 2,
+    ...(enabled !== undefined && { enabled }),
   })
 
   const updateOptimistically = useCallback(
