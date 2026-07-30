@@ -57,6 +57,43 @@ describe('googleEventsCacheKey', () => {
   })
 })
 
+describe('the prefetch key matches what the calendar mounts with', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  // OptimizedCalendarView holds useState(() => new Date()) and passes it to
+  // FullCalendar as selectedDate; useCalendarNavigation prefers that prop over the
+  // stored date. So the prefetch must key off today, not the stored date — keying
+  // off the stored date is a miss for anyone who left the calendar on another day.
+  const mountedKey = (propSelectedDate: Date) => {
+    const view = readStoredCalendarView()
+    return googleEventsCacheKey(view, calendarDateRange(view, propSelectedDate))
+  }
+  const prefetchKey = () => {
+    const view = readStoredCalendarView()
+    return googleEventsCacheKey(view, calendarDateRange(view, new Date()))
+  }
+
+  it('agrees in the default state', () => {
+    expect(prefetchKey()).toBe(mountedKey(new Date()))
+  })
+
+  it('agrees when a different view is stored', () => {
+    for (const view of ['month', 'week', 'day', 'agenda']) {
+      localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, view)
+      expect(prefetchKey()).toBe(mountedKey(new Date()))
+      expect(prefetchKey()).toContain(`calendar-google-${view}-`)
+    }
+  })
+
+  it('still agrees when a stale date is left in storage', () => {
+    localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, '2026-08-15')
+    localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, 'day')
+    expect(prefetchKey()).toBe(mountedKey(new Date()))
+  })
+})
+
 describe('stored mount state', () => {
   beforeEach(() => {
     localStorage.clear()

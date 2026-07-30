@@ -14,7 +14,6 @@ import { toDayKey } from "@/features/calendar/types";
 import {
   calendarDateRange,
   googleEventsCacheKey,
-  readStoredCalendarDate,
   readStoredCalendarView,
 } from "@/features/calendar/date-range";
 import { prefetchToGlobalCache } from "@/hooks/use-data-cache";
@@ -52,12 +51,19 @@ prefetchToGlobalCache('cycle-tracking-calendar', async () => {
   }
 });
 
+// The date the calendar mounts on. useCalendarNavigation prefers its
+// propSelectedDate over the stored date, and this component always supplies one,
+// so the prefetch below and the useState further down must use the same source or
+// they compute different cache keys.
+const initialCalendarDate = () => new Date();
+
 // Prefetch Google Calendar events for the range the calendar will actually mount
-// with. The view and date are restored from localStorage, so hardcoding "this
-// month" warmed a key the hook never read — a wasted API call plus a cold fetch.
+// with. The view is restored from localStorage and defaults to day, so hardcoding
+// "this month" warmed a key the hook never read — a wasted API call plus a cold
+// fetch on mount.
 {
   const view = readStoredCalendarView();
-  const range = calendarDateRange(view, readStoredCalendarDate());
+  const range = calendarDateRange(view, initialCalendarDate());
 
   prefetchToGlobalCache(googleEventsCacheKey(view, range), async () => {
     try {
@@ -252,7 +258,7 @@ class DnDErrorBoundary extends React.Component<
 }
 
 export default function OptimizedCalendarView() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(initialCalendarDate);
 
   // Defer CalendarContent mount by one frame so that React 18's initial
   // concurrent render completes before @hello-pangea/dnd's DragDropContext
