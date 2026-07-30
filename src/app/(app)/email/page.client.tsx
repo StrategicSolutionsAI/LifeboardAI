@@ -856,7 +856,7 @@ function ReadingPane({
       return { mode, to: '', cc: '', bcc: '', subject: '', body: '', inReplyTo: '', references: '', threadId: '' }
     }
 
-    const fromEmail = extractEmail(message.from)
+    const fromEmail = extractSenderEmail(message.from)
     const quotedDate = message.date
     const quotedFrom = message.from
     const quotedBody = message.htmlBody || message.textBody || ''
