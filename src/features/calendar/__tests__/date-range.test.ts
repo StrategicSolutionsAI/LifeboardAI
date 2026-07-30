@@ -82,6 +82,24 @@ describe('stored mount state', () => {
     expect(restored.getDate()).toBe(4)
   })
 
+  it('falls back to defaults when storage access throws', () => {
+    // Blocked storage throws on access; these readers run at module-evaluation
+    // time for the prefetch, so a throw would take out the whole chunk.
+    const real = window.localStorage
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('The operation is insecure.')
+      },
+    })
+    try {
+      expect(readStoredCalendarView()).toBe('day')
+      expect(readStoredCalendarDate().toDateString()).toBe(new Date().toDateString())
+    } finally {
+      Object.defineProperty(window, 'localStorage', { configurable: true, value: real })
+    }
+  })
+
   it('falls back to today when the stored date is unparseable', () => {
     // parseISO returns an Invalid Date instead of throwing, which would have
     // produced a NaN cache key.

@@ -45,26 +45,34 @@ export function googleEventsCacheKey(view: CalendarView, range: CalendarRange): 
   return `calendar-google-${view}-${toDayKey(range.start)}-${toDayKey(range.end)}`;
 }
 
+// These run at module-evaluation time for the prefetch, where a throw would take
+// out the whole chunk, and localStorage access itself can throw when the browser
+// blocks storage. Read defensively.
+function readStorage(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 /** The view the calendar will mount with — persisted by handleViewChange. */
 export function readStoredCalendarView(): CalendarView {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
-    if (saved && ["month", "week", "day", "agenda"].includes(saved)) {
-      return saved as CalendarView;
-    }
+  const saved = readStorage(CALENDAR_VIEW_STORAGE_KEY);
+  if (saved && ["month", "week", "day", "agenda"].includes(saved)) {
+    return saved as CalendarView;
   }
   return "day";
 }
 
 /** The date the calendar will mount on — persisted by handleDateChange. */
 export function readStoredCalendarDate(): Date {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(CALENDAR_DATE_STORAGE_KEY);
-    if (saved) {
-      // parseISO returns an Invalid Date rather than throwing, so check the value.
-      const parsed = parseISO(saved);
-      if (!Number.isNaN(parsed.getTime())) return parsed;
-    }
+  const saved = readStorage(CALENDAR_DATE_STORAGE_KEY);
+  if (saved) {
+    // parseISO returns an Invalid Date rather than throwing, so check the value.
+    const parsed = parseISO(saved);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
   }
   return new Date();
 }
