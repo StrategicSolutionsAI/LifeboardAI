@@ -302,8 +302,8 @@ export const widgetTemplates: WidgetTemplate[] = [
   },
   {
     id: "cycle_tracking",
-    name: "Cycle Tracker",
-    description: "Track your menstrual cycle, symptoms, and predictions",
+    name: "Period & Cycle Tracker",
+    description: "Track your period flow, menstrual cycle, symptoms, and next-period predictions",
     icon: CalendarHeart,
     category: "medical",
     color: "pink",

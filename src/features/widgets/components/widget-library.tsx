@@ -160,7 +160,7 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General", bucketColo
     
     // Match selected category or show all if 'all' is selected
     const matchesCategory = selectedCategory === 'all' || widget.category === selectedCategory;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -175,7 +175,12 @@ export function WidgetLibrary({ onAdd = () => {}, bucket = "General", bucketColo
             type="text"
             placeholder="Search widgets..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              // Searching spans the whole library — otherwise the bucket-recommended
+              // category silently hides matches that live elsewhere.
+              if (e.target.value) setSelectedCategory('all');
+            }}
             className="w-full pl-10 pr-4 py-2 border border-theme-neutral-300/80 rounded-xl focus:ring-2 focus:ring-theme-primary/30 focus:border-theme-primary outline-none transition-all duration-200 ease-out"
           />
         </div>

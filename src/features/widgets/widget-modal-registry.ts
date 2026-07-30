@@ -213,7 +213,7 @@ export const WIDGET_MODAL_REGISTRY: Record<string, WidgetModalEntry> = {
     render: statefulRender(CaffeineTrackerWidget),
   },
   cycle_tracking: {
-    title: 'Cycle Tracker',
+    title: 'Period & Cycle Tracker',
     render: statefulRender(CycleTrackingWidget),
   },
   family_members: {
