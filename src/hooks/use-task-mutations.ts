@@ -779,7 +779,13 @@ export function useTaskMutations(
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ updates: [{ taskId, updates: { endDate } }] })
             })
-            if (!res.ok) throw new Error('Failed to update task endDate')
+            // batch-update answers 200 even when every row failed — it reports
+            // per-row success in the body — so res.ok alone would let a failed
+            // write look like a successful one until the next refetch.
+            const body = await res.json().catch(() => null)
+            if (!res.ok || (body && !body.ok)) {
+              throw new Error('Failed to update task endDate')
+            }
             updateAllOptimistically(tasks =>
               tasks ? tasks.map(t => t.id.toString() === taskId ? { ...t, endDate } : t) : []
             )
