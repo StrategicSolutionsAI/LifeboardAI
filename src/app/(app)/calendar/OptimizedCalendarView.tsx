@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { flushSync } from "react-dom";
-import { startOfMonth, endOfMonth } from "date-fns";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { TasksProvider } from "@/contexts/tasks-context";
 import { useBuckets } from "@/hooks/use-buckets";
@@ -12,6 +11,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { CalendarPerformanceMonitor, useComponentLoadTime } from "@/features/calendar/components/calendar-performance-monitor";
 import { useDragDropHandler, type HabitDropPayload } from "@/features/calendar/hooks/use-drag-drop-handler";
 import { toDayKey } from "@/features/calendar/types";
+import {
+  calendarDateRange,
+  googleEventsCacheKey,
+  readStoredCalendarDate,
+  readStoredCalendarView,
+} from "@/features/calendar/date-range";
 import { prefetchToGlobalCache } from "@/hooks/use-data-cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
@@ -47,19 +52,18 @@ prefetchToGlobalCache('cycle-tracking-calendar', async () => {
   }
 });
 
-// Prefetch Google Calendar events for the current month
+// Prefetch Google Calendar events for the range the calendar will actually mount
+// with. The view and date are restored from localStorage, so hardcoding "this
+// month" warmed a key the hook never read — a wasted API call plus a cold fetch.
 {
-  const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-  const startKey = toDayKey(monthStart);
-  const endKey = toDayKey(monthEnd);
+  const view = readStoredCalendarView();
+  const range = calendarDateRange(view, readStoredCalendarDate());
 
-  prefetchToGlobalCache(`calendar-google-month-${startKey}-${endKey}`, async () => {
+  prefetchToGlobalCache(googleEventsCacheKey(view, range), async () => {
     try {
       const params = new URLSearchParams({
-        timeMin: monthStart.toISOString(),
-        timeMax: monthEnd.toISOString(),
+        timeMin: range.start.toISOString(),
+        timeMax: range.end.toISOString(),
         maxResults: '500',
       });
       const resp = await fetchWithTimeout(

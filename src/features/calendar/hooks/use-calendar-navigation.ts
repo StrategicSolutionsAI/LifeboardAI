@@ -11,6 +11,12 @@ import {
   parseISO,
 } from "date-fns";
 import { type CalendarView, toDayKey, isTypingInFormField } from "@/features/calendar/types";
+import {
+  CALENDAR_DATE_STORAGE_KEY,
+  CALENDAR_VIEW_STORAGE_KEY,
+  readStoredCalendarDate,
+  readStoredCalendarView,
+} from "@/features/calendar/date-range";
 
 /* ─── Options ─── */
 
@@ -42,27 +48,18 @@ export function useCalendarNavigation({
   dismissibles,
 }: UseCalendarNavigationOptions) {
   // ── Date state with localStorage persistence ──
+  // Readers live in date-range.ts so the calendar's module-load prefetch resolves
+  // the same mount state (and therefore the same cache key) this hook will use.
   const [currentDate, setCurrentDate] = useState(() => {
     if (propSelectedDate) return propSelectedDate;
-
-    if (typeof window !== "undefined") {
-      const savedDate = localStorage.getItem("calendar-selected-date");
-      if (savedDate) {
-        try {
-          return parseISO(savedDate);
-        } catch {
-          // If invalid date, fall back to today
-        }
-      }
-    }
-    return new Date();
+    return readStoredCalendarDate();
   });
 
   const handleDateChange = useCallback(
     (newDate: Date) => {
       setCurrentDate(newDate);
       if (typeof window !== "undefined") {
-        localStorage.setItem("calendar-selected-date", toDayKey(newDate));
+        localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, toDayKey(newDate));
       }
       onDateChange?.(newDate);
     },
@@ -70,15 +67,7 @@ export function useCalendarNavigation({
   );
 
   // ── View state with localStorage persistence ──
-  const [view, setView] = useState<CalendarView>(() => {
-    if (typeof window !== "undefined") {
-      const savedView = localStorage.getItem("calendar-view");
-      if (savedView && ["month", "week", "day", "agenda"].includes(savedView)) {
-        return savedView as CalendarView;
-      }
-    }
-    return "day";
-  });
+  const [view, setView] = useState<CalendarView>(readStoredCalendarView);
 
   const hasUserChosenMobileView = useRef(false);
 
@@ -86,7 +75,7 @@ export function useCalendarNavigation({
     hasUserChosenMobileView.current = true;
     setView(newView);
     if (typeof window !== "undefined") {
-      localStorage.setItem("calendar-view", newView);
+      localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, newView);
     }
   }, []);
 

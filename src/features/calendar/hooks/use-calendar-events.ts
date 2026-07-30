@@ -1,13 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import {
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  startOfDay,
-  endOfDay,
-  addDays,
-} from "date-fns";
+import { startOfDay, addDays } from "date-fns";
 import type { RepeatOption, Task, TaskOccurrenceException } from "@/types/tasks";
 import { useDataCache } from "@/hooks/use-data-cache";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
@@ -23,6 +15,7 @@ import {
   buildDayMatrix,
   hourSlotToISO,
 } from "@/features/calendar/types";
+import { calendarDateRange, googleEventsCacheKey } from "@/features/calendar/date-range";
 
 /* ─── Options ─── */
 
@@ -94,20 +87,7 @@ export function useCalendarEvents({
 
   /* ── Date range for current view ── */
 
-  const dateRange = useMemo(() => {
-    switch (view) {
-      case 'month':
-        return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
-      case 'week':
-        return { start: startOfWeek(currentDate, { weekStartsOn: 1 }), end: endOfWeek(currentDate, { weekStartsOn: 1 }) };
-      case 'day':
-        return { start: startOfDay(currentDate), end: endOfDay(currentDate) };
-      case 'agenda':
-        return { start: startOfDay(currentDate), end: endOfDay(addDays(currentDate, 13)) };
-      default:
-        return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
-    }
-  }, [currentDate, view]);
+  const dateRange = useMemo(() => calendarDateRange(view, currentDate), [currentDate, view]);
 
   const rangeStartMs = dateRange.start.getTime();
   const rangeEndMs = dateRange.end.getTime();
@@ -338,11 +318,7 @@ export function useCalendarEvents({
 
   /* ── Data Fetching: Google Calendar ── */
 
-  const googleCacheKey = useMemo(() => {
-    const startKey = toDayKey(new Date(rangeStartMs));
-    const endKey = toDayKey(new Date(rangeEndMs));
-    return `calendar-google-${view}-${startKey}-${endKey}`;
-  }, [rangeStartMs, rangeEndMs, view]);
+  const googleCacheKey = useMemo(() => googleEventsCacheKey(view, dateRange), [dateRange, view]);
 
   const googleEventsFetcher = useCallback(async () => {
     try {
