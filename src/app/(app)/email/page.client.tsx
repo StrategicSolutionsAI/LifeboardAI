@@ -732,15 +732,19 @@ function ReadingPane({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
+  // Every call against a specific message has to name the account it lives in;
+  // without it the API resolves the default account and the modify 404s for
+  // anyone with more than one mailbox connected.
+  const accountQuery = account ? `?account=${encodeURIComponent(account)}` : ''
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    const params = account ? `?account=${encodeURIComponent(account)}` : ''
     const url = threadId
-      ? `/api/email/threads/${threadId}${params}`
-      : `/api/email/messages/${messageId}${params}`
+      ? `/api/email/threads/${threadId}${accountQuery}`
+      : `/api/email/messages/${messageId}${accountQuery}`
 
     fetch(url)
       .then((res) => {
@@ -779,13 +783,13 @@ function ReadingPane({
   // Auto-mark as read when opening
   useEffect(() => {
     if (message?.isUnread) {
-      fetch(`/api/email/messages/${messageId}/modify`, {
+      fetch(`/api/email/messages/${messageId}/modify${accountQuery}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'markRead' }),
       }).catch(() => {})
     }
-  }, [message?.isUnread, messageId])
+  }, [message?.isUnread, messageId, accountQuery])
 
   // Auto-resize iframe using ResizeObserver so height updates as images/content load
   useEffect(() => {
@@ -817,7 +821,7 @@ function ReadingPane({
   const handleAction = async (action: string) => {
     setActionLoading(action)
     try {
-      const res = await fetch(`/api/email/messages/${messageId}/modify`, {
+      const res = await fetch(`/api/email/messages/${messageId}/modify${accountQuery}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
@@ -1969,10 +1973,14 @@ export default function EmailPageClient() {
         if (!connected) return
 
         if (accountsData?.accounts) {
-          setAccounts(accountsData.accounts)
-          if (accountsData.accounts.length > 0) {
-            setSelectedAccount(accountsData.accounts[0])
-          }
+          const available: string[] = accountsData.accounts
+          setAccounts(available)
+          // Keep the account restored from localStorage; only fall back to the
+          // first one when nothing was persisted or that account is gone.
+          // Overwriting unconditionally discarded the user's pick on every load.
+          setSelectedAccount((current) =>
+            current && available.includes(current) ? current : available[0] ?? ''
+          )
         }
         if (labelsData?.labels) setLabels(labelsData.labels)
       })
@@ -2090,11 +2098,14 @@ export default function EmailPageClient() {
       )
     }
     try {
-      await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
+      const res = await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       })
+      // fetch only rejects on network failure, so a 4xx/5xx would otherwise
+      // leave the optimistic removal standing and the mail silently un-archived.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch (err) {
       console.error(`Quick action ${action} error:`, err)
       refetch() // revert on failure
@@ -2115,11 +2126,12 @@ export default function EmailPageClient() {
     const label = option === '1h' ? 'Snoozed/1h' : option === 'tomorrow' ? 'Snoozed/Tomorrow' : 'Snoozed/NextWeek'
     try {
       // Archive it
-      await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
+      const archiveRes = await fetch(`/api/email/messages/${id}/modify${accountParam}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'archive' }),
       })
+      if (!archiveRes.ok) throw new Error(`HTTP ${archiveRes.status}`)
       // Try to add a snooze label (create if needed, but don't fail)
       try {
         // Create label if it doesn't exist
