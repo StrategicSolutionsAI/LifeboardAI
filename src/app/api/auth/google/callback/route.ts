@@ -3,6 +3,7 @@ import { getOAuth2Client } from '@/lib/google/client';
 import { supabaseServer } from '@/utils/supabase/server';
 import { PostgrestError } from '@supabase/supabase-js';
 import { sanitizeRedirectUrl } from '@/lib/url-utils';
+import { verifyOAuthState } from '@/lib/oauth-state';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,18 +15,11 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state');
 
   // Parse the state to get the redirectUrl if it exists
-  let redirectUrl = '/dashboard';
-  let userId = '';
-  
-  if (state) {
-    try {
-      const stateObj = JSON.parse(decodeURIComponent(state));
-      if (stateObj.redirectUrl) redirectUrl = sanitizeRedirectUrl(stateObj.redirectUrl);
-      if (stateObj.userId) userId = stateObj.userId;
-    } catch (e) {
-      console.error('Error parsing state:', e);
-    }
+  const verifiedState = verifyOAuthState(state)
+  if (!verifiedState) {
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=Invalid or expired OAuth state`)
   }
+  const redirectUrl = sanitizeRedirectUrl(verifiedState.redirectUrl)
 
   if (!code) {
     return NextResponse.redirect(
@@ -49,14 +43,9 @@ export async function GET(request: NextRequest) {
     
     // If no user is authenticated, this might be a login flow via Google OAuth
     // In that case, we should handle it differently or redirect to complete authentication
-    if (!user && userId) {
+    if (!user || user.id !== verifiedState.userId) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=Session expired, please log in again`
-      );
-    } else if (!user) {
-      // This might be initial Google OAuth login - redirect to complete Supabase auth
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?message=Please complete authentication`
+        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=OAuth session mismatch, please try again`
       );
     }
 

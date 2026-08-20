@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGoogleAuthUrl } from '@/lib/google/client';
 import { supabaseServer } from '@/utils/supabase/server';
 import { sanitizeRedirectUrl } from '@/lib/url-utils';
+import { createOAuthState } from '@/lib/oauth-state';
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,11 +20,11 @@ export async function GET(request: NextRequest) {
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   
-  // Create state parameter with redirect URL and user ID (if available)
-  const state = encodeURIComponent(JSON.stringify({
-    redirectUrl,
-    userId: user?.id || null,
-  }));
+  if (!user) {
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=You must be logged in to connect Google`)
+  }
+
+  const state = createOAuthState({ redirectUrl, userId: user.id });
 
   // Get the authorization URL
   const authUrl = getGoogleAuthUrl(origin) + `&state=${state}`;

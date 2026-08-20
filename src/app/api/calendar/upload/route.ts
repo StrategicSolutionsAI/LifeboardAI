@@ -39,6 +39,19 @@ type DateTimeComponents = {
   second: number;
 };
 
+async function cleanupPartialCalendarImport(
+  supabase: ReturnType<typeof supabaseServer>,
+  importId: string | null,
+) {
+  if (!importId) return;
+  const { error } = await supabase.rpc('delete_calendar_import', {
+    p_import_id: importId,
+  });
+  if (error) {
+    console.error('Failed to roll back partial calendar import', error);
+  }
+}
+
 function getTimeZoneFormatter(timeZone: string): Intl.DateTimeFormat {
   const cacheKey = timeZone;
   const cached = timeZoneFormatterCache.get(cacheKey);
@@ -486,6 +499,7 @@ export async function POST(request: NextRequest) {
 
         if (existingError) {
           console.error('Error loading existing calendar events for task preservation:', existingError);
+          await cleanupPartialCalendarImport(supabase, importId);
           return NextResponse.json({
             error: 'Failed to look up existing calendar events while importing.',
             details: existingError.message,
@@ -541,6 +555,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (recoveredRows.length === 0 && insertedCount === 0) {
+          await cleanupPartialCalendarImport(supabase, importId);
           return NextResponse.json({
             error: `Failed to save events (batch ${Math.floor(i / batchSize) + 1}): ${insertError.message}`,
             details: insertError,
@@ -562,6 +577,7 @@ export async function POST(request: NextRequest) {
           tasksErrored += syncResult.errors;
         } catch (syncError) {
           if (syncError instanceof MissingTasksTableError) {
+            await cleanupPartialCalendarImport(supabase, importId);
             return NextResponse.json({
               error: 'Tasks table not found in Supabase',
               details: 'Calendar events were saved but Lifeboard tasks table is missing. Please run supabase/migrations/0001_create_lifeboard_tasks.sql and retry.',
@@ -571,6 +587,7 @@ export async function POST(request: NextRequest) {
           }
 
           console.error('Error syncing calendar events to tasks:', syncError);
+          await cleanupPartialCalendarImport(supabase, importId);
           return NextResponse.json({
             error: 'Failed to convert calendar events into tasks',
             details: syncError instanceof Error ? syncError.message : 'Unknown error',
@@ -630,8 +647,7 @@ export async function POST(request: NextRequest) {
     if (importId && currentUserId) {
       try {
         const supabase = supabaseServer();
-        await supabase.from('calendar_events').delete().eq('import_id', importId).eq('user_id', currentUserId);
-        await supabase.from('calendar_imports').delete().eq('id', importId).eq('user_id', currentUserId);
+        await cleanupPartialCalendarImport(supabase, importId);
       } catch (cleanupError) {
         console.error('Failed to clean up partial calendar import', cleanupError);
       }

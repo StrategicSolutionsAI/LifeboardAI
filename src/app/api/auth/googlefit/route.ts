@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getGoogleFitAuthUrl } from '@/lib/googlefit/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { sanitizeRedirectUrl } from '@/lib/url-utils'
+import { createOAuthState } from '@/lib/oauth-state'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -18,9 +19,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const state = encodeURIComponent(
-    JSON.stringify({ redirectUrl, userId: user.id }),
-  )
+  const state = createOAuthState({ redirectUrl, userId: user.id })
 
   const authUrl = `${getGoogleFitAuthUrl()}&state=${state}`
   return NextResponse.redirect(authUrl)

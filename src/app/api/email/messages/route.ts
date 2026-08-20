@@ -13,7 +13,7 @@ export const GET = withAuth(async (req: NextRequest, { supabase, user }) => {
   // Fetch Gmail integration tokens
   const query = supabase
     .from('user_integrations')
-    .select('token_data')
+    .select('token_data, provider_user_id')
     .eq('user_id', user.id)
     .eq('provider', 'gmail')
   if (account) query.eq('provider_user_id', account)
@@ -27,7 +27,11 @@ export const GET = withAuth(async (req: NextRequest, { supabase, user }) => {
     )
   }
 
-  const gmail = await getGmailClient(integration.token_data, { userId: user.id, supabase })
+  const gmail = await getGmailClient(integration.token_data, {
+    userId: user.id,
+    providerUserId: integration.provider_user_id,
+    supabase,
+  })
   const maxResults = Math.min(
     parseInt(searchParams.get('maxResults') ?? '20', 10),
     50,

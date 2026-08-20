@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getWithingsAuthUrl } from '@/lib/withings/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { sanitizeRedirectUrl } from '@/lib/url-utils'
+import { createOAuthState } from '@/lib/oauth-state'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,10 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=You must be logged in to connect Withings`)
   }
 
-  const state = encodeURIComponent(JSON.stringify({
-    redirectUrl,
-    userId: user.id,
-  }))
+  const state = createOAuthState({ redirectUrl, userId: user.id })
 
   // Replace dummy state placeholder with actual state
   const baseAuth = getWithingsAuthUrl(origin)

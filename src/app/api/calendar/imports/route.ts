@@ -53,81 +53,24 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: importRow, error: fetchImportError } = await supabase
-      .from('calendar_imports')
-      .select('id')
-      .eq('id', importId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: deletion, error: deletionError } = await supabase.rpc(
+      'delete_calendar_import',
+      { p_import_id: importId },
+    );
 
-    if (fetchImportError) {
-      console.error('Failed to look up calendar import', fetchImportError);
-      return NextResponse.json({ error: 'Failed to load calendar import' }, { status: 500 });
-    }
-
-    if (!importRow) {
-      return NextResponse.json({ error: 'Calendar import not found' }, { status: 404 });
-    }
-
-    const { data: eventRows, error: eventsError } = await supabase
-      .from('calendar_events')
-      .select('id, task_id')
-      .eq('user_id', user.id)
-      .eq('import_id', importId);
-
-    if (eventsError) {
-      console.error('Failed to load calendar events for deletion', eventsError);
-      return NextResponse.json({ error: 'Failed to load calendar events' }, { status: 500 });
-    }
-
-    const taskIds = (eventRows ?? [])
-      .map(row => row.task_id)
-      .filter((value): value is string => typeof value === 'string' && value.length > 0);
-
-    let deletedTasks = 0;
-    if (taskIds.length > 0) {
-      const { data: removedTasks, error: deleteTasksError } = await supabase
-        .from('lifeboard_tasks')
-        .delete()
-        .eq('user_id', user.id)
-        .in('id', taskIds)
-        .select('id');
-
-      if (deleteTasksError) {
-        console.error('Failed to delete tasks for calendar import', deleteTasksError);
-        return NextResponse.json({ error: 'Failed to delete linked tasks' }, { status: 500 });
-      }
-
-      deletedTasks = Array.isArray(removedTasks) ? removedTasks.length : 0;
-    }
-
-    const { data: deletedEvents, error: deleteEventsError } = await supabase
-      .from('calendar_events')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('import_id', importId)
-      .select('id');
-
-    if (deleteEventsError) {
-      console.error('Failed to delete calendar events for import', deleteEventsError);
-      return NextResponse.json({ error: 'Failed to delete calendar events' }, { status: 500 });
-    }
-
-    const { error: deleteImportError } = await supabase
-      .from('calendar_imports')
-      .delete()
-      .eq('id', importId)
-      .eq('user_id', user.id);
-
-    if (deleteImportError) {
-      console.error('Failed to delete calendar import record', deleteImportError);
+    if (deletionError) {
+      console.error('Failed to delete calendar import atomically', deletionError);
       return NextResponse.json({ error: 'Failed to delete uploaded calendar' }, { status: 500 });
+    }
+
+    if (!deletion?.found) {
+      return NextResponse.json({ error: 'Calendar import not found' }, { status: 404 });
     }
 
     return NextResponse.json({
       ok: true,
-      deletedEvents: Array.isArray(deletedEvents) ? deletedEvents.length : 0,
-      deletedTasks,
+      deletedEvents: deletion.deletedEvents ?? 0,
+      deletedTasks: deletion.deletedTasks ?? 0,
     });
   } catch (error) {
     console.error('DELETE /api/calendar/imports error', error);

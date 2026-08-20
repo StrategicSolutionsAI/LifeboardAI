@@ -49,7 +49,7 @@ export function getGmailOAuth2Client(origin?: string) {
  */
 export async function getGmailClient(
   tokens: any,
-  opts?: { userId?: string; supabase?: any },
+  opts?: { userId?: string; providerUserId?: string | null; supabase?: any },
 ) {
   const oauth2Client = getGmailOAuth2Client()
   oauth2Client.setCredentials(tokens)
@@ -59,7 +59,7 @@ export async function getGmailClient(
     oauth2Client.on('tokens', async (newTokens) => {
       try {
         const merged = { ...tokens, ...newTokens }
-        await opts.supabase
+        const tokenUpdate = opts.supabase
           .from('user_integrations')
           .update({
             access_token: merged.access_token,
@@ -68,6 +68,14 @@ export async function getGmailClient(
           })
           .eq('user_id', opts.userId)
           .eq('provider', 'gmail')
+
+        if (opts.providerUserId) {
+          tokenUpdate.eq('provider_user_id', opts.providerUserId)
+        } else {
+          tokenUpdate.is('provider_user_id', null)
+        }
+
+        await tokenUpdate
       } catch (e) {
         console.error('Failed to persist refreshed Gmail tokens:', e)
       }
@@ -91,11 +99,15 @@ export async function getGmailForUser(
 ) {
   const query = supabase
     .from('user_integrations')
-    .select('token_data')
+    .select('token_data, provider_user_id')
     .eq('user_id', userId)
     .eq('provider', 'gmail')
   if (account) query.eq('provider_user_id', account)
   const { data: integration } = await query.maybeSingle()
   if (!integration?.token_data) return null
-  return getGmailClient(integration.token_data, { userId, supabase })
+  return getGmailClient(integration.token_data, {
+    userId,
+    providerUserId: integration.provider_user_id,
+    supabase,
+  })
 }

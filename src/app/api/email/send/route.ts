@@ -21,7 +21,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
 
   const query = supabase
     .from('user_integrations')
-    .select('token_data')
+    .select('token_data, provider_user_id')
     .eq('user_id', user.id)
     .eq('provider', 'gmail')
   if (account) query.eq('provider_user_id', account)
@@ -32,7 +32,11 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     return NextResponse.json({ error: 'Gmail not connected' }, { status: 404 })
   }
 
-  const gmail = await getGmailClient(integration.token_data, { userId: user.id, supabase })
+  const gmail = await getGmailClient(integration.token_data, {
+    userId: user.id,
+    providerUserId: integration.provider_user_id,
+    supabase,
+  })
 
   let to: string
   let cc: string | undefined

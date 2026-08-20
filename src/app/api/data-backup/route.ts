@@ -11,8 +11,8 @@ const EXPORT_TABLES = [
   'cycle_tracking',
   'widget_progress_history',
   'nutrition_goals',
-  'nutrition_meals',
-  'nutrition_favorites',
+  'meal_entries',
+  'favorite_foods',
 ] as const
 
 /**

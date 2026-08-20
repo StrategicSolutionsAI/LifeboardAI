@@ -10,6 +10,10 @@ import { validateAdminAuth } from '@/lib/admin-auth';
  * Requires: authenticated admin user + ADMIN_SECRET header
  */
 export async function GET(request: Request) {
+  if (process.env.ENABLE_RUNTIME_MIGRATIONS !== 'true') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   const authError = await validateAdminAuth(request);
   if (authError) return authError;
 

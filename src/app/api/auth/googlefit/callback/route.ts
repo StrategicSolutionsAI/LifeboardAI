@@ -2,24 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { exchangeGoogleFitCodeForToken } from '@/lib/googlefit/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { sanitizeRedirectUrl } from '@/lib/url-utils'
+import { verifyOAuthState } from '@/lib/oauth-state'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get('code')
   const state = searchParams.get('state')
 
-  let redirectUrl = '/dashboard'
-  let userIdFromState = ''
-
-  if (state) {
-    try {
-      const s = JSON.parse(decodeURIComponent(state))
-      if (s.redirectUrl) redirectUrl = sanitizeRedirectUrl(s.redirectUrl)
-      if (s.userId) userIdFromState = s.userId
-    } catch (e) {
-      console.error('Failed to parse state param', e)
-    }
+  const verifiedState = verifyOAuthState(state)
+  if (!verifiedState) {
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=Invalid or expired OAuth state`)
   }
+  let redirectUrl = sanitizeRedirectUrl(verifiedState.redirectUrl)
 
   if (!code) {
     return NextResponse.redirect(
@@ -35,17 +29,15 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const effectiveUserId = user?.id || userIdFromState
-
-    if (!effectiveUserId) {
+    if (!user || user.id !== verifiedState.userId) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=User not authenticated`,
+        `${process.env.NEXT_PUBLIC_SITE_URL}/login?error=OAuth session mismatch, please try again`,
       )
     }
 
     const { error: upsertError } = await supabase.from('user_integrations').upsert(
       {
-        user_id: effectiveUserId,
+        user_id: user.id,
         provider: 'google-fit',
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,

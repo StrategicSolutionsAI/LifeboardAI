@@ -33,6 +33,27 @@ export async function validateAdminAuth(
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
 
+  // A shared secret is not an admin identity. In production, require an
+  // explicit user allowlist as well so any authenticated user who discovers
+  // the header cannot reach service-role operations.
+  if (process.env.NODE_ENV === 'production') {
+    const allowedIds = (process.env.ADMIN_USER_IDS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const allowedEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+    const email = user.email?.toLowerCase()
+    if (
+      !allowedIds.includes(user.id) &&
+      (!email || !allowedEmails.includes(email))
+    ) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+  }
+
   // Require admin secret header with timing-safe comparison
   const adminSecret = request.headers.get('x-admin-secret')
   const expectedSecret = process.env.ADMIN_SECRET

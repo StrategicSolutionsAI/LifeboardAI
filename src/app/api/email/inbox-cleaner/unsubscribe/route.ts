@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
 import { getGmailForUser } from '@/lib/gmail/client'
 import { apiLimiter, getRateLimitKey } from '@/lib/rate-limit'
+import { fetchSafeOutbound } from '@/lib/safe-outbound-fetch'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -75,7 +76,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
   // Strategy 1: One-click unsubscribe (RFC 8058)
   if (hasOneClick && unsubscribeUrl) {
     try {
-      const res = await fetch(unsubscribeUrl, {
+      const res = await fetchSafeOutbound(unsubscribeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'List-Unsubscribe=One-Click',
@@ -94,7 +95,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
   // Strategy 2: HTTP URL — GET request server-side
   if (!unsubscribeMethod && unsubscribeUrl) {
     try {
-      const res = await fetch(unsubscribeUrl, {
+      const res = await fetchSafeOutbound(unsubscribeUrl, {
         method: 'GET',
         redirect: 'follow',
       })

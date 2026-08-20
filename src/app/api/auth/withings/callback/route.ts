@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { exchangeWithingsCodeForToken } from '@/lib/withings/client'
 import { supabaseServer } from '@/utils/supabase/server'
 import { sanitizeRedirectUrl } from '@/lib/url-utils'
+import { verifyOAuthState } from '@/lib/oauth-state'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,18 +13,11 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const state = searchParams.get('state')
 
-  let redirectUrl = '/dashboard'
-  let userIdFromState = ''
-
-  if (state) {
-    try {
-      const s = JSON.parse(decodeURIComponent(state))
-      if (s.redirectUrl) redirectUrl = sanitizeRedirectUrl(s.redirectUrl)
-      if (s.userId) userIdFromState = s.userId
-    } catch (e) {
-      console.error('Failed to parse state param', e)
-    }
+  const verifiedState = verifyOAuthState(state)
+  if (!verifiedState) {
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=Invalid or expired OAuth state`)
   }
+  let redirectUrl = sanitizeRedirectUrl(verifiedState.redirectUrl)
 
   if (!code) {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/error?message=No authorization code from Withings`)
@@ -41,10 +35,8 @@ export async function GET(request: NextRequest) {
     const supabase = supabaseServer()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const effectiveUserId = user?.id || userIdFromState
-
-    if (!effectiveUserId) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=User not authenticated`)
+    if (!user || user.id !== verifiedState.userId) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/login?error=OAuth session mismatch, please try again`)
     }
 
     // Use service role client to bypass RLS — the user is verified via OAuth state
@@ -59,7 +51,7 @@ export async function GET(request: NextRequest) {
       const { data: existingRow } = await serviceClient
         .from('user_integrations')
         .select('refresh_token')
-        .eq('user_id', effectiveUserId)
+        .eq('user_id', user.id)
         .eq('provider', 'withings')
         .maybeSingle()
 
@@ -75,7 +67,7 @@ export async function GET(request: NextRequest) {
     const { data: existing } = await serviceClient
       .from('user_integrations')
       .select('id')
-      .eq('user_id', effectiveUserId)
+      .eq('user_id', user.id)
       .eq('provider', 'withings')
       .maybeSingle()
 
@@ -95,7 +87,7 @@ export async function GET(request: NextRequest) {
       const { error } = await serviceClient
         .from('user_integrations')
         .insert({
-          user_id: effectiveUserId,
+          user_id: user.id,
           provider: 'withings',
           access_token: tokenData.access_token,
           refresh_token: refreshTokenToStore,
