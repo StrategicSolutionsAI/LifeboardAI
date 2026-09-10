@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useDataCache } from './use-data-cache'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { useToast } from '@/components/ui/use-toast'
@@ -11,8 +12,6 @@ import {
 import type { TaskSharedState } from './task-helpers'
 import type { Task } from '@/types/tasks'
 
-const SHARED_RESULT_TTL = 30_000
-
 // Module-level guard: several components mount this hook at once, and each
 // mount kicks off the local-task sync. Without the guard they race and POST
 // the same localStorage tasks multiple times, creating server duplicates.
@@ -22,14 +21,14 @@ let localSyncInFlight = false
 
 export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
   const {
-    sharedFetchRef,
-    sharedResultRef,
     todoistConnectedRef,
     setTodoistConnected,
     localUpdateTimestamps,
     nocacheRef,
   } = shared
 
+  const queryClient = useQueryClient()
+  const refreshPromiseRef = useRef<Promise<void> | null>(null)
   const lastSeenUpdateRef = useRef<number>(0)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { toast } = useToast()
@@ -38,17 +37,10 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
   const allCacheKey = 'tasks-all-open'
 
   const fetchAllOpenTasks = useCallback(async (): Promise<Task[]> => {
-    if (sharedFetchRef.current) {
-      return sharedFetchRef.current
-    }
-
-    // Return recently resolved result to prevent duplicate fetches
-    if (sharedResultRef.current && Date.now() - sharedResultRef.current.ts < SHARED_RESULT_TTL) {
-      return sharedResultRef.current.data
-    }
-
-    const inflight = (async () => {
-      const readSupabaseTasks = async (): Promise<Task[] | null> => {
+    let supabaseRequest: Promise<Task[] | null> | undefined
+    const readSupabaseTasks = (): Promise<Task[] | null> => {
+      if (supabaseRequest) return supabaseRequest
+      supabaseRequest = (async () => {
         try {
           const supa = await fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
           if (!supa.ok) return null
@@ -58,163 +50,129 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
         } catch {
           return null
         }
-      }
+      })()
+      return supabaseRequest
+    }
 
-      const readLocalTasks = (): Task[] => {
-        try {
-          if (typeof window === 'undefined') return []
-          const raw = window.localStorage.getItem('lifeboard_local_tasks')
-          const list: Task[] = raw ? JSON.parse(raw) : []
-          const normalized = ensureTasksSource(list, 'local')
-          return normalized.filter(t => !t.completed)
-        } catch {
-          return []
-        }
-      }
-
-      const fallbackToSupabaseOrLocal = async (): Promise<Task[]> => {
-        const supabaseTasks = await readSupabaseTasks()
-        const localTasks = readLocalTasks()
-        if (supabaseTasks) {
-          if (localTasks.length > 0) {
-            const taskMap = new Map<string, Task>()
-            localTasks.forEach(t => taskMap.set(t.id, t))
-            supabaseTasks.forEach(t => taskMap.set(t.id, t))
-            return Array.from(taskMap.values())
-          }
-          return supabaseTasks
-        }
-        return localTasks
-      }
-
+    const readLocalTasks = (): Task[] => {
       try {
-        // If we already know Todoist is not connected, skip trying it
-        if (todoistConnectedRef.current === false) {
-          const fallback = await fallbackToSupabaseOrLocal()
-          sharedResultRef.current = { data: fallback, ts: Date.now() }
-          return fallback
+        if (typeof window === 'undefined') return []
+        const raw = window.localStorage.getItem('lifeboard_local_tasks')
+        const list: Task[] = raw ? JSON.parse(raw) : []
+        const normalized = ensureTasksSource(list, 'local')
+        return normalized.filter(t => !t.completed)
+      } catch {
+        return []
+      }
+    }
+
+    const fallbackToSupabaseOrLocal = async (): Promise<Task[]> => {
+      const supabaseTasks = await readSupabaseTasks()
+      const localTasks = readLocalTasks()
+      if (supabaseTasks) {
+        if (localTasks.length > 0) {
+          const taskMap = new Map<string, Task>()
+          localTasks.forEach(t => taskMap.set(t.id, t))
+          supabaseTasks.forEach(t => taskMap.set(t.id, t))
+          return Array.from(taskMap.values())
         }
+        return supabaseTasks
+      }
+      return localTasks
+    }
 
-        const todoistUrl = nocacheRef.current
-          ? '/api/integrations/todoist/tasks?all=true&nocache=1'
-          : '/api/integrations/todoist/tasks?all=true'
-        nocacheRef.current = false
+    try {
+      // If we already know Todoist is not connected, skip trying it
+      if (todoistConnectedRef.current === false) {
+        const fallback = await fallbackToSupabaseOrLocal()
+        return fallback
+      }
 
-        // Fire Todoist and Supabase fetches in PARALLEL
-        const [todoistResult, supabaseResult] = await Promise.all([
-          fetchWithTimeout(todoistUrl, { credentials: 'same-origin' })
-            .then(async (res) => {
-              if (!res.ok) {
-                if (res.status === 400 || res.status === 401) {
-                  setTodoistConnected(false)
-                  return { ok: false as const, tasks: [] as Task[] }
-                }
-                if (res.status >= 500 || res.status === 429) {
-                  let upstreamStatus: number | null = null
-                  try {
-                    const payload = await res.clone().json()
-                    const reported = Number(payload?.upstreamStatus ?? payload?.status)
-                    if (Number.isFinite(reported)) upstreamStatus = reported
-                  } catch {}
-                  if (upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410) {
-                    setTodoistConnected(false)
-                  }
-                  console.warn(
-                    `Upstream error fetching tasks: ${res.status}${upstreamStatus ? ` (upstream ${upstreamStatus})` : ''}. Falling back to Supabase/local.`
-                  )
-                  return { ok: false as const, tasks: [] as Task[] }
-                }
-                throw new Error(`Failed to fetch tasks: ${res.status}`)
-              }
-              const data = await res.json()
-              setTodoistConnected(true)
-              const raw: Task[] = Array.isArray(data) ? data : (data.tasks ?? [])
-              return { ok: true as const, tasks: ensureTasksSource(raw, 'todoist') }
-            })
-            .catch((error) => {
-              if (isNetworkFetchError(error) || isAbortLikeError(error)) {
+      const todoistUrl = nocacheRef.current
+        ? '/api/integrations/todoist/tasks?all=true&nocache=1'
+        : '/api/integrations/todoist/tasks?all=true'
+      nocacheRef.current = false
+
+      // Fire Todoist and Supabase fetches in PARALLEL
+      const [todoistResult, supabaseResult] = await Promise.all([
+        fetchWithTimeout(todoistUrl, { credentials: 'same-origin' })
+          .then(async (res) => {
+            if (!res.ok) {
+              if (res.status === 400 || res.status === 401) {
                 setTodoistConnected(false)
                 return { ok: false as const, tasks: [] as Task[] }
               }
-              throw error
-            }),
-          // Supabase fetch runs in parallel
-          fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
-            .then(async (supa) => {
-              if (!supa.ok) return [] as Task[]
-              const json = await supa.json()
-              const raw = Array.isArray(json) ? json : (json.tasks ?? [])
-              return ensureTasksSource(raw as Task[], 'supabase')
-            })
-            .catch((error) => {
-              console.warn('Failed to fetch Supabase tasks:', error)
-              return [] as Task[]
-            }),
-        ])
+              if (res.status >= 500 || res.status === 429) {
+                let upstreamStatus: number | null = null
+                try {
+                  const payload = await res.clone().json()
+                  const reported = Number(payload?.upstreamStatus ?? payload?.status)
+                  if (Number.isFinite(reported)) upstreamStatus = reported
+                } catch {}
+                if (upstreamStatus === 401 || upstreamStatus === 403 || upstreamStatus === 410) {
+                  setTodoistConnected(false)
+                }
+                console.warn(
+                  `Upstream error fetching tasks: ${res.status}${upstreamStatus ? ` (upstream ${upstreamStatus})` : ''}. Falling back to Supabase/local.`
+                )
+                return { ok: false as const, tasks: [] as Task[] }
+              }
+              throw new Error(`Failed to fetch tasks: ${res.status}`)
+            }
+            const data = await res.json()
+            setTodoistConnected(true)
+            const raw: Task[] = Array.isArray(data) ? data : (data.tasks ?? [])
+            return { ok: true as const, tasks: ensureTasksSource(raw, 'todoist') }
+          })
+          .catch((error) => {
+            if (isNetworkFetchError(error) || isAbortLikeError(error)) {
+              setTodoistConnected(false)
+              return { ok: false as const, tasks: [] as Task[] }
+            }
+            throw error
+          }),
+        readSupabaseTasks().then(tasks => tasks ?? []),
+      ])
 
-        // If Todoist failed entirely, fall back to Supabase + local
-        if (!todoistResult.ok && supabaseResult.length === 0) {
-          return fallbackToSupabaseOrLocal()
-        }
-
-        const todoistTasks = todoistResult.tasks
-        const supabaseTasks = supabaseResult
-
-        // Merge: Supabase first, Todoist overwrites duplicates
-        const taskMap = new Map<string, Task>()
-        supabaseTasks.forEach((task: Task) => taskMap.set(task.id, task))
-        todoistTasks.forEach((task: Task) => taskMap.set(task.id, task))
-
-        // If Todoist failed but Supabase has data, include local tasks too
-        if (!todoistResult.ok) {
-          const localTasks = (() => {
-            try {
-              if (typeof window === 'undefined') return []
-              const raw = window.localStorage.getItem('lifeboard_local_tasks')
-              const list: Task[] = raw ? JSON.parse(raw) : []
-              return ensureTasksSource(list, 'local').filter(t => !t.completed)
-            } catch { return [] }
-          })()
-          localTasks.forEach(t => taskMap.set(t.id, t))
-        }
-
-        const merged = Array.from(taskMap.values())
-        sharedResultRef.current = { data: merged, ts: Date.now() }
-        return merged
-      } catch (error) {
-        if (isNetworkFetchError(error) || isAbortLikeError(error)) {
-          setTodoistConnected(false)
-          const fallback = await fallbackToSupabaseOrLocal()
-          sharedResultRef.current = { data: fallback, ts: Date.now() }
-          return fallback
-        }
-        throw error
-      } finally {
-        sharedFetchRef.current = null
+      // If Todoist failed entirely, fall back to Supabase + local
+      if (!todoistResult.ok && supabaseResult.length === 0) {
+        return fallbackToSupabaseOrLocal()
       }
-    })()
 
-    sharedFetchRef.current = inflight
-    return inflight
-  }, [sharedFetchRef, sharedResultRef, todoistConnectedRef, setTodoistConnected, nocacheRef])
+      const todoistTasks = todoistResult.tasks
+      const supabaseTasks = supabaseResult
 
-  // Fetch daily tasks by filtering the shared payload
-  const dailyTasksFetcher = useCallback(async () => {
-    const tasks = await fetchAllOpenTasks()
-    return tasks.filter(task => {
-      const due = task?.due
-      if (!due) return false
-      if (typeof due.date === 'string') {
-        return due.date.slice(0, 10) === dateStr
+      // Merge: Supabase first, Todoist overwrites duplicates
+      const taskMap = new Map<string, Task>()
+      supabaseTasks.forEach((task: Task) => taskMap.set(task.id, task))
+      todoistTasks.forEach((task: Task) => taskMap.set(task.id, task))
+
+      // If Todoist failed but Supabase has data, include local tasks too
+      if (!todoistResult.ok) {
+        const localTasks = (() => {
+          try {
+            if (typeof window === 'undefined') return []
+            const raw = window.localStorage.getItem('lifeboard_local_tasks')
+            const list: Task[] = raw ? JSON.parse(raw) : []
+            return ensureTasksSource(list, 'local').filter(t => !t.completed)
+          } catch { return [] }
+        })()
+        localTasks.forEach(t => taskMap.set(t.id, t))
       }
-      if (typeof due.datetime === 'string') {
-        return due.datetime.slice(0, 10) === dateStr
-      }
-      return false
-    })
-  }, [fetchAllOpenTasks, dateStr])
 
-  // Fetch all open tasks (reuses shared fetch)
+      const merged = Array.from(taskMap.values())
+      return merged
+    } catch (error) {
+      if (isNetworkFetchError(error) || isAbortLikeError(error)) {
+        setTodoistConnected(false)
+        const fallback = await fallbackToSupabaseOrLocal()
+        return fallback
+      }
+      throw error
+    }
+  }, [todoistConnectedRef, setTodoistConnected, nocacheRef])
+
+  // Fetch all open tasks (canonical query shared with prefetch and daily views)
   const allTasksFetcher = useCallback(async () => {
     const tasks = await fetchAllOpenTasks()
     const normalized = Array.isArray(tasks) ? [...tasks] : []
@@ -226,13 +184,32 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     return normalized
   }, [fetchAllOpenTasks])
 
+  // Fetch daily tasks by filtering the shared payload
+  const dailyTasksFetcher = useCallback(async () => {
+    const tasks = await queryClient.fetchQuery({
+      queryKey: [allCacheKey],
+      queryFn: allTasksFetcher,
+      staleTime: 5 * 60 * 1000,
+    })
+    return tasks.filter(task => {
+      const due = task?.due
+      if (!due) return false
+      if (typeof due.date === 'string') {
+        return due.date.slice(0, 10) === dateStr
+      }
+      if (typeof due.datetime === 'string') {
+        return due.datetime.slice(0, 10) === dateStr
+      }
+      return false
+    })
+  }, [queryClient, allTasksFetcher, dateStr])
+
   // Use data cache for both daily and all tasks
   const {
     data: dailyTasks,
     loading: dailyLoading,
     error: dailyError,
-    updateOptimistically: updateDailyOptimistically,
-    refetch: refetchDaily
+    updateOptimistically: updateDailyOptimistically
   } = useDataCache<Task[]>(dailyCacheKey, dailyTasksFetcher, {
     ttl: 5 * 60 * 1000,
     prefetch: false
@@ -242,12 +219,39 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     data: allTasks,
     loading: allLoading,
     error: allError,
-    updateOptimistically: updateAllOptimistically,
-    refetch: refetchAll
+    updateOptimistically: updateAllOptimistically
   } = useDataCache<Task[]>(allCacheKey, allTasksFetcher, {
     ttl: 5 * 60 * 1000,
     prefetch: false
   })
+
+  // Cancel reads started before a write, then let both views join one new read.
+  // Mutation callers invoke both refetch methods together; coalesce that pair.
+  const refreshTaskQueries = useCallback((): Promise<void> => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current
+    const refresh = (async () => {
+      const filters = {
+        predicate: (query: { queryKey: readonly unknown[] }) => {
+          const key = query.queryKey[0]
+          return key === allCacheKey || (typeof key === 'string' && key.startsWith('tasks-daily-'))
+        },
+      }
+      // A date switch can mount another daily query during this shared read.
+      // Cancel and refresh every active daily consumer so none is stranded.
+      await queryClient.cancelQueries(filters)
+      await queryClient.invalidateQueries(
+        { ...filters, refetchType: 'active' },
+        { cancelRefetch: false },
+      )
+    })()
+    refreshPromiseRef.current = refresh
+    // Only coalesce synchronous sibling calls, not a later write while the
+    // request is still pending (that write needs a new server snapshot).
+    queueMicrotask(() => {
+      if (refreshPromiseRef.current === refresh) refreshPromiseRef.current = null
+    })
+    return refresh
+  }, [queryClient])
 
   const scheduleRefetch = useCallback((timestamp?: number, delayMs = 120) => {
     if (typeof timestamp === 'number') {
@@ -262,13 +266,10 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     }
     refreshTimerRef.current = setTimeout(() => {
       // Force a fresh read after writes
-      sharedFetchRef.current = null
-      sharedResultRef.current = null
-      try { refetchDaily() } catch {}
-      try { refetchAll() } catch {}
+      void refreshTaskQueries()
       refreshTimerRef.current = null
     }, delayMs)
-  }, [refetchDaily, refetchAll, sharedFetchRef, sharedResultRef])
+  }, [refreshTaskQueries])
 
   // On mount, check if another part of the app recently announced a task update
   useEffect(() => {
@@ -349,10 +350,7 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
         }
 
         if (synced.length > 0) {
-          sharedFetchRef.current = null
-          sharedResultRef.current = null
-          try { refetchDaily() } catch {}
-          try { refetchAll() } catch {}
+          void refreshTaskQueries()
           toast({
             type: 'success',
             title: synced.length === 1 ? 'Task synced' : `${synced.length} tasks synced`,
@@ -373,7 +371,7 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     } else {
       void syncLocalTasks()
     }
-  }, [refetchDaily, refetchAll, sharedFetchRef, sharedResultRef, toast])
+  }, [refreshTaskQueries, toast])
 
   // Cleanup refresh timer on unmount
   useEffect(() => {
@@ -444,21 +442,6 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     }
   }, [scheduleRefetch, updateAllOptimistically, updateDailyOptimistically, dateStr, localUpdateTimestamps, nocacheRef])
 
-  // Wrap refetch functions to clear the shared result cache first.
-  // Without this, fetchAllOpenTasks returns stale data from sharedResultRef
-  // (30s TTL) which overwrites optimistic updates after mutations like delete.
-  const forceRefetchDaily = useCallback(() => {
-    sharedFetchRef.current = null
-    sharedResultRef.current = null
-    refetchDaily()
-  }, [refetchDaily, sharedFetchRef, sharedResultRef])
-
-  const forceRefetchAll = useCallback(() => {
-    sharedFetchRef.current = null
-    sharedResultRef.current = null
-    refetchAll()
-  }, [refetchAll, sharedFetchRef, sharedResultRef])
-
   return {
     dailyTasks,
     allTasks,
@@ -468,8 +451,8 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
     allError,
     updateDailyOptimistically,
     updateAllOptimistically,
-    refetchDaily: forceRefetchDaily,
-    refetchAll: forceRefetchAll,
+    refetchDaily: refreshTaskQueries,
+    refetchAll: refreshTaskQueries,
     scheduleRefetch,
   }
 }

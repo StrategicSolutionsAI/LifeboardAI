@@ -34,3 +34,4 @@ export const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000     // 60 sec
 // ── Fetch timeouts ───────────────────────────────────────────────────────
 export const FETCH_DEFAULT_TIMEOUT_MS = 5_000            // 5 sec
 export const PREFETCH_TASKS_TIMEOUT_MS = 4_500           // 4.5 sec
+export const MIDDLEWARE_AUTH_TIMEOUT_MS = 5_000         // total auth budget, including refresh retries

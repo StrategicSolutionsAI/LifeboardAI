@@ -21,14 +21,10 @@ export function useTasks(selectedDate?: Date) {
     setModuleTodoistConnected(v)
     todoistConnectedRef.current = v
   }
-  const sharedFetchRef = useRef<Promise<Task[]> | null>(null)
-  const sharedResultRef = useRef<{ data: Task[]; ts: number } | null>(null)
   const localUpdateTimestamps = useRef<Set<number>>(new Set())
   const nocacheRef = useRef(false)
 
   const shared: TaskSharedState = {
-    sharedFetchRef,
-    sharedResultRef,
     todoistConnectedRef,
     setTodoistConnected,
     localUpdateTimestamps,

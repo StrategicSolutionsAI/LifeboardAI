@@ -31,8 +31,6 @@ export function useTaskMutations(
   promptOccurrenceDecision: (opts: { actionDescription: string; taskTitle: string }) => Promise<OccurrenceDecision>,
 ) {
   const {
-    sharedFetchRef,
-    sharedResultRef,
     todoistConnectedRef,
     setTodoistConnected,
     localUpdateTimestamps,
@@ -53,14 +51,12 @@ export function useTaskMutations(
   // ── Shared helper: announce task update to other components ────────
   const announceTaskUpdate = useCallback(() => {
     if (typeof window !== 'undefined') {
-      sharedFetchRef.current = null
-      sharedResultRef.current = null
       const timestamp = Date.now()
       localUpdateTimestamps.current.add(timestamp)
       window.localStorage.setItem('lifeboard:last-tasks-update', timestamp.toString())
       window.dispatchEvent(new CustomEvent('lifeboard:tasks-updated', { detail: { timestamp } }))
     }
-  }, [sharedFetchRef, sharedResultRef, localUpdateTimestamps])
+  }, [localUpdateTimestamps])
 
   // ── Create task ────────────────────────────────────────────────────
 

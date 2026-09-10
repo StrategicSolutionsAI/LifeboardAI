@@ -48,8 +48,6 @@ export function setTodoistConnected(v: boolean | null) {
 // ── Shared state interface (passed between sub-hooks) ────────────────
 
 export interface TaskSharedState {
-  sharedFetchRef: MutableRefObject<Promise<Task[]> | null>
-  sharedResultRef: MutableRefObject<{ data: Task[]; ts: number } | null>
   todoistConnectedRef: MutableRefObject<boolean | null>
   setTodoistConnected: (v: boolean | null) => void
   /** Timestamps of updates we made locally — skip refetch to avoid clobbering optimistic state */
