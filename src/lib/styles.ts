@@ -220,6 +220,12 @@ export const layout = {
     spacious: 'px-5',
     section: 'px-4 sm:px-6',
   },
+  /** Page-root widths. The shell already pads the main area, so page roots
+   *  add no horizontal padding of their own. */
+  container: {
+    full: 'w-full',
+    reading: 'w-full max-w-4xl',
+  },
 } as const
 
 // -----------------------------------------------------------------------------

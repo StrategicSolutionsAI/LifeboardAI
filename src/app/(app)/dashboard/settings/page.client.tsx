@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Settings, Check, AlertCircle, Palette, Plus, Trash2, Edit3, Square, ChevronDown, X, Download, Upload, Loader2, CheckCircle2 } from 'lucide-react'
+import { layout } from '@/lib/styles'
 import { ThemeColor, getAllThemes, createCustomTheme, saveCustomTheme, deleteCustomTheme, updateCustomTheme } from '@/lib/theme'
 import { useTheme } from '@/components/theme-provider'
 import { cn } from '@/lib/utils'
@@ -325,7 +326,7 @@ export default function SettingsPageClient() {
   if (!mounted) return null
 
   return (
-    <div className="max-w-4xl min-h-screen">
+    <div className={layout.container.reading}>
         {/* ── Page header ─────────────────────────────────── */}
         <div className="mb-6">
           <p className="text-sm text-theme-text-tertiary">Manage your preferences and account settings</p>

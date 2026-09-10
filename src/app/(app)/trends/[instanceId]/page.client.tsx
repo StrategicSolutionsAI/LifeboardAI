@@ -8,6 +8,7 @@ import { dateStr, todayStrGlobal } from '@/lib/dashboard-utils';
 import SectionLoadTimer from '@/components/section-load-timer';
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Scale, Activity, Target, Calendar } from "lucide-react";
+import { layout } from "@/lib/styles";
 interface Point { date: string; value: number; isReal?: boolean }
 type TimeRange = '7d' | '30d' | '90d'
 interface TrendAnalysis { totalValue: number; dailyAverage: number; trend: 'up' | 'down' | 'stable'; trendPercentage: number; bestDay: { date: string; value: number } | null }
@@ -165,7 +166,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
     return (
       <>
         <SectionLoadTimer name="/trends/[instanceId]" />
-        <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+        <div className={`${layout.container.reading} space-y-6`}>
           <div className="space-y-2"><Skeleton className="h-8 w-56 bg-theme-skeleton" /><Skeleton className="h-4 w-80 bg-theme-skeleton" /></div>
           <div className="flex gap-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-9 w-16 rounded-full bg-theme-skeleton" />)}</div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[...Array(4)].map((_, i) => (
@@ -190,7 +191,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
     return (
       <>
         <SectionLoadTimer name="/trends/[instanceId]" />
-        <div className="p-4 sm:p-8 max-w-5xl mx-auto">
+        <div className={layout.container.reading}>
           <div className="rounded-xl border border-red-200 bg-red-50/80 p-6 shadow-warm-sm text-center">
             <BarChart3 className="h-10 w-10 text-red-300 mx-auto mb-3" />
             <h2 className="text-lg font-semibold text-red-800 mb-1">Unable to Load Trends</h2>
@@ -212,7 +213,7 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
   /* ── Empty ── */
   if (!data || data.length === 0) {
     return (
-      <div className="p-4 sm:p-8 max-w-5xl mx-auto">
+      <div className={layout.container.reading}>
         <div className="rounded-xl border border-theme-neutral-300 bg-theme-surface-raised p-12 shadow-warm-sm text-center">
           <BarChart3 className="h-12 w-12 text-theme-text-subtle mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-theme-text-primary mb-1">No Data Available</h2>
@@ -233,13 +234,13 @@ export default function TrendsPageClient({ params }: { params: { instanceId: str
   return (
     <>
       <SectionLoadTimer name="/trends/[instanceId]" />
-      <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+      <div className={`${layout.container.reading} space-y-6`}>
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 animate-fade-in-up">
           <div>
-            <h1 className="text-2xl font-semibold leading-tight text-theme-text-primary">
+            <h2 className="text-xl font-semibold leading-tight text-theme-text-primary">
               {isWithingsWeight ? 'Weight Trends' : 'Widget Trends'}
-            </h1>
+            </h2>
             <div className="w-10 h-[3px] rounded-full bg-gradient-to-r from-warm-400 to-warm-300 mt-2 mb-1" />
             <p className="text-sm font-normal leading-normal text-theme-text-secondary">
               {isWithingsWeight ? 'Track your weight and identify patterns over time' : 'Track your progress and identify patterns over time'}

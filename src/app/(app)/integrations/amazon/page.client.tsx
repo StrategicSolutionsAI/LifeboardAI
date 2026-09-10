@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
+import { layout } from "@/lib/styles";
 import { useToast } from "@/components/ui/use-toast";
 import Link from "next/link";
 import { invalidateIntegrationCaches } from "@/hooks/use-data-cache";
@@ -158,7 +159,7 @@ function AmazonIntegrationPageInner() {
   );
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+    <div className={`${layout.container.reading} flex flex-col gap-6`}>
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" className="px-0 text-sm text-theme-primary hover:text-theme-primary">
             <Link href="/integrations" className="inline-flex items-center gap-2">
@@ -176,7 +177,7 @@ function AmazonIntegrationPageInner() {
         </div>
 
         <header className="space-y-2">
-          <h1 className="text-3xl font-semibold text-theme-text-primary">Amazon integration</h1>
+          <h2 className="text-xl font-semibold text-theme-text-primary">Amazon integration</h2>
           <p className="text-sm text-theme-text-subtle">
             Store your Amazon credentials and preferred delivery defaults. These settings unlock one-click purchases and recurring deliveries from your shopping list.
           </p>

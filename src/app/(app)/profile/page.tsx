@@ -1,6 +1,8 @@
+import { layout } from "@/lib/styles"
+
 export default function ProfilePage() {
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className={`${layout.container.reading} space-y-6`}>
       <p className="text-sm text-theme-text-tertiary">
         Profile management is being finalized.
       </p>

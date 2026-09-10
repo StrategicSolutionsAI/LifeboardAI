@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock, Upload, Trash2 } from 'lucide-react'
+import { PageHeaderActions } from '@/components/page-header-actions'
+import { layout } from '@/lib/styles'
 import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-data-cache'
 import SectionLoadTimer from '@/components/section-load-timer'
 import { CalendarFileUpload, type UploadResult } from '@/features/calendar/components/calendar-file-upload'
@@ -407,16 +409,16 @@ export default function IntegrationsPageClient() {
   }
 
   const getMessageStyle = (message: string, connected: boolean) => {
-    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed') || lower.includes('synced') || lower.includes('loaded')) return 'text-green-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-red-600 font-medium'; if (lower.includes('disconnect')) return 'text-amber-600'; return 'text-muted-foreground'
+    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed') || lower.includes('synced') || lower.includes('loaded')) return 'text-green-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-red-600 font-medium'; if (lower.includes('disconnect')) return 'text-amber-600'; return 'text-theme-text-secondary'
   }
 
   if (initialLoading) {
     return (
       <>
         <SectionLoadTimer name="/integrations" />
-        <div className="max-w-4xl">
+        <div className={layout.container.reading}>
           <div className="mb-6">
-            <p className="text-muted-foreground">Connect your favorite apps and services to LifeboardAI</p>
+            <p className="text-theme-text-secondary">Connect your favorite apps and services to LifeboardAI</p>
           </div>
           <div className="grid gap-6 md:grid-cols-2">
             {[...Array(6)].map((_, i) => (
@@ -431,16 +433,16 @@ export default function IntegrationsPageClient() {
   return (
     <>
       <SectionLoadTimer name="/integrations" />
-      <div className="max-w-4xl">
+      <div className={layout.container.reading}>
         <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="w-full sm:w-auto relative overflow-hidden transition-all duration-200 hover:shadow-warm hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
+          <PageHeaderActions>
+            <Button variant="outline" size="sm" onClick={() => fetchIntegrationStatuses({ invalidateCache: true })} disabled={loading} className="relative overflow-hidden transition-all duration-200 hover:shadow-warm hover:scale-105 active:scale-95 group focus:ring-2 focus:ring-primary/50 focus:ring-offset-2" aria-label={loading ? 'Refreshing all integrations...' : 'Refresh all integrations'} title={loading ? 'Currently refreshing all integrations' : 'Refresh data from all connected integrations (Ctrl/Cmd+Shift+U)'}>
               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${loading ? 'animate-spin' : 'group-hover:rotate-180'}`} aria-hidden="true" />
               <span className="relative z-10">{loading ? 'Refreshing...' : 'Refresh All'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
             </Button>
-          </div>
-          <p className="text-muted-foreground">Connect your favorite apps and services to sync data with LifeboardAI</p>
+          </PageHeaderActions>
+          <p className="text-theme-text-secondary">Connect your favorite apps and services to sync data with LifeboardAI</p>
         </div>
 
         {globalError && (
@@ -487,12 +489,12 @@ export default function IntegrationsPageClient() {
               </div>
             )}
             {calendarLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm text-theme-text-secondary">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading uploaded calendars...
               </div>
             ) : calendarImports.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-theme-text-secondary">
                 No calendars uploaded yet. Upload an .ics file to populate the calendar without connecting an integration.
               </p>
             ) : (
@@ -518,7 +520,7 @@ export default function IntegrationsPageClient() {
                     >
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-theme-text-primary">{calendar.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-theme-text-secondary mt-1">
                           {eventCount} event{eventCount === 1 ? '' : 's'}
                           {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
                           {calendar.file_name ? ` • ${calendar.file_name}` : ''}
@@ -557,7 +559,7 @@ export default function IntegrationsPageClient() {
                               ))}
                             </select>
                             {isUpdatingBucket && (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground absolute right-[-18px] top-1/2 -translate-y-1/2" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-theme-text-secondary absolute right-[-18px] top-1/2 -translate-y-1/2" />
                             )}
                           </div>
                         </div>
@@ -596,7 +598,7 @@ export default function IntegrationsPageClient() {
                                 ))}
                               </select>
                               {isUpdatingAssignee && (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground absolute right-[-18px] top-1/2 -translate-y-1/2" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-theme-text-secondary absolute right-[-18px] top-1/2 -translate-y-1/2" />
                               )}
                             </div>
                           </div>
@@ -658,12 +660,12 @@ export default function IntegrationsPageClient() {
                     </div>
                     {!isComingSoon && (
                       <div className="ml-2">
-                        {isLoading ? (<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />) : status?.connected && isStale ? (
+                        {isLoading ? (<Loader2 className="h-5 w-5 animate-spin text-theme-text-secondary" />) : status?.connected && isStale ? (
                           <Badge className="bg-amber-500 hover:bg-amber-600 text-white"><Clock className="h-3 w-3 mr-1" />Needs sync</Badge>
                         ) : status?.connected ? (
                           <Badge className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-muted-foreground"><XCircle className="h-3 w-3 mr-1" />Not Connected</Badge>
+                          <Badge variant="outline" className="text-theme-text-secondary"><XCircle className="h-3 w-3 mr-1" />Not Connected</Badge>
                         )}
                       </div>
                     )}
@@ -673,7 +675,7 @@ export default function IntegrationsPageClient() {
                   <CardContent className="pt-0">
                     <div className="space-y-3">
                       {status?.connected && status?.lastUpdated && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="h-3 w-3" /><span>Last synced {formatRelativeTime(status.lastUpdated)}</span></div>
+                        <div className="flex items-center gap-2 text-sm text-theme-text-secondary"><Clock className="h-3 w-3" /><span>Last synced {formatRelativeTime(status.lastUpdated)}</span></div>
                       )}
                       {status?.message && (<p className={`text-sm ${getMessageStyle(status.message, status.connected)}`}>{status.message}</p>)}
                       {status?.error && (<p className="text-sm text-red-600 font-medium">{status.error}</p>)}
