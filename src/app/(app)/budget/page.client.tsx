@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import { useState, useCallback } from 'react'
 import { Plus, Settings } from 'lucide-react'
 import { useBudget } from '@/hooks/use-budget'
@@ -45,11 +46,11 @@ export default function BudgetPageClient() {
   }, [])
 
   return (
-    <div className="flex w-full flex-col gap-4 px-3 sm:px-6 md:px-8 py-3 sm:py-5">
+    <div className="flex w-full flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <MonthSelector month={month} onChange={setMonth} />
-        <div className="flex items-center gap-2">
+        <PageHeaderActions>
           <button
             onClick={() => setShowCategoryManager(true)}
             className="p-2 rounded-lg hover:bg-theme-surface-alt transition-colors"
@@ -62,9 +63,9 @@ export default function BudgetPageClient() {
             className={`${button.brand} flex items-center gap-1.5`}
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Expense</span>
+            <span>Add Expense</span>
           </button>
-        </div>
+        </PageHeaderActions>
       </div>
 
       {/* Summary cards */}
@@ -105,15 +106,6 @@ export default function BudgetPageClient() {
           />
         </div>
       </div>
-
-      {/* FAB for mobile */}
-      <button
-        onClick={() => setShowAddExpense(true)}
-        className="fixed bottom-20 right-4 sm:hidden w-14 h-14 rounded-full bg-theme-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform z-40"
-        aria-label="Add expense"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
 
       {/* Modals */}
       {showAddExpense && (

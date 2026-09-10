@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { TasksProvider, useTaskData, useTaskActions } from "@/contexts/tasks-context";
@@ -696,13 +697,13 @@ function TasksBoardShell() {
   const hasActiveFilters = filters.status !== "all" || filters.buckets.length > 0 || filters.assignees.length > 0 || filters.dueDateRange !== null;
 
   return (
-    <div className="flex h-[calc(100dvh-64px)] md:h-[calc(100dvh-64px)] w-full flex-col gap-3 sm:gap-4 pb-3 sm:pb-5">
+    <div className="task-workspace flex flex-1 min-h-0 w-full flex-col gap-3 sm:gap-4">
       {/* ── Header Row: Progress ring + Title + Stats + Search ── */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-5">
+      <div className="flex shrink-0 flex-col gap-3">
+        <div className="flex items-center gap-3">
           {/* Progress ring */}
           <div className="relative shrink-0 hidden sm:flex">
-            <svg width="52" height="52" viewBox="0 0 44 44" className="-rotate-90">
+            <svg width="32" height="32" viewBox="0 0 44 44" className="-rotate-90">
               <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(219,214,207,0.4)" strokeWidth="3" />
               <circle
                 cx="22" cy="22" r="18" fill="none"
@@ -724,9 +725,11 @@ function TasksBoardShell() {
           </div>
 
 
+          <PageHeaderActions>
           {/* Add Task */}
           <button
             onClick={openNewTaskModal}
+            aria-label="Add Task"
             className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
           >
             <Plus size={15} />
@@ -764,6 +767,7 @@ function TasksBoardShell() {
           >
             <Search size={18} />
           </button>
+          </PageHeaderActions>
         </div>
 
         {/* Expandable search bar */}
@@ -911,7 +915,7 @@ function TasksBoardShell() {
       </div>
 
       {/* ── Content Area ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
+      <div className="task-list-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 -mr-1">
         {allTasks.length === 0 ? (
           /* ── Beautiful Empty State ── */
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] animate-in fade-in duration-500">

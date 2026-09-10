@@ -1,5 +1,6 @@
 "use client"
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import { useState, useEffect, useCallback, useRef, useMemo, FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -180,7 +181,7 @@ const LABEL_ICONS: Record<string, typeof Inbox> = {
   TRASH: Trash2,
 }
 
-// ── Email List Item (Gmail-style single row) ─────────────────────────────
+// ── Email List Item (stacked on phones, single row on desktop) ───────────
 
 function EmailListItem({
   message,
@@ -211,7 +212,7 @@ function EmailListItem({
   return (
     <div
       onClick={onClick}
-      className={`flex items-center h-10 px-2 cursor-pointer group border-b border-theme-neutral-300/20 ${interactive.transitionFast} ${
+      className={`grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-x-1 gap-y-1 px-3 py-3 md:flex md:items-center md:gap-0 md:h-10 md:px-2 md:py-0 cursor-pointer group border-b border-theme-neutral-300/20 ${interactive.transitionFast} ${
         isSelected
           ? 'bg-theme-brand-tint/60'
           : isChecked
@@ -222,9 +223,10 @@ function EmailListItem({
       } hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.3),0_1px_3px_1px_rgba(60,64,67,.15)] hover:z-[1] relative`}
     >
       {/* Checkbox */}
-      <label className="flex-shrink-0 px-2 cursor-pointer flex items-center" onClick={(e) => e.stopPropagation()}>
+      <label className="col-start-1 row-start-1 h-8 flex-shrink-0 px-2 cursor-pointer flex items-center md:h-auto" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
+          aria-label={`Select email: ${message.subject || '(no subject)'}`}
           checked={isChecked}
           onChange={onCheck}
           className="h-[18px] w-[18px] rounded border-theme-neutral-300 text-theme-primary focus:ring-theme-primary/30 cursor-pointer"
@@ -234,14 +236,15 @@ function EmailListItem({
       {/* Star */}
       <button
         onClick={(e) => { e.stopPropagation(); onStar() }}
-        className="flex-shrink-0 p-1 rounded-full hover:bg-theme-surface-raised"
+        aria-label={isStarred ? 'Unstar email' : 'Star email'}
+        className="col-start-1 row-start-2 flex h-8 w-8 items-center justify-center md:h-auto md:w-auto flex-shrink-0 p-1 rounded-full hover:bg-theme-surface-raised"
       >
         <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-theme-text-tertiary/50 group-hover:text-theme-text-tertiary'}`} />
       </button>
 
-      {/* Sender name (fixed width) */}
+      {/* Sender and time share the first mobile line. */}
       <span
-        className={`flex-shrink-0 w-[180px] truncate text-[13px] pl-2 ${
+        className={`col-start-2 row-start-1 min-w-0 self-center truncate text-sm md:flex-shrink-0 md:w-[180px] md:text-[13px] md:pl-2 ${
           message.isUnread
             ? 'font-bold text-theme-text-primary'
             : 'text-theme-text-secondary'
@@ -251,31 +254,36 @@ function EmailListItem({
       </span>
 
       {/* Subject + snippet */}
-      <span className="flex-1 min-w-0 flex items-center gap-0 truncate pl-2 pr-2">
+      <button
+        onClick={(event) => { event.stopPropagation(); onClick() }}
+        aria-label={`Open email: ${message.subject || '(no subject)'}`}
+        className="col-start-2 col-span-2 row-start-2 flex-1 min-w-0 flex flex-col items-start text-left gap-0.5 md:flex-row md:items-center md:gap-0 md:truncate md:pl-2 md:pr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary"
+      >
         <span
-          className={`text-[13px] truncate flex-shrink ${
+          className={`w-full text-sm leading-5 line-clamp-2 break-words md:w-auto md:text-[13px] md:line-clamp-none md:truncate md:flex-shrink ${
             message.isUnread
               ? 'font-bold text-theme-text-primary'
               : 'text-theme-text-secondary'
           }`}
         >
+          {hasAttachments && <Paperclip aria-label="Has attachment" className="inline h-3.5 w-3.5 mr-1 md:hidden" />}
           {message.subject || '(no subject)'}
         </span>
         {message.snippet && (
-          <span className="text-[13px] text-theme-text-tertiary truncate flex-shrink-[2]">
-            &nbsp;- {message.snippet}
+          <span className="w-full text-xs text-theme-text-tertiary line-clamp-1 break-words md:w-auto md:text-[13px] md:line-clamp-none md:truncate md:flex-shrink-[2]">
+            <span className="hidden md:inline">&nbsp;- </span>{message.snippet}
           </span>
         )}
-      </span>
+      </button>
 
       {/* Attachment icon */}
       {hasAttachments && (
-        <Paperclip className="flex-shrink-0 h-3.5 w-3.5 text-theme-text-tertiary mr-2" />
+        <Paperclip aria-label="Has attachment" className="hidden md:block flex-shrink-0 h-3.5 w-3.5 text-theme-text-tertiary mr-2" />
       )}
 
       {/* Date (visible by default, hidden on hover) */}
       <span
-        className={`flex-shrink-0 text-xs pr-2 group-hover:hidden ${
+        className={`col-start-3 row-start-1 self-center flex-shrink-0 whitespace-nowrap text-xs md:pr-2 md:group-hover:hidden ${
           message.isUnread
             ? 'font-bold text-theme-text-primary'
             : 'text-theme-text-tertiary'
@@ -285,7 +293,7 @@ function EmailListItem({
       </span>
 
       {/* Hover action buttons (hidden by default, visible on hover) */}
-      <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0 pr-1" onClick={(e) => e.stopPropagation()}>
+      <div className="hidden md:group-hover:flex items-center gap-0.5 flex-shrink-0 pr-1" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onArchive}
           title="Archive"
@@ -1952,16 +1960,15 @@ export default function EmailPageClient() {
   const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Parallel initial data fetch — eliminates connection→accounts→labels waterfall
+  // Resolve the account before fetching its inbox; labels load independently.
   useEffect(() => {
     let cancelled = false
 
     Promise.all([
       fetch('/api/integrations/status?provider=gmail').then((r) => r.json()),
       fetch('/api/email/accounts').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch('/api/email/labels').then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ])
-      .then(([statusData, accountsData, labelsData]) => {
+      .then(([statusData, accountsData]) => {
         if (cancelled) return
         const connected = statusData?.connected === true
         setIsConnected(connected)
@@ -1977,7 +1984,6 @@ export default function EmailPageClient() {
             current && available.includes(current) ? current : available[0] ?? ''
           )
         }
-        if (labelsData?.labels) setLabels(labelsData.labels)
       })
       .catch(() => {
         if (!cancelled) setIsConnected(false)
@@ -1992,13 +1998,17 @@ export default function EmailPageClient() {
 
   // Refetch labels when selected account changes
   useEffect(() => {
-    if (!isConnected || !selectedAccount) return
-    fetch(`/api/email/labels?account=${encodeURIComponent(selectedAccount)}`)
-      .then((res) => res.json())
+    if (!isConnected) return
+    let cancelled = false
+    setLabels([])
+    const query = selectedAccount ? `?account=${encodeURIComponent(selectedAccount)}` : ''
+    fetch(`/api/email/labels${query}`)
+      .then((res) => res.ok ? res.json() : null)
       .then((data) => {
-        if (data.labels) setLabels(data.labels)
+        if (!cancelled && data?.labels) setLabels(data.labels)
       })
       .catch(() => {})
+    return () => { cancelled = true }
   }, [isConnected, selectedAccount])
 
   // Map active label to Gmail query
@@ -2524,17 +2534,6 @@ export default function EmailPageClient() {
 
   const renderSidebarContent = (onNavigate?: () => void) => (
     <>
-      {/* Compose button */}
-      <div className="px-3 pt-4 pb-2">
-        <button
-          onClick={() => { handleNewCompose(); onNavigate?.() }}
-          className="flex items-center gap-3 w-full h-14 px-6 rounded-2xl bg-white border border-theme-neutral-300/60 shadow-warm-sm hover:shadow-warm text-theme-text-primary text-sm font-medium transition-shadow"
-        >
-          <Pencil className="h-5 w-5 text-theme-text-secondary" />
-          Compose
-        </button>
-      </div>
-
       {/* Labels navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-1">
         {/* System labels */}
@@ -2653,7 +2652,12 @@ export default function EmailPageClient() {
 
   return (
     <>
-      <div className="flex h-[calc(100dvh-160px)] md:h-[calc(100dvh-140px)] -mx-6 sm:-mx-8 md:-mx-10 -mt-4 sm:-mt-6 md:-mt-8">
+      <PageHeaderActions>
+        <button onClick={handleNewCompose} className="inline-flex h-10 items-center gap-2 rounded-lg bg-theme-primary px-3.5 text-sm font-medium text-white hover:bg-theme-primary-600">
+          <Pencil className="h-4 w-4" />Compose
+        </button>
+      </PageHeaderActions>
+      <div className="flex h-[calc(100dvh-216px)] md:h-[calc(100dvh-144px)] min-h-[240px] -mx-6 sm:-mx-8 md:-mx-10">
 
         {/* ── Gmail-style left sidebar (desktop) ── */}
         <aside className="hidden md:flex w-[220px] lg:w-[256px] flex-shrink-0 flex-col border-r border-theme-neutral-300 bg-theme-surface-base">
@@ -2668,7 +2672,7 @@ export default function EmailPageClient() {
               {/* Close button */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-theme-neutral-300/50">
                 <span className="text-sm font-semibold text-theme-text-primary">Mail</span>
-                <button onClick={() => setSidebarOpen(false)} className="p-1 rounded-full hover:bg-theme-surface-raised">
+                <button onClick={() => setSidebarOpen(false)} aria-label="Close mail folders" className="p-1 rounded-full hover:bg-theme-surface-raised">
                   <X className="h-5 w-5 text-theme-text-secondary" />
                 </button>
               </div>
@@ -2685,20 +2689,11 @@ export default function EmailPageClient() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setSidebarOpen(true)}
+              aria-label="Open mail folders"
               className="md:hidden p-1.5 rounded-full hover:bg-theme-surface-raised"
             >
               <Menu className="h-5 w-5 text-theme-text-secondary" />
             </button>
-
-            {/* Mobile compose */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNewCompose}
-              className="md:hidden gap-1.5"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
 
             {/* List-view controls: select all, refresh, bulk actions (hidden when reading) */}
             {!selectedMessageId && (
@@ -2777,6 +2772,7 @@ export default function EmailPageClient() {
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                   placeholder="Search mail"
+                  aria-label="Search mail"
                   className="w-full pl-10 pr-10 py-2 text-sm rounded-full bg-theme-surface-raised/80 border-0 outline-none focus:bg-white focus:shadow-[0_1px_3px_rgba(60,64,67,.3)] text-theme-text-primary placeholder:text-theme-text-tertiary"
                 />
                 {(searchQuery || activeQuery) && (

@@ -131,10 +131,10 @@
 
     --theme-text-primary: #314158;
     --theme-text-secondary: #596881;
-    --theme-text-tertiary: #8e99a8;
+    --theme-text-tertiary: #667085;
     --theme-text-quaternary: #b0b8c4;
     --theme-text-inverse: #ffffff;
-    --theme-text-subtle: #6b7688;
+    --theme-text-subtle: #626f82;
     --theme-text-body: #4a5568;
 
     --theme-surface-alt: #faf8f5;
@@ -460,9 +460,23 @@
   }
 }
 
+/* On short screens, scroll controls and tasks together so the list cannot collapse. */
+@media (max-height: 600px) {
+  [data-workspace="tasks"] {
+    overflow-y: auto;
+  }
+  .task-workspace {
+    flex: 0 0 auto;
+  }
+  .task-list-scroll {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
+
 /* Widget card sizing for flex-wrap grid (replaces CSS grid cols) */
 .widget-card-size {
-  width: calc(50% - 0.375rem); /* 2 cols, gap-3 */
+  width: 100%; /* One readable widget per row on phones. */
 }
 @media (min-width: 640px) {
   .widget-card-size {

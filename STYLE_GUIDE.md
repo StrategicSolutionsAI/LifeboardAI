@@ -93,8 +93,8 @@ Warm-shifted neutrals for surfaces, borders, and text.
 | `text-theme-text-primary` | `--theme-text-primary` | `#314158` | Headings, important content |
 | `text-theme-text-secondary` | `--theme-text-secondary` | `#596881` | Body text, descriptions |
 | `text-theme-text-body` | `--theme-text-body` | `#4a5568` | Standard paragraph text |
-| `text-theme-text-tertiary` | `--theme-text-tertiary` | `#8e99a8` | Helper text, timestamps, labels |
-| `text-theme-text-subtle` | `--theme-text-subtle` | `#6b7688` | De-emphasized labels |
+| `text-theme-text-tertiary` | `--theme-text-tertiary` | `#667085` | Helper text, timestamps, labels |
+| `text-theme-text-subtle` | `--theme-text-subtle` | `#626f82` | De-emphasized labels |
 | `text-theme-text-quaternary` | `--theme-text-quaternary` | `#b0b8c4` | Placeholders, disabled text |
 | `text-theme-text-inverse` | `--theme-text-inverse` | `#ffffff` | Text on dark backgrounds |
 

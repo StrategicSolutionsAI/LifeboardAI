@@ -32,7 +32,9 @@ export function MobileViewDropdown({ currentView, onViewChange }: { currentView:
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 rounded-md border border-theme-neutral-300 text-[11px] font-medium text-theme-text-secondary"
+        aria-expanded={open}
+        aria-label={`Calendar view: ${currentView}`}
+        className="flex min-h-11 items-center gap-1 px-2 rounded-lg border border-theme-neutral-300 text-[13px] font-medium text-theme-text-secondary"
       >
         {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
         <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,7 +48,7 @@ export function MobileViewDropdown({ currentView, onViewChange }: { currentView:
               key={opt.value}
               type="button"
               onClick={() => { onViewChange(opt.value); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+              className={`w-full min-h-11 text-left px-3 py-2 text-sm transition-colors ${
                 currentView === opt.value
                   ? 'bg-theme-brand-tint-light text-theme-primary font-medium'
                   : 'text-theme-text-secondary active:bg-theme-surface-alt'
@@ -98,7 +100,7 @@ export function MobileOverflowMenu({
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="More options">
+      <button type="button" onClick={() => setOpen(!open)} className="flex h-11 w-11 items-center justify-center rounded-lg active:bg-theme-brand-tint-light" aria-label="More options" aria-expanded={open}>
         <MoreHorizontal className="h-4 w-4 text-theme-text-secondary" />
       </button>
       {open && (
@@ -110,7 +112,7 @@ export function MobileOverflowMenu({
             <>
               <div className="border-t border-theme-neutral-300/40 my-1" />
               <div className="px-3 py-1">
-                <p className="text-2xs font-semibold uppercase tracking-wider text-theme-text-quaternary mb-1">Filter</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-theme-text-tertiary mb-1">Filter</p>
                 <label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('all')} onChange={() => toggleBucketFilter('all')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">All Categories</span></label>
                 {filterableBuckets.map((bucket) => (<label key={bucket} className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes(bucket)} onChange={() => toggleBucketFilter(bucket)} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">{bucket}</span></label>))}
                 {filterableBuckets.length > 0 && (<label className="flex cursor-pointer items-center py-1"><input type="checkbox" checked={selectedBucketFilters.includes('unassigned')} onChange={() => toggleBucketFilter('unassigned')} className="mr-2 h-3 w-3 rounded accent-theme-primary" /><span className="text-xs text-theme-text-secondary">Unassigned</span></label>)}

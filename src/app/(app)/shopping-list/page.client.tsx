@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1688,14 +1689,16 @@ function ShoppingListLayout() {
             </span>
           </div>
 
+          <PageHeaderActions>
           <button
             type="button"
             onClick={() => setAddModalOpen(true)}
             className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
           >
             <Plus size={15} />
-            <span className="hidden sm:inline">Add Item</span>
+            <span>Add Item</span>
           </button>
+          </PageHeaderActions>
         </div>
 
         {/* ── Stat Tiles ── */}

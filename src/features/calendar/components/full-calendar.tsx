@@ -315,18 +315,18 @@ export default function FullCalendar({ selectedDate: propSelectedDate, onDateCha
       {/* Calendar Header */}
       {isCompactBreakpoint ? (
         /* ─── MOBILE HEADER ─── */
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-theme-neutral-300/60">
-          <h3 className="text-base font-semibold text-theme-text-primary truncate">
+        <div className="flex flex-col gap-2 px-3 py-3 border-b border-theme-neutral-300/60">
+          <h3 className="text-base font-semibold text-theme-text-primary">
             {format(currentDate, "MMMM yyyy")}
           </h3>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-1">
             <button type="button" onClick={() => handleDateChange(new Date())} disabled={isOnToday}
-              className={`px-2.5 py-1 rounded-full text-[13px] sm:text-[11px] font-medium transition-colors ${isOnToday ? 'bg-theme-surface-alt text-theme-text-quaternary' : 'bg-theme-primary text-white active:bg-[#a8896a]'}`}>Today</button>
+              className={`min-h-11 px-2.5 rounded-lg text-[13px] font-medium transition-colors ${isOnToday ? 'bg-theme-surface-alt text-theme-text-tertiary' : 'bg-theme-primary text-white active:bg-[#a8896a]'}`}>Today</button>
             <MobileViewDropdown currentView={view} onViewChange={handleViewChange} />
-            <button type="button" onClick={prevPeriod} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="Previous">
+            <button type="button" onClick={prevPeriod} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg active:bg-theme-brand-tint-light" aria-label="Previous">
               <svg className="h-4 w-4 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <button type="button" onClick={nextPeriod} className="p-1 rounded-md active:bg-theme-brand-tint-light" aria-label="Next">
+            <button type="button" onClick={nextPeriod} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg active:bg-theme-brand-tint-light" aria-label="Next">
               <svg className="h-4 w-4 text-theme-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
             <MobileOverflowMenu onUpload={() => setIsUploadModalOpen(true)} showFilter={showFilterControls} isFilterOpen={isFilterDropdownOpen} onFilterToggle={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)} filterDisplayText={getFilterDisplayText()} selectedBucketFilters={selectedBucketFilters} toggleBucketFilter={toggleBucketFilter} filterableBuckets={filterableBuckets} hasGoogleEvents={googleEvents.length > 0} hasUploadedEvents={uploadedEvents.length > 0} />

@@ -19,7 +19,7 @@ import { ChatMessage } from "./chat/chat-message"
 import { ChatInput } from "./chat/chat-input"
 import { ChatSettingsPanel } from "./chat/chat-settings-panel"
 
-export function ChatBar() {
+export function ChatBar({ inlineTrigger = false }: { inlineTrigger?: boolean } = {}) {
   const vvHeight = useVisualViewport()
   const [messages, _setMessagesRaw] = useState<Message[]>(loadStoredMessages)
   /** Wrapper around setState that auto-assigns missing IDs. */
@@ -1493,7 +1493,7 @@ export function ChatBar() {
   }, [])
 
   return (
-    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-4 right-3 sm:right-4 z-50">
+    <div className={inlineTrigger ? "relative z-50" : "fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-4 right-3 sm:right-4 z-50"}>
       <AnimatePresence>
       {isOpen ? (
         <motion.div
@@ -1506,7 +1506,7 @@ export function ChatBar() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col md:h-[420px] relative pb-[env(safe-area-inset-bottom)]"
+          className={`w-[90vw] max-w-sm sm:w-80 bg-white shadow-xl rounded-xl flex flex-col md:h-[420px] pb-[env(safe-area-inset-bottom)] ${inlineTrigger ? "fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6 right-4" : "relative"}`}
           style={{ height: vvHeight ? `min(${vvHeight * 0.7}px, 480px)` : undefined }}
         >
           <ChatHeader
@@ -1662,10 +1662,11 @@ export function ChatBar() {
           exit={{ opacity: 0, scale: 0.9 }}
           transition={{ duration: 0.15 }}
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 bg-white shadow-warm rounded-full pl-3 pr-4 py-2 hover:shadow-warm-lg"
+          aria-label="Ask me anything"
+          className="flex h-10 items-center justify-center gap-2 bg-theme-surface-raised border border-theme-neutral-300 rounded-lg px-2.5 sm:px-3 hover:bg-theme-surface-alt"
         >
           <MessageSquare className="w-5 h-5 text-theme-secondary" />
-          <span className="text-sm text-theme-text-tertiary">Ask me anything</span>
+          <span className={inlineTrigger ? "hidden sm:inline text-sm text-theme-text-secondary" : "text-sm text-theme-text-secondary"}>Ask me anything</span>
         </motion.button>
       )}
       </AnimatePresence>

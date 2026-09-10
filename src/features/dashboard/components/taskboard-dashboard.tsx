@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { updateUserPreferenceFields } from "@/lib/user-preferences";
 import { ensureCacheOwner } from "@/lib/auth-cleanup";
@@ -20,15 +21,11 @@ import {
   withRetry,
   getContrastText,
 } from "@/lib/dashboard-utils";
-import { card, text, surface, iconBox } from "@/lib/styles";
+import { surface } from "@/lib/styles";
 import {
   Plus,
-  Target,
-  Activity,
-  Check,
   Loader2,
   RotateCw,
-  LayoutDashboard,
   ListChecks,
 } from "lucide-react";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
@@ -460,17 +457,23 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   });
 
   return (
-    <div className="flex-1 relative min-h-screen overflow-hidden bg-theme-surface-warm-70">
+    <div className="flex-1 relative min-w-0 bg-theme-surface-warm-70">
+
+      <PageHeaderActions>
+        <button onClick={() => setIsWidgetSheetOpen(true)} disabled={!activeBucket} className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-theme-primary px-3 text-sm font-medium text-white hover:bg-theme-primary-600 disabled:opacity-50">
+          <Plus className="h-4 w-4" />Add Widget
+        </button>
+      </PageHeaderActions>
 
       {/* Main wrapper */}
       <div className="relative z-10 flex flex-col">
 
         {/* Greeting + Completion Ring row */}
-        <section className="flex items-center justify-between mb-6">
+        <section className="flex items-center justify-between mb-4">
           <div>
-            <h1 className=" text-[24px] text-theme-text-primary tracking-tight">
+            <h2 className="text-lg font-semibold text-theme-text-primary tracking-tight">
               {greetingName ? `Welcome back, ${greetingName}` : 'Welcome back'}
-            </h1>
+            </h2>
             <p className=" text-sm text-theme-text-tertiary mt-1">You've got this! Let's make today productive.</p>
           </div>
         </section>
@@ -600,8 +603,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             {/* Content container: white widget box with subtle shadow */}
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-sm">
               {/* Inner nav */}
-              <nav className="flex items-center border-b border-theme-border-subtle-70 px-3 sm:px-5 pt-6 sm:pt-7 text-sm font-semibold overflow-x-auto no-scrollbar">
-                <div className="flex items-center gap-3 sm:gap-5">
+              <nav className="flex items-center border-b border-theme-border-subtle-70 px-3 sm:px-5 pt-4 text-sm font-semibold">
+                <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar">
                   {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                     <button
                       key={item}
@@ -620,53 +623,37 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                 </div>
                 <button
                   onClick={isRefreshing ? undefined : fetchIntegrationsData}
-                  className="ml-auto shrink-0 flex items-center gap-1.5 pb-3 text-xs tracking-[0.88px] uppercase text-theme-text-secondary hover:text-theme-text-primary transition-colors cursor-pointer"
+                  aria-label="Refresh dashboard"
+                  className="ml-3 shrink-0 flex items-center gap-1.5 pb-3 text-xs tracking-[0.88px] uppercase text-theme-text-secondary hover:text-theme-text-primary transition-colors cursor-pointer"
                 >
                   {isRefreshing ? (
                     <Loader2 className="h-4 w-4 animate-spin text-theme-primary" />
                   ) : (
                     <RotateCw className="h-4 w-4" />
                   )}
-                  Refresh
+                  <span className="hidden sm:inline">Refresh</span>
                 </button>
               </nav>
 
               {/* Content area */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-5 pt-6 sm:pt-8 pb-6 sm:pb-8">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5">
                 {/* Overview Tab */}
                 <div className={activeSubTab === 'Overview' ? '' : 'hidden'}>
-                  {/* Stat summary row — Calidora pattern */}
+                  {/* Keep progress visible without pushing the widgets down the page. */}
                   {activeWidgets.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-                      <div className={card.stat}>
-                        <div className={`${iconBox.md} bg-theme-brand-tint-strong mb-2`}>
-                          <LayoutDashboard className="h-[18px] w-[18px] text-theme-primary" />
+                    <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-theme-surface-alt px-3 py-3 text-xs sm:flex sm:flex-wrap sm:gap-x-6">
+                      {[
+                        { label: 'Widgets', value: activeWidgets.length },
+                        { label: 'In progress', value: widgetProgressStats.inProgress },
+                        { label: 'Completed', value: widgetProgressStats.completed },
+                        { label: 'Not started', value: widgetProgressStats.notStarted },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex items-baseline gap-2">
+                          <dt className="order-2 text-theme-text-tertiary">{label}</dt>
+                          <dd className="text-sm font-semibold tabular-nums text-theme-text-primary">{value}</dd>
                         </div>
-                        <p className={text.statValue}>{activeWidgets.length}</p>
-                        <p className="text-xs text-theme-text-tertiary mt-1">Total Widgets</p>
-                      </div>
-                      <div className={card.stat}>
-                        <div className={`${iconBox.md} ${surface.infoTint} mb-2`}>
-                          <Activity className="h-[18px] w-[18px] text-theme-info" />
-                        </div>
-                        <p className={text.statValue}>{widgetProgressStats.inProgress}</p>
-                        <p className="text-xs text-theme-text-tertiary mt-1">In Progress</p>
-                      </div>
-                      <div className={card.stat}>
-                        <div className={`${iconBox.md} ${surface.successTint} mb-2`}>
-                          <Check className="h-[18px] w-[18px] text-theme-success" />
-                        </div>
-                        <p className={text.statValue}>{widgetProgressStats.completed}</p>
-                        <p className="text-xs text-theme-text-tertiary mt-1">Completed</p>
-                      </div>
-                      <div className={card.stat}>
-                        <div className={`${iconBox.md} bg-[rgba(214,42,154,0.15)] mb-2`}>
-                          <Target className="h-[18px] w-[18px] text-[#d62a9a]" />
-                        </div>
-                        <p className={text.statValue}>{widgetProgressStats.notStarted}</p>
-                        <p className="text-xs text-theme-text-tertiary mt-1">Not Started</p>
-                      </div>
-                    </div>
+                      ))}
+                    </dl>
                   )}
 
                   {/* Widget grid — flex-wrap for drag-and-drop reorder */}
@@ -708,14 +695,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                   ))}
                   {/* DnD placeholder */}
                   {droppableProvided.placeholder}
-                  {/* Add Widget card */}
-                  <button className="widget-card-size rounded-xl border border-dashed border-theme-neutral-300 bg-theme-surface-raised p-4 hover:bg-theme-surface-warm-50 transition-colors text-left cursor-pointer min-w-0 flex flex-col items-center justify-center gap-2" onClick={() => setIsWidgetSheetOpen(true)}>
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-theme-neutral-300 bg-theme-brand-tint-subtle">
-                      <Plus className="h-5 w-5 text-theme-primary" />
-                    </div>
-                    <p className=" text-[13px] font-medium text-theme-text-primary">Add Widget</p>
-                    <p className=" text-[11px] text-theme-text-tertiary">Track your stats</p>
-                  </button>
+
                   </div>
                   )}
                   </Droppable>
@@ -977,7 +957,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
         />
       )}
 
-      {chatBarReady && <ChatBarLazy />}
+      {chatBarReady && <PageHeaderActions><ChatBarLazy inlineTrigger /></PageHeaderActions>}
 
       <TaskEditorModal
         ref={taskEditorRef}

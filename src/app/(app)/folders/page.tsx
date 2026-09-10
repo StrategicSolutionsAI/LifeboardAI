@@ -1,5 +1,6 @@
 "use client"
 
+import { PageHeaderActions } from "@/components/page-header-actions"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Check, ListChecks, LayoutGrid, ShoppingCart, Calendar, Plus, Trash2, X } from "lucide-react"
 import {
@@ -639,16 +640,16 @@ export default function FoldersPage() {
 
       <div className="rounded-2xl border border-theme-neutral-300 bg-white p-4 sm:p-6 md:p-8 shadow-sm">
         {localBuckets.length > 0 && !loading && colorsLoaded && (
-          <div className="flex justify-end mb-2">
+          <PageHeaderActions>
             <button
               type="button"
               onClick={openAddMode}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-theme-primary text-white text-[13px] font-medium hover:bg-theme-primary-600 transition-colors shadow-warm-sm"
             >
               <Plus size={15} />
-              <span className="hidden sm:inline">Add Folder</span>
+              <span>Add Folder</span>
             </button>
-          </div>
+          </PageHeaderActions>
         )}
         {loading || !colorsLoaded ? (
           <div className="grid grid-cols-[repeat(2,auto)] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 justify-center sm:justify-items-center gap-x-6 sm:gap-x-0 gap-y-8 sm:gap-y-10 md:gap-y-12 lg:gap-y-14 pt-8 sm:pt-10 pb-4 sm:pb-6">

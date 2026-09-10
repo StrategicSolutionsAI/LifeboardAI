@@ -17,23 +17,22 @@ import {
   Mail,
   MoreHorizontal,
   LogOut,
+  UserRound,
 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/utils/supabase/client"
 import { clearAllUserCaches } from "@/lib/auth-cleanup"
 import { Button } from "@/components/ui/button"
+import { PageHeaderActionsProvider } from "@/components/page-header-actions"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { prefetchCalendarExperience } from "@/lib/prefetch-calendar"
 import { prefetchDashboardExperience } from "@/lib/prefetch-dashboard"
 import { prefetchNotes } from "@/lib/prefetch-notes"
 import { prefetchAllTasks, prefetchTasksExperience } from "@/lib/prefetch-tasks"
 import { prefetchUserPreferences, prefetchGreetingName } from "@/lib/prefetch-user-prefs"
 
-// Sheet is only used for mobile hamburger menu — lazy-load to keep Radix Dialog out of desktop bundle
-const Sheet = dynamic(() => import("@/components/ui/sheet").then(m => m.Sheet), { ssr: false })
-const SheetContent = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetContent), { ssr: false })
-const SheetHeader = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetHeader), { ssr: false })
-const SheetTitle = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTitle), { ssr: false })
-const SheetTrigger = dynamic(() => import("@/components/ui/sheet").then(m => m.SheetTrigger), { ssr: false })
+// Load the complete dialog together so its accessible title is present on mount.
+const MobileNavigationSheet = dynamic(() => import("@/components/mobile-navigation-sheet"), { ssr: false })
 import { nav, interactive, surface } from "@/lib/styles"
 
 interface SidebarLayoutProps {
@@ -136,6 +135,12 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   const [isPending, startTransition] = useTransition()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [emailUnread, setEmailUnread] = useState(0)
+  const [headerActionsTarget, setHeaderActionsTarget] = useState<HTMLDivElement | null>(null)
+  const [navigationTrigger, setNavigationTrigger] = useState<HTMLButtonElement | null>(null)
+  const isTaskWorkspace = pathname.startsWith("/tasks")
+  const isSecondaryMobileRoute = !mobileNavItems.some(({ href }) =>
+    href === "/dashboard" ? pathname === href || pathname === `${href}/` : pathname.startsWith(href)
+  )
 
   // Fetch unread email count
   useEffect(() => {
@@ -273,7 +278,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
   )
 
   return (
-    <div className="relative min-h-[100dvh] flex flex-col overflow-x-hidden md:flex md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5" style={surface.pageBgStyle}>
+    <PageHeaderActionsProvider target={headerActionsTarget}>
+    <div className={`relative flex flex-col overflow-x-hidden md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5 ${isTaskWorkspace ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]"}`} style={surface.pageBgStyle}>
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
@@ -282,7 +288,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       </a>
 
       {/* Sidebar - Floating Panel */}
-      <aside className="hidden md:flex flex-shrink-0 flex-col bg-white rounded-2xl border border-theme-neutral-300 py-3 w-[92px] h-[calc(100dvh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
+      <aside className="hidden md:flex flex-shrink-0 flex-col bg-theme-surface-raised rounded-2xl border border-theme-neutral-300 py-3 w-[92px] h-[calc(100dvh-40px)] overflow-y-auto z-30 shadow-[0px_8px_30px_rgba(163,133,96,0.1)]">
         {/* Logo */}
         <div className="flex flex-col items-center gap-1 px-2 pb-3 mb-1 border-b border-theme-neutral-300/50">
           <div className="w-9 h-9 bg-theme-primary rounded-xl flex items-center justify-center shadow-sm">
@@ -291,7 +297,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           <span className="section-label text-2xs tracking-[0.5px]">Lifeboard</span>
         </div>
 
-        <nav className="w-full px-2 space-y-1 pt-1">
+        <nav aria-label="Primary navigation" className="w-full px-2 space-y-1 pt-1">
           {navItems.map(({ href, icon: Icon, label }) => {
             const activeOrNav = isActiveOrNavigating(href)
             const isNavigating = navigatingTo === href
@@ -346,14 +352,26 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             />
             <span className="leading-none">Settings</span>
           </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button aria-label="Account menu" className="flex w-full flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-[11px] font-medium text-theme-text-subtle hover:bg-theme-brand-tint-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme-primary">
+                <UserRound className="h-5 w-5" />
+                Account
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="end">
+              <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2 h-4 w-4" />Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleSignOut}><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
 
       {/* Right side: Header + Content */}
-      <div className="flex flex-1 flex-col min-w-0 md:gap-5">
+      <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Mobile Header */}
         <header
-          className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-theme-neutral-300 px-4 md:hidden bg-gradient-to-b from-white/[0.98] to-white"
+          className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-theme-neutral-300 px-4 md:hidden bg-theme-surface-raised"
         >
           <div className="flex min-w-0 items-center gap-4">
             <div className="w-8 h-8 bg-theme-primary rounded-lg flex items-center justify-center shadow-sm">
@@ -365,17 +383,17 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             </div>
           </div>
 
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
-              <button className={`p-2 rounded-lg hover:bg-theme-brand-tint-light active:bg-theme-active ${interactive.transitionFast}`} aria-label="Open quick actions">
-                <Menu className="h-5 w-5 text-theme-text-primary" />
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <SheetHeader>
-                <SheetTitle>{currentRoute.title}</SheetTitle>
-              </SheetHeader>
-
+          <button
+            onClick={(event) => { setNavigationTrigger(event.currentTarget); setSheetOpen(true) }}
+            className={`p-2 rounded-lg hover:bg-theme-brand-tint-light active:bg-theme-active ${interactive.transitionFast}`}
+            aria-label="Open navigation"
+            aria-expanded={sheetOpen}
+            aria-haspopup="dialog"
+          >
+            <Menu className="h-5 w-5 text-theme-text-primary" />
+          </button>
+          {sheetOpen && (
+            <MobileNavigationSheet onOpenChange={setSheetOpen} returnFocusTo={navigationTrigger}>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
                   <Link
@@ -386,7 +404,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                       setSheetOpen(false)
                     }}
                     {...getPrefetchHandlers(href)}
-                    className={`flex items-center gap-2 rounded-xl border border-theme-neutral-300/80 px-3 py-3 text-sm font-medium text-theme-text-primary hover:bg-theme-brand-tint-light ${interactive.transitionFast} ${navigatingTo === href ? "bg-theme-brand-tint-light" : ""}`}
+                    aria-current={isActiveRoute(href) ? "page" : undefined}
+                    className={`flex items-center gap-2 rounded-xl border border-theme-neutral-300/80 px-3 py-3 text-sm font-medium text-theme-text-primary hover:bg-theme-brand-tint-light ${interactive.transitionFast} ${isActiveOrNavigating(href) ? "bg-theme-brand-tint border-theme-primary/50" : ""}`}
                   >
                     <Icon className="h-4 w-4 text-theme-text-tertiary" />
                     {label}
@@ -397,27 +416,21 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
               <Button onClick={handleSignOut} variant="outline" className="mt-4 w-full">
                 Sign out
               </Button>
-            </SheetContent>
-          </Sheet>
+            </MobileNavigationSheet>
+          )}
         </header>
 
         {/* Main content area */}
         <main
           id="main-content"
-          className="flex-1 w-full px-6 sm:px-8 md:px-10 pb-24 pt-4 sm:pt-6 md:h-full md:overflow-y-auto md:pb-4 md:pt-8"
+          data-workspace={isTaskWorkspace ? "tasks" : undefined}
+          className={`flex-1 min-h-0 w-full px-6 sm:px-8 md:px-10 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:pt-6 md:pb-4 ${isTaskWorkspace ? "flex flex-col overflow-hidden" : "md:overflow-y-auto"}`}
         >
-          <div className="flex items-center justify-between mb-10 sm:mb-12">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-5 sm:mb-6">
             <h1 className="text-2xl font-semibold text-theme-text-primary">
               {currentRoute.title}
             </h1>
-            <Button
-              variant="outline"
-              onClick={handleSignOut}
-              className="hidden md:inline-flex items-center gap-2 text-sm font-medium text-theme-primary border-theme-primary/40 hover:bg-theme-primary/5 hover:border-theme-primary/60"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
+            <div ref={setHeaderActionsTarget} className="flex min-w-0 flex-wrap items-center gap-2" />
           </div>
           {children}
         </main>
@@ -425,7 +438,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
 
       {/* Mobile bottom nav */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-theme-neutral-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 pwa-standalone-bottom"
+        aria-label="Mobile navigation"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-theme-neutral-300 bg-theme-surface-raised pwa-standalone-bottom"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <ul className="grid grid-cols-5 items-center py-1.5">
@@ -451,16 +465,21 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           })}
           <li className="flex justify-center">
             <button
-              onClick={() => setSheetOpen(true)}
+              onClick={(event) => { setNavigationTrigger(event.currentTarget); setSheetOpen(true) }}
               aria-label="More navigation options"
-              className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} text-theme-text-subtle`}
+              aria-current={isSecondaryMobileRoute ? "true" : undefined}
+              aria-expanded={sheetOpen}
+              aria-haspopup="dialog"
+              className={`relative flex w-full max-w-[72px] flex-col items-center justify-center rounded-lg px-2 py-2 text-[11px] font-medium ${interactive.transitionFast} ${isSecondaryMobileRoute ? "text-theme-text-primary bg-theme-brand-tint" : "text-theme-text-subtle"}`}
             >
-              <MoreHorizontal className="mb-0.5 h-5 w-5 text-theme-text-tertiary" />
+              {isSecondaryMobileRoute && <span className={nav.bottomIndicator} aria-hidden="true" />}
+              <MoreHorizontal className={`mb-0.5 h-5 w-5 ${isSecondaryMobileRoute ? "text-theme-primary" : "text-theme-text-tertiary"}`} />
               More
             </button>
           </li>
         </ul>
       </nav>
     </div>
+    </PageHeaderActionsProvider>
   )
 }
