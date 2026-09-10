@@ -25,7 +25,9 @@ it('identifies secondary routes in More and in the navigation sheet', async () =
   fireEvent.click(more)
   const dialog = await screen.findByRole('dialog', { name: 'Navigation' })
   expect(within(dialog).getByRole('link', { name: 'Email' })).toHaveAttribute('aria-current', 'page')
-  expect(within(dialog).getByRole('link', { name: 'Tasks' })).not.toHaveAttribute('aria-current')
+  expect(within(dialog).getByRole('link', { name: 'Budget' })).not.toHaveAttribute('aria-current')
+  // Bottom-bar destinations are not repeated inside the sheet.
+  expect(within(dialog).queryByRole('link', { name: 'Tasks' })).not.toBeInTheDocument()
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(more).toHaveFocus())
   mockPathname = '/tasks'

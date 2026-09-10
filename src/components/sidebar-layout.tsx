@@ -64,67 +64,54 @@ const routeContext = [
   {
     match: (path: string) => path === "/dashboard" || path === "/dashboard/",
     title: "Dashboard",
-    description: "Track your priorities and daily momentum at a glance.",
   },
   {
     match: (path: string) => path.startsWith("/calendar"),
     title: "Calendar",
-    description: "Plan your schedule and drag tasks directly into time slots.",
   },
   {
     match: (path: string) => path.startsWith("/tasks"),
     title: "Tasks",
-    description: "Organize work into buckets and ship high-impact items first.",
   },
   {
     match: (path: string) => path.startsWith("/budget"),
     title: "Budget",
-    description: "Track spending and stay on top of your monthly budget.",
   },
   {
     match: (path: string) => path.startsWith("/trends"),
     title: "Trends",
-    description: "See how your tracked metrics change over time.",
   },
   {
     match: (path: string) => path.startsWith("/folders"),
     title: "Folders",
-    description: "Organize and browse your files and documents.",
   },
   {
     match: (path: string) => path.startsWith("/email"),
     title: "Email",
-    description: "Read and manage your Gmail inbox.",
   },
   {
     match: (path: string) => path.startsWith("/integrations"),
     title: "Integrations",
-    description: "Connect tools and keep all your data in one workflow.",
   },
   {
     match: (path: string) => path.startsWith("/shopping-list"),
     title: "Shopping",
-    description: "Capture and manage your household list quickly.",
   },
   {
     match: (path: string) => path.startsWith("/notes"),
     title: "Notes",
-    description: "Capture ideas, thoughts, and reference material.",
   },
   {
     match: (path: string) => path.startsWith("/history"),
     title: "History",
-    description: "Review trends and progress across recent activity.",
   },
   {
     match: (path: string) => path.startsWith("/profile"),
     title: "Profile",
-    description: "Personalize your account and preferences.",
   },
   {
     match: (path: string) => path.startsWith("/dashboard/settings"),
     title: "Settings",
-    description: "Fine-tune themes, behavior, and account controls.",
   },
 ]
 
@@ -213,7 +200,6 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     return (
       routeContext.find((route) => route.match(pathname)) ?? {
         title: "Workspace",
-        description: "Stay focused and keep your day in flow.",
       }
     )
   }, [pathname])
@@ -282,7 +268,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
     <div className={`relative flex flex-col overflow-x-hidden md:h-[100dvh] md:flex-row md:overflow-hidden md:p-5 md:gap-5 ${isTaskWorkspace ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]"}`} style={surface.pageBgStyle}>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:shadow"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-theme-surface-raised focus:px-3 focus:py-2 focus:text-sm focus:shadow"
       >
         Skip to content
       </a>
@@ -320,7 +306,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 <span className="relative">
                   <Icon className={`h-5 w-5 ${activeOrNav ? "text-theme-primary" : "text-theme-text-tertiary group-hover:text-theme-text-primary"} ${isNavigating ? "opacity-50 transition-opacity" : ""}`} />
                   {badgeCount > 0 && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-theme-error-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                       {badgeCount > 99 ? '99+' : badgeCount}
                     </span>
                   )}
@@ -395,7 +381,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
           {sheetOpen && (
             <MobileNavigationSheet onOpenChange={setSheetOpen} returnFocusTo={navigationTrigger}>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                {[...navItems, { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
+                {/* Only destinations the bottom bar does not already show. */}
+                {[...navItems.filter(({ href }) => !mobileNavItems.some((item) => item.href === href)), { href: "/dashboard/settings", icon: Settings, label: "Settings" }].map(({ href, icon: Icon, label }) => (
                   <Link
                     key={href}
                     href={href}
