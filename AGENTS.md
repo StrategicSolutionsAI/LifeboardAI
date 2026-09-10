@@ -7,7 +7,7 @@
 Run `npm run dev` for the local dev server, `npm run build` to generate the production bundle, and `npm run start` to serve it. Quality checks include `npm run lint` for ESLint, `npm run type-check` for TypeScript, and `npm run security:audit` for npm advisories. Use `npm run test` for Jest suites, `npm run test:e2e` for Playwright headless runs, and `npm run test:all` before proposing a merge.
 
 ## Coding Style & Naming Conventions
-Follow the patterns in `LIFEBOARD_AI_STYLE_GUIDE.md` and Tailwind utility classes for styling. Components and contexts use PascalCase, hooks start with `use`, and helpers remain camelCase. Prefer composition over deep prop drilling, and add focused comments only where logic is non-obvious. ESLint enforces 2-space indentation and import ordering via `npm run lint`.
+Follow the patterns in `STYLE_GUIDE.md` and Tailwind utility classes for styling. Components and contexts use PascalCase, hooks start with `use`, and helpers remain camelCase. Prefer composition over deep prop drilling, and add focused comments only where logic is non-obvious. ESLint enforces 2-space indentation and import ordering via `npm run lint`.
 
 ## Testing Guidelines
 Jest unit and integration tests live alongside code in `__tests__` folders (e.g., `src/app/api/.../__tests__/route.test.ts`). End-to-end scenarios belong in `tests/` and use Playwright fixtures. Mirror bug fixes with regressions tests, aim for meaningful coverage reporting via `npm run test:coverage`, and name test files with `.test.ts` or `.spec.ts` endings. Update mocks in `tests/fixtures` when backend contracts change.
@@ -17,3 +17,15 @@ Use Conventional Commits (`feat:`, `fix:`, `chore:`, etc.) and scope them by dom
 
 ## Security & Configuration Tips
 Copy `.env.example` to `.env.local` and keep secrets out of version control. Coordinate Supabase schema updates by pairing code changes with matching migration files and documenting them in the PR. When integrating third-party APIs, route credentials through environment variables and add usage notes to `SECURITY.md`.
+
+## Engineering Operating Workflow
+Use `docs/engineering/SENIOR_ENGINEERING_PLAYBOOK.md` as the operating model for non-trivial work. Before editing, restate the outcome, relevant context, constraints, risk level, and observable definition of done. For medium- or high-risk work, create or update an execution plan using `PLANS.md`; keep it current as evidence changes.
+
+- Investigate before implementing. Map callers, data flow, existing patterns, tests, and trust boundaries.
+- Keep one writer per checkout. Parallelize independent read-only exploration, research, test analysis, or review. Use separate Codex worktrees and branches when two lanes must write; never assign overlapping files.
+- Keep the lead as the decision and merge point. Architecture, schema sequencing, production deployment, rollback decisions, and final visual direction are not delegated to competing writers.
+- Match verification to risk. Add a regression test for bugs, visually inspect UI changes, exercise negative auth paths for API changes, and run the smallest relevant checks before broader gates.
+- Review the final diff using `docs/engineering/CODE_REVIEW.md`. Report prioritized findings with file and line references; if there are no findings, state residual risks and unverified behavior.
+- Finish with evidence: behavior verified, commands and results, screenshots when relevant, rollout or rollback notes, and clearly separated follow-ups.
+
+Use the project-scoped `explorer`, `builder`, and `reviewer` Codex roles only for bounded work. Do not delegate small, tightly coupled, or sequential tasks merely to increase concurrency.

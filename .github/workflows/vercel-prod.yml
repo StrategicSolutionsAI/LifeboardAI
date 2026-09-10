@@ -24,6 +24,15 @@ jobs:
       - name: Install deps (no audit)
         run: npm ci --no-audit --prefer-offline
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Unit tests
+        run: npm run test -- --runInBand
+
       - name: Pull Vercel env (Production)
         run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
         env:

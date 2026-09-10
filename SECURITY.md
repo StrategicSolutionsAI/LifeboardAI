@@ -9,6 +9,14 @@
 - Copy `.env.example` (or provider-specific variants) into `.env.local` and keep it out of version control.
 - Rotate Supabase service keys, OAuth client secrets, and third-party API tokens on a regular cadence.
 - Restrict access to secrets by role; never embed privileged keys in client code or logs.
+- Never place token values in committed agent files, MCP command arguments, or Codex/Claude configuration. Reference an external environment or provider authentication mechanism instead.
+- Treat any credential previously stored in plaintext configuration as exposed: rotate it first, then remove the literal. Deleting the value alone does not revoke it.
+
+## AI-Assisted Development
+- Explorers and reviewers use read-only access. A builder receives write access only for a bounded task and is the sole writer in its checkout.
+- Background agents inherit the parent task's permission posture. Do not use bypass or unrestricted permission modes for routine parallel work.
+- Do not copy `.env.local` into Codex worktrees by default. Provide the narrowest test credential only when verification genuinely requires it.
+- Agents must not deploy, rotate credentials, modify live Supabase state, or run destructive operations without explicit human approval.
 
 ## Authentication & Authorization
 - Use the shared helpers in `src/utils/supabase/` for session handling; avoid duplicating Supabase clients.

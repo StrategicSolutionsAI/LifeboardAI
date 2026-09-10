@@ -1,0 +1,4 @@
+# Keep parallel work useful and inspectable: the lead plus at most three lanes.
+[agents]
+max_threads = 4
+max_depth = 1
