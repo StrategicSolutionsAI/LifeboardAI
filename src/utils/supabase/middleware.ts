@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { getUserCached } from '@/lib/server-auth-cache'
+import { MIDDLEWARE_AUTH_TIMEOUT_MS } from '@/lib/cache-config'
+import { authUnavailableResponse } from './auth-unavailable-response'
 
 // Pages reachable without a session. Everything else redirects to /login.
 // The /auth/ prefix must stay public — the OAuth callback at /auth/callback
@@ -24,55 +26,111 @@ export async function updateSession(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
 
   let response = NextResponse.next({ request: { headers: requestHeaders } })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          // Rebuild the response so it carries the updated request cookies,
-          // then write the refreshed auth cookies onto it.
-          response = NextResponse.next({ request: { headers: requestHeaders } })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  // getUserCached wraps getUser() (not getSession()) — the token is validated
-  // with Supabase rather than trusted from the cookie, which is required now
-  // that we gate on the result. Repeat requests with the same already-validated
-  // token skip the ~90ms auth round-trip for AUTH_CACHE_TTL_MS.
-  const { data: { user }, error: authError } = await getUserCached(supabase)
-
-  // A network failure (offline Electron, Supabase outage) makes the session
-  // unverifiable, not absent — fail open rather than locking out valid users.
-  const authUnreachable = authError?.name === 'AuthRetryableFetchError'
-
-  if (!user && !authUnreachable && !isPublicPath(request.nextUrl.pathname)) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/login'
-    loginUrl.search = ''
-    // Preserve the intended destination so login can return to it
-    loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search)
-    const redirect = NextResponse.redirect(loginUrl)
-    // Carry over any cookies getUser() refreshed so the work isn't lost
-    response.cookies.getAll().forEach((cookie) => {
-      redirect.cookies.set(cookie)
-    })
-    return redirect
+  let refreshedCookies = response.cookies.getAll()
+  const finish = (result: NextResponse) => {
+    result.headers.set('x-nonce', nonce)
+    result.headers.set('Content-Security-Policy', buildContentSecurityPolicy(nonce))
+    return result
   }
 
-  response.headers.set('x-nonce', nonce)
-  response.headers.set('Content-Security-Policy', buildContentSecurityPolicy(nonce))
-  return response
+  // These pages don't consume a middleware user. The OAuth callback handles
+  // its own exchange; an expired cookie must not delay the public site.
+  if (isPublicPath(request.nextUrl.pathname)) return finish(response)
+
+  const controller = new AbortController()
+  const unavailable = () => {
+    const result = authUnavailableResponse()
+    // Keep a completed token rotation even if subsequent user validation
+    // fails. Never send deletion-only batches caused by an auth outage.
+    refreshedCookies.forEach(cookie => result.cookies.set(cookie))
+    return finish(result)
+  }
+  let acceptingCookies = true
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      acceptingCookies = false
+      reject(new Error('auth_timeout'))
+      controller.abort()
+    }, MIDDLEWARE_AUTH_TIMEOUT_MS)
+  })
+
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          fetch: async (input, init) => {
+            // SDK retries can outlive the overall deadline. Never send another
+            // request after it, and abort any in-flight network/body read.
+            controller.signal.throwIfAborted()
+            return fetch(input, { ...init, signal: controller.signal })
+          },
+        },
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            if (!acceptingCookies) return
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            // Refresh the copied header too, so Server Components receive the
+            // rotated token rather than attempting a second refresh themselves.
+            requestHeaders.set('cookie', request.headers.get('cookie') ?? '')
+            const previousCookies = response.cookies.getAll()
+            response = NextResponse.next({ request: { headers: requestHeaders } })
+            previousCookies.forEach(cookie => response.cookies.set(cookie))
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+            if (cookiesToSet.some(({ value, options }) => value && options?.maxAge !== 0)) {
+              refreshedCookies = response.cookies.getAll()
+            }
+          },
+        },
+      }
+    )
+
+    // Bound the whole operation, including getSession's refresh and SDK retry
+    // backoff. A timeout on each individual fetch would still exceed 25s.
+    const { data: { user }, error: authError } = await Promise.race([
+      getUserCached(supabase),
+      deadline,
+    ])
+
+    if (authError && (
+      authError.name === 'AuthRetryableFetchError' ||
+      authError.name === 'AuthUnknownError' ||
+      authError.status === 429 ||
+      (authError.status !== undefined && authError.status >= 500)
+    )) {
+      console.warn('[middleware] auth_unavailable', { pathname: request.nextUrl.pathname })
+      return unavailable()
+    }
+
+    if (!user || authError) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/login'
+      loginUrl.search = ''
+      loginUrl.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search)
+      const redirect = NextResponse.redirect(loginUrl)
+      response.cookies.getAll().forEach(cookie => redirect.cookies.set(cookie))
+      return finish(redirect)
+    }
+
+    return finish(response)
+  } catch {
+    // Never log the exception: provider errors can contain URLs or credentials.
+    console.warn(controller.signal.aborted ? '[middleware] auth_timeout' : '[middleware] auth_unavailable', {
+      pathname: request.nextUrl.pathname,
+    })
+    return unavailable()
+  } finally {
+    acceptingCookies = false
+    clearTimeout(timeoutId)
+    controller.abort()
+  }
 }
 
 function generateNonce(): string {

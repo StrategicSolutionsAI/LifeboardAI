@@ -6,7 +6,7 @@ import { AUTH_CACHE_TTL_MS } from '@/lib/cache-config'
 interface AuthClient {
   auth: {
     getUser(): Promise<{ data: { user: User | null }; error: AuthError | null }>
-    getSession(): Promise<{ data: { session: { access_token: string } | null } }>
+    getSession(): Promise<{ data: { session: { access_token: string } | null }; error?: AuthError | null }>
   }
 }
 
@@ -37,7 +37,7 @@ function tokenExpiryMs(token: string): number | null {
  * network round-trip when the same access token was already validated in the
  * last AUTH_CACHE_TTL_MS. Pass the bearer token when the request carried one;
  * otherwise the token is read from the client's cookie-backed session
- * (local parse, no network).
+ * (which can refresh an expired session over the network).
  */
 export async function getUserCached(
   supabase: AuthClient,
@@ -45,7 +45,10 @@ export async function getUserCached(
 ): Promise<GetUserResult> {
   let token = explicitToken ?? null
   if (!token) {
-    const { data } = await supabase.auth.getSession()
+    const { data, error } = await supabase.auth.getSession()
+    // A failed refresh can remove the SDK's in-memory session. Preserve its
+    // actual cause instead of masking an outage as a missing login in getUser.
+    if (error) return { data: { user: null }, error }
     token = data.session?.access_token ?? null
   }
 
