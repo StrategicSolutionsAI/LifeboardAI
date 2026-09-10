@@ -99,12 +99,13 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
   // handleDragEnd) mid-drag, which destabilises @hello-pangea/dnd.
   const creatingHabitRef = useRef(false);
 
-  // Hide sidebar on mobile
-  const [isMobile, setIsMobile] = useState(false);
+  // The task panel only sits beside the calendar from lg up; below that it would
+  // stack inside the fixed-height column and starve the calendar of height.
+  const [isStackedLayout, setIsStackedLayout] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 640px)');
-    const update = (e: MediaQueryListEvent | MediaQueryList) => setIsMobile(e.matches);
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const update = (e: MediaQueryListEvent | MediaQueryList) => setIsStackedLayout(e.matches);
     update(mq);
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
@@ -183,8 +184,8 @@ function CalendarContent({ selectedDate, onDateChange }: CalendarContentProps) {
           />
         </div>
 
-        {/* Task list sidebar — hidden on mobile */}
-        {!isMobile && (
+        {/* Task list sidebar — only rendered in the side-by-side (lg+) layout */}
+        {!isStackedLayout && (
           <div
             className={`flex-shrink-0 w-full transition-[width] duration-300 ease-in-out ${
               isSidebarCollapsed ? 'lg:w-[64px]' : 'lg:w-[360px]'
