@@ -111,16 +111,21 @@ export default function RootLayout({
         <link rel="apple-touch-startup-image" href="/splash/iphone-14pro-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" />
         <link rel="apple-touch-startup-image" href="/splash/iphone-15promax-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
         <link rel="apple-touch-startup-image" href="/splash/iphone-16promax-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" />
-        {/* Register service worker for PWA (skip in Electron — not needed) */}
+        {/* Register service worker for PWA (skip in Electron — not needed).
+            Production only: sw.js caches /_next/static cache-first, and dev
+            chunk URLs never change, so in development it keeps serving code
+            from before your edits. */}
         {/* suppressHydrationWarning: browsers blank the nonce attribute after
             parsing (nonce hiding), so client hydration always reads "" */}
-        <script
-          nonce={nonce}
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator && !window.electronAPI){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')})}`
-          }}
-        />
+        {process.env.NODE_ENV === 'production' && (
+          <script
+            nonce={nonce}
+            suppressHydrationWarning
+            dangerouslySetInnerHTML={{
+              __html: `if('serviceWorker' in navigator && !window.electronAPI){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js')})}`
+            }}
+          />
+        )}
         {/*
           Inline theme script: injects a <style> tag with CSS custom properties
           from localStorage BEFORE React hydrates, preventing the blank flash
