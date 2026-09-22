@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock, Upload, Trash2 } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertCircle, Clock, Upload, Trash2, ListChecks, CalendarDays, Mail, Activity, Watch, Scale, MessageSquare, type LucideIcon } from 'lucide-react'
 import { PageHeaderActions } from '@/components/page-header-actions'
-import { layout } from '@/lib/styles'
+import { layout, iconBox } from '@/lib/styles'
 import { invalidateIntegrationCaches, invalidateTaskCaches } from '@/hooks/use-data-cache'
 import SectionLoadTimer from '@/components/section-load-timer'
 import { CalendarFileUpload, type UploadResult } from '@/features/calendar/components/calendar-file-upload'
@@ -15,7 +15,7 @@ import { useFamilyMembers } from '@/hooks/use-family-members'
 import { getCurrentLocalDate } from '@/lib/date-utils'
 
 interface IntegrationStatus { connected: boolean; lastUpdated?: string; integrationId?: string; message?: string; error?: string }
-interface Integration { id: string; name: string; description: string; icon: string; status?: IntegrationStatus; authUrl?: string }
+interface Integration { id: string; name: string; description: string; icon: LucideIcon; status?: IntegrationStatus; authUrl?: string }
 
 interface CalendarImport {
   id: string;
@@ -29,13 +29,13 @@ interface CalendarImport {
 }
 
 const integrations: Integration[] = [
-  { id: 'todoist', name: 'Todoist', description: 'Sync your tasks and projects from Todoist', icon: '📝', authUrl: '/api/integrations/todoist/auth' },
-  { id: 'google', name: 'Google Calendar', description: 'View and manage your Google Calendar events', icon: '📅', authUrl: '/api/auth/google?redirectUrl=/integrations' },
-  { id: 'gmail', name: 'Gmail', description: 'Read and manage your Gmail inbox from LifeboardAI', icon: '📧', authUrl: '/api/auth/gmail?redirectUrl=/integrations' },
-  { id: 'google-fit', name: 'Google Fit', description: 'Connect to track your fitness activities and health metrics', icon: '🏃', authUrl: '/api/auth/googlefit?redirectUrl=/integrations' },
-  { id: 'fitbit', name: 'Fitbit', description: 'Track your fitness data and health metrics', icon: '⌚', authUrl: '/api/auth/fitbit?redirectUrl=/integrations' },
-  { id: 'withings', name: 'Withings Smart Scale', description: 'Monitor your health data and body metrics', icon: '⚖️', authUrl: '/api/auth/withings?redirectUrl=/integrations' },
-  { id: 'slack', name: 'Slack', description: 'Get notifications and manage tasks from Slack (Coming Soon)', icon: '💬' },
+  { id: 'todoist', name: 'Todoist', description: 'Sync your tasks and projects from Todoist', icon: ListChecks, authUrl: '/api/integrations/todoist/auth' },
+  { id: 'google', name: 'Google Calendar', description: 'View and manage your Google Calendar events', icon: CalendarDays, authUrl: '/api/auth/google?redirectUrl=/integrations' },
+  { id: 'gmail', name: 'Gmail', description: 'Read and manage your Gmail inbox from LifeboardAI', icon: Mail, authUrl: '/api/auth/gmail?redirectUrl=/integrations' },
+  { id: 'google-fit', name: 'Google Fit', description: 'Connect to track your fitness activities and health metrics', icon: Activity, authUrl: '/api/auth/googlefit?redirectUrl=/integrations' },
+  { id: 'fitbit', name: 'Fitbit', description: 'Track your fitness data and health metrics', icon: Watch, authUrl: '/api/auth/fitbit?redirectUrl=/integrations' },
+  { id: 'withings', name: 'Withings Smart Scale', description: 'Monitor your health data and body metrics', icon: Scale, authUrl: '/api/auth/withings?redirectUrl=/integrations' },
+  { id: 'slack', name: 'Slack', description: 'Get notifications and manage tasks from Slack (Coming Soon)', icon: MessageSquare },
 ]
 
 const integerFormatter = new Intl.NumberFormat()
@@ -409,7 +409,7 @@ export default function IntegrationsPageClient() {
   }
 
   const getMessageStyle = (message: string, connected: boolean) => {
-    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed') || lower.includes('synced') || lower.includes('loaded')) return 'text-green-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-red-600 font-medium'; if (lower.includes('disconnect')) return 'text-amber-600'; return 'text-theme-text-secondary'
+    if (!message) return ''; const lower = message.toLowerCase(); if (lower.includes('success') || lower.includes('refreshed') || lower.includes('synced') || lower.includes('loaded')) return 'text-theme-success-600 font-medium'; if (lower.includes('fail') || lower.includes('error')) return 'text-theme-error-600 font-medium'; if (lower.includes('disconnect')) return 'text-theme-warning-600'; return 'text-theme-text-secondary'
   }
 
   if (initialLoading) {
@@ -604,11 +604,11 @@ export default function IntegrationsPageClient() {
                           </div>
                         )}
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleDeleteImport(calendar.id)}
                           disabled={deletingImportId === calendar.id || isUpdatingBucket}
-                          className="w-full sm:w-auto"
+                          className="w-full sm:w-auto border-theme-neutral-300 text-theme-text-secondary hover:border-theme-error-100 hover:bg-theme-error-50 hover:text-theme-error-600"
                         >
                           {deletingImportId === calendar.id ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -647,12 +647,13 @@ export default function IntegrationsPageClient() {
               status?.connected && status?.lastUpdated &&
               Date.now() - new Date(status.lastUpdated).getTime() > STALE_SYNC_MS
             )
+            const Icon = integration.icon
             return (
               <Card key={integration.id} className={`relative transition-all ${isComingSoon ? 'opacity-60' : ''} ${isLoading ? 'scale-[0.99]' : ''}`}>
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl mt-1">{integration.icon}</span>
+                      <span className={`${iconBox.lg} shrink-0 bg-theme-brand-tint-light text-theme-primary-600`}><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
                       <div className="flex-1">
                         <CardTitle className="text-lg flex items-center gap-2">{integration.name}{isComingSoon && (<Badge variant="secondary" className="text-xs">Coming Soon</Badge>)}</CardTitle>
                         <CardDescription className="mt-1">{integration.description}</CardDescription>
@@ -661,11 +662,11 @@ export default function IntegrationsPageClient() {
                     {!isComingSoon && (
                       <div className="ml-2">
                         {isLoading ? (<Loader2 className="h-5 w-5 animate-spin text-theme-text-secondary" />) : status?.connected && isStale ? (
-                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white"><Clock className="h-3 w-3 mr-1" />Needs sync</Badge>
+                          <Badge variant="outline" className="whitespace-nowrap border-theme-warning-100 bg-theme-warning-50 text-theme-warning-700 font-medium"><Clock className="h-3 w-3 mr-1" />Needs sync</Badge>
                         ) : status?.connected ? (
-                          <Badge className="bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>
+                          <Badge variant="outline" className="whitespace-nowrap border-theme-success-100 bg-theme-success-50 text-theme-success-700 font-medium"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-theme-text-secondary"><XCircle className="h-3 w-3 mr-1" />Not Connected</Badge>
+                          <Badge variant="outline" className="whitespace-nowrap border-theme-neutral-300 text-theme-text-tertiary font-medium"><XCircle className="h-3 w-3 mr-1" />Not Connected</Badge>
                         )}
                       </div>
                     )}
@@ -678,17 +679,17 @@ export default function IntegrationsPageClient() {
                         <div className="flex items-center gap-2 text-sm text-theme-text-secondary"><Clock className="h-3 w-3" /><span>Last synced {formatRelativeTime(status.lastUpdated)}</span></div>
                       )}
                       {status?.message && (<p className={`text-sm ${getMessageStyle(status.message, status.connected)}`}>{status.message}</p>)}
-                      {status?.error && (<p className="text-sm text-red-600 font-medium">{status.error}</p>)}
+                      {status?.error && (<p className="text-sm text-theme-error-600 font-medium">{status.error}</p>)}
                       <div className="flex gap-2">
                         {status?.connected ? (
                           <>
                             <Button variant="outline" size="sm" onClick={() => handleRefresh(integration.id)} disabled={isLoading} className="flex-1 relative overflow-hidden transition-all duration-200 hover:shadow-sm hover:scale-[1.02] active:scale-[0.98] group disabled:opacity-60 disabled:cursor-not-allowed">
                               <RefreshCw className={`h-4 w-4 mr-2 transition-transform duration-300 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180'}`} />
                               <span className="relative z-10 text-xs font-medium">{isLoading ? 'Syncing...' : 'Sync Data'}</span>
-                              {status?.message?.toLowerCase().includes('success') && (<div className="absolute inset-0 bg-green-500/10 animate-pulse" />)}
-                              {status?.error && (<div className="absolute inset-0 bg-red-500/10" />)}
+                              {status?.message?.toLowerCase().includes('success') && (<div className="absolute inset-0 bg-theme-success-tint animate-pulse" />)}
+                              {status?.error && (<div className="absolute inset-0 bg-theme-error-tint" />)}
                             </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDisconnect(integration.id)} disabled={isLoading}>Disconnect</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDisconnect(integration.id)} disabled={isLoading} className="border-theme-neutral-300 text-theme-text-secondary hover:border-theme-error-100 hover:bg-theme-error-50 hover:text-theme-error-600">Disconnect</Button>
                           </>
                         ) : (
                           <Button onClick={() => handleConnect(integration)} disabled={isLoading} className="w-full"><ExternalLink className="h-4 w-4 mr-2" />Connect {integration.name}</Button>
