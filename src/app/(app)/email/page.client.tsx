@@ -2964,8 +2964,18 @@ export default function EmailPageClient() {
                     <Loader2 className="h-5 w-5 animate-spin text-theme-text-tertiary" />
                   </div>
                 ) : messagesError ? (
-                  <div className="px-4 py-8 text-center text-sm text-red-600">
-                    Failed to load emails. Please try again.
+                  <div className="px-4 py-12 text-center">
+                    <AlertCircle className="h-10 w-10 text-theme-error/50 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-theme-text-primary">Couldn&apos;t load your inbox</p>
+                    <p className="mt-1 text-sm text-theme-text-tertiary">Check your connection and try again.</p>
+                    <button
+                      type="button"
+                      onClick={() => void refetch()}
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-theme-neutral-300 bg-theme-surface-raised px-3 py-1.5 text-xs font-medium text-theme-text-secondary transition-colors hover:bg-theme-surface-alt hover:text-theme-text-primary"
+                    >
+                      <RefreshCcw className="h-3.5 w-3.5" />
+                      Try again
+                    </button>
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="px-4 py-12 text-center">
