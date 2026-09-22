@@ -27,7 +27,13 @@ import {
   Loader2,
   RotateCw,
   ListChecks,
+  LayoutGrid,
 } from "lucide-react";
+
+// Phone-width tab strips scroll horizontally; the fade tells the eye there is
+// more, and the trailing padding lets the last tab scroll clear of it.
+const MOBILE_SCROLL_FADE =
+  "max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%_-_32px),transparent)]";
 import type { WidgetTemplate, WidgetInstance } from "@/types/widgets";
 import type { Task } from "@/types/tasks";
 import type { ProgressEntry } from "@/features/dashboard/types";
@@ -482,7 +488,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
           className="relative z-10 transition-all duration-300 ease-in-out"
           style={{ width: '100%' }}
         >
-          <div className="flex items-start overflow-x-auto pt-1 no-scrollbar" ref={tabsScrollRef}>
+          <div className={`flex items-start overflow-x-auto pt-1 no-scrollbar ${MOBILE_SCROLL_FADE}`} ref={tabsScrollRef}>
             {bucketsInitialized && buckets.length === 0 && (
               <div className="flex h-[48px] items-center justify-between gap-3 rounded-t-[16px] border border-dashed border-theme-neutral-300 bg-white px-5 text-[13px] text-theme-text-tertiary ">
                 <span>No tabs yet. Click + to add your first bucket.</span>
@@ -604,7 +610,7 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
             <div className="relative z-10 -mt-px flex h-full flex-col overflow-hidden rounded-b-xl border border-theme-neutral-300 bg-theme-surface-raised shadow-warm-sm">
               {/* Inner nav */}
               <nav className="flex items-center border-b border-theme-border-subtle-70 px-3 sm:px-5 pt-4 text-sm font-semibold">
-                <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar">
+                <div className={`flex min-w-0 flex-1 items-center gap-3 sm:gap-5 overflow-x-auto no-scrollbar ${MOBILE_SCROLL_FADE}`}>
                   {(['Overview', 'Trends', 'Logs', 'Tasks', 'Settings'] as const).map((item) => (
                     <button
                       key={item}
@@ -662,6 +668,27 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
                       {Array.from({ length: 6 }).map((_, i) => (
                         <WidgetCardSkeleton key={i} index={i} />
                       ))}
+                    </div>
+                  ) : activeWidgets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+                      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-theme-neutral-300/50 bg-gradient-to-br from-theme-brand-tint-light to-theme-brand-tint-subtle">
+                        <LayoutGrid className="h-7 w-7 text-theme-secondary" strokeWidth={1.5} />
+                      </div>
+                      <h3 className="mb-1.5 text-base font-semibold text-theme-text-primary">
+                        {activeBucket ? `Nothing in ${activeBucket} yet` : 'No widgets yet'}
+                      </h3>
+                      <p className="mb-6 max-w-[300px] text-sm leading-relaxed text-theme-text-tertiary">
+                        Add a tracker, habit, or note widget to start filling this bucket.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsWidgetSheetOpen(true)}
+                        disabled={!activeBucket}
+                        className="inline-flex items-center gap-2 rounded-xl bg-theme-primary px-5 py-2.5 text-sm font-medium text-white shadow-warm-sm transition-colors hover:bg-theme-primary-600 disabled:opacity-50"
+                      >
+                        <Plus size={16} />
+                        Add a widget
+                      </button>
                     </div>
                   ) : (
                   <DragDropContext onDragEnd={handleWidgetDragEnd}>
