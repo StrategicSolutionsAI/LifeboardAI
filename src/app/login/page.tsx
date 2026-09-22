@@ -27,7 +27,7 @@ export default function Login({ searchParams }: { searchParams: { error?: string
 
         {/* Google */}
         <form action={signInWithGoogle} className="space-y-4">
-          <Button type="submit" className="w-full text-white bg-theme-primary hover:bg-theme-primary-600">
+          <Button type="submit" variant="outline" className="w-full border-theme-neutral-300 bg-white text-theme-text-primary hover:bg-theme-surface-alt hover:text-theme-text-primary">
             Continue with Google
           </Button>
         </form>
@@ -42,20 +42,32 @@ export default function Login({ searchParams }: { searchParams: { error?: string
           {searchParams.redirect && (
             <input type="hidden" name="redirect" value={searchParams.redirect} />
           )}
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="Email"
-            className={`${form.authInput} font-['Manrope',sans-serif]`}
-          />
-          <input
-            name="password"
-            type="password"
-            required
-            placeholder="Password"
-            className={`${form.authInput} font-['Manrope',sans-serif]`}
-          />
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-theme-text-primary mb-2">
+              Email Address
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              className={form.authInput}
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-theme-text-primary mb-2">
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              className={form.authInput}
+            />
+          </div>
           <div className="flex justify-end">
             <Link
               href="/forgot-password"

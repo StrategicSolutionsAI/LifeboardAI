@@ -58,7 +58,7 @@ export default function ResetPassword() {
             placeholder="New password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={`${form.authInput} font-['Manrope',sans-serif]`}
+            className={form.authInput}
           />
           <input
             type="password"
@@ -68,7 +68,7 @@ export default function ResetPassword() {
             placeholder="Confirm new password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className={`${form.authInput} font-['Manrope',sans-serif]`}
+            className={form.authInput}
           />
           <Button
             type="submit"

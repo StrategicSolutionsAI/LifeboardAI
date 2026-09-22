@@ -20,7 +20,7 @@ export default function ForgotPassword({ searchParams }: { searchParams: { error
             type="email"
             required
             placeholder="Email"
-            className={`${form.authInput} font-['Manrope',sans-serif]`}
+            className={form.authInput}
           />
           <Button type="submit" className="w-full text-white bg-theme-primary hover:bg-theme-primary-600">
             Send reset link
