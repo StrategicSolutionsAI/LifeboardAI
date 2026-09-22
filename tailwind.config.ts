@@ -1,5 +1,33 @@
 import type { Config } from "tailwindcss"
 
+// Theme colors are runtime CSS variables holding plain hex (applyTheme writes
+// them), so Tailwind cannot open an alpha slot and used to drop every
+// `theme-*/NN` utility without a trace — focus rings fell back to Tailwind's
+// default blue and tinted icons to the inherited body color. A function value
+// receives the modifier, and color-mix() applies it to whatever the variable
+// holds at runtime. Without a modifier the plain variable is emitted as before,
+// so `bg-opacity-*` stays the documented no-op.
+type ColorTree = { [key: string]: string | ColorTree }
+function alphaCapable<T extends ColorTree>(tree: T): T {
+  const out: ColorTree = {}
+  for (const [key, value] of Object.entries(tree)) {
+    if (typeof value !== 'string') {
+      out[key] = alphaCapable(value)
+    } else if (/^var\(--theme-[\w-]+\)$/.test(value)) {
+      const color = ({ opacityValue }: { opacityValue?: string | number }) => {
+        const alpha = opacityValue === undefined ? undefined : String(opacityValue)
+        return alpha === undefined || alpha.startsWith('var(')
+          ? value
+          : `color-mix(in srgb, ${value} calc(100% * ${alpha}), transparent)`
+      }
+      out[key] = color as unknown as string
+    } else {
+      out[key] = value
+    }
+  }
+  return out as T
+}
+
 const config = {
   darkMode: ["class"],
   content: [
@@ -32,7 +60,7 @@ const config = {
         'warm': '0px 6px 20px rgba(163, 133, 96, 0.1)',
         'warm-lg': '0px 8px 30px rgba(163, 133, 96, 0.1)',
       },
-      colors: {
+      colors: alphaCapable({
         // Warm color scale (Calidora earth tones)
         'warm': {
           50: '#fdf8f6',
@@ -231,7 +259,7 @@ const config = {
           subtle: 'var(--theme-text-subtle)',
           body: 'var(--theme-text-body)',
         },
-      },
+      }),
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
