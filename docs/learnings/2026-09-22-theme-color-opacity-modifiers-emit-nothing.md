@@ -1,0 +1,11 @@
+# `theme-*/NN` opacity modifiers emitted no CSS at all
+
+**Problem** — The Notes empty-state icon rendered pure black on a warm-neutral page, and focus rings on cards and inputs were Tailwind's default blue on a golden-brown brand.
+
+**Approach** — `getComputedStyle(icon).color` was `rgb(10,10,10)`, i.e. the body foreground, so the icon's `text-theme-text-tertiary/40` class was setting nothing. Searched the served stylesheets for the selector `.text-theme-text-tertiary\/40` — no rule existed. Dropped a test div with `ring-2 ring-theme-primary/40` into the page: `--tw-ring-color` was `rgb(59 130 246 / 0.5)`, Tailwind's default. Grep for `(text|bg|border|ring|from|to)-theme-[a-z0-9-]+/[0-9]+` found 286 sites, including `styles.ts` tokens like `authInput`'s focus ring. Root cause: theme colors are `var(--theme-x)` strings; Tailwind's `withAlphaValue` cannot parse them, returns `undefined`, and the whole utility is dropped — not rendered opaque, dropped.
+
+**Solution** — `tailwind.config.ts` wraps the colors object in `alphaCapable()`, which turns every `var(--theme-…)` string into a function value. With no modifier it returns the plain variable (unchanged output); with a numeric modifier it returns `color-mix(in srgb, var(--theme-x) calc(100% * α), transparent)`, which works on the hex values `applyTheme` writes at runtime. α is coerced with `String()` because the gradient `transparentTo()` path passes `0` as a number. Verified: the ring became `#B1916A` at 40 %, and 97 `color-mix` rules appeared in the served CSS.
+
+**Rule** — In this repo `theme-*/NN` slash modifiers now work; `bg-opacity-*`/`text-opacity-*` still do nothing (documented in the 2026-07-09 note). When an icon renders black or a ring renders blue, first check whether the utility class exists in the served stylesheet (`document.styleSheets` → `cssRules` → `selectorText`) before touching the component; a missing rule means the config, not the call site, is wrong. Fix it once in the config, never by editing hundreds of sites.
+
+**Dead ends** — Replacing the 286 call sites with tint tokens one by one; `<alpha-value>` in the config (breaks `applyTheme`, which writes plain hex); assuming a `/NN` class "just renders opaque" — it renders nothing, so the fallback is whatever the parent or Tailwind default supplies.

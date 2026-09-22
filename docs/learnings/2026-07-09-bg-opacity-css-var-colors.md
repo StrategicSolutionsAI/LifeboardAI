@@ -9,3 +9,5 @@
 **Rule** — Never combine `bg-opacity-*` / `text-opacity-*` with `theme-*` colors in this repo; use the `theme-brand-tint-*` tokens (or an inline `hexToRgba`) for translucent brand surfaces. Grep for `bg-opacity` when auditing new UI.
 
 **Dead ends** — "Fix" by bumping opacity value (the utility does nothing at any value); redefining the Tailwind color with `<alpha-value>` (would break `applyTheme`, which writes plain hex vars at runtime).
+
+**Update 2026-09-22** — Slash modifiers (`theme-*/NN`) are now alpha-capable through `alphaCapable()` in `tailwind.config.ts` (`color-mix()` on the runtime variable), so `ring-theme-primary/40` renders as intended. `bg-opacity-*` remains a no-op by design. See docs/learnings/2026-09-22-theme-color-opacity-modifiers-emit-nothing.md.
