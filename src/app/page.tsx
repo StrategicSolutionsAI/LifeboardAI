@@ -34,7 +34,7 @@ function DashboardMockup() {
         </div>
 
         {/* App body */}
-        <div className="flex min-h-[300px] md:min-h-[380px]">
+        <div className="flex min-h-[300px]">
           {/* Sidebar - matches actual app sidebar */}
           <div className="hidden md:flex flex-col items-center w-16 bg-theme-surface-alt border-r border-warm-200 py-4 gap-3">
             <div className="w-8 h-8 rounded-lg bg-warm-500 flex items-center justify-center text-white text-xs font-bold">L</div>
@@ -140,7 +140,7 @@ function DashboardMockup() {
         </div>
 
         {/* Chat bar at bottom - matches actual app */}
-        <div className="border-t border-warm-200 bg-theme-surface-alt px-4 py-2.5 flex items-center gap-2">
+        <div className="border-t border-warm-200 bg-theme-surface-alt px-4 sm:pl-44 py-2.5 flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-warm-400" />
           <div className="flex-1 h-7 bg-white rounded-full border border-warm-200 px-3 flex items-center">
             <span className="text-[10px] text-theme-text-tertiary">Ask AI anything about your day...</span>
@@ -214,7 +214,7 @@ function FeatureRow({ reverse, label, title, desc, bullets, visual }: {
     <div className={`scroll-reveal flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} items-center gap-10 md:gap-16`}>
       <div className="md:w-1/2">
         <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">{label}</p>
-        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4 text-theme-text-primary">{title}</h3>
+        <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-4 text-theme-text-primary text-balance">{title}</h3>
         <p className="text-theme-text-subtle leading-relaxed mb-6">{desc}</p>
         <ul className="space-y-2.5">
           {bullets.map((b) => (
@@ -273,11 +273,11 @@ export default function Page() {
           <div className="animate-fade-in-up inline-block mb-6 px-4 py-1.5 rounded-full border border-warm-200 bg-white/60 backdrop-blur text-xs font-semibold uppercase tracking-[0.15em] text-warm-500">
             Your life, one dashboard
           </div>
-          <h1 className="animate-fade-in-up delay-100 text-[2rem] sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 leading-[1.2] sm:leading-[1.1] text-theme-text-primary">
+          <h1 className="animate-fade-in-up delay-100 text-[2.5rem] sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-8 leading-[1.1] text-theme-text-primary">
             Tasks, health &amp; AI<br />
             <span className="text-warm-500">all in one place.</span>
           </h1>
-          <p className="animate-fade-in-up delay-200 text-[0.95rem] sm:text-base md:text-xl text-theme-text-subtle max-w-2xl mx-auto leading-relaxed mb-10 font-light px-0">
+          <p className="animate-fade-in-up delay-200 text-[0.95rem] sm:text-base md:text-xl text-theme-text-subtle max-w-2xl mx-auto leading-relaxed mb-10 font-light px-0 text-balance">
             Organize your life with customizable buckets, 30+ tracking widgets, an AI assistant, and integrations with the tools you already use.
           </p>
 
@@ -315,7 +315,7 @@ export default function Page() {
         <div className="max-w-7xl mx-auto">
           <div className="scroll-reveal mb-16 max-w-2xl">
             <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">Features</p>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary">Everything you need, nothing you don&apos;t.</h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary text-balance">Everything you need, nothing you don&apos;t.</h2>
             <p className="text-lg text-theme-text-subtle leading-relaxed">
               Lifeboard adapts to you. Organize tasks your way, track what matters, and let AI handle the rest.
             </p>
@@ -355,7 +355,7 @@ export default function Page() {
         <div className="max-w-7xl mx-auto">
           <div className="scroll-reveal text-center mb-14 max-w-2xl mx-auto">
             <p className="text-xs uppercase tracking-[0.18em] text-warm-500 font-semibold mb-3">Widgets</p>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary">30+ widgets for every part of your life.</h2>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4 text-theme-text-primary text-balance">30+ widgets for every part of your life.</h2>
             <p className="text-lg text-theme-text-subtle">
               Health, wellness, nutrition, finance, family, and productivity &mdash; all in one dashboard.
             </p>
@@ -537,7 +537,7 @@ export default function Page() {
         <div className="mx-auto max-w-7xl">
           <div className="scroll-reveal mx-auto mb-14 max-w-2xl text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-warm-500">Pricing</p>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight md:text-5xl text-theme-text-primary">Start simple. Scale when you need it.</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight md:text-5xl text-theme-text-primary text-balance">Start simple. Scale when you need it.</h2>
             <p className="mt-4 text-lg text-theme-text-subtle">All plans include bucket tabs, task management, and your AI assistant.</p>
           </div>
 
@@ -606,10 +606,11 @@ export default function Page() {
 
                 <Link href={plan.name === "Team" ? "/login" : "/signup"}>
                   <Button
+                    variant={plan.popular ? "default" : "outline"}
                     className={`w-full rounded-xl ${
                       plan.popular
                         ? "bg-warm-600 text-white hover:bg-warm-700"
-                        : "bg-[#111] text-white hover:bg-theme-text-primary"
+                        : "border-warm-300 text-warm-700 hover:bg-warm-50"
                     }`}
                   >
                     {plan.cta}

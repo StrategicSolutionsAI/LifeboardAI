@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function FooterLinks() {
   return (
-    <div className="mt-32 flex flex-col md:flex-row justify-between items-end border-t border-white/10 pt-8">
+    <div className="mt-32 max-w-7xl mx-auto flex flex-col gap-6 md:flex-row justify-between items-start md:items-end border-t border-white/10 pt-8">
       <div className="text-left">
         <div className="text-2xl font-bold mb-2">Lifeboard.</div>
         <div className="text-theme-text-tertiary">© {new Date().getFullYear()}</div>
