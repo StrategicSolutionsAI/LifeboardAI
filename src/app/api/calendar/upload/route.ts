@@ -659,6 +659,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Rows the calendar view renders: ICS imports plus events the assistant adds
+// through POST /api/calendar/events (which defaults source to 'manual').
+const CALENDAR_VIEW_SOURCES = ['uploaded_calendar', 'manual'];
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = supabaseServer();
@@ -674,7 +678,7 @@ export async function GET(request: NextRequest) {
       .from('calendar_events')
       .select('*')
       .eq('user_id', user.id)
-      .eq('source', 'uploaded_calendar')
+      .in('source', CALENDAR_VIEW_SOURCES)
       .order('start_time', { ascending: true });
 
     if (error) {
@@ -695,7 +699,7 @@ export async function GET(request: NextRequest) {
           .from('calendar_events')
           .select('*')
           .eq('user_id', user.id)
-          .eq('source', 'uploaded_calendar')
+          .in('source', CALENDAR_VIEW_SOURCES)
           .order('start_time', { ascending: true });
 
         if (!refreshError && Array.isArray(refreshedEvents)) {
