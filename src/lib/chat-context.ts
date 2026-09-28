@@ -3,6 +3,9 @@ import { getRequestOrigin } from '@/lib/api-utils'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { getUserCached } from '@/lib/server-auth-cache'
 import { getDataScope, ownedOrShared } from '@/lib/household/scope'
+import { TASK_SELECT_COLUMNS } from '@/repositories/tasks'
+import { CLIENT_DATE_HEADER } from '@/lib/date-utils'
+import { capacitySummary, currentMood, cycleDay, lastNightSleep, scheduledHoursByDay } from '@/lib/capacity'
 import { supabaseServer } from '@/utils/supabase/server'
 
 /**
@@ -31,7 +34,9 @@ export async function buildChatContext(
   req: NextRequest
 ): Promise<ChatContextResult> {
   const origin = getRequestOrigin(req)
-  const today = new Date().toISOString().split('T')[0]
+  // The client's local date; the server's UTC date is a day ahead on US evenings.
+  const clientDate = req.headers.get(CLIENT_DATE_HEADER)
+  const today = clientDate && /^\d{4}-\d{2}-\d{2}$/.test(clientDate) ? clientDate : new Date().toISOString().split('T')[0]
 
   const supabase = supabaseServer()
   // Cached validation — the route wrapper already verified this token
@@ -65,6 +70,14 @@ export async function buildChatContext(
             .gte('start_date', today)
             .order('start_date', { ascending: true })
             .limit(20),
+          // Timed tasks feed the capacity summary (hours committed per day)
+          supabase
+            .from('lifeboard_tasks')
+            .select(TASK_SELECT_COLUMNS)
+            .or(ownedOrShared(scope))
+            .eq('completed', false)
+            .not('hour_slot', 'is', null)
+            .limit(500),
           supabase
             .from('shopping_list_items')
             .select('id, name, quantity, bucket, is_purchased')
@@ -93,6 +106,7 @@ export async function buildChatContext(
       .join('; ')
 
     const contextData: ChatContextData = {}
+    let timedTaskRows: Array<Record<string, any>> = []
 
     // Steps depend only on prefs — start the metrics fetch now so it overlaps
     // the dashboard-query batch instead of running after it
@@ -132,7 +146,10 @@ export async function buildChatContext(
       : null
 
     if (batchPromise) {
-      const [tasksResult, calendarResult, shoppingResult] = await batchPromise
+      const [tasksResult, calendarResult, timedResult, shoppingResult] = await batchPromise
+      if (timedResult.status === 'fulfilled' && timedResult.value.data) {
+        timedTaskRows = timedResult.value.data
+      }
 
       if (
         tasksResult.status === 'fulfilled' &&
@@ -172,6 +189,8 @@ export async function buildChatContext(
       const steps = await stepsPromise
       if (steps !== undefined) contextData.steps = steps
     }
+
+    const allWidgetsForCapacity = Object.values(prefs.widgets_by_bucket || {}).flat() as any[]
 
     // Assemble the context string
     const contextParts = [
@@ -220,6 +239,20 @@ export async function buildChatContext(
 
     if (contextData.steps !== undefined) {
       contextParts.push(`\n\nToday's Steps: ${contextData.steps}`)
+    }
+
+    // Capacity: sleep, mood, cycle day and this week's committed hours
+    if (user) {
+      const accountByRosterId = new Map<string, string>(
+        (householdRoster ?? []).filter((m: any) => m?.userId).map((m: any) => [m.id, m.userId]),
+      )
+      const capacity = capacitySummary({
+        sleep: lastNightSleep(allWidgetsForCapacity, today),
+        mood: currentMood(prefs.mood_entries, today),
+        cycle: cycleDay(allWidgetsForCapacity, today),
+        load: scheduledHoursByDay(timedTaskRows, { userId: user.id, today, days: 7, accountByRosterId }),
+      })
+      if (capacity) contextParts.push(capacity)
     }
 
     // Family members: the household's shared roster, else the widget's own

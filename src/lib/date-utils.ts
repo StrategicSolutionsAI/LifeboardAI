@@ -3,6 +3,9 @@
  * use toISOString() for date keys, it is UTC and rolls to tomorrow's date
  * during evening hours west of Greenwich. dashboard-utils re-exports this.
  */
+/** Header carrying the client's local YYYY-MM-DD to routes that build context server-side. */
+export const CLIENT_DATE_HEADER = 'x-client-date'
+
 export function dateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

@@ -6,6 +6,7 @@ import { MessageSquare, Square, WifiOff } from "lucide-react"
 import { invalidateTaskCaches } from "@/hooks/use-data-cache"
 import { useVisualViewport } from "@/hooks/use-visual-viewport"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { CLIENT_DATE_HEADER, dateStr } from "@/lib/date-utils"
 import type { Message } from "./chat/chat-types"
 import {
   applySpeakerDevice,
@@ -717,7 +718,7 @@ export function ChatBar({ inlineTrigger = false }: { inlineTrigger?: boolean } =
       const sessionPromise = (async (): Promise<string> => {
         const sessRes = await fetch('/api/openai/realtime-session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', [CLIENT_DATE_HEADER]: dateStr(new Date()) },
           body: JSON.stringify({ voice: ttsVoice })
         })
         if (!sessRes.ok) throw new Error('Failed to create realtime session')
@@ -873,7 +874,7 @@ export function ChatBar({ inlineTrigger = false }: { inlineTrigger?: boolean } =
                 const res = await fetchWithTimeout('/api/chat/execute-command', {
                   method: 'POST',
                   credentials: 'same-origin',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 'Content-Type': 'application/json', [CLIENT_DATE_HEADER]: dateStr(new Date()) },
                   body: JSON.stringify({ action: call.name, ...args }),
                 })
                 return res.ok
@@ -1023,6 +1024,7 @@ export function ChatBar({ inlineTrigger = false }: { inlineTrigger?: boolean } =
       const timer = setTimeout(() => controller.abort(), 90000) // 90s for STT + LLM + TTS pipeline
       const res = await fetch("/api/chat/voice", {
         method: "POST",
+        headers: { [CLIENT_DATE_HEADER]: dateStr(new Date()) },
         body: formData,
         signal: controller.signal
       }).finally(() => clearTimeout(timer))
@@ -1286,7 +1288,7 @@ export function ChatBar({ inlineTrigger = false }: { inlineTrigger?: boolean } =
       const timer = setTimeout(() => controller.abort(), 90000) // Increased to 90s for GPT-5 Pro (cold starts can be slow)
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", [CLIENT_DATE_HEADER]: dateStr(new Date()) },
         body: JSON.stringify({
           // Error bubbles are UI-only — never feed them back as assistant turns.
           messages: newMessages.filter(m => !m.isError).map(m => ({ role: m.role, content: m.content })),

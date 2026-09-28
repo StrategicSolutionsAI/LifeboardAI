@@ -40,6 +40,15 @@ export interface OccurrenceOverride {
   overrideHourSlot: string | null
 }
 
+/**
+ * Who a task belongs to day-to-day: its assignee when that family member is a
+ * linked household account, otherwise its author. Drives reminders and the
+ * assistant's view of how full someone's week is.
+ */
+export function responsibleUserId(row: Record<string, any>, accountByRosterId: Map<string, string>): string {
+  return (row.assignee_id && accountByRosterId.get(row.assignee_id)) || row.user_id
+}
+
 export interface DueReminder {
   taskId: string
   title: string
@@ -63,8 +72,7 @@ export function dueReminders(
 ): DueReminder[] {
   const due: DueReminder[] = []
   for (const row of rows) {
-    const recipient = (row.assignee_id && opts.accountByRosterId.get(row.assignee_id)) || row.user_id
-    if (recipient !== opts.recipientId) continue
+    if (responsibleUserId(row, opts.accountByRosterId) !== opts.recipientId) continue
 
     const task = mapRowToTask(row)
     if (!occursOnDate(task, opts.today)) continue
