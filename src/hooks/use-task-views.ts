@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { format } from 'date-fns'
 import type { Task, TaskOccurrenceException } from '@/types/tasks'
+import { occursOnDate } from '@/lib/task-recurrence'
 
 export function useTaskViews(
   dailyTasks: Task[] | null | undefined,
@@ -26,53 +27,6 @@ export function useTaskViews(
 
   const scheduledTasks = useMemo(() => {
     const targetDateStr = dateStr
-
-    const occursOnDate = (task: Task, todayStr: string) => {
-      if (!task || task.completed) return false
-      const dueDateStr = task.due?.date
-      if (!dueDateStr) {
-        return true
-      }
-
-      const rule = task.repeatRule as string | undefined
-      if (!rule || rule === 'none') {
-        return dueDateStr === todayStr
-      }
-
-      const target = new Date(`${todayStr}T00:00:00`)
-      const due = new Date(`${dueDateStr}T00:00:00`)
-      if (target < due) return false
-
-      // Respect recurrence end date: if endDate is set and differs from
-      // startDate, treat it as the last date the recurrence should appear
-      const taskEndDate = task.endDate
-      const taskStartDate = task.startDate ?? dueDateStr
-      if (taskEndDate && taskEndDate !== taskStartDate && todayStr > taskEndDate) return false
-
-      const day = target.getDay()
-      const dueDay = due.getDay()
-      const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000))
-
-      switch (rule) {
-        case 'daily':
-          return true
-        case 'weekdays':
-          return day >= 1 && day <= 5
-        case 'weekly':
-          return diffDays % 7 === 0 && day === dueDay
-        case 'monthly': {
-          const dueDateNum = due.getDate()
-          const targetDateNum = target.getDate()
-          const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
-          if (dueDateNum > daysInTargetMonth) {
-            return targetDateNum === daysInTargetMonth
-          }
-          return targetDateNum === dueDateNum
-        }
-        default:
-          return false
-      }
-    }
 
     const collectFrom = (source: Task[] | null | undefined, map: Map<string, Task>) => {
       (source || []).forEach(originalTask => {
