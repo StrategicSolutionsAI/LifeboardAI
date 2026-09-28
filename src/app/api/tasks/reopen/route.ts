@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { withAuthAndBody } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import { z } from 'zod'
 
 const schema = z.object({ taskId: z.string().min(1) })
 
 export const POST = withAuthAndBody(schema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { error } = await supabase
     .from('lifeboard_tasks')
     .update({ completed: false, updated_at: new Date().toISOString() })
     .eq('id', body.taskId)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
 
   if (error) {
     console.error('Supabase reopen task error', error)

@@ -264,6 +264,7 @@ export interface WidgetInstance extends WidgetTemplate {
       allergens?: string[]
       medicalNotes?: string
       createdAt: string        // ISO timestamp
+      userId?: string          // linked household account, set when their invite is accepted
     }>
   }
   // Budget widget cached summary

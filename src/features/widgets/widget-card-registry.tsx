@@ -7,6 +7,7 @@ import { getWidgetColorStyles, todayStrGlobal } from "@/lib/dashboard-utils";
 import { getDateKey, calculateStreak, getLast7Days } from "@/lib/habit-utils";
 import { progress as progressStyles } from "@/lib/styles";
 import { Flame, Check, Circle } from "lucide-react";
+import { useHousehold } from "@/hooks/use-household";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -1051,7 +1052,14 @@ function renderHomeProjectsBody({
 }
 
 function renderFamilyMembersBody({ widget: w }: CardBodyRenderProps) {
-  const members = w.familyMembersData?.members || [];
+  return <FamilyMembersCardBody widget={w} />;
+}
+
+// A component (not a plain render function) so it can read the household's
+// shared roster, which replaces the widget's own once the user joins one.
+function FamilyMembersCardBody({ widget: w }: { widget: WidgetInstance }) {
+  const { household } = useHousehold();
+  const members = household ? household.familyRoster : w.familyMembersData?.members || [];
 
   if (members.length === 0) {
     return (

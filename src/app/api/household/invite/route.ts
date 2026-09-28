@@ -1,69 +1,72 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/utils/supabase/server'
-import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
-import { parseBody, inviteHouseholdMemberSchema } from '@/lib/validations'
-import { getUserCached } from '@/lib/server-auth-cache'
+import { NextResponse } from 'next/server'
+import { withAuthAndBody, getRequestOrigin } from '@/lib/api-utils'
+import { createApiError } from '@/lib/api-error-handler'
+import { inviteHouseholdMemberSchema } from '@/lib/validations'
+import { sendInviteViaGmail } from '@/lib/household/invite-email'
+import { HOUSEHOLD_MEMBER_SELECT_COLUMNS, mapRowToHouseholdMember } from '@/repositories/household'
 
-// POST — Invite by email: creates a pending household_members row
-async function postHandler(request: NextRequest) {
-  const supabase = supabaseServer()
-  const { data: { user } } = await getUserCached(supabase)
-  if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
+// POST — create a pending invite and return its shareable link. When the
+// inviter's Gmail is connected the link is also emailed from their account.
+export const POST = withAuthAndBody(inviteHouseholdMemberSchema, async (req, { supabase, user, body }) => {
+  const email = body.email.toLowerCase().trim()
 
-  const body = await request.json()
-  const parsed = parseBody(inviteHouseholdMemberSchema, body)
-  if (parsed.error) return parsed.response!
-
-  const email = parsed.data.email.toLowerCase().trim()
-
-  // Find user's household where they are admin
-  const { data: adminMembership } = await supabase
+  const { data: admin, error: adminError } = await supabase
     .from('household_members')
-    .select('household_id')
+    .select('household_id, display_name')
     .eq('user_id', user.id)
     .eq('role', 'admin')
     .eq('status', 'active')
     .limit(1)
     .maybeSingle()
 
-  if (!adminMembership) {
-    throw createApiError('No household found or insufficient permissions', 403, 'NOT_ADMIN')
-  }
+  if (adminError) throw createApiError('Failed to load household', 500, 'DB_ERROR', adminError)
+  if (!admin) throw createApiError('Only a household admin can invite', 403, 'NOT_ADMIN')
 
-  // Check for duplicate invite
-  const { data: existingInvite } = await supabase
+  const { data: existing } = await supabase
     .from('household_members')
-    .select('id, status')
-    .eq('household_id', adminMembership.household_id)
+    .select('status')
+    .eq('household_id', admin.household_id)
     .eq('invited_email', email)
     .maybeSingle()
 
-  if (existingInvite) {
+  if (existing) {
     throw createApiError(
-      existingInvite.status === 'active'
-        ? 'This person is already a member'
-        : 'An invite has already been sent to this email',
-      400,
+      existing.status === 'active' ? 'This person is already a member' : 'This email already has an invite — copy its link below',
+      409,
       'DUPLICATE_INVITE',
     )
   }
 
-  // Create pending member
-  const { data: invite, error } = await supabase
+  const { data: row, error } = await supabase
     .from('household_members')
     .insert({
-      household_id: adminMembership.household_id,
+      household_id: admin.household_id,
       invited_email: email,
-      display_name: parsed.data.displayName || email.split('@')[0],
+      display_name: body.displayName || email.split('@')[0],
       role: 'member',
       status: 'pending',
     })
-    .select()
+    .select(HOUSEHOLD_MEMBER_SELECT_COLUMNS)
     .single()
 
   if (error) throw createApiError('Failed to create invite', 500, 'DB_ERROR', error)
 
-  return NextResponse.json({ invite }, { status: 201 })
-}
+  const { data: household } = await supabase
+    .from('households')
+    .select('name')
+    .eq('id', admin.household_id)
+    .single()
 
-export const POST = withErrorHandling(postHandler, 'household/invite/POST')
+  const inviteUrl = `${getRequestOrigin(req)}/join/${row.invite_token}`
+  const emailed = await sendInviteViaGmail(supabase, user.id, {
+    to: email,
+    inviterName: admin.display_name || user.email || 'A family member',
+    householdName: household?.name ?? 'our household',
+    inviteUrl,
+  })
+
+  return NextResponse.json(
+    { invite: mapRowToHouseholdMember(row, true), inviteUrl, emailed },
+    { status: 201 },
+  )
+}, 'POST /api/household/invite')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { getUserCached } from '@/lib/server-auth-cache';
+import { getDataScope, ownedOrShared } from '@/lib/household/scope';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,10 +15,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const scope = await getDataScope(supabase, user.id);
+
     const { data, error } = await supabase
       .from('calendar_imports')
       .select('id, name, file_name, event_count, created_at, updated_at, default_bucket, default_assignee')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -102,11 +105,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const scope = await getDataScope(supabase, user.id);
+
     const { data: importRow, error: fetchImportError } = await supabase
       .from('calendar_imports')
       .select('id')
       .eq('id', importId)
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .maybeSingle();
 
     if (fetchImportError) {
@@ -121,7 +126,7 @@ export async function PATCH(request: NextRequest) {
     const { data: eventRows, error: eventsError } = await supabase
       .from('calendar_events')
       .select('id, task_id')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('import_id', importId);
 
     if (eventsError) {
@@ -143,7 +148,7 @@ export async function PATCH(request: NextRequest) {
       .from('calendar_imports')
       .update(importUpdate)
       .eq('id', importId)
-      .eq('user_id', user.id);
+      .or(ownedOrShared(scope));
 
     if (updateImportError) {
       console.error('Failed to update calendar import record', updateImportError);
@@ -156,7 +161,7 @@ export async function PATCH(request: NextRequest) {
         bucket: normalizedBucket,
         updated_at: timestamp,
       })
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('import_id', importId);
 
     if (updateEventsError) {
@@ -180,7 +185,7 @@ export async function PATCH(request: NextRequest) {
       const { error: updateTasksError } = await supabase
         .from('lifeboard_tasks')
         .update(taskUpdate)
-        .eq('user_id', user.id)
+        .or(ownedOrShared(scope))
         .in('id', taskIds);
 
       if (updateTasksError) {

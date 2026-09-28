@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createShoppingItemSchema, updateShoppingItemSchema, deleteShoppingItemSchema } from "@/lib/validations";
 import { SHOPPING_LIST_SELECT_COLUMNS as SELECT_COLUMNS, mapRowToItem } from "@/repositories/shopping-list";
 import { withAuth, withAuthAndBody } from "@/lib/api-utils";
+import { getDataScope, ownedOrShared } from "@/lib/household/scope";
 
 const TABLE = "shopping_list_items";
 
 export const GET = withAuth(async (req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id);
   const sp = req.nextUrl.searchParams;
   const bucketFilter = sp.get("bucket");
   const taskIdFilter = sp.get("taskId");
@@ -14,7 +16,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   let query = supabase
     .from(TABLE)
     .select(SELECT_COLUMNS)
-    .eq("user_id", user.id)
+    .or(ownedOrShared(scope))
     .order("created_at", { ascending: true });
 
   if (bucketFilter) {
@@ -98,6 +100,7 @@ export const POST = withAuthAndBody(createShoppingItemSchema, async (req, { supa
 }, "POST /api/shopping-list");
 
 export const PATCH = withAuthAndBody(updateShoppingItemSchema, async (req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id);
   const id = body.id;
 
   const updates: Record<string, any> = {};
@@ -200,7 +203,7 @@ export const PATCH = withAuthAndBody(updateShoppingItemSchema, async (req, { sup
     .from(TABLE)
     .update(updates)
     .eq("id", id)
-    .eq("user_id", user.id)
+    .or(ownedOrShared(scope))
     .select(SELECT_COLUMNS)
     .single();
 
@@ -213,13 +216,14 @@ export const PATCH = withAuthAndBody(updateShoppingItemSchema, async (req, { sup
 }, "PATCH /api/shopping-list");
 
 export const DELETE = withAuthAndBody(deleteShoppingItemSchema, async (req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id);
   const id = body.id;
 
   const { error } = await supabase
     .from(TABLE)
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .or(ownedOrShared(scope));
 
   if (error) {
     console.error("Failed to delete shopping list item", error);

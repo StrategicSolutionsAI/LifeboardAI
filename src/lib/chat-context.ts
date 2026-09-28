@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getRequestOrigin } from '@/lib/api-utils'
 import { getUserPreferencesServer } from '@/lib/user-preferences-server'
 import { getUserCached } from '@/lib/server-auth-cache'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import { supabaseServer } from '@/utils/supabase/server'
 
 /**
@@ -43,14 +44,15 @@ export async function buildChatContext(
   try {
     // Prefs and the dashboard queries are independent — run them concurrently
     const prefsPromise = getUserPreferencesServer()
-    const batchPromise = user
+    const scope = user ? await getDataScope(supabase, user.id) : null
+    const batchPromise = user && scope
       ? Promise.allSettled([
           supabase
             .from('lifeboard_tasks')
             .select(
               'id, content, completed, due_date, start_date, hour_slot, bucket, created_at'
             )
-            .eq('user_id', user.id)
+            .or(ownedOrShared(scope))
             .eq('completed', false)
             .order('created_at', { ascending: false })
             .limit(50),
@@ -59,21 +61,26 @@ export async function buildChatContext(
             .select(
               'id, title, description, start_date, end_date, hour_slot, all_day, bucket'
             )
-            .eq('user_id', user.id)
+            .or(ownedOrShared(scope))
             .gte('start_date', today)
             .order('start_date', { ascending: true })
             .limit(20),
           supabase
             .from('shopping_list_items')
             .select('id, name, quantity, bucket, is_purchased')
-            .eq('user_id', user.id)
+            .or(ownedOrShared(scope))
             .eq('is_purchased', false)
             .order('created_at', { ascending: true })
             .limit(30),
         ])
       : null
 
+    const householdRosterPromise = scope?.householdId
+      ? supabase.from('households').select('family_roster').eq('id', scope.householdId).maybeSingle()
+          .then(({ data }) => (Array.isArray(data?.family_roster) ? data.family_roster : null))
+      : Promise.resolve(null)
     const prefs = await prefsPromise
+    const householdRoster: any[] | null = await householdRosterPromise
     if (!prefs) return { systemContext }
 
     const bucketSummary = Object.entries(prefs.widgets_by_bucket || {})
@@ -215,11 +222,12 @@ export async function buildChatContext(
       contextParts.push(`\n\nToday's Steps: ${contextData.steps}`)
     }
 
-    // Extract family members from widget data
+    // Family members: the household's shared roster, else the widget's own
     const allWidgets = Object.values(prefs.widgets_by_bucket || {}).flat() as any[]
     const familyWidget = allWidgets.find((w: any) => w?.id === 'family_members' && w?.familyMembersData?.members?.length)
-    if (familyWidget) {
-      const familySummary = familyWidget.familyMembersData.members
+    const roster: any[] = householdRoster ?? familyWidget?.familyMembersData?.members ?? []
+    if (roster.length > 0) {
+      const familySummary = roster
         .map((m: any) => {
           const parts = [`- ${m.name} (${m.relationship})`]
           if (m.birthday) parts.push(`birthday: ${m.birthday}`)
@@ -228,7 +236,7 @@ export async function buildChatContext(
           return parts.join(' | ')
         })
         .join('\n')
-      contextParts.push(`\n\nFamily Members (${familyWidget.familyMembersData.members.length}):\n${familySummary}`)
+      contextParts.push(`\n\nFamily Members (${roster.length}):\n${familySummary}`)
     }
 
     systemContext = `System: ${contextParts.join('\n')}`

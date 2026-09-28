@@ -1,6 +1,7 @@
 // app/api/day/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,7 @@ function mapEventRow(row: Record<string, unknown>) {
 }
 
 export const GET = withAuth(async (req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id)
   const sp = req.nextUrl.searchParams
   const date = sp.get('date') // YYYY-MM-DD (required)
   const includeCompleted = sp.get('includeCompleted') // show completed tasks too
@@ -55,7 +57,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   let taskQuery = supabase
     .from('lifeboard_tasks')
     .select('*')
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .or(`due_date.eq.${date},start_date.eq.${date}`)
 
   if (!includeCompleted) {
@@ -66,7 +68,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   const eventQuery = supabase
     .from('calendar_events')
     .select('*')
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .eq('start_date', date)
 
   const [tasksRes, eventsRes] = await Promise.all([taskQuery, eventQuery])

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { getUserCached } from '@/lib/server-auth-cache';
+import { getDataScope, ownedOrShared } from '@/lib/household/scope';
 
 interface TaskOccurrenceExceptionRow {
   id: string;
@@ -40,10 +41,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    const scope = await getDataScope(supabase, user.id);
     const { data, error } = await supabase
       .from('task_occurrence_exceptions')
       .select('*')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .order('occurrence_date', { ascending: true });
 
     if (error) {
@@ -101,11 +103,31 @@ export async function POST(request: NextRequest) {
       payload.override_duration = overrideDuration;
     }
 
-    const { data, error } = await supabase
+    // A household member may already have an exception for this occurrence of
+    // a shared task; edit that row instead of adding a conflicting second one.
+    const scope = await getDataScope(supabase, user.id);
+    const { data: existing } = await supabase
       .from('task_occurrence_exceptions')
-      .upsert(payload, { onConflict: 'user_id,task_id,occurrence_date' })
-      .select('*')
-      .single();
+      .select('id')
+      .or(ownedOrShared(scope))
+      .eq('task_id', taskId)
+      .eq('occurrence_date', occurrenceDate)
+      .limit(1)
+      .maybeSingle();
+
+    const { user_id: _author, ...changes } = payload;
+    const { data, error } = existing
+      ? await supabase
+          .from('task_occurrence_exceptions')
+          .update(changes)
+          .eq('id', existing.id)
+          .select('*')
+          .single()
+      : await supabase
+          .from('task_occurrence_exceptions')
+          .upsert(payload, { onConflict: 'user_id,task_id,occurrence_date' })
+          .select('*')
+          .single();
 
     if (error) {
       console.error('Failed to upsert task occurrence exception', error);
@@ -139,10 +161,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    const scope = await getDataScope(supabase, user.id);
     const { error } = await supabase
       .from('task_occurrence_exceptions')
       .delete()
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('task_id', taskId)
       .eq('occurrence_date', occurrenceDate);
 

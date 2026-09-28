@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, withAuthAndBody } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import {
   createBudgetExpenseSchema,
   updateBudgetExpenseSchema,
@@ -11,6 +12,7 @@ import {
 } from '@/repositories/budget'
 
 export const GET = withAuth(async (req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month') // YYYY-MM-01
   if (!month) {
@@ -27,7 +29,7 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   let query = supabase
     .from('budget_expenses')
     .select(BUDGET_EXPENSE_SELECT_COLUMNS)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .gte('date', startDate)
     .lt('date', endDate)
     .order('date', { ascending: false })
@@ -65,6 +67,7 @@ export const POST = withAuthAndBody(createBudgetExpenseSchema, async (_req, { su
 }, 'POST /api/budget/expenses')
 
 export const PATCH = withAuthAndBody(updateBudgetExpenseSchema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const updates: Record<string, unknown> = {}
   if (body.categoryId !== undefined) updates.category_id = body.categoryId
   if (body.amount !== undefined) updates.amount = body.amount
@@ -75,7 +78,7 @@ export const PATCH = withAuthAndBody(updateBudgetExpenseSchema, async (_req, { s
     .from('budget_expenses')
     .update(updates)
     .eq('id', body.id)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .select(BUDGET_EXPENSE_SELECT_COLUMNS)
     .single()
 
@@ -86,11 +89,12 @@ export const PATCH = withAuthAndBody(updateBudgetExpenseSchema, async (_req, { s
 }, 'PATCH /api/budget/expenses')
 
 export const DELETE = withAuthAndBody(deleteBudgetExpenseSchema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { error } = await supabase
     .from('budget_expenses')
     .delete()
     .eq('id', body.id)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

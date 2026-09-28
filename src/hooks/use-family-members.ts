@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { WidgetInstance } from '@/types/widgets'
+import type { RosterMember } from '@/types/household'
 
 export interface FamilyMemberOption {
   id: string
@@ -17,17 +18,19 @@ export interface FamilyMemberOption {
 let _cache: { data: FamilyMemberOption[]; ts: number } | null = null
 const CACHE_TTL = 15_000 // 15s
 
-function extractFamilyMembers(widgetsByBucket: Record<string, WidgetInstance[]>): FamilyMemberOption[] {
-  const allWidgets = Object.values(widgetsByBucket).flat()
-  const fmWidget = allWidgets.find((w) => w.id === 'family_members')
-  const raw = fmWidget?.familyMembersData?.members
-  if (!Array.isArray(raw) || raw.length === 0) return []
+function toOptions(raw: RosterMember[]): FamilyMemberOption[] {
   return raw.map((m) => ({
     id: m.id,
     name: m.name,
     avatarColor: m.avatarColor,
     relationship: m.relationship,
   }))
+}
+
+function extractFamilyMembers(widgetsByBucket: Record<string, WidgetInstance[]>): FamilyMemberOption[] {
+  const allWidgets = Object.values(widgetsByBucket).flat()
+  const raw = allWidgets.find((w) => w.id === 'family_members')?.familyMembersData?.members
+  return Array.isArray(raw) ? toOptions(raw) : []
 }
 
 function tryLocalStorage(): FamilyMemberOption[] {
@@ -62,14 +65,25 @@ export function useFamilyMembers(): FamilyMemberOption[] {
 
     let cancelled = false
 
-    // Also fetch from API (source of truth) in background
+    // Also fetch from API (source of truth) in background. A household's shared
+    // roster wins over the widget's, so every member resolves the same assignees.
     ;(async () => {
       try {
-        const res = await fetch('/api/user/preferences', { credentials: 'same-origin' })
-        if (!res.ok || cancelled) return
-        const json = await res.json()
-        const widgetsByBucket: Record<string, WidgetInstance[]> = json?.widgets_by_bucket ?? {}
-        const result = extractFamilyMembers(widgetsByBucket)
+        const [prefsRes, householdRes] = await Promise.all([
+          fetch('/api/user/preferences', { credentials: 'same-origin' }),
+          fetch('/api/household', { credentials: 'same-origin' }).catch(() => null),
+        ])
+        if (cancelled) return
+        const household = householdRes?.ok ? (await householdRes.json())?.household : null
+        let result: FamilyMemberOption[]
+        if (household) {
+          result = toOptions(household.familyRoster ?? [])
+        } else {
+          if (!prefsRes.ok) return
+          const json = await prefsRes.json()
+          const widgetsByBucket: Record<string, WidgetInstance[]> = json?.widgets_by_bucket ?? {}
+          result = extractFamilyMembers(widgetsByBucket)
+        }
         // Prefer API result if it has data; otherwise keep localStorage result
         if (result.length > 0 || lsMembers.length === 0) {
           _cache = { data: result, ts: Date.now() }

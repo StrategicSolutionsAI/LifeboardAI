@@ -24,6 +24,7 @@ export const FOLDER_STATS_CACHE_TTL_MS = 60_000          // 60 sec
 // ── Auth & preferences caches ────────────────────────────────────────────
 export const AUTH_CACHE_TTL_MS = 30_000                  // 30 sec
 export const PREFS_CACHE_TTL_MS = 60_000                 // 60 sec
+export const HOUSEHOLD_SCOPE_CACHE_TTL_MS = 30_000       // 30 sec — RLS stays authoritative when stale
 
 // ── Greeting name prefetch ───────────────────────────────────────────────
 export const GREETING_CACHE_TTL_MS = 60_000              // 60 sec

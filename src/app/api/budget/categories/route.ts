@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, withAuthAndBody } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import {
   createBudgetCategorySchema,
   updateBudgetCategorySchema,
@@ -12,10 +13,11 @@ import {
 import { DEFAULT_BUDGET_CATEGORIES } from '@/types/budget'
 
 export const GET = withAuth(async (_req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { data: rows, error } = await supabase
     .from('budget_categories')
     .select(BUDGET_CATEGORY_SELECT_COLUMNS)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .order('sort_order', { ascending: true })
 
   if (error) {
@@ -66,6 +68,7 @@ export const POST = withAuthAndBody(createBudgetCategorySchema, async (_req, { s
 }, 'POST /api/budget/categories')
 
 export const PATCH = withAuthAndBody(updateBudgetCategorySchema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const updates: Record<string, unknown> = {}
   if (body.name !== undefined) updates.name = body.name
   if (body.icon !== undefined) updates.icon = body.icon
@@ -76,7 +79,7 @@ export const PATCH = withAuthAndBody(updateBudgetCategorySchema, async (_req, { 
     .from('budget_categories')
     .update(updates)
     .eq('id', body.id)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .select(BUDGET_CATEGORY_SELECT_COLUMNS)
     .single()
 
@@ -87,11 +90,12 @@ export const PATCH = withAuthAndBody(updateBudgetCategorySchema, async (_req, { 
 }, 'PATCH /api/budget/categories')
 
 export const DELETE = withAuthAndBody(deleteBudgetCategorySchema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { error } = await supabase
     .from('budget_categories')
     .delete()
     .eq('id', body.id)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

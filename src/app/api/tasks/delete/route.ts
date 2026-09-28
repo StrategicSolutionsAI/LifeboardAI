@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { withAuthAndBody } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import { z } from 'zod'
 
 const schema = z.object({ taskId: z.string().min(1) })
 
 export const DELETE = withAuthAndBody(schema, async (_req, { supabase, user, body }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { error } = await supabase
     .from('lifeboard_tasks')
     .delete()
     .eq('id', body.taskId)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
 
   if (error) {
     console.error('Supabase delete task error', error)
@@ -22,12 +24,12 @@ export const DELETE = withAuthAndBody(schema, async (_req, { supabase, user, bod
       .from('calendar_events')
       .delete()
       .eq('task_id', body.taskId)
-      .eq('user_id', user.id),
+      .or(ownedOrShared(scope)),
     supabase
       .from('task_occurrence_exceptions')
       .delete()
       .eq('task_id', body.taskId)
-      .eq('user_id', user.id),
+      .or(ownedOrShared(scope)),
   ])
 
   if (calendarResult.error) {

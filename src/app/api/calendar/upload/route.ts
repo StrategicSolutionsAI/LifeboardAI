@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/utils/supabase/server';
 import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired';
+import { getDataScope, ownedOrShared } from '@/lib/household/scope';
 import {
   calculateDurationMinutes,
   isoToHourSlot,
@@ -673,11 +674,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: { [SESSION_EXPIRED_HEADER]: '1' } });
     }
 
-    // Get uploaded calendar events for the user
+    // Calendar events visible to the user: their own and their household's
+    const scope = await getDataScope(supabase, user.id);
     const { data: events, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .in('source', CALENDAR_VIEW_SOURCES)
       .order('start_time', { ascending: true });
 
@@ -690,7 +692,9 @@ export async function GET(request: NextRequest) {
 
     let normalizedEvents = (events ?? []) as CalendarEventRow[];
 
-    const eventsMissingTask = normalizedEvents.filter((event) => !event.task_id);
+    // Only the author backfills a linked task: the sync writes the task as the
+    // current user and links it back by their user id.
+    const eventsMissingTask = normalizedEvents.filter((event) => !event.task_id && event.user_id === user.id);
 
     if (eventsMissingTask.length > 0) {
       try {
@@ -698,7 +702,7 @@ export async function GET(request: NextRequest) {
         const { data: refreshedEvents, error: refreshError } = await supabase
           .from('calendar_events')
           .select('*')
-          .eq('user_id', user.id)
+          .or(ownedOrShared(scope))
           .in('source', CALENDAR_VIEW_SOURCES)
           .order('start_time', { ascending: true });
 
@@ -714,7 +718,7 @@ export async function GET(request: NextRequest) {
     const { data: importRows } = await supabase
       .from('calendar_imports')
       .select('id, default_assignee')
-      .eq('user_id', user.id);
+      .or(ownedOrShared(scope));
 
     const assigneeByImport = new Map<string, string>();
     if (Array.isArray(importRows)) {

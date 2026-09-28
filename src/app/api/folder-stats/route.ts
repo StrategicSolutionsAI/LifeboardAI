@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 
 interface BucketStats {
   tasks: number
@@ -9,28 +10,29 @@ interface BucketStats {
 }
 
 export const GET = withAuth(async (_req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id)
   const [tasksRes, shoppingRes, calendarRes, prefsRes] = await Promise.all([
     supabase
       .from('lifeboard_tasks')
       .select('bucket')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('completed', false)
       .not('bucket', 'is', null),
     supabase
       .from('shopping_list_items')
       .select('bucket')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('is_purchased', false)
       .not('bucket', 'is', null),
     supabase
       .from('calendar_events')
       .select('bucket')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .not('bucket', 'is', null),
     supabase
       .from('user_preferences')
       .select('widgets_by_bucket')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .maybeSingle(),
   ])
 

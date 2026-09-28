@@ -1,100 +1,87 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseServer } from '@/utils/supabase/server'
-import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
-import { parseBody, createHouseholdSchema } from '@/lib/validations'
-import { getUserCached } from '@/lib/server-auth-cache'
+import { NextResponse } from 'next/server'
+import { withAuth, withAuthAndBody } from '@/lib/api-utils'
+import { createApiError } from '@/lib/api-error-handler'
+import { createHouseholdSchema } from '@/lib/validations'
+import { invalidateDataScope } from '@/lib/household/scope'
+import {
+  HOUSEHOLD_MEMBER_SELECT_COLUMNS,
+  HOUSEHOLD_SELECT_COLUMNS,
+  mapRowToHousehold,
+  mapRowToHouseholdMember,
+} from '@/repositories/household'
 
-// GET — Fetch current user's household + members
-async function getHandler(request: NextRequest) {
-  const supabase = supabaseServer()
-  const { data: { user } } = await getUserCached(supabase)
-  if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
+// no-store: read right after invites and joins; an HTTP-cached copy would hide them.
+const NO_STORE = { 'Cache-Control': 'no-store' }
 
-  // Find the user's household via household_members
-  const { data: membership } = await supabase
+// GET — the current user's household, its members, and the caller's own membership
+export const GET = withAuth(async (_req, { supabase, user }) => {
+  const { data: membership, error } = await supabase
     .from('household_members')
-    .select('household_id')
+    .select('id, household_id, role')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .limit(1)
     .maybeSingle()
 
+  if (error) throw createApiError('Failed to load household', 500, 'DB_ERROR', error)
   if (!membership) {
-    const res = NextResponse.json({ household: null, members: [] })
-    res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
-    return res
+    return NextResponse.json({ household: null, members: [], role: null, selfMemberId: null }, { headers: NO_STORE })
   }
 
   const [householdResult, membersResult] = await Promise.all([
-    supabase
-      .from('households')
-      .select('*')
-      .eq('id', membership.household_id)
-      .single(),
+    supabase.from('households').select(HOUSEHOLD_SELECT_COLUMNS).eq('id', membership.household_id).single(),
     supabase
       .from('household_members')
-      .select('*')
+      .select(HOUSEHOLD_MEMBER_SELECT_COLUMNS)
       .eq('household_id', membership.household_id)
       .order('invited_at', { ascending: true }),
   ])
 
-  const res = NextResponse.json({
-    household: householdResult.data,
-    members: membersResult.data || [],
+  if (householdResult.error) throw createApiError('Failed to load household', 500, 'DB_ERROR', householdResult.error)
+  if (membersResult.error) throw createApiError('Failed to load members', 500, 'DB_ERROR', membersResult.error)
+
+  const isAdmin = membership.role === 'admin'
+  return NextResponse.json(
+    {
+      household: mapRowToHousehold(householdResult.data),
+      members: (membersResult.data ?? []).map((row) => mapRowToHouseholdMember(row, isAdmin)),
+      role: membership.role,
+      selfMemberId: membership.id,
+    },
+    { headers: NO_STORE },
+  )
+}, 'GET /api/household')
+
+// POST — create a household with the caller as admin; their existing rows become shared
+export const POST = withAuthAndBody(createHouseholdSchema, async (_req, { supabase, user, body }) => {
+  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin'
+  const { data: householdId, error } = await supabase.rpc('create_household', {
+    p_name: body.name,
+    p_display_name: displayName,
   })
-  res.headers.set('Cache-Control', 'private, max-age=300, stale-while-revalidate=600')
-  return res
-}
 
-// POST — Create a household, auto-add creator as admin
-async function postHandler(request: NextRequest) {
-  const supabase = supabaseServer()
-  const { data: { user } } = await getUserCached(supabase)
-  if (!user) throw createApiError('Unauthorized', 401, 'AUTH_REQUIRED')
+  if (error) {
+    if (error.message?.includes('ALREADY_MEMBER')) {
+      throw createApiError('You already belong to a household', 409, 'ALREADY_MEMBER')
+    }
+    throw createApiError('Failed to create household', 500, 'DB_ERROR', error)
+  }
+  invalidateDataScope(user.id)
 
-  // Check if user already has a household
-  const { data: existing } = await supabase
-    .from('household_members')
-    .select('household_id')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .limit(1)
-    .maybeSingle()
-
-  if (existing) {
-    throw createApiError('User already belongs to a household', 400, 'ALREADY_MEMBER')
+  if (body.roster && body.roster.length > 0) {
+    const { error: rosterError } = await supabase
+      .from('households')
+      .update({ family_roster: body.roster })
+      .eq('id', householdId)
+    if (rosterError) console.error('Household created but roster seed failed', rosterError)
   }
 
-  const body = await request.json()
-  const parsed = parseBody(createHouseholdSchema, body)
-  if (parsed.error) return parsed.response!
-
-  // Create household
-  const { data: household, error: hErr } = await supabase
+  const { data: row, error: readError } = await supabase
     .from('households')
-    .insert({ name: parsed.data.name, created_by: user.id })
-    .select()
+    .select(HOUSEHOLD_SELECT_COLUMNS)
+    .eq('id', householdId)
     .single()
+  if (readError) throw createApiError('Failed to load new household', 500, 'DB_ERROR', readError)
 
-  if (hErr) throw createApiError('Failed to create household', 500, 'DB_ERROR', hErr)
-
-  // Add creator as admin member
-  const { error: mErr } = await supabase
-    .from('household_members')
-    .insert({
-      household_id: household.id,
-      user_id: user.id,
-      role: 'admin',
-      status: 'active',
-      display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin',
-      invited_email: user.email,
-      joined_at: new Date().toISOString(),
-    })
-
-  if (mErr) throw createApiError('Failed to add admin member', 500, 'DB_ERROR', mErr)
-
-  return NextResponse.json({ household }, { status: 201 })
-}
-
-export const GET = withErrorHandling(getHandler, 'household/GET')
-export const POST = withErrorHandling(postHandler, 'household/POST')
+  return NextResponse.json({ household: mapRowToHousehold(row) }, { status: 201 })
+}, 'POST /api/household')

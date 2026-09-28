@@ -3,10 +3,10 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
   Plus, Trash2, Edit3, Phone, Mail, AlertTriangle,
-  Cake, Users, ChevronLeft, X, Heart, Check, Send, Clock, UserPlus, Home,
+  Cake, Users, ChevronLeft, X, Heart, Check, Send, Clock, UserPlus, Home, Copy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useHousehold } from '@/hooks/use-household'
+import { useHousehold, type InviteResult } from '@/hooks/use-household'
 import type { WidgetInstance } from '@/types/widgets'
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -108,28 +108,33 @@ function getRelationshipBadgeColor(rel: Relationship): string {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetProps) {
-  const members = useMemo(
-    () => widget.familyMembersData?.members || [],
-    [widget.familyMembersData?.members],
-  )
-
-  // Household state for invite UI
   const {
     household,
     members: householdMembers,
+    role: householdRole,
+    selfMemberId,
     isLoading: householdLoading,
     error: householdError,
     createHousehold,
     inviteMember,
+    saveRoster,
     removeMember: removeHouseholdMember,
   } = useHousehold()
+
+  // In a household the roster is shared, so assignees and calendar colours
+  // resolve for every member; otherwise it lives in this widget.
+  const members = useMemo(
+    () => (household ? household.familyRoster : widget.familyMembersData?.members || []),
+    [household, widget.familyMembersData?.members],
+  )
 
   const [view, setView] = useState<'list' | 'form' | 'detail'>('list')
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null)
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteSending, setInviteSending] = useState(false)
-  const [inviteSuccess, setInviteSuccess] = useState(false)
+  const [inviteResult, setInviteResult] = useState<(InviteResult & { email: string }) | null>(null)
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
 
   // Form state
   const [formName, setFormName] = useState('')
@@ -144,9 +149,10 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
 
   const saveMembers = useCallback(
     (newMembers: FamilyMember[]) => {
-      onUpdate({ familyMembersData: { members: newMembers } })
+      if (household) saveRoster(newMembers)
+      else onUpdate({ familyMembersData: { members: newMembers } })
     },
-    [onUpdate],
+    [household, saveRoster, onUpdate],
   )
 
   const resetForm = () => {
@@ -220,24 +226,37 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
   }
 
   const handleSendInvite = async () => {
-    if (!inviteEmail.trim()) return
+    const email = inviteEmail.trim()
+    if (!email) return
     setInviteSending(true)
-    setInviteSuccess(false)
+    setInviteResult(null)
 
-    // Auto-create household if none exists
+    // The first invite creates the household, seeded with this roster.
     if (!household) {
-      const created = await createHousehold('My Family')
+      const created = await createHousehold('My Family', members)
       if (!created) { setInviteSending(false); return }
     }
 
-    const ok = await inviteMember(inviteEmail.trim())
+    const result = await inviteMember(email)
     setInviteSending(false)
-    if (ok) {
+    if (result) {
       setInviteEmail('')
-      setInviteSuccess(true)
-      setTimeout(() => setInviteSuccess(false), 3000)
+      setInviteResult({ ...result, email })
     }
   }
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedUrl(url)
+      setTimeout(() => setCopiedUrl((current) => (current === url ? null : current)), 2000)
+    } catch {
+      // Clipboard blocked (permissions, insecure origin): the link stays visible to copy by hand.
+    }
+  }
+
+  const activeMembers = householdMembers.filter(m => m.status === 'active')
+  const pendingInvites = householdMembers.filter(m => m.status === 'pending')
 
   // ── List View ─────────────────────────────────────────────────────────
 
@@ -339,44 +358,71 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
           })}
         </div>
 
-        {/* ── Invite to LifeboardAI ─────────────────────────────────────── */}
+        {/* ── Share with your household ─────────────────────────────────── */}
         <div className="border-t border-theme-neutral-300/60 pt-4 mt-4 space-y-3">
           <div className="flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-theme-text-secondary" />
             <span className="text-xs font-medium text-theme-text-secondary uppercase tracking-wide">
-              Invite to LifeboardAI
+              {household ? household.name : 'Share with your household'}
             </span>
           </div>
+          {!household && !householdLoading && (
+            <p className="text-xs text-theme-text-tertiary">
+              Invite your partner or family to share your calendar, tasks, shopping list and budget.
+            </p>
+          )}
 
-          <div className="flex gap-2">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              placeholder="family@email.com"
-              aria-label="Email address to invite"
-              onKeyDown={e => { if (e.key === 'Enter') handleSendInvite() }}
-              className="flex-1 px-3 py-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-base text-sm text-theme-text-primary placeholder:text-theme-text-subtle focus:outline-none focus:ring-2 focus:ring-theme-brand-tint-DEFAULT/50"
-            />
-            <button
-              onClick={handleSendInvite}
-              disabled={!inviteEmail.trim() || inviteSending}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-theme-primary text-white hover:bg-theme-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              {inviteSending ? 'Sending...' : 'Invite'}
-            </button>
-          </div>
+          {(!household || householdRole === 'admin') && (
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="family@email.com"
+                aria-label="Email address to invite"
+                onKeyDown={e => { if (e.key === 'Enter') handleSendInvite() }}
+                className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-theme-neutral-300 bg-theme-surface-base text-sm text-theme-text-primary placeholder:text-theme-text-subtle focus:outline-none focus:ring-2 focus:ring-theme-brand-tint-DEFAULT/50"
+              />
+              <button
+                onClick={handleSendInvite}
+                disabled={!inviteEmail.trim() || inviteSending}
+                className="px-3 py-2 rounded-lg text-sm font-medium bg-theme-primary text-white hover:bg-theme-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {inviteSending ? 'Inviting...' : 'Invite'}
+              </button>
+            </div>
+          )}
 
-          {inviteSuccess && (
-            <div className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-              <Check className="w-3.5 h-3.5" />
-              Invite sent successfully
+          {inviteResult && (
+            <div className="rounded-lg bg-theme-brand-tint-subtle p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-theme-text-primary">
+                <Check className="w-3.5 h-3.5 text-theme-primary" />
+                {inviteResult.emailed
+                  ? `Invite emailed to ${inviteResult.email} from your Gmail`
+                  : `Invite created — send ${inviteResult.email} this link`}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={inviteResult.inviteUrl}
+                  aria-label="Invite link"
+                  onFocus={e => e.currentTarget.select()}
+                  className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-theme-neutral-300 bg-theme-surface-base text-xs text-theme-text-secondary"
+                />
+                <button
+                  onClick={() => copyLink(inviteResult.inviteUrl)}
+                  className="px-2.5 py-1.5 rounded-md text-xs font-medium border border-theme-neutral-300 bg-theme-surface-base text-theme-text-primary hover:bg-theme-surface-alt flex items-center gap-1"
+                >
+                  {copiedUrl === inviteResult.inviteUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedUrl === inviteResult.inviteUrl ? 'Copied' : 'Copy'}
+                </button>
+              </div>
             </div>
           )}
 
           {householdError && (
-            <div className="text-xs text-red-500">{householdError}</div>
+            <div role="alert" className="text-xs text-red-500">{householdError}</div>
           )}
 
           {/* Loading skeleton */}
@@ -388,63 +434,65 @@ export function FamilyMembersWidget({ widget, onUpdate }: FamilyMembersWidgetPro
           )}
 
           {/* Pending invites */}
-          {!householdLoading && householdMembers.filter(m => m.status === 'pending').length > 0 && (
+          {!householdLoading && pendingInvites.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-xs text-theme-text-tertiary">Pending invites</div>
-              {householdMembers
-                .filter(m => m.status === 'pending')
-                .map(m => (
+              <div className="text-xs text-theme-text-tertiary">Waiting to join</div>
+              {pendingInvites.map(m => {
+                const url = m.inviteToken ? `${window.location.origin}/join/${m.inviteToken}` : null
+                return (
                   <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface-raised">
                     <Clock className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                     <span className="text-xs text-theme-text-secondary truncate flex-1">
-                      {m.invited_email || m.display_name}
+                      {m.invitedEmail || m.displayName}
                     </span>
-                    <button
-                      aria-label={`Cancel invite for ${m.invited_email || m.display_name}`}
-                      onClick={() => removeHouseholdMember(m.id)}
-                      className="text-2xs text-red-500 hover:text-red-700 dark:hover:text-red-300 px-1.5 py-0.5 rounded font-medium flex-shrink-0 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    >
-                      Cancel
-                    </button>
+                    {url && (
+                      <button
+                        aria-label={`Copy invite link for ${m.invitedEmail || m.displayName}`}
+                        onClick={() => copyLink(url)}
+                        className="text-2xs text-theme-text-secondary hover:text-theme-text-primary px-1.5 py-0.5 rounded font-medium flex-shrink-0 hover:bg-theme-surface-alt transition-colors"
+                      >
+                        {copiedUrl === url ? 'Copied' : 'Copy link'}
+                      </button>
+                    )}
+                    {householdRole === 'admin' && (
+                      <button
+                        aria-label={`Cancel invite for ${m.invitedEmail || m.displayName}`}
+                        onClick={() => removeHouseholdMember(m.id)}
+                        className="text-2xs text-red-500 hover:text-red-700 dark:hover:text-red-300 px-1.5 py-0.5 rounded font-medium flex-shrink-0 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
-                ))}
+                )
+              })}
             </div>
           )}
 
-          {/* Active household members */}
-          {!householdLoading && householdMembers.filter(m => m.status === 'active').length > 1 && (
+          {/* Accounts sharing this household */}
+          {!householdLoading && activeMembers.length > 1 && (
             <div className="space-y-1.5">
-              <div className="text-xs text-theme-text-tertiary">Linked accounts</div>
-              {householdMembers
-                .filter(m => m.status === 'active')
-                .map(m => (
-                  <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface-raised">
-                    <Home className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                    <span className="text-xs text-theme-text-secondary truncate">
-                      {m.display_name || m.invited_email}
-                    </span>
-                    <span className="text-2xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded font-medium ml-auto flex-shrink-0 capitalize">
-                      {m.role}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          )}
-
-          {/* Leave household (for non-admin members) */}
-          {!householdLoading && household && householdMembers.some(m => m.status === 'active' && m.role === 'member' && m.user_id) && (
-            (() => {
-              const selfMember = householdMembers.find(m => m.status === 'active' && m.role === 'member')
-              if (!selfMember) return null
-              return (
+              <div className="text-xs text-theme-text-tertiary">Sharing with</div>
+              {activeMembers.map(m => (
+                <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-surface-raised">
+                  <Home className="w-3.5 h-3.5 text-theme-primary flex-shrink-0" />
+                  <span className="text-xs text-theme-text-secondary truncate">
+                    {m.displayName || m.invitedEmail}{m.id === selfMemberId ? ' (you)' : ''}
+                  </span>
+                  <span className="text-2xs text-theme-text-secondary bg-theme-surface-alt px-1.5 py-0.5 rounded font-medium ml-auto flex-shrink-0 capitalize">
+                    {m.role}
+                  </span>
+                </div>
+              ))}
+              {selfMemberId && (
                 <button
-                  onClick={() => removeHouseholdMember(selfMember.id)}
+                  onClick={() => removeHouseholdMember(selfMemberId)}
                   className="w-full text-xs text-theme-text-tertiary hover:text-red-500 transition-colors py-1"
                 >
                   Leave household
                 </button>
-              )
-            })()
+              )}
+            </div>
           )}
         </div>
       </div>

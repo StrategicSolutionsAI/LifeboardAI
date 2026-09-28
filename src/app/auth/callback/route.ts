@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse, NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { PENDING_INVITE_COOKIE, pendingInvitePath } from '@/lib/household/pending-invite'
 
 // Same-origin path only — an absolute or protocol-relative `next` could
 // bounce a freshly authenticated user to an attacker-chosen site.
@@ -94,28 +95,19 @@ export async function GET(request: NextRequest) {
     await supabase.from('profiles').insert({ id: user.id, onboarded: false }).throwOnError()
     // Password recovery still wins — the user came to set a password, not to onboard.
     destination = next ?? '/onboarding/0'
+  }
 
-    // Auto-join household if this email was invited
-    if (user.email) {
-      const { data: pendingInvite } = await supabase
-        .from('household_members')
-        .select('id')
-        .eq('invited_email', user.email.toLowerCase())
-        .eq('status', 'pending')
-        .limit(1)
-        .maybeSingle()
-
-      if (pendingInvite) {
-        await supabase
-          .from('household_members')
-          .update({
-            user_id: user.id,
-            status: 'active',
-            joined_at: new Date().toISOString(),
-          })
-          .eq('id', pendingInvite.id)
-      }
+  // A household invite waiting for this user goes to /join to confirm — joining
+  // shares their calendar, tasks and budget, so it is never done silently.
+  // The cookie comes from an invite link opened while signed out; a new
+  // account also picks up an invite addressed to its email.
+  if (!next) {
+    let invitePath = pendingInvitePath(request.cookies.get(PENDING_INVITE_COOKIE)?.value)
+    if (!invitePath && !profile) {
+      const { data: token } = await supabase.rpc('my_pending_invite_token')
+      invitePath = pendingInvitePath(token)
     }
+    if (invitePath) destination = invitePath
   }
 
   // Create the final redirect, copying cookies set earlier into the redirect response

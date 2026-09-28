@@ -3,6 +3,7 @@ import { supabaseServer } from '@/utils/supabase/server'
 import { withErrorHandling, createApiError } from '@/lib/api-error-handler'
 import { parseBody, updateHouseholdMemberSchema } from '@/lib/validations'
 import { getUserCached } from '@/lib/server-auth-cache'
+import { invalidateDataScope } from '@/lib/household/scope'
 
 // GET — List household members (active + pending)
 async function getHandler(request: NextRequest) {
@@ -27,7 +28,7 @@ async function getHandler(request: NextRequest) {
 
   const { data: members, error } = await supabase
     .from('household_members')
-    .select('*')
+    .select('id, household_id, user_id, role, status, invited_email, display_name, invited_at, joined_at')
     .eq('household_id', membership.household_id)
     .order('invited_at', { ascending: true })
 
@@ -113,7 +114,23 @@ async function deleteHandler(request: NextRequest) {
 
   const isSelf = targetMember.user_id === user.id
 
-  if (!isSelf) {
+  if (isSelf) {
+    // The last admin leaving would strand everyone else with no one able to invite.
+    const { data: others } = await supabase
+      .from('household_members')
+      .select('user_id, role')
+      .eq('household_id', targetMember.household_id)
+      .eq('status', 'active')
+      .neq('user_id', user.id)
+    const { data: me } = await supabase
+      .from('household_members')
+      .select('role')
+      .eq('id', memberId)
+      .single()
+    if (me?.role === 'admin' && (others ?? []).length > 0 && !(others ?? []).some((m) => m.role === 'admin')) {
+      throw createApiError('Make another member an admin before leaving', 409, 'LAST_ADMIN')
+    }
+  } else {
     // Only admins can remove other members
     const { data: adminCheck } = await supabase
       .from('household_members')
@@ -136,6 +153,9 @@ async function deleteHandler(request: NextRequest) {
 
   if (error) throw createApiError('Failed to remove member', 500, 'DB_ERROR', error)
 
+  // Leaving takes the member's own rows private again (DB trigger); drop the
+  // cached scope so their next request stops asking for household rows.
+  if (targetMember.user_id) invalidateDataScope(targetMember.user_id)
   return NextResponse.json({ success: true })
 }
 

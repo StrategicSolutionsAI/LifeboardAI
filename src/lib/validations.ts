@@ -113,8 +113,32 @@ export const deleteNoteSchema = z.object({
 
 // ---------- Household ----------
 
+const rosterMemberSchema = z.object({
+  id: z.string().min(1).max(100),
+  name: z.string().min(1).max(100),
+  relationship: z.enum(['spouse', 'child', 'parent', 'grandparent', 'sibling', 'pet', 'other']),
+  birthday: z.string().max(20).optional(),
+  phone: z.string().max(50).optional(),
+  email: z.string().max(200).optional(),
+  avatarColor: z.string().max(20),
+  allergens: z.array(z.string().max(100)).max(50).optional(),
+  medicalNotes: z.string().max(2000).optional(),
+  createdAt: z.string().max(40),
+  userId: z.string().uuid().optional(),
+})
+
+export const householdRosterSchema = z.object({
+  roster: z.array(rosterMemberSchema).max(50),
+})
+
 export const createHouseholdSchema = z.object({
   name: z.string().min(1, 'name required').max(100),
+  // The creator's existing Family Members roster seeds the shared one.
+  roster: z.array(rosterMemberSchema).max(50).optional(),
+})
+
+export const joinHouseholdSchema = z.object({
+  token: z.string().uuid('valid invite token required'),
 })
 
 export const inviteHouseholdMemberSchema = z.object({

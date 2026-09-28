@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 import {
   BUDGET_CATEGORY_SELECT_COLUMNS,
   mapRowToCategory,
@@ -9,6 +10,7 @@ import { computeHealthScore } from '@/lib/budget-utils'
 import type { CategoryBudgetSummary, MonthlyBudgetSummary } from '@/types/budget'
 
 export const GET = withAuth(async (req, { supabase, user }) => {
+  const scope = await getDataScope(supabase, user.id)
   const { searchParams } = new URL(req.url)
   const month = searchParams.get('month')
   if (!month) {
@@ -27,17 +29,17 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     supabase
       .from('budget_categories')
       .select(BUDGET_CATEGORY_SELECT_COLUMNS)
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .order('sort_order', { ascending: true }),
     supabase
       .from('monthly_budgets')
       .select('category_id, amount')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .eq('month', month),
     supabase
       .from('budget_expenses')
       .select('category_id, amount')
-      .eq('user_id', user.id)
+      .or(ownedOrShared(scope))
       .gte('date', startDate)
       .lt('date', endDate),
   ])

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-utils'
 import { normalizeHourSlot } from '@/lib/date-utils'
 import { syncTaskToCalendarEvent } from '@/lib/calendar-sync'
+import { getDataScope, ownedOrShared } from '@/lib/household/scope'
 
 export const POST = withAuth(async (req, { supabase, user }) => {
   const { updates } = await req.json()
@@ -67,6 +68,7 @@ export const POST = withAuth(async (req, { supabase, user }) => {
   // overlap. Bounded waves rather than one Promise.all over the whole list: a
   // large batch would otherwise open hundreds of simultaneous PostgREST calls.
   const CONCURRENCY = 25
+  const scope = await getDataScope(supabase, user.id)
   const results: Record<string, unknown>[] = []
   for (let i = 0; i < jobs.length; i += CONCURRENCY) {
     const wave = await Promise.all(
@@ -75,7 +77,7 @@ export const POST = withAuth(async (req, { supabase, user }) => {
           .from('lifeboard_tasks')
           .update(updateData)
           .eq('id', taskId)
-          .eq('user_id', user.id)
+          .or(ownedOrShared(scope))
           .select('id, content, due_date, start_date, end_date, hour_slot, end_hour_slot, duration, repeat_rule, bucket, completed, position, all_day, kanban_status, assignee_id')
           .single()
         if (error) {
@@ -83,7 +85,7 @@ export const POST = withAuth(async (req, { supabase, user }) => {
         }
         if (!error && data) {
           try {
-            await syncTaskToCalendarEvent(supabase, user.id, {
+            await syncTaskToCalendarEvent(supabase, scope, {
               id: data.id,
               content: data.content,
               due_date: data.due_date,

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import type { LifeboardCommand } from './chat-command-catalog'
+import { getDataScope, ownedOrShared } from './household/scope'
 
 /**
  * Shared chat command infrastructure for LifeboardAI.
@@ -246,11 +247,12 @@ async function findTaskByName(
   ctx: CommandContext,
   taskName: string,
 ): Promise<{ id: string; content: string; source: 'supabase' | 'todoist'; strong: boolean } | null> {
-  // Try lifeboard_tasks first
+  // Try lifeboard_tasks first — the household's shared tasks count too
+  const scope = await getDataScope(ctx.supabase, ctx.userId)
   const { data: tasks } = await ctx.supabase
     .from('lifeboard_tasks')
     .select('id, content')
-    .eq('user_id', ctx.userId)
+    .or(ownedOrShared(scope))
     .eq('completed', false)
     .order('created_at', { ascending: false })
     .limit(100)
@@ -291,10 +293,11 @@ async function findShoppingItemByName(
   ctx: CommandContext,
   itemName: string,
 ): Promise<{ id: string; name: string } | null> {
+  const scope = await getDataScope(ctx.supabase, ctx.userId)
   const { data: items } = await ctx.supabase
     .from('shopping_list_items')
     .select('id, name')
-    .eq('user_id', ctx.userId)
+    .or(ownedOrShared(scope))
     .eq('is_purchased', false)
     .order('created_at', { ascending: false })
     .limit(100)

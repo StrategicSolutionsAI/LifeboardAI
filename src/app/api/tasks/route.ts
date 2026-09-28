@@ -4,6 +4,7 @@ import { createTaskSchema, updateTaskSchema } from '@/lib/validations';
 import { TASK_SELECT_COLUMNS as SELECT_COLUMNS, mapRowToTask } from '@/repositories/tasks';
 import { withAuth, withAuthAndBody } from '@/lib/api-utils';
 import { normalizeHourSlot } from '@/lib/date-utils';
+import { getDataScope, ownedOrShared } from '@/lib/household/scope';
 
 export const GET = withAuth(async (req, { supabase, user }) => {
   const sp = req.nextUrl.searchParams;
@@ -15,10 +16,11 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     return NextResponse.json({ error: 'Missing date parameter' }, { status: 400 });
   }
 
+  const scope = await getDataScope(supabase, user.id);
   let query = supabase
     .from('lifeboard_tasks')
     .select(SELECT_COLUMNS)
-    .eq('user_id', user.id);
+    .or(ownedOrShared(scope));
 
   if (date && !allParam) {
     // Include tasks where EITHER due_date OR start_date matches the requested day
@@ -173,11 +175,12 @@ export const PATCH = withAuthAndBody(updateTaskSchema, async (req, { supabase, u
     return NextResponse.json({ error: 'no update fields provided' }, { status: 400 });
   }
 
+  const scope = await getDataScope(supabase, user.id);
   const { data, error } = await supabase
     .from('lifeboard_tasks')
     .update(updatePayload)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .or(ownedOrShared(scope))
     .select(SELECT_COLUMNS)
     .single();
 

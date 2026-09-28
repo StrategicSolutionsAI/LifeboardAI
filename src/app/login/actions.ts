@@ -1,7 +1,8 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { PENDING_INVITE_COOKIE, pendingInvitePath } from '@/lib/household/pending-invite'
  
 function getBaseUrl() {
   const h = headers()
@@ -45,6 +46,11 @@ function sanitizeRedirect(value: FormDataEntryValue | null): string | null {
     return null
   }
   return value
+}
+
+// An invite link opened before signing in takes precedence over the default landing.
+function pendingInviteRedirect(): string | null {
+  return pendingInvitePath(cookies().get(PENDING_INVITE_COOKIE)?.value)
 }
 
 // Email password login
@@ -91,10 +97,10 @@ export async function emailLogin(formData: FormData): Promise<void> {
       loginError(createProfileError.message)
     }
 
-    redirect('/onboarding/0')
+    redirect(pendingInviteRedirect() ?? '/onboarding/0')
   }
 
-  redirect(redirectTo ?? '/dashboard')
+  redirect(redirectTo ?? pendingInviteRedirect() ?? '/dashboard')
 }
 
 // Simple email sign-up
@@ -113,5 +119,5 @@ export async function emailSignUp(formData: FormData): Promise<void> {
     // would just bounce back to /login. Tell the user what to do instead.
     redirect(`/login?message=${encodeURIComponent('Check your email to confirm your account, then sign in.')}`)
   }
-  redirect('/onboarding/0')
+  redirect(pendingInviteRedirect() ?? '/onboarding/0')
 }

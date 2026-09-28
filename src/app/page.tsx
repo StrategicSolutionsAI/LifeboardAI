@@ -553,7 +553,7 @@ export default function Page() {
 
             <ul className="mb-8 space-y-2">
               {[
-                "Tasks, calendar & shopping list",
+                "Calendar, tasks & shopping list shared with your household",
                 "Budget with monthly category limits",
                 "Fitbit, Withings & Google Fit sync",
                 "Gmail inbox & two-way Todoist sync",

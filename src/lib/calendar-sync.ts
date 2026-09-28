@@ -1,5 +1,6 @@
 import { addMinutes } from 'date-fns';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ownedOrShared, type DataScope } from '@/lib/household/scope';
 
 export type CalendarRepeatRule = 'daily' | 'weekly' | 'weekdays' | 'monthly';
 
@@ -111,6 +112,7 @@ export interface LifeboardTaskLike {
 
 export interface CalendarEventRow {
   id: string;
+  user_id?: string;
   import_id: string | null;
   external_id?: string | null;
   source?: string | null;
@@ -196,9 +198,11 @@ function buildCalendarUpdateFromTask(task: LifeboardTaskLike) {
 
 type GenericSupabaseClient = SupabaseClient<any, any, any>;
 
+// The linked event may belong to another household member, so it is found by
+// the viewer's scope rather than their user id.
 export async function syncTaskToCalendarEvent(
   supabase: GenericSupabaseClient,
-  userId: string,
+  scope: DataScope,
   task: LifeboardTaskLike
 ): Promise<void> {
   const update = buildCalendarUpdateFromTask(task);
@@ -207,7 +211,7 @@ export async function syncTaskToCalendarEvent(
   const { data: eventRows, error: lookupError } = await supabase
     .from('calendar_events')
     .select('id')
-    .eq('user_id', userId)
+    .or(ownedOrShared(scope))
     .eq('task_id', task.id)
     .limit(1);
 
@@ -225,7 +229,7 @@ export async function syncTaskToCalendarEvent(
     .from('calendar_events')
     .update(update)
     .eq('id', eventId)
-    .eq('user_id', userId);
+    .or(ownedOrShared(scope));
 
   if (updateError) {
     console.error('Failed to sync task changes to calendar event', { taskId: task.id, eventId, updateError });
