@@ -129,6 +129,10 @@ Define success criteria, then loop until verified. Don't just follow steps.
 
 24. **Prefetch keys derived twice.** /calendar's module-load prefetch hardcoded a month range while the calendar restores its view from localStorage and defaults to *day* — so it warmed a key nothing read, costing an API call and still cold-fetching on mount. Rule: a prefetch and the hook it warms must call the *same exported* key builder (pattern: `src/features/calendar/date-range.ts`), never two copies of the derivation; a prefetch whose key guesses at default state is worse than none (docs/learnings/2026-07-29-prefetch-key-must-be-derived-not-guessed.md).
 
+25. **Querying a shared table by `user_id` alone.** Tasks, calendar events/imports, occurrence exceptions, shopping items and the budget tables are household-shared. Rule: read and edit them with `.or(ownedOrShared(await getDataScope(supabase, user.id)))` from `src/lib/household/scope.ts` — it mirrors the RLS rule, so a drifted policy can never widen access; keep `.eq('user_id', …)` only for rows that are inherently yours (bucket delete, data export, the service-role cron still scopes explicitly).
+
+26. **RLS migrations shipped untested.** A policy that sub-selects its own table is 42P17 infinite recursion for every non-superuser — invisible to `postgres` and the service key. Rule: run migrations on a local Postgres with the auth shim, as two users, before presenting SQL; membership checks go through `SECURITY DEFINER` helpers (docs/learnings/2026-09-28-test-rls-migrations-on-local-postgres.md).
+
 ## Quality bar per deliverable (checkable, not adjectives)
 - **Bug fix:** root cause named in the commit body; regression test added next to the code; `tsc --noEmit` clean; the failing scenario re-run and shown passing.
 - **Feature:** repository-layer data access; tokens from `styles.ts` (zero hardcoded colors); loading skeleton for any async view; works in light and dark mode; `npm run build` passes; screenshot of the working UI.
