@@ -228,6 +228,18 @@ export const pushUnsubscribeSchema = z.object({
   endpoint: z.string().url().max(2000),
 })
 
+// ---------- Calendar feeds ----------
+
+export const subscribeCalendarFeedSchema = z.object({
+  url: z.string().min(1, 'url required').max(2000),
+  name: z.string().max(100).optional(),
+  bucket: z.string().max(200).nullable().optional(),
+})
+
+export const refreshCalendarFeedSchema = z.object({
+  importId: z.string().uuid('valid importId required'),
+})
+
 // ---------- Helpers ----------
 
 /** Validation failure shape shared by classic zod and zod/v4. */

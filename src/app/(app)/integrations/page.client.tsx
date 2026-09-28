@@ -26,6 +26,9 @@ interface CalendarImport {
   updated_at?: string;
   default_bucket?: string | null;
   default_assignee?: string | null;
+  feed_url?: string | null;
+  last_synced_at?: string | null;
+  last_sync_error?: string | null;
 }
 
 const integrations: Integration[] = [
@@ -134,6 +137,7 @@ export default function IntegrationsPageClient() {
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null)
   const [showCalendarUpload, setShowCalendarUpload] = useState(false)
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null)
+  const [refreshingImportId, setRefreshingImportId] = useState<string | null>(null)
   const [updatingBucketId, setUpdatingBucketId] = useState<string | null>(null)
   const [bucketSelections, setBucketSelections] = useState<Record<string, string>>({})
   const [assigneeSelections, setAssigneeSelections] = useState<Record<string, string>>({})
@@ -199,15 +203,38 @@ export default function IntegrationsPageClient() {
       setAssigneeSelections(nextAssigneeSelections)
     } catch (error) {
       console.error('Failed to load calendar imports', error)
-      setCalendarError('Unable to load uploaded calendars. Please try again.')
+      setCalendarError('Unable to load calendars. Please try again.')
     } finally {
       setCalendarLoading(false)
     }
   }, [])
 
+  const handleRefreshFeed = useCallback(async (importId: string) => {
+    setRefreshingImportId(importId)
+    setCalendarMessage(null)
+    setCalendarError(null)
+    try {
+      const response = await fetch('/api/calendar/feeds/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Refresh failed')
+      invalidateTaskCaches()
+      invalidateIntegrationCaches('calendar')
+      setCalendarMessage(`Calendar refreshed: ${data.events} events${data.removed ? `, ${data.removed} removed` : ''}.`)
+    } catch (error) {
+      setCalendarError(error instanceof Error ? error.message : 'Refresh failed')
+    } finally {
+      setRefreshingImportId(null)
+      void fetchCalendarImports()
+    }
+  }, [fetchCalendarImports])
+
   const handleDeleteImport = useCallback(async (importId: string) => {
     if (!importId) return
-    const confirmed = window.confirm('Delete this uploaded calendar? All imported events and linked tasks will be removed.')
+    const confirmed = window.confirm('Delete this calendar? All its events and linked tasks will be removed.')
     if (!confirmed) return
 
     setDeletingImportId(importId)
@@ -455,8 +482,8 @@ export default function IntegrationsPageClient() {
         <Card className="mb-6">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle className="text-lg">Uploaded Calendars</CardTitle>
-              <CardDescription className="mt-1">Import ICS files and manage manual calendars alongside your integrations.</CardDescription>
+              <CardTitle className="text-lg">Calendars</CardTitle>
+              <CardDescription className="mt-1">Subscribe to school and team calendars by link, or import an .ics file.</CardDescription>
             </div>
             <Button
               variant="outline"
@@ -472,7 +499,7 @@ export default function IntegrationsPageClient() {
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Upload calendar
+                  Add calendar
                 </>
               )}
             </Button>
@@ -491,11 +518,11 @@ export default function IntegrationsPageClient() {
             {calendarLoading ? (
               <div className="flex items-center gap-2 text-sm text-theme-text-secondary">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading uploaded calendars...
+                Loading calendars...
               </div>
             ) : calendarImports.length === 0 ? (
               <p className="text-sm text-theme-text-secondary">
-                No calendars uploaded yet. Upload an .ics file to populate the calendar without connecting an integration.
+                No calendars yet. Paste a school or team calendar link, or upload an .ics file.
               </p>
             ) : (
               <div className="space-y-3">
@@ -522,13 +549,18 @@ export default function IntegrationsPageClient() {
                         <p className="text-sm font-semibold text-theme-text-primary">{calendar.name}</p>
                         <p className="text-xs text-theme-text-secondary mt-1">
                           {eventCount} event{eventCount === 1 ? '' : 's'}
-                          {timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
+                          {calendar.feed_url
+                            ? calendar.last_synced_at ? ` • Subscribed, synced ${formatRelativeTime(calendar.last_synced_at)}` : ' • Subscribed'
+                            : timestamp ? ` • Updated ${formatRelativeTime(timestamp)}` : ''}
                           {calendar.file_name ? ` • ${calendar.file_name}` : ''}
                           {' '}
                           {currentBucket
                             ? `• Bucket: ${currentBucket}`
                             : '• Bucket: Unassigned'}
                         </p>
+                        {calendar.feed_url && calendar.last_sync_error && (
+                          <p className="text-xs text-theme-error-600 mt-1">Last refresh failed: {calendar.last_sync_error}</p>
+                        )}
                       </div>
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="flex items-center gap-2">
@@ -602,6 +634,18 @@ export default function IntegrationsPageClient() {
                               )}
                             </div>
                           </div>
+                        )}
+                        {calendar.feed_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRefreshFeed(calendar.id)}
+                            disabled={refreshingImportId === calendar.id || deletingImportId === calendar.id}
+                            className="w-full sm:w-auto border-theme-neutral-300 text-theme-text-secondary"
+                          >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${refreshingImportId === calendar.id ? 'animate-spin' : ''}`} />
+                            Refresh
+                          </Button>
                         )}
                         <Button
                           variant="outline"

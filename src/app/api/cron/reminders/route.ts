@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// Called every 15 minutes by .github/workflows/reminders.yml (or any scheduler)
+// Called every 15 minutes by .github/workflows/scheduled-jobs.yml (or any scheduler)
 // with `Authorization: Bearer $CRON_SECRET`. Vercel Cron sends the same header.
 async function handler(req: NextRequest) {
   const secret = process.env.CRON_SECRET

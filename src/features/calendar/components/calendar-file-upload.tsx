@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, X, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { invalidateTaskCaches, invalidateIntegrationCaches } from "@/hooks/use-data-cache";
 import { useBuckets } from "@/hooks/use-buckets";
@@ -32,6 +32,9 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [calendarName, setCalendarName] = useState('');
+  // "link" subscribes to a calendar feed (school, team) that refreshes on its own.
+  const [mode, setMode] = useState<'file' | 'link'>('link');
+  const [feedUrl, setFeedUrl] = useState('');
   const { buckets, activeBucket } = useBuckets();
   const [selectedBucket, setSelectedBucket] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -187,6 +190,55 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
     }
   };
 
+  const handleSubscribe = async () => {
+    if (!feedUrl.trim()) return;
+    setIsUploading(true);
+    setUploadResult(null);
+    try {
+      const trimmedName = calendarName.trim();
+      const response = await fetch('/api/calendar/feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: feedUrl.trim(),
+          name: trimmedName || undefined,
+          bucket: selectedBucket || null,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) {
+        invalidateTaskCaches();
+        invalidateIntegrationCaches('calendar');
+        const successResult: UploadResult = {
+          success: true,
+          message: result.message,
+          totalEvents: result.totalEvents,
+          importedEvents: result.importedEvents,
+          tasksCreated: result.tasksCreated,
+          tasksUpdated: result.tasksUpdated,
+          taskSyncErrors: result.taskSyncErrors,
+          importId: result.importId,
+          calendarName: result.calendarName,
+          bucket: result.bucket ?? null,
+        };
+        setUploadResult(successResult);
+        onUploadComplete?.(successResult);
+        setFeedUrl('');
+        setCalendarName('');
+      } else {
+        const errorResult: UploadResult = { success: false, message: result.error || 'Could not subscribe to that calendar', error: result.error };
+        setUploadResult(errorResult);
+        onUploadComplete?.(errorResult);
+      }
+    } catch {
+      const errorResult: UploadResult = { success: false, message: 'Network error occurred', error: 'Network error' };
+      setUploadResult(errorResult);
+      onUploadComplete?.(errorResult);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleReset = () => {
     setSelectedFile(null);
     setUploadResult(null);
@@ -210,8 +262,8 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-xl flex items-center gap-2">
-          <Upload className="h-5 w-5 text-warm-600" />
-          Upload Calendar File
+          {mode === 'link' ? <Link2 className="h-5 w-5 text-warm-600" /> : <Upload className="h-5 w-5 text-warm-600" />}
+          Add a Calendar
         </CardTitle>
         {onClose && (
           <button
@@ -224,6 +276,43 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         )}
       </CardHeader>
       <CardContent className="space-y-6">
+        <div role="tablist" aria-label="How to add the calendar" className="inline-flex rounded-lg border border-theme-neutral-300 bg-theme-surface-alt p-0.5">
+          {([['link', 'Subscribe by link'], ['file', 'Upload a file']] as const).map(([value, label]) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={mode === value}
+              onClick={() => { setMode(value); setUploadResult(null); }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                mode === value ? 'bg-theme-primary text-white' : 'text-theme-text-secondary hover:text-theme-text-primary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'link' && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-theme-text-body">
+              Calendar link
+              <input
+                type="url"
+                inputMode="url"
+                value={feedUrl}
+                onChange={(e) => setFeedUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubscribe(); }}
+                placeholder="webcal://… or https://….ics"
+                className="mt-1 w-full rounded-lg border border-theme-neutral-300 px-3 py-2 text-sm focus:border-warm-500 focus:outline-none"
+              />
+            </label>
+            <p className="text-xs text-theme-text-tertiary">
+              Paste the iCal / webcal link from your school, sports team or club. For a Google calendar, use its
+              &ldquo;Secret address in iCal format&rdquo;. Lifeboard checks it for changes every few hours.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <label className="block text-sm font-medium text-theme-text-body">
             Calendar name
@@ -265,6 +354,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         </div>
 
         {/* Upload Area */}
+        {mode === 'file' && (<>
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -329,6 +419,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           onChange={handleFileInputChange}
           className="hidden"
         />
+        </>)}
 
         {/* Upload Result */}
         {uploadResult && (
@@ -374,8 +465,26 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
           </div>
         )}
 
+        {/* Subscribe Button */}
+        {mode === 'link' && !uploadResult?.success && (
+          <button
+            onClick={handleSubscribe}
+            disabled={isUploading || !feedUrl.trim()}
+            className="w-full bg-warm-600 text-white py-3 px-4 rounded-lg hover:bg-warm-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+          >
+            {isUploading ? (
+              <span className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Checking calendar...
+              </span>
+            ) : (
+              'Subscribe'
+            )}
+          </button>
+        )}
+
         {/* Upload Button */}
-        {selectedFile && !uploadResult?.success && (
+        {mode === 'file' && selectedFile && !uploadResult?.success && (
           <div className="flex gap-3">
             <button
               onClick={handleUpload}
@@ -401,6 +510,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
         )}
 
         {/* Help Text */}
+        {mode === 'file' && (
         <div className="text-sm text-theme-text-subtle bg-warm-50 p-4 rounded-lg">
           <h4 className="font-medium text-warm-900 mb-2">Supported formats:</h4>
           <ul className="space-y-1 list-disc list-inside">
@@ -413,6 +523,7 @@ export function CalendarFileUpload({ onUploadComplete, onClose }: CalendarFileUp
             Duplicate events will update automatically.
           </p>
         </div>
+        )}
       </CardContent>
     </Card>
   );

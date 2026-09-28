@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('calendar_imports')
-      .select('id, name, file_name, event_count, created_at, updated_at, default_bucket, default_assignee')
+      .select('id, name, file_name, event_count, created_at, updated_at, default_bucket, default_assignee, feed_url, last_synced_at, last_sync_error')
       .or(ownedOrShared(scope))
       .order('created_at', { ascending: false });
 
