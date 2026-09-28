@@ -4,7 +4,7 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
-  ArrowRight, Calendar, Zap, Brain,
+  ArrowRight, Calendar, Brain,
   Activity, CheckCircle,
   BarChart3, Link2, MessageCircle, Mic,
   LayoutGrid, List, Columns3, Droplets,
@@ -537,91 +537,44 @@ export default function Page() {
         <div className="mx-auto max-w-7xl">
           <div className="scroll-reveal mx-auto mb-14 max-w-2xl text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-warm-500">Pricing</p>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight md:text-5xl text-theme-text-primary text-balance">Start simple. Scale when you need it.</h2>
-            <p className="mt-4 text-lg text-theme-text-subtle">All plans include bucket tabs, task management, and your AI assistant.</p>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight md:text-5xl text-theme-text-primary text-balance">Free while we&apos;re in beta.</h2>
+            <p className="mt-4 text-lg text-theme-text-subtle">Everything below is included. If paid plans ever arrive, you&apos;ll hear about it before anything changes.</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {[
-              {
-                name: "Starter",
-                price: "$0",
-                cadence: "/month",
-                cta: "Create Account",
-                summary: "Personal planning with essential task management and widgets.",
-                features: ["5 custom buckets", "List & Board views", "10 tracking widgets", "AI chat assistant"],
-                popular: false,
-              },
-              {
-                name: "Pro",
-                price: "$18",
-                cadence: "/month",
-                cta: "Start Pro Trial",
-                summary: "Full power with unlimited widgets, health integrations, and Kanban.",
-                features: ["Unlimited buckets & widgets", "Kanban view + drag-and-drop", "Fitbit, Withings & Todoist sync", "Voice AI + priority insights"],
-                popular: true,
-              },
-              {
-                name: "Team",
-                price: "$39",
-                cadence: "/month",
-                cta: "Contact Sales",
-                summary: "Shared dashboards for families, assistants, or small teams.",
-                features: ["Shared bucket boards", "Role-based access", "Family meal planning", "Priority support"],
-                popular: false,
-              },
-            ].map((plan) => (
-              <article
-                key={plan.name}
-                className={`scroll-reveal rounded-3xl border p-5 sm:p-7 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-warm ${
-                  plan.popular
-                    ? "border-warm-300 bg-white ring-2 ring-warm-400 shadow-warm"
-                    : "border-warm-200 bg-white"
-                }`}
-              >
-                <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-theme-text-primary">{plan.name}</h3>
-                  {plan.popular && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warm-700 border border-warm-300">
-                      <Zap className="h-3.5 w-3.5" />
-                      Most Popular
-                    </span>
-                  )}
-                </div>
+          <article className="scroll-reveal mx-auto max-w-md rounded-3xl border border-warm-300 bg-white p-5 sm:p-7 ring-2 ring-warm-400 shadow-warm">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-theme-text-primary">Beta</h3>
+              <span className="inline-flex items-center rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-warm-700 border border-warm-300">
+                Everything included
+              </span>
+            </div>
 
-                <p className="mb-4 text-4xl font-bold tracking-tight text-theme-text-primary">
-                  {plan.price}
-                  <span className="ml-1 text-base font-medium text-theme-text-tertiary">{plan.cadence}</span>
-                </p>
-                <p className="mb-6 text-sm leading-6 text-theme-text-subtle">{plan.summary}</p>
+            <p className="mb-6 text-4xl font-bold tracking-tight text-theme-text-primary">$0</p>
 
-                <ul className="mb-8 space-y-2">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm text-theme-text-body">
-                      <CheckCircle className="h-4 w-4 text-warm-500 shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+            <ul className="mb-8 space-y-2">
+              {[
+                "Tasks, calendar & shopping list",
+                "Budget with monthly category limits",
+                "Fitbit, Withings & Google Fit sync",
+                "Gmail inbox & two-way Todoist sync",
+                "AI chat and voice assistant",
+              ].map((feature) => (
+                <li key={feature} className="flex items-center gap-2 text-sm text-theme-text-body">
+                  <CheckCircle className="h-4 w-4 text-warm-500 shrink-0" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
 
-                <Link href={plan.name === "Team" ? "/login" : "/signup"}>
-                  <Button
-                    variant={plan.popular ? "default" : "outline"}
-                    className={`w-full rounded-xl ${
-                      plan.popular
-                        ? "bg-warm-600 text-white hover:bg-warm-700"
-                        : "border-warm-300 text-warm-700 hover:bg-warm-50"
-                    }`}
-                  >
-                    {plan.cta}
-                  </Button>
-                </Link>
-              </article>
-            ))}
-          </div>
+            <Link href="/signup">
+              <Button className="w-full rounded-xl bg-warm-600 text-white hover:bg-warm-700">
+                Create free account
+              </Button>
+            </Link>
+          </article>
 
           <p className="text-sm text-theme-text-tertiary text-center mt-8">
-            All plans include a 14-day free trial. No credit card required.
+            No credit card required.
           </p>
         </div>
       </section>
