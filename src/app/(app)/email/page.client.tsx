@@ -2,6 +2,7 @@
 
 import { PageHeaderActions } from "@/components/page-header-actions"
 import { useState, useEffect, useCallback, useRef, useMemo, FormEvent } from 'react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDataCache } from '@/hooks/use-data-cache'
@@ -52,7 +53,8 @@ import type { ParsedEmail, AttachmentMeta } from '@/lib/gmail/message-parser'
 import { extractSenderName, extractSenderEmail } from '@/lib/gmail/message-parser'
 import type { SenderGroup } from '@/app/api/email/inbox-cleaner/scan/route'
 import type { MarketingSenderGroup } from '@/app/api/email/ai/marketing/route'
-import type { TaskExtraction } from '@/lib/gmail/email-ai-utils'
+// Loaded on first open — it pulls in the buckets/preferences client the inbox itself never needs.
+const FindTasksModal = dynamic(() => import('./components/find-tasks-modal').then((m) => m.FindTasksModal), { ssr: false })
 
 type MessageSummary = Omit<ParsedEmail, 'textBody' | 'htmlBody'>
 
@@ -1956,6 +1958,8 @@ export default function EmailPageClient() {
   const [marketingState, setMarketingState] = useState<'idle' | 'scanning' | 'done'>('idle')
   const [marketingResults, setMarketingResults] = useState<{ movedCount: number; senders: MarketingSenderGroup[] } | null>(null)
   const [showInboxCleaner, setShowInboxCleaner] = useState(false)
+  // Message ids frozen when Find Tasks opens, so the scan doesn't re-run as the list refreshes
+  const [findTasksIds, setFindTasksIds] = useState<string[] | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -2618,6 +2622,19 @@ export default function EmailPageClient() {
           <span className="flex-1 text-left">Sweep Marketing</span>
         </button>
         <button
+          onClick={() => {
+            // Checked messages win; otherwise the newest in view (the route caps a scan at 15).
+            const ids = checkedIds.size > 0 ? Array.from(checkedIds) : allMessages.map((m) => m.id)
+            setFindTasksIds(ids.slice(0, 15))
+            onNavigate?.()
+          }}
+          disabled={allMessages.length === 0}
+          className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised disabled:opacity-50 ${interactive.transitionFast}`}
+        >
+          <ListTodo className="h-4 w-4" />
+          <span className="flex-1 text-left">Find Tasks</span>
+        </button>
+        <button
           onClick={() => { setShowInboxCleaner(true); onNavigate?.() }}
           className={`w-full flex items-center gap-3 px-3 py-[7px] rounded-r-full text-[13px] font-medium text-theme-text-secondary hover:bg-theme-surface-raised ${interactive.transitionFast}`}
         >
@@ -3042,6 +3059,14 @@ export default function EmailPageClient() {
         <InboxCleanerModal
           onClose={() => setShowInboxCleaner(false)}
           account={selectedAccount || undefined}
+        />
+      )}
+
+      {findTasksIds && (
+        <FindTasksModal
+          messageIds={findTasksIds}
+          account={selectedAccount || undefined}
+          onClose={() => setFindTasksIds(null)}
         />
       )}
 

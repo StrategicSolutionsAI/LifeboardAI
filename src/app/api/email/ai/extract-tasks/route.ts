@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { withAuth } from '@/lib/api-utils'
+import { withAuthAndBody } from '@/lib/api-utils'
+import { extractEmailTasksSchema } from '@/lib/validations'
 import { getGmailForUser } from '@/lib/gmail/client'
 import { parseGmailMessage } from '@/lib/gmail/message-parser'
 import { runGemini } from '@/lib/replicate/client'
@@ -27,7 +28,7 @@ function getOpenAI(): OpenAI {
 
 const BATCH_SIZE = 15 // Max emails to scan per request
 
-export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
+export const POST = withAuthAndBody(extractEmailTasksSchema, async (req: NextRequest, { supabase, user, body }) => {
   const rateLimitKey = getRateLimitKey(req)
   const rateLimited = chatLimiter.check(rateLimitKey)
   if (rateLimited) return rateLimited
@@ -40,11 +41,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     return NextResponse.json({ error: 'Gmail not connected' }, { status: 404 })
   }
 
-  const body = await req.json()
-  const { messageIds, buckets = [] } = body as { messageIds: string[]; buckets?: string[] }
-  if (!Array.isArray(messageIds) || messageIds.length === 0) {
-    return NextResponse.json({ error: 'messageIds array is required' }, { status: 400 })
-  }
+  const { messageIds, buckets = [], today } = body
 
   // Limit batch size
   const idsToScan = messageIds.slice(0, BATCH_SIZE)
@@ -76,8 +73,7 @@ export const POST = withAuth(async (req: NextRequest, { supabase, user }) => {
     return NextResponse.json({ tasks: [] })
   }
 
-  const currentDate = new Date().toISOString().split('T')[0]
-  const systemPrompt = buildTaskExtractionPrompt(currentDate, buckets)
+  const systemPrompt = buildTaskExtractionPrompt(today, buckets)
   const emailBatch = emailSummaries.join('\n\n')
 
   let rawResponse: string

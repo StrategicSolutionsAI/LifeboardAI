@@ -180,6 +180,15 @@ export const upsertMonthlyBudgetSchema = z.object({
 // chat-command-catalog.ts — the single source that also generates the
 // OpenAI Realtime tool definitions.
 
+// ---------- Email AI ----------
+
+export const extractEmailTasksSchema = z.object({
+  messageIds: z.array(z.string().min(1)).min(1, 'messageIds required').max(50),
+  buckets: z.array(z.string().max(200)).max(100).optional(),
+  // Client-local YYYY-MM-DD — the server never derives "today" itself.
+  today: dateString,
+})
+
 // ---------- Helpers ----------
 
 /** Validation failure shape shared by classic zod and zod/v4. */
