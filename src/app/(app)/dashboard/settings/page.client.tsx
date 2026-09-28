@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { getUserPreferencesClient, saveUserPreferences, UserPreferences } from '@/lib/user-preferences'
 import { invalidateBucketColorCache } from '@/lib/bucket-colors'
 import { getCurrentLocalDate } from '@/lib/date-utils'
+import { ReminderSettings } from '@/features/reminders/components/reminder-settings'
 
 /** Curated palette from the Calidoraplanner-codex design system */
 const PALETTE_COLORS = [
@@ -354,6 +355,9 @@ export default function SettingsPageClient() {
               </div>
             </div>
           </div>
+
+          {/* ── Reminders ──────────────────────────────────── */}
+          <ReminderSettings />
 
           {/* ── Appearance ─────────────────────────────────── */}
           <div className="bg-white p-4 sm:p-6 rounded-xl shadow-warm-sm border border-theme-neutral-300">

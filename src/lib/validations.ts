@@ -213,6 +213,21 @@ export const extractEmailTasksSchema = z.object({
   today: dateString,
 })
 
+// ---------- Push reminders ----------
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(500),
+    auth: z.string().min(1).max(500),
+  }),
+  timeZone: z.string().min(1).max(100),
+})
+
+export const pushUnsubscribeSchema = z.object({
+  endpoint: z.string().url().max(2000),
+})
+
 // ---------- Helpers ----------
 
 /** Validation failure shape shared by classic zod and zod/v4. */

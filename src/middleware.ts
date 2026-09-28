@@ -8,7 +8,7 @@ export async function middleware(request: NextRequest) {
 // Run on page routes only — skip static assets, images, fonts, monitoring,
 // and API routes (they don't render HTML so CSP/nonce overhead is wasted).
 // Auth session refresh for API routes happens in-route via createClient().
-// PWA assets (sw.js, manifest.json, offline.html) and crawler/metadata routes
+// PWA assets (sw.js, push-sw.js, manifest.json, offline.html) and crawler/metadata routes
 // (robots.txt, sitemap.xml, opengraph-image, apple-icon) must also be skipped:
 // they are fetched without cookies (the manifest by spec even when logged in),
 // so the auth gate would 307 them to /login and break SW registration,
@@ -16,6 +16,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|monitoring|api/|sw\\.js|manifest\\.json|offline\\.html|robots\\.txt|sitemap\\.xml|opengraph-image|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|monitoring|api/|sw\\.js|push-sw\\.js|manifest\\.json|offline\\.html|robots\\.txt|sitemap\\.xml|opengraph-image|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot)$).*)',
   ],
 }
