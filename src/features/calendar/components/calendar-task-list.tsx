@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { format, isToday, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
-import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, AlertCircle, ChevronUp, MoreHorizontal } from "lucide-react";
+import { format, isTomorrow, isThisWeek, isWithinInterval, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, startOfDay, differenceInDays, parse } from "date-fns";
+import { ChevronRight, ChevronDown, ChevronLeft, Clock, Star, Calendar, ChevronUp, MoreHorizontal } from "lucide-react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { useTaskData, useTaskActions } from "@/contexts/tasks-context";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,9 @@ import { normalizeBucketId, toDayKey } from "@/features/calendar/types";
 import { EnhancedTaskCard, getCustomBucketStyles } from "@/features/calendar/components/calendar-task-card";
 import { useTaskOrdering } from "@/features/calendar/hooks/use-task-ordering";
 import { HabitChecklistPanel } from "@/features/calendar/components/habit-checklist-panel";
-import { occursOnDate } from "@/lib/task-recurrence";
+import { buildTodayPlan, completesPerOccurrence, DAY_PARTS } from "@/features/tasks/today-plan";
+import { useMoveTasks } from "@/features/tasks/use-move-tasks";
+import type { Task } from "@/types/tasks";
 
 // ---- Bucket mapping helpers ----
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
@@ -48,10 +50,6 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
 };
 
 
-// Today's list shows dated tasks only; occursOnDate would count undated ones as every day.
-const doesTaskOccurOnDate = (task: any, dateStr: string): boolean =>
-  Boolean(task?.due?.date) && occursOnDate(task, dateStr);
-
 interface CalendarTaskListProps {
   selectedDate: Date;
   onDateChange?: (date: Date) => void;
@@ -70,8 +68,6 @@ function useTaskGrouping(tasks: any[]) {
     const today = startOfDay(now);
 
     const groups = {
-      overdue: [] as any[],
-      today: [] as any[],
       tomorrow: [] as any[],
       thisWeek: [] as any[],
       nextWeek: [] as any[],
@@ -87,11 +83,10 @@ function useTaskGrouping(tasks: any[]) {
       // Parse date-only strings as local dates to avoid timezone issues
       const taskDate = startOfDay(parse(task.due.date, 'yyyy-MM-dd', new Date()));
 
-      if (isBefore(taskDate, today)) {
-        groups.overdue.push(task);
-      } else if (isToday(taskDate)) {
-        groups.today.push(task);
-      } else if (isTomorrow(taskDate)) {
+      // Today and overdue belong to the Master List's day plan, not here.
+      if (!isBefore(today, taskDate)) return;
+
+      if (isTomorrow(taskDate)) {
         groups.tomorrow.push(task);
       } else if (isThisWeek(taskDate)) {
         groups.thisWeek.push(task);
@@ -120,19 +115,20 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   const {
     allTasks,
     upcomingTasks,
+    occurrenceExceptionIndex,
     loading,
   } = useTaskData();
   const {
     createTask,
     toggleTaskCompletion,
     batchUpdateTasks,
+    setOccurrenceDone,
   } = useTaskActions();
+  const moveTasks = useMoveTasks();
 
   // Enhanced state management for upcoming tasks view
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [groupCollapsed, setGroupCollapsed] = useState<Record<string, boolean>>({
-    overdue: false,
-    today: true,
     tomorrow: false,
     thisWeek: true,
     nextWeek: true,
@@ -267,22 +263,49 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
   // Use the selected calendar date for calendar view, real today for dashboard contexts
   const referenceDate = useMemo(() => (dashboardView ? new Date() : selectedDate), [dashboardView, selectedDate]);
   const todayStr = useMemo(() => toDayKey(referenceDate), [referenceDate]);
-  const todayTasks = useMemo(() => {
-    // In calendar master list, include time-slotted tasks so it's a complete view of the day
-    let filtered = allTasks.filter(t => (dashboardView ? !t.hourSlot : true) && doesTaskOccurOnDate(t, todayStr));
+  const realTodayStr = toDayKey(new Date());
+  const isViewingToday = todayStr === realTodayStr;
+  const dayLabel = isViewingToday ? "today" : format(referenceDate, "EEE, MMM d");
 
-    // Filter by selectedBucket in dashboard view
+  // The same plan the /tasks Today tab uses, for whichever day is selected:
+  // occurrence exceptions applied, and only the real today carries work over.
+  const dayPlan = useMemo(
+    () => buildTodayPlan(allTasks, todayStr, occurrenceExceptionIndex, realTodayStr),
+    [allTasks, todayStr, occurrenceExceptionIndex, realTodayStr],
+  );
+
+  const applyListFilters = useCallback((list: Task[]) => {
     if (selectedBucket && dashboardView) {
-      filtered = filtered.filter(t => !t.bucket || t.bucket === selectedBucket);
+      return list.filter(t => !t.bucket || t.bucket === selectedBucket);
     }
-
-    // Filter by masterListBucketFilter in calendar view
     if (!dashboardView && masterListBucketFilter !== "all") {
-      filtered = filtered.filter(t => t.bucket === masterListBucketFilter);
+      return list.filter(t => t.bucket === masterListBucketFilter);
     }
+    return list;
+  }, [selectedBucket, dashboardView, masterListBucketFilter]);
 
-    return filtered;
-  }, [allTasks, todayStr, selectedBucket, dashboardView, masterListBucketFilter]);
+  const todayTasks = useMemo(() => {
+    // Anytime first, then by time of day — the Today tab's order.
+    const open = [...dayPlan.anytime, ...DAY_PARTS.flatMap(part => dayPlan.timed[part])];
+    return applyListFilters(dashboardView ? open.filter(t => !t.hourSlot) : open);
+  }, [dayPlan, dashboardView, applyListFilters]);
+  // Carried-over tasks stay draggable in All Open Tasks; this only counts them.
+  const carriedOver = useMemo(() => applyListFilters(dayPlan.overdue), [dayPlan, applyListFilters]);
+  const doneOnDay = useMemo(() => applyListFilters(dayPlan.done), [dayPlan, applyListFilters]);
+  const [isDoneExpanded, setIsDoneExpanded] = useState(false);
+
+  // A repeating task is finished one day at a time; its series stays open.
+  const setDoneOnDay = useCallback(async (task: Task, done: boolean) => {
+    if (completesPerOccurrence(task) && !task.completed) {
+      try {
+        await setOccurrenceDone(task, todayStr, done);
+      } catch (error) {
+        console.error("Failed to update occurrence", error);
+      }
+      return;
+    }
+    await toggleTaskCompletion(task.id.toString());
+  }, [setOccurrenceDone, todayStr, toggleTaskCompletion]);
 
   // Open tasks (only shown in Master List tab)
   // Exclude tasks already in todayTasks to prevent duplicate draggableIds
@@ -525,8 +548,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               if (tasks.length === 0) return null;
 
               const groupConfig = {
-                overdue: { title: 'Overdue', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
-                today: { title: 'Today', color: 'text-theme-primary-600', bgColor: 'bg-theme-primary-50', borderColor: 'border-theme-neutral-300' },
                 tomorrow: { title: 'Tomorrow', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
                 thisWeek: { title: 'This Week', color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
                 nextWeek: { title: 'Next Week', color: 'text-theme-primary-600', bgColor: 'bg-theme-primary-50', borderColor: 'border-theme-neutral-300' },
@@ -539,10 +560,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               const now = new Date();
               const subtitle = (() => {
                 switch (groupKey) {
-                  case 'overdue':
-                    return `Before ${format(now, 'EEE, MMM d')}`;
-                  case 'today':
-                    return `${format(now, 'EEE, MMM d')}`;
                   case 'tomorrow':
                     return `${format(addDays(now, 1), 'EEE, MMM d')}`;
                   case 'thisWeek': {
@@ -583,12 +600,6 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                           {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                           {subtitle && (
                             <span className="ml-2 text-theme-text-tertiary/70">{subtitle}</span>
-                          )}
-                          {groupKey === 'overdue' && tasks.length > 0 && (
-                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
-                              <AlertCircle size={10} />
-                              Urgent
-                            </span>
                           )}
                         </p>
                       </div>
@@ -763,7 +774,22 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
               </div>
             )}
 
-            {/* Today's Tasks Section in Master List */}
+            {isViewingToday && carriedOver.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-theme-neutral-300 bg-theme-warning-50 px-4 py-3">
+                <p className="text-sm text-theme-warning-700">
+                  {carriedOver.length} carried over from earlier days
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void moveTasks(carriedOver, todayStr)}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-theme-primary-600 transition-colors hover:bg-theme-brand-tint-subtle"
+                >
+                  Move all to today
+                </button>
+              </div>
+            )}
+
+            {/* Day's Tasks Section in Master List */}
             <Droppable droppableId="masterTodayTasks">
               {(provided: any, snapshot: any) => (
                 <div
@@ -780,7 +806,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                         <ChevronRight size={14} className="text-white" />
                       </div>
                       <div>
-                        <h4 className="section-label">Today&apos;s Tasks</h4>
+                        <h4 className="section-label">{isViewingToday ? "Today's Tasks" : dayLabel}</h4>
                         <p className="text-sm text-theme-text-tertiary">{todayTasks.length} {todayTasks.length === 1 ? 'task' : 'tasks'}</p>
                       </div>
                     </div>
@@ -804,8 +830,8 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                           <div className="w-12 h-12 rounded-xl bg-theme-surface-selected flex items-center justify-center mx-auto mb-3">
                             <Clock size={20} className="text-theme-primary-600" />
                           </div>
-                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks for today</h5>
-                          <p className="text-xs text-theme-text-tertiary">Drag a task from "All Open Tasks" below to add it to today</p>
+                          <h5 className="text-sm font-medium text-theme-text-primary mb-1">No tasks for {dayLabel}</h5>
+                          <p className="text-xs text-theme-text-tertiary">Drag a task from &quot;All Open Tasks&quot; below to add it</p>
                         </div>
                       ) : (
                         todayTasksOrdered.map((t: any, index: number) => (
@@ -823,7 +849,7 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                                     <input
                                       type="checkbox"
                                       checked={t.completed ?? false}
-                                      onChange={() => toggleTaskCompletion(t.id.toString())}
+                                      onChange={() => void setDoneOnDay(t, true)}
                                       className="sr-only"
                                     />
                                     <div className={`w-5 h-5 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${t.completed
@@ -888,6 +914,41 @@ export function CalendarTaskList({ selectedDate = new Date(), availableBuckets =
                 </div>
               )}
             </Droppable>
+
+            {doneOnDay.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setIsDoneExpanded(v => !v)}
+                  aria-expanded={isDoneExpanded}
+                  className="flex items-center gap-1.5 text-xs font-medium text-theme-text-tertiary transition-colors hover:text-theme-text-secondary"
+                >
+                  {isDoneExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  Completed · {doneOnDay.length}
+                </button>
+                {isDoneExpanded && (
+                  <ul className="mt-2 space-y-2">
+                    {doneOnDay.map(t => (
+                      <li key={t.id} className="flex items-center gap-3 rounded-xl border border-theme-neutral-300 bg-theme-surface-raised px-4 py-2.5">
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked
+                          aria-label={`Mark "${t.content}" not done`}
+                          onClick={() => void setDoneOnDay(t, false)}
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border-2 border-theme-secondary bg-theme-secondary"
+                        >
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                        <span className="min-w-0 text-sm text-theme-text-tertiary line-through">{t.content}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* All Open Tasks Section */}
             <div className="space-y-4">

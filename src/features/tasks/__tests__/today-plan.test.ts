@@ -75,6 +75,17 @@ describe('buildTodayPlan', () => {
     expect(plan.suggestions.thisWeek).toEqual([])
   })
 
+  it('plans another day without carrying anything over into it', () => {
+    const plan = buildTodayPlan([
+      task({ content: 'late', ...due('2026-09-20') }),
+      task({ content: 'on-day', ...due('2026-10-02') }),
+      task({ content: 'todoist-repeat', ...due('2026-09-20'), due: { date: '2026-09-20', is_recurring: true } }),
+      task({ content: 'weekly-fri', ...due('2026-09-04'), repeatRule: 'weekly' }),
+    ], '2026-10-02', new Map(), TODAY)
+    expect(plan.overdue).toEqual([])
+    expect(ids(plan.anytime)).toEqual(['on-day', 'weekly-fri'])
+  })
+
   it('lists tasks finished today, whether due today or completed today', () => {
     const plan = buildTodayPlan([
       task({ content: 'due-today', ...due(TODAY), completed: true, updated_at: '2026-09-20T12:00:00Z' }),

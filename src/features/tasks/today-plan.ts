@@ -8,7 +8,9 @@ import { DEFAULT_TASK_MINUTES, HEAVY_DAY_HOURS } from '@/lib/capacity'
 // What belongs on "Today": the tasks due or repeating today, grouped the way
 // Apple Reminders and Things do (morning / afternoon / evening, then anytime),
 // with overdue work kept separate so it can be rescheduled in one move rather
-// than silently piling into today. Pure — `today` is the client-local key.
+// than silently piling into today. Pure — `day` and `today` are client-local
+// keys. The calendar plans whichever day is selected; only the real today
+// carries anything over.
 
 export type DayPart = 'morning' | 'afternoon' | 'evening'
 export const DAY_PARTS: DayPart[] = ['morning', 'afternoon', 'evening']
@@ -68,9 +70,15 @@ function occurrenceForToday(task: Task, exception: TaskOccurrenceException | und
 
 const byContent = (a: Task, b: Task) => a.content.localeCompare(b.content)
 
-export function buildTodayPlan(tasks: Task[], today: string, exceptions: ExceptionIndex = new Map()): TodayPlan {
-  const tomorrow = shiftKey(today, 1)
-  const weekEnd = shiftKey(today, 7)
+export function buildTodayPlan(
+  tasks: Task[],
+  day: string,
+  exceptions: ExceptionIndex = new Map(),
+  today: string = day,
+): TodayPlan {
+  const carriesOver = day === today
+  const tomorrow = shiftKey(day, 1)
+  const weekEnd = shiftKey(day, 7)
   const overdue: Task[] = []
   const timed: Record<DayPart, Task[]> = { morning: [], afternoon: [], evening: [] }
   const anytime: Task[] = []
@@ -90,13 +98,13 @@ export function buildTodayPlan(tasks: Task[], today: string, exceptions: Excepti
     const due = task.due?.date
 
     if (task.completed) {
-      if (due === today || localDayOf(task.updated_at) === today) done.push(task)
+      if (due === day || localDayOf(task.updated_at) === day) done.push(task)
       continue
     }
 
     if (isRepeating(task)) {
-      if (!due || !occursOnDate(task, today)) continue
-      const exception = exceptions.get(task.id)?.get(today)
+      if (!due || !occursOnDate(task, day)) continue
+      const exception = exceptions.get(task.id)?.get(day)
       if (exception?.skip) done.push(task)
       else place(occurrenceForToday(task, exception))
       continue
@@ -104,18 +112,18 @@ export function buildTodayPlan(tasks: Task[], today: string, exceptions: Excepti
 
     // A Todoist repeat we can't expand: its date is the next occurrence.
     if (task.due?.is_recurring) {
-      if (due && due <= today) place(task)
+      if (due === day || (carriesOver && due && due < day)) place(task)
       continue
     }
 
     if (!due) {
       suggestions.someday.push(task)
-    } else if (due === today) {
+    } else if (due === day) {
       place(task)
-    } else if (due < today) {
+    } else if (due < day) {
       // A multi-day task that started earlier is still in progress, not late.
-      if (task.endDate && task.endDate >= today) place(task)
-      else overdue.push(task)
+      if (task.endDate && task.endDate >= day) place(task)
+      else if (carriesOver) overdue.push(task)
     } else if (due === tomorrow) {
       suggestions.tomorrow.push(task)
     } else if (due <= weekEnd) {

@@ -30,6 +30,7 @@ import { dateStr } from "@/lib/date-utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { dateLabel, parseQuickAdd, type QuickAddMatchKind } from "@/lib/quick-add-parser";
 import { buildTodayPlan, completesPerOccurrence, DAY_PARTS, isRecurring, startMinutes, type DayPart } from "@/features/tasks/today-plan";
+import { useMoveTasks } from "@/features/tasks/use-move-tasks";
 
 interface TodayViewProps {
   /** The page's tasks after its search and filters. */
@@ -263,7 +264,7 @@ export function TodayView({
   onEditTask,
 }: TodayViewProps) {
   const { occurrenceExceptionIndex } = useTaskData();
-  const { createTask, batchUpdateTasks, setOccurrenceDone } = useTaskActions();
+  const { createTask, setOccurrenceDone } = useTaskActions();
   const { toast } = useToast();
   const now = useNow();
   const today = dateStr(now);
@@ -336,28 +337,7 @@ export function TodayView({
     }, SETTLE_MS);
   };
 
-  const moveTasks = useCallback(async (list: Task[], date: string | null) => {
-    if (list.length === 0) return;
-    const previous = list.map((t) => ({ id: t.id, date: t.due?.date ?? null }));
-    const apply = (entries: Array<{ id: string; date: string | null }>) =>
-      batchUpdateTasks(entries.map((e) => ({
-        taskId: e.id,
-        // null, not { date: undefined }: the Todoist route only clears on null.
-        updates: { due: e.date ? { date: e.date } : null, startDate: e.date },
-      })));
-    try {
-      await apply(list.map((t) => ({ id: t.id, date })));
-      const where = date ? dateLabel(date, now) : "Someday";
-      toast({
-        title: list.length === 1 ? `Moved to ${where}` : `${list.length} tasks moved to ${where}`,
-        description: list.length === 1 ? list[0].content : undefined,
-        type: "success",
-        undoAction: () => void apply(previous),
-      });
-    } catch {
-      toast({ title: "Couldn't move tasks", description: "Please try again.", type: "error" });
-    }
-  }, [batchUpdateTasks, now, toast]);
+  const moveTasks = useMoveTasks();
 
   const addFromDraft = async () => {
     if (!parsed?.title) return;
@@ -609,7 +589,11 @@ export function TodayView({
               </h3>
               <p className="mt-1 max-w-sm text-sm text-theme-text-tertiary">
                 {doneCount > 0
-                  ? `You finished ${doneCount} ${doneCount === 1 ? "task" : "tasks"}. Enjoy the rest of your day.`
+                  ? `You finished ${doneCount} ${doneCount === 1 ? "task" : "tasks"}. ${
+                      plan.overdue.length > 0
+                        ? `${plan.overdue.length} still carried over from earlier days.`
+                        : "Enjoy the rest of your day."
+                    }`
                   : suggestionGroups.length > 0
                     ? "Add a task above, or pull one in from Plan your day."
                     : "Add a task above to get started."}
