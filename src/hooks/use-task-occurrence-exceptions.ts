@@ -60,6 +60,8 @@ export function useTaskOccurrenceExceptions() {
       }
       const json = await res.json().catch(() => ({}))
       const exception = json?.exception as TaskOccurrenceException | undefined
+      // The module cache would hand the pre-write list to the next page mount.
+      _occurrenceExceptionsCache = null
       if (exception) {
         setOccurrenceExceptions(prev => {
           const next = prev.filter(item => !(item.taskId === exception.taskId && item.occurrenceDate === exception.occurrenceDate))
@@ -73,6 +75,36 @@ export function useTaskOccurrenceExceptions() {
       throw error
     }
   }, [])
+
+  // Mark one day of a repeating task done (or not) without touching the series.
+  // Done is a skipped occurrence; undoing it removes the exception outright,
+  // since re-posting skip:false would clear the hour slot and hide the day.
+  const setOccurrenceDone = useCallback(async (task: Task, occurrenceDate: string, done: boolean) => {
+    const existing = occurrenceExceptions.find(e => e.taskId === task.id && e.occurrenceDate === occurrenceDate)
+    const keepsOverrides = Boolean(existing && (existing.overrideHourSlot || existing.overrideDuration != null || existing.overrideBucket))
+    if (done || keepsOverrides) {
+      await upsertOccurrenceException({
+        taskId: task.id,
+        occurrenceDate,
+        skip: done,
+        // The route stores a missing slot as null, which the planner reads as
+        // "off the timeline today" — so carry the task's own time through.
+        overrideHourSlot: existing?.overrideHourSlot ?? task.hourSlot ?? undefined,
+        overrideDuration: existing?.overrideDuration ?? undefined,
+        overrideBucket: existing?.overrideBucket ?? undefined,
+      })
+      return
+    }
+    const res = await fetch('/api/task-occurrence-exceptions', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: task.id, occurrenceDate }),
+    })
+    if (!res.ok) throw new Error(`Failed to reopen occurrence (${res.status})`)
+    _occurrenceExceptionsCache = null
+    setOccurrenceExceptions(prev => prev.filter(e => !(e.taskId === task.id && e.occurrenceDate === occurrenceDate)))
+  }, [occurrenceExceptions, upsertOccurrenceException])
 
   const occurrenceExceptionIndex = useMemo(() => {
     const map = new Map<string, Map<string, TaskOccurrenceException>>()
@@ -132,5 +164,6 @@ export function useTaskOccurrenceExceptions() {
     applyOccurrenceAdjustments,
     getTaskForOccurrence,
     upsertOccurrenceException,
+    setOccurrenceDone,
   }
 }

@@ -7,7 +7,7 @@ import { hourSlotMinutes, responsibleUserId } from '@/lib/reminders/due-reminder
 // how many hours are already committed each day this week. Pure functions over
 // data the app already has; nothing here is a diagnosis.
 
-const DEFAULT_TASK_MINUTES = 60
+export const DEFAULT_TASK_MINUTES = 60
 export const HEAVY_DAY_HOURS = 8
 
 const MOOD_LABELS: Record<string, string> = { great: 'great', good: 'good', okay: 'okay', meh: 'meh', bad: 'bad' }

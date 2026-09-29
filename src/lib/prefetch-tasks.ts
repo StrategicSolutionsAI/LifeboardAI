@@ -22,15 +22,16 @@ const FETCH_TIMEOUT_MS = PREFETCH_TASKS_TIMEOUT_MS
 let tasksViewChunksPrefetched = false
 
 /**
- * Warm the ssr:false view chunks for /tasks (list, board, kanban) ahead of
- * navigation. dynamic() chunks are not covered by <Link> prefetch, so without
- * this they only start downloading after the click commits.
+ * Warm the ssr:false view chunks for /tasks (today, list, board, kanban) ahead
+ * of navigation. dynamic() chunks are not covered by <Link> prefetch, so
+ * without this they only start downloading after the click commits.
  */
 export async function prefetchTasksExperience(): Promise<void> {
   if (tasksViewChunksPrefetched) return
   tasksViewChunksPrefetched = true
 
   await Promise.allSettled([
+    import('@/features/tasks/components/today-view'),
     import('@/features/tasks/components/task-list-view'),
     import('@/features/tasks/components/TasksBoard'),
     import('@/features/tasks/components/task-kanban-board'),

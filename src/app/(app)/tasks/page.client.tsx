@@ -26,18 +26,22 @@ import { prefetchAllTasks } from "@/lib/prefetch-tasks";
 // cached by the time the component tree mounts and calls useTasks.
 prefetchAllTasks();
 
-// TaskListView is the default tab, so start its chunk at module evaluation
+// TodayView is the default tab, so start its chunk at module evaluation
 // time — it is needed for first paint.
-const taskListChunk = import("@/features/tasks/components/task-list-view");
+const todayChunk = import("@/features/tasks/components/today-view");
 
-// Board and Kanban render only behind their tabs. Downloading them at module
-// scope too made them compete with the List chunk and the task data for
-// bandwidth on every visit, delaying the view the user actually landed on.
-// Warm them once the browser goes idle instead, so switching tabs is still
-// instant without paying for it up front.
+// List, Board and Kanban render only behind their tabs. Downloading them at
+// module scope too made them compete with the default tab's chunk and the task
+// data for bandwidth on every visit, delaying the view the user actually
+// landed on. Warm them once the browser goes idle instead, so switching tabs
+// is still instant without paying for it up front.
+let taskListChunk: ReturnType<typeof importTaskList> | null = null;
 let tasksBoardChunk: ReturnType<typeof importTasksBoard> | null = null;
 let kanbanChunk: ReturnType<typeof importKanban> | null = null;
 
+function importTaskList() {
+  return import("@/features/tasks/components/task-list-view");
+}
 function importTasksBoard() {
   return import("@/features/tasks/components/TasksBoard");
 }
@@ -45,6 +49,10 @@ function importKanban() {
   return import("@/features/tasks/components/task-kanban-board");
 }
 
+function loadTaskList() {
+  if (!taskListChunk) taskListChunk = importTaskList();
+  return taskListChunk;
+}
 function loadTasksBoard() {
   if (!tasksBoardChunk) tasksBoardChunk = importTasksBoard();
   return tasksBoardChunk;
@@ -56,6 +64,7 @@ function loadKanban() {
 
 if (typeof window !== "undefined") {
   const warmHiddenTabs = () => {
+    void loadTaskList();
     void loadTasksBoard();
     void loadKanban();
   };
@@ -75,8 +84,20 @@ const TasksBoard = dynamic(() => loadTasksBoard(), {
   ),
 });
 
+const TodayView = dynamic(
+  () => todayChunk.then((m) => ({ default: m.TodayView })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-theme-neutral-300 bg-white p-4">
+        <div className="h-64 animate-pulse rounded-lg bg-theme-brand-tint-subtle" />
+      </div>
+    ),
+  }
+);
+
 const TaskListView = dynamic(
-  () => taskListChunk.then((m) => ({ default: m.TaskListView })),
+  () => loadTaskList().then((m) => ({ default: m.TaskListView })),
   {
     ssr: false,
     loading: () => (
@@ -170,7 +191,7 @@ function TasksBoardShell() {
   const { toast } = useToast();
   const [bucketColors, setBucketColors] = useState<Record<string, string>>({});
   const [quickBucket, setQuickBucket] = useState<string>(buckets[0] ?? "");
-  const [activeTab, setActiveTab] = useState<TaskTabId>("lists");
+  const [activeTab, setActiveTab] = useState<TaskTabId>("today");
   const [filters, setFilters] = useState<TaskFilterState>(defaultTaskFilters);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
@@ -232,10 +253,11 @@ function TasksBoardShell() {
       result = result.filter((t) => t.assigneeId && filters.assignees.includes(t.assigneeId));
     }
 
-    // Due date filter
+    // Due date filter — a repeating task is never overdue; it just recurs.
     if (filters.dueDateRange) {
       result = result.filter((t) =>
-        matchesDateFilter(t.due?.date ?? null, filters.dueDateRange)
+        matchesDateFilter(t.due?.date ?? null, filters.dueDateRange) &&
+        !(filters.dueDateRange === "overdue" && (t.repeatRule || t.due?.is_recurring))
       );
     }
 
@@ -278,7 +300,7 @@ function TasksBoardShell() {
     today.setHours(0, 0, 0, 0);
     return openTasks.filter((t) => {
       if (!t.due?.date) return false;
-      if (t.due?.is_recurring) return false;
+      if (t.due?.is_recurring || t.repeatRule) return false;
       const parsed = parseISO(t.due.date);
       return isValid(parsed) && parsed < today;
     });
@@ -356,7 +378,7 @@ function TasksBoardShell() {
       completed: t.completed,
       bucket: t.bucket ?? null,
       dueDate: t.due?.date ?? null,
-      isRecurring: t.due?.is_recurring ?? false,
+      isRecurring: Boolean(t.due?.is_recurring || t.repeatRule),
       position: typeof t.position === "number" ? t.position : null,
       kanbanStatus: (t.kanbanStatus ?? (t.completed ? "done" : "todo")) as "todo" | "in_progress" | "done",
       assigneeId: t.assigneeId ?? null,
@@ -370,7 +392,7 @@ function TasksBoardShell() {
       title: t.content,
       bucket: t.bucket ?? null,
       dueDate: t.due?.date ?? null,
-      isRecurring: t.due?.is_recurring ?? false,
+      isRecurring: Boolean(t.due?.is_recurring || t.repeatRule),
       kanbanStatus: t.kanbanStatus ?? (t.completed ? "done" : "todo") as KanbanStatus,
       completed: t.completed,
       assigneeId: t.assigneeId ?? null,
@@ -947,6 +969,19 @@ function TasksBoardShell() {
         ) : (
           /* ── Tab Content with Crossfade ── */
           <div key={activeTab} className="animate-in fade-in duration-200">
+            {activeTab === "today" && (
+              <TodayView
+                tasks={filteredTasks}
+                buckets={buckets}
+                bucketColors={bucketColors}
+                familyMembers={familyMembers}
+                defaultBucket={filters.buckets.length === 1 && filters.buckets[0] !== UNASSIGNED_BUCKET_LABEL ? filters.buckets[0] : undefined}
+                defaultAssigneeId={filters.assignees.length === 1 ? filters.assignees[0] : undefined}
+                onToggleTask={handleToggleTask}
+                onEditTask={handleEditTask}
+              />
+            )}
+
             {activeTab === "lists" && (
               <TaskListView
                 tasks={listTasks}

@@ -1,11 +1,11 @@
 "use client";
 
-import { List, LayoutGrid, Columns3, Filter } from "lucide-react";
+import { List, LayoutGrid, Columns3, Filter, Sun } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { TaskFilterPanel, type TaskFilterState, activeFilterCount } from "@/features/tasks/components/task-filter-panel";
 import type { FamilyMemberOption } from "@/hooks/use-family-members";
 
-export type TaskTabId = "lists" | "board" | "kanban";
+export type TaskTabId = "today" | "lists" | "board" | "kanban";
 
 interface TaskBoardTabsProps {
   activeTab: TaskTabId;
@@ -18,6 +18,7 @@ interface TaskBoardTabsProps {
 }
 
 const tabs: { id: TaskTabId; label: string; icon: React.ReactNode }[] = [
+  { id: "today", label: "Today", icon: <Sun size={18} /> },
   { id: "lists", label: "Lists", icon: <List size={18} /> },
   { id: "board", label: "Board", icon: <LayoutGrid size={18} /> },
   { id: "kanban", label: "Kanban", icon: <Columns3 size={18} /> },
@@ -35,13 +36,13 @@ export function TaskBoardTabs({
   const count = activeFilterCount(filters);
 
   return (
-    <div className="flex items-center justify-between w-full border-b border-theme-neutral-300/50">
-      <div className="flex items-center gap-1">
+    <div className="flex items-center justify-between gap-2 w-full border-b border-theme-neutral-300/50">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto no-scrollbar">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-1 transition-all duration-200 ease-out rounded-t-lg ${
+            className={`relative flex shrink-0 items-center gap-1.5 px-2 sm:px-3 pb-2.5 pt-1 whitespace-nowrap transition-all duration-200 ease-out rounded-t-lg ${
               activeTab === tab.id
                 ? "text-theme-text-primary"
                 : "text-theme-text-tertiary hover:text-theme-text-secondary hover:bg-theme-brand-tint-subtle"
@@ -61,7 +62,7 @@ export function TaskBoardTabs({
       <Popover>
         <PopoverTrigger asChild>
           <button
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-out ${
+            className={`relative flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-out ${
               count > 0
                 ? "bg-theme-brand-tint-light text-theme-text-primary ring-1 ring-theme-focus/25"
                 : "text-theme-text-tertiary hover:bg-theme-brand-tint-subtle hover:text-theme-text-secondary"

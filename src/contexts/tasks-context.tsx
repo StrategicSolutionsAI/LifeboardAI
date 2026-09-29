@@ -18,6 +18,7 @@ interface TaskDataContextValue {
   scheduledTasks: Task[];
   upcomingTasks: Task[];
   completedTasks: Task[];
+  occurrenceExceptionIndex: ReturnType<typeof useTasks>["occurrenceExceptionIndex"];
   loading: boolean;
   error: Error | null;
 }
@@ -32,6 +33,7 @@ interface TaskActionsContextValue {
   deleteTask: ReturnType<typeof useTasks>["deleteTask"];
   refetch: () => void;
   getTaskForOccurrence: ReturnType<typeof useTasks>["getTaskForOccurrence"];
+  setOccurrenceDone: ReturnType<typeof useTasks>["setOccurrenceDone"];
 }
 
 const TaskActionsContext = createContext<TaskActionsContextValue | null>(null);
@@ -48,6 +50,7 @@ function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
     deleteTask: tasks.deleteTask,
     refetch: tasks.refetch,
     getTaskForOccurrence: tasks.getTaskForOccurrence,
+    setOccurrenceDone: tasks.setOccurrenceDone,
   };
 
   // Stable actions object created once — delegates to ref for latest impl
@@ -58,6 +61,7 @@ function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
     deleteTask: (...args: Parameters<typeof tasks.deleteTask>) => actionsRef.current.deleteTask(...args),
     refetch: () => actionsRef.current.refetch(),
     getTaskForOccurrence: (...args: Parameters<typeof tasks.getTaskForOccurrence>) => actionsRef.current.getTaskForOccurrence(...args),
+    setOccurrenceDone: (...args: Parameters<typeof tasks.setOccurrenceDone>) => actionsRef.current.setOccurrenceDone(...args),
   }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dataValue = useMemo<TaskDataContextValue>(() => ({
@@ -67,6 +71,7 @@ function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
     scheduledTasks: tasks.scheduledTasks,
     upcomingTasks: tasks.upcomingTasks,
     completedTasks: tasks.completedTasks,
+    occurrenceExceptionIndex: tasks.occurrenceExceptionIndex,
     loading: tasks.loading,
     error: tasks.error,
   }), [
@@ -76,6 +81,7 @@ function TasksProviderInner({ children, selectedDate }: TasksProviderProps) {
     tasks.scheduledTasks,
     tasks.upcomingTasks,
     tasks.completedTasks,
+    tasks.occurrenceExceptionIndex,
     tasks.loading,
     tasks.error,
   ]);

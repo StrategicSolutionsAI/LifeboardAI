@@ -63,6 +63,8 @@ export function useTasks(selectedDate?: Date) {
     upcomingTasks: views.upcomingTasks,
     completedTasks: views.completedTasks,
     getTaskForOccurrence: occurrences.getTaskForOccurrence,
+    occurrenceExceptionIndex: occurrences.occurrenceExceptionIndex,
+    setOccurrenceDone: occurrences.setOccurrenceDone,
     loading: fetcher.dailyLoading || fetcher.allLoading,
     error: fetcher.dailyError || fetcher.allError,
     createTask: mutations.createTask,
