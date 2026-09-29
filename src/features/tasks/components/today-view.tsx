@@ -29,7 +29,7 @@ import { card, text } from "@/lib/styles";
 import { dateStr } from "@/lib/date-utils";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import { dateLabel, parseQuickAdd, type QuickAddMatchKind } from "@/lib/quick-add-parser";
-import { buildTodayPlan, DAY_PARTS, isRepeating, startMinutes, type DayPart } from "@/features/tasks/today-plan";
+import { buildTodayPlan, completesPerOccurrence, DAY_PARTS, isRecurring, startMinutes, type DayPart } from "@/features/tasks/today-plan";
 
 interface TodayViewProps {
   /** The page's tasks after its search and filters. */
@@ -212,7 +212,8 @@ function ReschedulePopover({ task, today, onMove, now }: {
               type="date"
               aria-label="Pick a date"
               min={today}
-              onChange={(e) => e.target.value && pick(e.target.value)}
+              // Typing a year reports partial values ("0002-10-05") — wait for a real date.
+              onChange={(e) => e.target.value >= today && pick(e.target.value)}
               className="w-full cursor-pointer rounded-md border border-theme-neutral-300/60 bg-transparent px-2 py-1 text-[12px] text-theme-text-secondary focus:outline-none focus:ring-1 focus:ring-theme-primary/40"
             />
           </div>
@@ -308,7 +309,7 @@ export function TodayView({
 
   // A repeating task is finished one day at a time; its series stays open.
   const setDone = useCallback(async (task: Task, done: boolean) => {
-    if (isRepeating(task) && !task.completed) {
+    if (completesPerOccurrence(task) && !task.completed) {
       markBusy(task.id, true);
       try {
         await setOccurrenceDone(task, today, done);
@@ -341,7 +342,8 @@ export function TodayView({
     const apply = (entries: Array<{ id: string; date: string | null }>) =>
       batchUpdateTasks(entries.map((e) => ({
         taskId: e.id,
-        updates: { due: e.date ? { date: e.date } : { date: undefined }, startDate: e.date },
+        // null, not { date: undefined }: the Todoist route only clears on null.
+        updates: { due: e.date ? { date: e.date } : null, startDate: e.date },
       })));
     try {
       await apply(list.map((t) => ({ id: t.id, date })));
@@ -379,7 +381,7 @@ export function TodayView({
   const isEvening = now.getHours() >= EVENING_HOUR;
   // Only one-off tasks roll over; a repeating task simply comes back tomorrow.
   const unfinishedToday = [...DAY_PARTS.flatMap((p) => plan.timed[p]), ...plan.anytime].filter(
-    (t) => !isRepeating(t) && t.due?.date === today,
+    (t) => !isRecurring(t) && t.due?.date === today,
   );
   const suggestionGroups = [
     { key: "tomorrow", label: "Tomorrow", tasks: plan.suggestions.tomorrow },
@@ -389,7 +391,7 @@ export function TodayView({
 
   const renderRow = (task: Task, opts: { done?: boolean; carried?: boolean } = {}) => {
     const checked = opts.done || settling.has(task.id);
-    const repeating = isRepeating(task);
+    const repeating = isRecurring(task);
     const minutes = startMinutes(task);
     const isNow = !checked && minutes !== null && nowMinutes >= minutes && nowMinutes < minutes + (task.duration || 60);
     const member = task.assigneeId ? memberMap.get(task.assigneeId) : undefined;

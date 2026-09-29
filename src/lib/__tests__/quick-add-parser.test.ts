@@ -71,6 +71,36 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Snacks for 3 kids', now)).toMatchObject({ title: 'Snacks for 3 kids', duration: null })
   })
 
+  it('never trims words from a title that had nothing to parse', () => {
+    for (const title of ['Check in', 'Log in', 'Turn the porch light on', 'Sign up for', 'Fill in']) {
+      expect(parseQuickAdd(title, now)).toMatchObject({ title, matches: [] })
+    }
+    expect(parseQuickAdd('Clock in tomorrow', now)).toMatchObject({ title: 'Clock in', dueDate: '2026-09-29' })
+  })
+
+  it('reads daily/weekly/monthly only as a trailing schedule word, not inside a title', () => {
+    expect(parseQuickAdd('Submit weekly report', now)).toMatchObject({ title: 'Submit weekly report', repeat: null })
+    expect(parseQuickAdd('Read The Daily Stoic', now)).toMatchObject({ title: 'Read The Daily Stoic', repeat: null })
+    expect(parseQuickAdd('Water plants daily at 8am', now)).toMatchObject({ title: 'Water plants', repeat: 'daily', hourSlot: 'hour-8AM' })
+    expect(parseQuickAdd('Pay rent monthly', now)).toMatchObject({ title: 'Pay rent', repeat: 'monthly' })
+  })
+
+  it('does not read fractions, noon/midnight in titles, or stray hashtags as schedule', () => {
+    expect(parseQuickAdd('Take 1/2 pill', now)).toMatchObject({ title: 'Take 1/2 pill', dueDate: null })
+    expect(parseQuickAdd('Dentist on 4/15', now).dueDate).toBe('2027-04-15')
+    expect(parseQuickAdd('Watch Midnight Mass', now)).toMatchObject({ title: 'Watch Midnight Mass', hourSlot: null })
+    expect(parseQuickAdd('Fix bug #123 #work', now, ['Work'])).toMatchObject({ title: 'Fix bug #123', bucket: 'Work' })
+  })
+
+  it('reads "next weekend" as the weekend after this one', () => {
+    expect(parseQuickAdd('Hike next weekend', now)).toMatchObject({ title: 'Hike', dueDate: '2026-10-10' })
+  })
+
+  it('rolls feb 29 to the next leap year only when that date exists', () => {
+    const afterLeapDay = new Date(2028, 2, 1)
+    expect(parseQuickAdd('Party feb 29', afterLeapDay)).toMatchObject({ title: 'Party feb 29', dueDate: null })
+  })
+
   it('keeps a schedule-only entry as its own title', () => {
     expect(parseQuickAdd('tomorrow', now)).toMatchObject({ title: 'tomorrow', dueDate: null, matches: [] })
   })

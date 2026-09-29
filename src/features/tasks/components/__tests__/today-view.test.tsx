@@ -69,6 +69,31 @@ describe("TodayView", () => {
     expect(onToggleTask).not.toHaveBeenCalled();
   });
 
+  it("closes a Todoist repeat through Todoist, which advances it, not as a local occurrence", async () => {
+    const standup = task({ content: "Standup", ...due(TODAY), repeatRule: "daily", source: "todoist" });
+    const { onToggleTask } = renderView([standup]);
+    fireEvent.click(screen.getByRole("checkbox", { name: 'Complete "Standup"' }));
+    await act(async () => { jest.advanceTimersByTime(500); });
+    expect(onToggleTask).toHaveBeenCalledWith("Standup");
+    expect(mockSetOccurrenceDone).not.toHaveBeenCalled();
+  });
+
+  it("sends Someday as a cleared date the Todoist route understands", async () => {
+    renderView([task({ content: "Old", ...due("2026-09-20") })]);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Someday" })); });
+    expect(mockBatchUpdateTasks).toHaveBeenCalledWith([{ taskId: "Old", updates: { due: null, startDate: null } }]);
+  });
+
+  it("ignores a half-typed year in the reschedule date field", async () => {
+    renderView([task({ content: "Old", ...due("2026-09-20") })]);
+    fireEvent.click(screen.getByRole("button", { name: "Reschedule Old" }));
+    const field = screen.getByLabelText("Pick a date");
+    fireEvent.change(field, { target: { value: "0002-10-05" } });
+    expect(mockBatchUpdateTasks).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.change(field, { target: { value: "2026-10-05" } }); });
+    expect(mockBatchUpdateTasks).toHaveBeenCalledWith([{ taskId: "Old", updates: { due: { date: "2026-10-05" }, startDate: "2026-10-05" } }]);
+  });
+
   it("moves every carried-over task to today in one batch, with undo", async () => {
     renderView([
       task({ content: "Old", ...due("2026-09-20") }),

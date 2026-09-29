@@ -764,6 +764,8 @@ function TasksBoardShell() {
               if (isSelectMode) {
                 clearSelection();
               } else {
+                // Only the List tab renders selection checkboxes.
+                setActiveTab("lists");
                 setIsSelectMode(true);
               }
             }}

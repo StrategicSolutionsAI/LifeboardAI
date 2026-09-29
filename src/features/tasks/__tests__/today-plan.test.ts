@@ -65,6 +65,16 @@ describe('buildTodayPlan', () => {
     expect(plan.timed.morning).toEqual([])
   })
 
+  it('treats a Todoist repeat it cannot expand as never late and never a suggestion', () => {
+    const plan = buildTodayPlan([
+      task({ content: 'biweekly-late', ...due('2026-09-20'), due: { date: '2026-09-20', is_recurring: true } }),
+      task({ content: 'biweekly-next', ...due('2026-10-01'), due: { date: '2026-10-01', is_recurring: true } }),
+    ], TODAY)
+    expect(ids(plan.anytime)).toEqual(['biweekly-late'])
+    expect(plan.overdue).toEqual([])
+    expect(plan.suggestions.thisWeek).toEqual([])
+  })
+
   it('lists tasks finished today, whether due today or completed today', () => {
     const plan = buildTodayPlan([
       task({ content: 'due-today', ...due(TODAY), completed: true, updated_at: '2026-09-20T12:00:00Z' }),

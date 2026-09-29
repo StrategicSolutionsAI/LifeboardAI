@@ -27,7 +27,15 @@ export interface TodayPlan {
   heavy: boolean
 }
 
+/** Repeats by a rule we can expand day by day. */
 export const isRepeating = (task: Task) => Boolean(task.repeatRule)
+/** Repeats in any system — including Todoist rules we can't expand — so never "late". */
+export const isRecurring = (task: Task) => Boolean(task.repeatRule || task.due?.is_recurring)
+/**
+ * Checking it off finishes today's occurrence (a local exception). Todoist
+ * repeats close through Todoist instead, which advances them itself.
+ */
+export const completesPerOccurrence = (task: Task) => isRepeating(task) && task.source !== 'todoist'
 
 /** Minutes after midnight the task starts, or null for an untimed task. */
 export const startMinutes = (task: Task) => hourSlotMinutes(task.hourSlot)
@@ -91,6 +99,12 @@ export function buildTodayPlan(tasks: Task[], today: string, exceptions: Excepti
       const exception = exceptions.get(task.id)?.get(today)
       if (exception?.skip) done.push(task)
       else place(occurrenceForToday(task, exception))
+      continue
+    }
+
+    // A Todoist repeat we can't expand: its date is the next occurrence.
+    if (task.due?.is_recurring) {
+      if (due && due <= today) place(task)
       continue
     }
 

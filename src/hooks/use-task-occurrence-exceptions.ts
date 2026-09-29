@@ -88,8 +88,9 @@ export function useTaskOccurrenceExceptions() {
         occurrenceDate,
         skip: done,
         // The route stores a missing slot as null, which the planner reads as
-        // "off the timeline today" — so carry the task's own time through.
-        overrideHourSlot: existing?.overrideHourSlot ?? task.hourSlot ?? undefined,
+        // "off the timeline today" — so when reopening, carry the task's own
+        // time through. Marking done pins nothing, so undo can delete cleanly.
+        overrideHourSlot: existing?.overrideHourSlot ?? (done ? undefined : task.hourSlot) ?? undefined,
         overrideDuration: existing?.overrideDuration ?? undefined,
         overrideBucket: existing?.overrideBucket ?? undefined,
       })

@@ -76,54 +76,60 @@ export function parseQuickAdd(input: string, now: Date, buckets: string[] = []):
   let repeat: RepeatRule | null = null
   let bucket: string | null = null
 
-  // Replace the first match with a space, keeping word boundaries intact.
+  // Cut a recognised phrase out of the text, keeping word boundaries intact.
+  // Each pattern swallows its own lead word ("at", "for", "on"...), so a
+  // title with nothing to parse is never trimmed ("Check in" stays whole).
+  const cut = (m: RegExpMatchArray, result: { kind: QuickAddMatchKind; label: string }) => {
+    found.push(result)
+    text = `${text.slice(0, m.index)} ${text.slice((m.index ?? 0) + m[0].length)}`
+  }
   const take = (pattern: RegExp, handle: (m: RegExpMatchArray) => { kind: QuickAddMatchKind; label: string } | null) => {
     const m = text.match(pattern)
     if (!m || m.index === undefined) return
     const result = handle(m)
-    if (!result) return
-    found.push(result)
-    text = `${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}`
+    if (result) cut(m, result)
   }
 
   const today = dateStr(now)
 
-  // #Bucket — only when it names a real bucket; unknown #tags stay in the title.
-  take(/\s#([^\s#]+)(?=\s)/, (m) => {
-    const wanted = normalizeBucket(m[1])
+  // #Bucket — the first tag that names a real bucket; other #tags stay in the title.
+  const tagPattern = /\s#([^\s#]+)(?=\s)/g
+  for (let tag = tagPattern.exec(text); tag; tag = tagPattern.exec(text)) {
+    const wanted = normalizeBucket(tag[1])
     const match = buckets.find((b) => normalizeBucket(b) === wanted)
-    if (!match) return null
-    bucket = match
-    return { kind: 'bucket', label: match }
-  })
+    if (match) {
+      bucket = match
+      cut(tag, { kind: 'bucket', label: match })
+      break
+    }
+  }
 
-  take(
-    new RegExp(`\\s(?:every\\s+(day|weekday|week|month|${WEEKDAY_NAMES}|${WEEKDAY_ABBR})|(daily|weekdays|weekly|monthly))(?=\\s)`, 'i'),
-    (m) => {
-      const word = (m[1] ?? m[2]).toLowerCase()
-      if (word === 'day' || word === 'daily') {
-        repeat = 'daily'
-        return { kind: 'repeat', label: 'Every day' }
-      }
-      if (word === 'weekday' || word === 'weekdays') {
-        repeat = 'weekdays'
-        return { kind: 'repeat', label: 'Every weekday' }
-      }
-      if (word === 'week' || word === 'weekly') {
-        repeat = 'weekly'
-        return { kind: 'repeat', label: 'Every week' }
-      }
-      if (word === 'month' || word === 'monthly') {
-        repeat = 'monthly'
-        return { kind: 'repeat', label: 'Every month' }
-      }
-      // "every friday" — weekly, anchored on the next Friday (today counts).
-      const day = WEEKDAYS[word]
+  const setRepeat = (word: string) => {
+    if (word === 'day' || word === 'daily') {
+      repeat = 'daily'
+      return { kind: 'repeat' as const, label: 'Every day' }
+    }
+    if (word === 'weekday' || word === 'weekdays') {
+      repeat = 'weekdays'
+      return { kind: 'repeat' as const, label: 'Every weekday' }
+    }
+    if (word === 'week' || word === 'weekly') {
       repeat = 'weekly'
-      dueDate = now.getDay() === day ? today : dateStr(nextDay(now, day))
-      return { kind: 'repeat', label: `Every ${format(nextDay(now, day), 'EEEE')}` }
-    },
-  )
+      return { kind: 'repeat' as const, label: 'Every week' }
+    }
+    repeat = 'monthly'
+    return { kind: 'repeat' as const, label: 'Every month' }
+  }
+
+  take(new RegExp(`\\severy\\s+(day|weekday|week|month|${WEEKDAY_NAMES}|${WEEKDAY_ABBR})(?=\\s)`, 'i'), (m) => {
+    const word = m[1].toLowerCase()
+    if (!(word in WEEKDAYS)) return setRepeat(word)
+    // "every friday" — weekly, anchored on the next Friday (today counts).
+    const day = WEEKDAYS[word]
+    repeat = 'weekly'
+    dueDate = now.getDay() === day ? today : dateStr(nextDay(now, day))
+    return { kind: 'repeat', label: `Every ${format(nextDay(now, day), 'EEEE')}` }
+  })
 
   // "for 30m", "for 2 hours", "for 1h15m" (Todoist's documented forms).
   take(/\sfor\s+(?=\d)(?:(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?))?\s*(?:(\d+)\s*(?:m|mins?|minutes?))?(?=\s)/i, (m) => {
@@ -133,7 +139,8 @@ export function parseQuickAdd(input: string, now: Date, buckets: string[] = []):
     return { kind: 'duration', label: durationLabel(minutes) }
   })
 
-  take(/\s(?:at\s+|@\s*)?(?:(noon|midnight)|(\d{1,2})(?::(\d{2}))?\s*(am|pm)|(\d{1,2}):(\d{2}))(?=\s)/i, (m) => {
+  // noon/midnight only after "at" — "Watch Midnight Mass" is a title.
+  take(/\s(?:(?:at\s+|@\s*)(noon|midnight)|(?:at\s+|@\s*)?(?:(\d{1,2})(?::(\d{2}))?\s*(am|pm)|(\d{1,2}):(\d{2})))(?=\s)/i, (m) => {
     let hours: number
     let minutes = 0
     if (m[1]) {
@@ -156,30 +163,39 @@ export function parseQuickAdd(input: string, now: Date, buckets: string[] = []):
       dueDate = key
       return { kind: 'date' as const, label: dateLabel(key, now) }
     }
-    const lead = '(?:(?:on|by|due)\\s+)?'
+    const lead = '(?:(?:on|by|due|for)\\s+)?'
     // A month/day without a year means the next time that date comes round.
     const monthDay = (month: number, day: number) => {
       if (month < 0 || month > 11 || day < 1 || day > 31) return null
       let candidate = new Date(now.getFullYear(), month, day)
       if (candidate.getMonth() !== month) return null
       if (dateStr(candidate) < today) candidate = new Date(now.getFullYear() + 1, month, day)
+      // Feb 29 after a leap day rolls into a year without one.
+      if (candidate.getMonth() !== month) return null
       return setDate(dateStr(candidate))
     }
     const attempts: Array<[RegExp, (m: RegExpMatchArray) => { kind: QuickAddMatchKind; label: string } | null]> = [
       [new RegExp(`\\s${lead}(today|tod|tonight|tomorrow|tmrw?|tmr)(?=\\s)`, 'i'), (m) =>
         setDate(/^to(day|d|night)$/i.test(m[1]) ? today : dateStr(addDays(now, 1)))],
-      [/\s(?:this\s+)?weekend(?=\s)/i, () => setDate(now.getDay() === 6 ? today : dateStr(nextDay(now, 6)))],
+      [/\s(?:(this|next)\s+)?weekend(?=\s)/i, (m) => {
+        // This weekend's Saturday (yesterday, when today is Sunday).
+        const saturday = now.getDay() === 6 ? now : now.getDay() === 0 ? addDays(now, -1) : nextDay(now, 6)
+        if (m[1]?.toLowerCase() === 'next') return setDate(dateStr(addDays(saturday, 7)))
+        return setDate(now.getDay() === 0 ? today : dateStr(saturday))
+      }],
       [/\snext\s+week(?=\s)/i, () => setDate(dateStr(nextMonday(now)))],
       [/\sin\s+(\d+|an?|one|two|three|four|five)\s+(days?|weeks?)(?=\s)/i, (m) => {
         const n = SMALL_NUMBERS[m[1].toLowerCase()] ?? Number(m[1])
         if (!n || n > 365) return null
         return setDate(dateStr(m[2].toLowerCase().startsWith('w') ? addWeeks(now, n) : addDays(now, n)))
       }],
-      [new RegExp(`\\s(?:(?:on|by|due|next|this)\\s+(${WEEKDAY_NAMES}|${WEEKDAY_ABBR})|(${WEEKDAY_NAMES}))(?=\\s)`, 'i'), (m) =>
+      [new RegExp(`\\s(?:(?:on|by|due|for|next|this)\\s+(${WEEKDAY_NAMES}|${WEEKDAY_ABBR})|(${WEEKDAY_NAMES}))(?=\\s)`, 'i'), (m) =>
         setDate(dateStr(nextDay(now, WEEKDAYS[(m[1] ?? m[2]).toLowerCase()])))],
       [new RegExp(`\\s${lead}(${MONTH_PATTERN})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?=\\s)`, 'i'), (m) =>
         monthDay(MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()), Number(m[2]))],
-      [new RegExp(`\\s${lead}(\\d{1,2})/(\\d{1,2})(?=\\s)`), (m) => monthDay(Number(m[1]) - 1, Number(m[2]))],
+      // "4/15" needs a lead word or to end the entry — "Take 1/2 pill" is a dose.
+      [/\s(?:(?:on|by|due|for)\s+(\d{1,2})\/(\d{1,2})(?=\s)|(\d{1,2})\/(\d{1,2})(?=\s*$))/, (m) =>
+        monthDay(Number(m[1] ?? m[3]) - 1, Number(m[2] ?? m[4]))],
     ]
     for (const [pattern, handle] of attempts) {
       take(pattern, handle)
@@ -187,14 +203,14 @@ export function parseQuickAdd(input: string, now: Date, buckets: string[] = []):
     }
   }
 
+  // Bare "daily" / "weekly" count only as the last word ("Pay rent monthly"),
+  // after times and dates are cut — "Submit weekly report" is a title.
+  if (!repeat) take(/\s(daily|weekdays|weekly|monthly)\s*$/i, (m) => setRepeat(m[1].toLowerCase()))
+
   // A repeat with no anchor day starts today.
   if (repeat && !dueDate) dueDate = today
 
-  const title = text
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/(?:\s+(?:at|on|by|for|due|every|in))+$/i, '')
-    .trim()
+  const title = text.replace(/\s+/g, ' ').trim()
 
   // Nothing but schedule words ("tomorrow") — keep the text as the title.
   if (!title) {
