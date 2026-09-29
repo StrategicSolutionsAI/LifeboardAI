@@ -133,7 +133,7 @@ Define success criteria, then loop until verified. Don't just follow steps.
 
 26. **RLS migrations shipped untested.** A policy that sub-selects its own table is 42P17 infinite recursion for every non-superuser — invisible to `postgres` and the service key. Rule: run migrations on a local Postgres with the auth shim, as two users, before presenting SQL; membership checks go through `SECURITY DEFINER` helpers (docs/learnings/2026-09-28-test-rls-migrations-on-local-postgres.md).
 
-27. **Completing a repeating task ends the series.** `toggleTaskCompletion` sets `completed` on the row, so checking off "Vitamins, daily" removes every future day. Rule: a daily-list checkbox on a repeating task finishes the occurrence — `setOccurrenceDone` (skip exception; undo deletes it, never re-posts `skip:false`, whose null slot hides the day) (docs/learnings/2026-09-28-repeating-task-done-is-per-occurrence.md).
+27. **Completing a repeating task ends the series.** `toggleTaskCompletion` sets `completed` on the row, so checking off "Vitamins, daily" removes every future day. Rule: a checkbox on a repeating task finishes one occurrence — that day in day lists (`setOccurrenceDone`), the next one in task lists (`useCompleteTask`); undo deletes the skip exception, never re-posts `skip:false`, whose null slot hides the day (docs/learnings/2026-09-28-repeating-task-done-is-per-occurrence.md).
 
 ## Quality bar per deliverable (checkable, not adjectives)
 - **Bug fix:** root cause named in the commit body; regression test added next to the code; `tsc --noEmit` clean; the failing scenario re-run and shown passing.
