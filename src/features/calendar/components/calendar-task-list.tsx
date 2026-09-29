@@ -13,6 +13,7 @@ import { normalizeBucketId, toDayKey } from "@/features/calendar/types";
 import { EnhancedTaskCard, getCustomBucketStyles } from "@/features/calendar/components/calendar-task-card";
 import { useTaskOrdering } from "@/features/calendar/hooks/use-task-ordering";
 import { HabitChecklistPanel } from "@/features/calendar/components/habit-checklist-panel";
+import { occursOnDate } from "@/lib/task-recurrence";
 
 // ---- Bucket mapping helpers ----
 const UNASSIGNED_BUCKET_LABEL = "Unsorted";
@@ -47,45 +48,9 @@ const getBucketColorClasses = (bucketName?: string | null, bucketColors?: Record
 };
 
 
-const doesTaskOccurOnDate = (task: any, dateStr: string): boolean => {
-  if (!task || task.completed) return false;
-  const dueDateStr = task.due?.date;
-  if (!dueDateStr) return false;
-
-  const repeatRule = task.repeatRule;
-  if (!repeatRule || repeatRule === 'none') {
-    return dueDateStr === dateStr;
-  }
-
-  const target = new Date(`${dateStr}T00:00:00`);
-  const due = new Date(`${dueDateStr}T00:00:00`);
-  if (Number.isNaN(target.getTime()) || Number.isNaN(due.getTime())) return false;
-  if (target < due) return false;
-
-  const day = target.getDay();
-  const dueDay = due.getDay();
-  const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
-
-  switch (repeatRule) {
-    case 'daily':
-      return true;
-    case 'weekdays':
-      return day >= 1 && day <= 5;
-    case 'weekly':
-      return diffDays % 7 === 0 && day === dueDay;
-    case 'monthly': {
-      const dueDateNum = due.getDate();
-      const targetDateNum = target.getDate();
-      const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-      if (dueDateNum > daysInTargetMonth) {
-        return targetDateNum === daysInTargetMonth;
-      }
-      return targetDateNum === dueDateNum;
-    }
-    default:
-      return false;
-  }
-};
+// Today's list shows dated tasks only; occursOnDate would count undated ones as every day.
+const doesTaskOccurOnDate = (task: any, dateStr: string): boolean =>
+  Boolean(task?.due?.date) && occursOnDate(task, dateStr);
 
 interface CalendarTaskListProps {
   selectedDate: Date;

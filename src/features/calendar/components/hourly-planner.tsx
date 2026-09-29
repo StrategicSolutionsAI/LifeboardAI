@@ -15,6 +15,7 @@ import {
 } from "@hello-pangea/dnd";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import type { RepeatOption } from "@/types/tasks";
+import { occursOnDate } from "@/lib/task-recurrence";
 import { getBucketColorSync } from "@/lib/bucket-colors";
 import type { FamilyMemberOption } from "@/hooks/use-family-members";
 import type { NativeCalendarDragPayload } from "@/features/calendar/lib/native-calendar-dnd";
@@ -206,49 +207,9 @@ const HourlyPlanner = forwardRef<HourlyPlannerHandle, HourlyPlannerProps>(({
     return map;
   }, [familyMembers]);
 
-  const shouldShowTaskForDate = useCallback((task: any, dateStr: string): boolean => {
-    if (!task || task.completed) return false;
-    const dueDateStr: string | undefined = task.due?.date ?? task.due_date ?? undefined;
-    if (!dueDateStr) {
-      return true;
-    }
-
-    if (!task.repeatRule || task.repeatRule === 'none') {
-      return dueDateStr === dateStr;
-    }
-
-    const target = new Date(`${dateStr}T00:00:00`);
-    const due = new Date(`${dueDateStr}T00:00:00`);
-    if (target < due) return false;
-
-    const day = target.getDay();
-    const dueDay = due.getDay();
-    const diffDays = Math.floor((target.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
-
-    switch (task.repeatRule) {
-      case 'daily':
-        return true;
-      case 'weekdays':
-        return day >= 1 && day <= 5;
-      case 'weekly':
-        return diffDays % 7 === 0 && day === dueDay;
-      case 'monthly': {
-        const dueDateNum = due.getDate();
-        const targetDateNum = target.getDate();
-        const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-        if (dueDateNum > daysInTargetMonth) {
-          return targetDateNum === daysInTargetMonth;
-        }
-        return targetDateNum === dueDateNum;
-      }
-      default:
-        return false;
-    }
-  }, []);
-
   const scopedScheduledTasks = useMemo(() => {
-    return scheduledTasks.filter((task) => shouldShowTaskForDate(task, activePlannerDate));
-  }, [scheduledTasks, shouldShowTaskForDate, activePlannerDate]);
+    return scheduledTasks.filter((task) => occursOnDate(task, activePlannerDate));
+  }, [scheduledTasks, activePlannerDate]);
   
   // Local drag state so the component can work standalone
   const [dragging, setDragging] = useState(false);
