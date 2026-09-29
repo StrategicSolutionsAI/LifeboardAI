@@ -236,7 +236,9 @@ export function useCalendarEvents({
           const cursorDay = cursor.getDay();
           let daysUntilMatch = (dueDay - cursorDay + 7) % 7;
           if (daysUntilMatch === 0) {
-            const diffFromDue = Math.floor((cursor.getTime() - dueMs) / MS_PER_DAY);
+            // Round, not floor: across the spring DST change the span is an
+            // hour short of whole days, which read as 7n-1 and skipped a week.
+            const diffFromDue = Math.round((cursor.getTime() - dueMs) / MS_PER_DAY);
             if (diffFromDue % 7 !== 0) daysUntilMatch = 7;
           }
           cursor = addDays(cursor, daysUntilMatch);
