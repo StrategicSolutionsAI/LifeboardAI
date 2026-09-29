@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDataCache } from './use-data-cache'
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
+import { allTasksUrl } from '@/lib/tasks-query'
 import { useToast } from '@/components/ui/use-toast'
 import {
   ensureTaskSource,
@@ -42,7 +43,7 @@ export function useTaskFetcher(dateStr: string, shared: TaskSharedState) {
       if (supabaseRequest) return supabaseRequest
       supabaseRequest = (async () => {
         try {
-          const supa = await fetchWithTimeout('/api/tasks?all=true', { credentials: 'same-origin' })
+          const supa = await fetchWithTimeout(allTasksUrl(), { credentials: 'same-origin' })
           if (!supa.ok) return null
           const json = await supa.json()
           const supabaseTasks = Array.isArray(json) ? json : (json.tasks ?? [])

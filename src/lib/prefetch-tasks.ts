@@ -3,6 +3,7 @@ import type { Task } from '@/types/tasks'
 import { ensureTasksSource } from '@/hooks/task-helpers'
 import { PREFETCH_TASKS_TIMEOUT_MS } from '@/lib/cache-config'
 import { SESSION_EXPIRED_HEADER } from '@/lib/session-expired'
+import { allTasksUrl } from '@/lib/tasks-query'
 
 const CACHE_KEY = 'tasks-all-open'
 const FETCH_TIMEOUT_MS = PREFETCH_TASKS_TIMEOUT_MS
@@ -60,7 +61,7 @@ export function prefetchAllTasks(): void {
       // Fire both requests in parallel to save time
       const [todoistRes, supabaseRes] = await Promise.all([
         safeFetch('/api/integrations/todoist/tasks?all=true'),
-        safeFetch('/api/tasks?all=true'),
+        safeFetch(allTasksUrl()),
       ])
 
       const parseTasks = async (

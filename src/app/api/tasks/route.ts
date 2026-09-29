@@ -11,9 +11,23 @@ export const GET = withAuth(async (req, { supabase, user }) => {
   const date = sp.get('date'); // YYYY-MM-DD
   const allParam = sp.get('all'); // truthy to load all (not date-scoped)
   const includeCompleted = sp.get('includeCompleted'); // show completed too
+  // ISO instant of the client's local midnight: also return tasks finished
+  // since then, so "Completed today" survives a reload. The server never
+  // decides when the user's day starts.
+  const completedSinceParam = sp.get('completedSince');
 
   if (!date && !allParam) {
     return NextResponse.json({ error: 'Missing date parameter' }, { status: 400 });
+  }
+
+  let completedSince: string | null = null;
+  if (completedSinceParam) {
+    const ms = Date.parse(completedSinceParam);
+    if (Number.isNaN(ms)) {
+      return NextResponse.json({ error: 'completedSince must be an ISO timestamp' }, { status: 400 });
+    }
+    // Re-serialised, so raw input never reaches the PostgREST filter string.
+    completedSince = new Date(ms).toISOString();
   }
 
   const scope = await getDataScope(supabase, user.id);
@@ -27,9 +41,11 @@ export const GET = withAuth(async (req, { supabase, user }) => {
     query = query.or(`due_date.eq.${date},start_date.eq.${date}`);
   }
 
-  // Hide completed unless explicitly requested
+  // Hide completed unless explicitly requested (or finished since completedSince)
   if (!includeCompleted) {
-    query = query.eq('completed', false);
+    query = completedSince
+      ? query.or(`completed.eq.false,updated_at.gte."${completedSince}"`)
+      : query.eq('completed', false);
   }
 
   // Sort in SQL: position ASC (nulls last), then created_at DESC
