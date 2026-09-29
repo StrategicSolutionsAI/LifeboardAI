@@ -125,9 +125,9 @@ export function parseQuickAdd(input: string, now: Date, buckets: string[] = []):
     },
   )
 
-  take(/\sfor\s+(\d+(?:\.\d+)?)\s*(h|hrs?|hours?|m|mins?|minutes?)(?=\s)/i, (m) => {
-    const amount = Number(m[1])
-    const minutes = Math.round(m[2].toLowerCase().startsWith('h') ? amount * 60 : amount)
+  // "for 30m", "for 2 hours", "for 1h15m" (Todoist's documented forms).
+  take(/\sfor\s+(?=\d)(?:(\d+(?:\.\d+)?)\s*(?:h|hrs?|hours?))?\s*(?:(\d+)\s*(?:m|mins?|minutes?))?(?=\s)/i, (m) => {
+    const minutes = Math.round(Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0))
     if (!minutes || minutes > 24 * 60) return null
     duration = minutes
     return { kind: 'duration', label: durationLabel(minutes) }

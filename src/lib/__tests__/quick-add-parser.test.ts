@@ -64,6 +64,13 @@ describe('parseQuickAdd', () => {
     expect(parseQuickAdd('Chapter 13pm', now).hourSlot).toBeNull()
   })
 
+  it('reads compound durations and leaves "for" phrases without a length alone', () => {
+    expect(parseQuickAdd('Deep work for 1h15m', now)).toMatchObject({ title: 'Deep work', duration: 75 })
+    expect(parseQuickAdd('Deep work for 1h 30m', now).duration).toBe(90)
+    expect(parseQuickAdd('Nap for 1.5 hours', now).duration).toBe(90)
+    expect(parseQuickAdd('Snacks for 3 kids', now)).toMatchObject({ title: 'Snacks for 3 kids', duration: null })
+  })
+
   it('keeps a schedule-only entry as its own title', () => {
     expect(parseQuickAdd('tomorrow', now)).toMatchObject({ title: 'tomorrow', dueDate: null, matches: [] })
   })
