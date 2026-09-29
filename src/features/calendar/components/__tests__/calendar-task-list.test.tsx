@@ -21,7 +21,8 @@ jest.mock("@/contexts/tasks-context", () => ({
     setOccurrenceDone: mockSetOccurrenceDone,
   }),
 }));
-jest.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast: jest.fn() }) }));
+const mockToast = jest.fn();
+jest.mock("@/components/ui/use-toast", () => ({ useToast: () => ({ toast: mockToast }) }));
 jest.mock("@/lib/user-preferences", () => ({ getUserPreferencesClient: jest.fn().mockResolvedValue({}) }));
 jest.mock("@/features/calendar/components/habit-checklist-panel", () => ({ HabitChecklistPanel: () => null }));
 
@@ -72,6 +73,26 @@ describe("CalendarTaskList day list", () => {
     expect(screen.getByText("1 carried over from earlier days")).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Move all to today" })); });
     expect(mockBatchUpdateTasks).toHaveBeenCalledWith([{ taskId: "Late", updates: { due: { date: TODAY }, startDate: TODAY } }]);
+  });
+
+  it("finishes a repeating task's next occurrence from All Open Tasks, with undo", async () => {
+    const trash = task({ content: "Trash", ...due("2026-01-07"), repeatRule: "weekly" }); // Wednesdays
+    const oneOff = task({ content: "Call plumber" });
+    mockTasks = [trash, oneOff];
+    mockSetOccurrenceDone.mockResolvedValue(undefined);
+    renderMasterList(new Date(2026, 8, 28));
+
+    const row = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
+    await act(async () => { fireEvent.click(row("Trash").querySelector('input[type="checkbox"]')!); });
+    expect(mockSetOccurrenceDone).toHaveBeenCalledWith(trash, "2026-09-30", true);
+    expect(mockToggleTaskCompletion).not.toHaveBeenCalled();
+    const toast = mockToast.mock.calls[0][0];
+    expect(toast.title).toBe("Done for Wednesday");
+    await act(async () => { toast.undoAction(); });
+    expect(mockSetOccurrenceDone).toHaveBeenLastCalledWith(trash, "2026-09-30", false);
+
+    await act(async () => { fireEvent.click(row("Call plumber").querySelector('input[type="checkbox"]')!); });
+    expect(mockToggleTaskCompletion).toHaveBeenCalledWith("Call plumber");
   });
 
   it("titles another day by its date and carries nothing into it", () => {

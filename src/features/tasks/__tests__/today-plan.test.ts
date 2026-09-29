@@ -1,4 +1,4 @@
-import { buildTodayPlan, type ExceptionIndex } from '../today-plan'
+import { buildTodayPlan, nextOccurrence, type ExceptionIndex } from '../today-plan'
 import type { Task, TaskOccurrenceException } from '@/types/tasks'
 
 process.env.TZ = 'America/Chicago'
@@ -118,5 +118,28 @@ describe('buildTodayPlan', () => {
     expect(light.heavy).toBe(false)
     const heavy = buildTodayPlan([task({ ...due(TODAY), hourSlot: 'hour-8AM', duration: 8 * 60 })], TODAY)
     expect(heavy.heavy).toBe(true)
+  })
+})
+
+describe('nextOccurrence', () => {
+  const skip = (taskId: string, day: string): TaskOccurrenceException => ({ id: `${taskId}-${day}`, taskId, occurrenceDate: day, skip: true })
+
+  it('finds the next day a repeating task falls on, today included', () => {
+    const weekly = task({ ...due('2026-01-07'), repeatRule: 'weekly' }) // Wednesdays
+    expect(nextOccurrence(weekly, TODAY)).toBe('2026-09-30')
+    const daily = task({ ...due('2026-09-01'), repeatRule: 'daily' })
+    expect(nextOccurrence(daily, TODAY)).toBe(TODAY)
+  })
+
+  it('skips days already finished or skipped', () => {
+    const daily = task({ ...due('2026-09-01'), repeatRule: 'daily' })
+    const index: ExceptionIndex = new Map([[daily.id, new Map([[TODAY, skip(daily.id, TODAY)]])]])
+    expect(nextOccurrence(daily, TODAY, index)).toBe('2026-09-29')
+  })
+
+  it('returns null when the series has ended or the task has no anchor date', () => {
+    const ended = task({ due: { date: '2026-09-01' }, startDate: '2026-09-01', endDate: '2026-09-20', repeatRule: 'daily' })
+    expect(nextOccurrence(ended, TODAY)).toBeNull()
+    expect(nextOccurrence(task({ repeatRule: 'daily' }), TODAY)).toBeNull()
   })
 })

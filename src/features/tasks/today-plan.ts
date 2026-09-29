@@ -70,6 +70,26 @@ function occurrenceForToday(task: Task, exception: TaskOccurrenceException | und
 
 const byContent = (a: Task, b: Task) => a.content.localeCompare(b.content)
 
+/**
+ * The first day on or after `fromDay` that a repeating task falls on and has
+ * not already been finished or skipped — what a checkbox in a task list (not
+ * a day list) should finish. Null once the series has ended.
+ */
+export function nextOccurrence(
+  task: Task,
+  fromDay: string,
+  exceptions: ExceptionIndex = new Map(),
+  horizonDays = 400,
+): string | null {
+  if (!task.due?.date) return null
+  const perTask = exceptions.get(task.id)
+  for (let i = 0; i <= horizonDays; i++) {
+    const day = shiftKey(fromDay, i)
+    if (occursOnDate(task, day) && !perTask?.get(day)?.skip) return day
+  }
+  return null
+}
+
 export function buildTodayPlan(
   tasks: Task[],
   day: string,

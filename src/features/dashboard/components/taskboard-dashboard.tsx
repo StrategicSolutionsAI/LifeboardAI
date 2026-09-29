@@ -53,6 +53,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 const DragDropContext = dynamic(() => import("@hello-pangea/dnd").then(m => m.DragDropContext), { ssr: false });
 const Droppable = dynamic(() => import("@hello-pangea/dnd").then(m => m.Droppable), { ssr: false });
 import { TasksProvider, useTaskData, useTaskActions } from '@/contexts/tasks-context';
+import { useCompleteTask } from '@/features/tasks/use-complete-task';
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskEditorModal from "@/features/tasks/components/lazy-task-editor-modal";
 import type { TaskEditorModalHandle } from "@/features/tasks/components/task-editor-modal";
@@ -105,7 +106,8 @@ const WidgetCardSkeleton = dynamic(
 function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDate: Date; setSelectedDate: (date: Date) => void }) {
   // Access tasks context for all task operations
   const { scheduledTasks, dailyVisibleTasks: contextDailyTasks, allTasks } = useTaskData();
-  const { batchUpdateTasks, deleteTask, createTask: contextCreateTask, toggleTaskCompletion: toggleTaskCompletionContext } = useTaskActions();
+  const { batchUpdateTasks, deleteTask, createTask: contextCreateTask } = useTaskActions();
+  const completeTask = useCompleteTask();
 
   // Auth: user, greeting, sign out — onBeforeSignOut flushes debounced saves
   const flushRef = useRef<(() => void) | null>(null);
@@ -364,8 +366,8 @@ function TaskBoardDashboardInner({ selectedDate, setSelectedDate }: { selectedDa
   });
 
   const handleToggleTaskCompletion = useCallback((taskId: string) => {
-    void toggleTaskCompletionContext(taskId);
-  }, [toggleTaskCompletionContext]);
+    void completeTask(taskId);
+  }, [completeTask]);
 
   // Effect for user state changes (login/logout)
   // loadBuckets + loadWidgets both call getUserPreferencesClient() which deduplicates
