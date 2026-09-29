@@ -33,7 +33,9 @@ jobs:
           fi
       - name: Task reminders
         if: steps.config.outputs.ready == 'true'
-        run: curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders"
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/reminders"
       - name: Calendar feeds
         if: steps.config.outputs.ready == 'true' && always()
-        run: curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/calendar-feeds"
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "$APP_URL/api/cron/calendar-feeds"
